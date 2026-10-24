@@ -56,3 +56,4 @@ decisions.tsv
 todo.md
 .stryker-tmp-*
 test-results
+spikes/**/out

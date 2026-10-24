@@ -1,0 +1,12 @@
+plain sample.tsx: sha (ids masked) 2a5dc33ba953, 1657 -> 3770 chars, mutants placed 13 (ui 0), ignored 0
+plain app.tsx: sha (ids masked) 0f4bff0567d9, 2066 -> 4573 chars, mutants placed 21 (ui 0), ignored 0
+plain price-tag.tsx: sha (ids masked) bc0accb7ef05, 817 -> 3901 chars, mutants placed 27 (ui 0), ignored 0
+patched sample.tsx: sha (ids masked) 2a5dc33ba953, 1657 -> 3786 chars, mutants placed 13 (ui 0), ignored 48
+patched app.tsx: sha (ids masked) 0f4bff0567d9, 2066 -> 4573 chars, mutants placed 21 (ui 0), ignored 15
+patched price-tag.tsx: sha (ids masked) bc0accb7ef05, 817 -> 3901 chars, mutants placed 27 (ui 0), ignored 3
+ui sample.tsx: sha (ids masked) f4269af28f9c, 1657 -> 6803 chars, mutants placed 61 (ui 48), ignored 0
+  TextContent=14 AccessibleName=6 EventHandler=2 ConditionalRendering=5 NavigationTarget=2 DisabledState=3 HiddenState=2 Role=8 ChildExpression=4 AriaState=2
+ui app.tsx: sha (ids masked) 12e180bd7c76, 2066 -> 5412 chars, mutants placed 36 (ui 15), ignored 0
+  TextContent=8 AccessibleName=0 EventHandler=0 ConditionalRendering=0 NavigationTarget=2 DisabledState=0 HiddenState=0 Role=0 ChildExpression=5 AriaState=0
+ui price-tag.tsx: sha (ids masked) 7665c63c6972, 817 -> 4253 chars, mutants placed 30 (ui 3), ignored 0
+  TextContent=0 AccessibleName=0 EventHandler=0 ConditionalRendering=1 NavigationTarget=0 DisabledState=0 HiddenState=0 Role=0 ChildExpression=2 AriaState=0

@@ -1,0 +1,57 @@
+installed: TextContent, AccessibleName, EventHandler, ConditionalRendering, NavigationTarget, DisabledState, HiddenState, Role, ChildExpression, AriaState
+mutants: 61 total, 48 from UI operators
+per mutator: BlockStatement=2 TextContent=14 ChildExpression=4 AccessibleName=6 Role=8 EventHandler=2 DisabledState=3 NavigationTarget=2 HiddenState=2 BooleanLiteral=2 ConditionalExpression=2 LogicalOperator=1 ConditionalRendering=5 AriaState=2 ArrowFunction=2 StringLiteral=4
+size: original 1657 chars, instrumented 6803 chars
+UI mutants (ok = instrumented render equals hand-applied render in both scenarios):
+ok   L21 TextContent: Edit items -> 
+ok   L22 TextContent:  Hello  -> 
+ok   L23 ChildExpression: user.name -> null
+ok   L23 TextContent: , you have  -> 
+ok   L23 ChildExpression: items.length -> null
+ok   L23 TextContent:  items  -> 
+ok   L25 AccessibleName: title="Fish &amp; Chips" -> title=""
+ok   L25 TextContent: Fish &amp; Chips &mdash; daily -> 
+ok   L26 Role: <button aria-label="Close dialog" onClic -> <span aria-label="Close dialog" onClick={onClose}>
+ok   L26 AccessibleName: aria-label="Close dialog" -> aria-label=""
+ok   L26 EventHandler: onClick={onClose} -> onClick={undefined}
+ok   L29 Role: <button type="submit" disabled={busy} on -> <span type="submit" disabled={busy} onClick={onSav
+ok   L29 DisabledState: disabled={busy} -> disabled={false}
+ok   L29 EventHandler: onClick={onSave} -> onClick={undefined}
+ok   L29 TextContent:  Save  -> 
+ok   L32 AccessibleName: aria-label={label} -> aria-label=""
+ok   L32 AccessibleName: placeholder="Search items" -> placeholder=""
+ok   L32 DisabledState: readOnly -> readOnly={undefined}
+ok   L33 AccessibleName: htmlFor="q" -> htmlFor=""
+ok   L33 TextContent: Query -> 
+ok   L34 DisabledState: disabled -> disabled={undefined}
+ok   L35 Role: <a href="/docs">Docs</a> -> <span href="/docs">Docs</span>
+ok   L35 NavigationTarget: href="/docs" -> href=""
+ok   L35 TextContent: Docs -> 
+ok   L36 Role: <a href={url}>External</a> -> <span href={url}>External</span>
+ok   L36 NavigationTarget: href={url} -> href=""
+ok   L36 TextContent: External -> 
+ok   L37 Role: role="dialog" -> role={undefined}
+ok   L37 HiddenState: aria-hidden={!open} -> aria-hidden={false}
+ok   L37 HiddenState: hidden={!open} -> hidden={false}
+ok   L38 ConditionalRendering: open && <p role="status">Opened</p> -> <p role="status">Opened</p>
+ok   L38 Role: role="status" -> role={undefined}
+ok   L38 TextContent: Opened -> 
+ok   L39 ConditionalRendering: busy ? <span>Saving</span> : <span>Idle< -> <span>Saving</span>
+ok   L39 ConditionalRendering: busy ? <span>Saving</span> : <span>Idle< -> <span>Idle</span>
+ok   L39 TextContent: Saving -> 
+ok   L39 TextContent: Idle -> 
+ok   L41 Role: <button aria-expanded={open} aria-presse -> <span aria-expanded={open} aria-pressed="true" onC
+ok   L41 AriaState: aria-expanded={open} -> aria-expanded={!open}
+ok   L41 AriaState: aria-pressed="true" -> aria-pressed={undefined}
+ok   L41 TextContent:  Toggle  -> 
+ok   L44 ConditionalRendering: error ? <p role="alert">{error}</p> : nu -> <p role="alert">{error}</p>
+ok   L44 ConditionalRendering: error ? <p role="alert">{error}</p> : nu -> null
+ok   L44 Role: role="alert" -> role={undefined}
+ok   L44 ChildExpression: error -> null
+ok   L47 ChildExpression: i.label -> null
+ok   L51 TextContent: Status:  -> 
+ok   L53 AccessibleName: alt="Logo" -> alt=""
+mutants rendering identically to the original in both scenarios (equivalent for this oracle): 1
+47 ArrowFunction L41 () => undefined
+mismatches: 0
+

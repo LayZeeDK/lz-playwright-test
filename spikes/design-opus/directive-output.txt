@@ -1,0 +1,7 @@
+L1 BlockStatement placed 
+L5 TextContent placed 
+L6 TextContent placed 
+L9 TextContent Ignored Ignored using a comment
+L15 ArrowFunction placed 
+L15 TextContent Ignored Ignored using a comment
+warnings: none
