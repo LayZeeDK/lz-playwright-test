@@ -1,0 +1,43 @@
+# Endpoint inventory
+
+Base URL: `<api_url>` = `https://real-world-app-39656dff2ddc.herokuapp.com/api` in the app
+(`apps/conduit/src/environments/environment.ts:8`, `environment.prod.ts:3`), `http://localhost:3100/api` for the double.
+App paths are relative to the clone `angular-ngrx-nx-realworld-example-app`; e2e paths relative to `apps/conduit-e2e/src`.
+
+How the app authenticates: `libs/core/http-client/src/lib/api.service.ts` sends no `Authorization` header; every request uses
+`withCredentials: true`, so the real backend relies on a cookie. The double sets an `HttpOnly` cookie named `jwt` on register and login,
+clears it on logout, and accepts either that cookie or `Authorization: Token <jwt>` (also `Bearer`).
+
+| Method | Path | App caller | E2E exercise | Implemented |
+|--------|------|------------|--------------|-------------|
+| POST | `/users` | `libs/auth/data-access/src/services/auth.service.ts:28` | `helpers/register-user.ts:4` (called by `auth/auth.setup.ts:11`, `auth/auth.spec.ts:10`) | yes |
+| POST | `/users/login` | `auth.service.ts:20` | `helpers/login-user.ts:4` (`auth.setup.ts:12`); UI login in `auth/auth.spec.ts:13,24` (wrong password expects error text `message User not found`) | yes |
+| POST | `/users/logout` | `auth.service.ts:24` | `auth/logout.spec.ts:3` | yes |
+| GET | `/user` | `auth.service.ts:12` (called at app start and by `AuthGuard`) | every authenticated spec (guard for `/editor`, `/settings`) | yes |
+| PUT | `/user` | `auth.service.ts:16` | none | yes |
+| GET | `/profiles/:username` | `libs/profile/data-access/src/services/profile.service.ts:12` | `article-list/article-list.spec.ts:19` (author link) | yes |
+| POST | `/profiles/:username/follow` | `libs/articles/data-access/src/services/actions.service.ts:11` | none | yes |
+| DELETE | `/profiles/:username/follow` | `actions.service.ts:15` | none | yes |
+| GET | `/tags` | `libs/home/feature-home/src/home.service.ts:10` | `article-list/article-list.spec.ts:3` (home page load) | yes |
+| GET | `/articles` (query: `limit`, `offset`, `tag`, `author`, `favorited`) | `libs/articles/data-access/src/services/articles.service.ts:42` | `article-list/article-list.spec.ts:3-5` (global feed) | yes |
+| GET | `/articles/feed` (query: `limit`, `offset`) | `articles.service.ts:42` | none | yes |
+| GET | `/articles/:slug` | `articles.service.ts:20` | `article-list/article-list.spec.ts:8,19`, `article-list/new-article.spec.ts:16` | yes |
+| POST | `/articles/` | `articles.service.ts:49` | `article-list/new-article.spec.ts:7` | yes |
+| PUT | `/articles/:slug` | `articles.service.ts:53` | none | yes |
+| DELETE | `/articles/:slug` | `articles.service.ts:28` | none | yes |
+| POST | `/articles/:slug/favorite` | `actions.service.ts:19` | none | yes |
+| DELETE | `/articles/:slug/favorite` | `actions.service.ts:23` | none | yes |
+| GET | `/articles/:slug/comments` | `articles.service.ts:24` | `article-list/article-list.spec.ts:8,19` (article page load) | yes |
+| POST | `/articles/:slug/comments` | `articles.service.ts:36` | none | yes |
+| DELETE | `/articles/:slug/comments/:id` | `articles.service.ts:32` | none | yes |
+
+## Behaviour notes
+
+- Success codes: 201 for register, create article, add comment; 204 (empty body) for the two DELETE calls that remove a resource; 200 otherwise.
+- Errors: 422 `{ errors: { field: [msg] } }` for validation, duplicate email or username, and failed login (`{ errors: { message: ["User not found"] } }`, which the app renders as `message User not found`);
+  401 `{ errors: { token: [...] } }` for a missing or invalid token on protected routes; 403 when editing or deleting another user's article or comment; 404 for unknown article, user, comment or route.
+- The app treats a 401 as "go to /login" (`libs/core/error-handler`) and a 404 as "go to /", so those codes are not interchangeable.
+- `POST /users` answers `{ user }` per the RealWorld spec. `AuthStore.register` (`libs/auth/data-access/src/auth.store.ts:48-52`) stores the whole response as `user`; that is how the app is written, not something the double can fix.
+- Tags sent as `"e2e, testing, playwright"` arrive from the editor as `["e2e"," testing"," playwright"]`; the double trims them and drops empties.
+- Seed: users `jake`, `anne`, `carl` (emails `<name>@example.com`, password `password123`; `anne` follows `jake`), five articles, tags, one comment.
+- Every endpoint the app or the specs call was determined and is implemented. Spec extras the app never calls (for example `GET /user` variants or pagination headers) are not implemented.
