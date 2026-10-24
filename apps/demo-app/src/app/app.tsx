@@ -1,51 +1,83 @@
-// Uncomment this line to use CSS modules
-// import styles from './app.module.css';
-import NxWelcome from './nx-welcome';
+import { useState } from 'react';
+import { Link, Route, Routes } from 'react-router-dom';
+import {
+  type CartLine,
+  formatPrice,
+  lineTotal,
+  shipping,
+  subtotal,
+  total,
+} from './cart';
 
-import { Route, Routes, Link } from 'react-router-dom';
+const initialLines: CartLine[] = [
+  { name: 'Mug', priceCents: 12_00, quantity: 1 },
+  { name: 'Poster', priceCents: 20_00, quantity: 1 },
+];
+
+function Cart() {
+  const [lines, setLines] = useState(initialLines);
+  const [code, setCode] = useState('');
+
+  const setQuantity = (name: string, quantity: number) =>
+    setLines((current) =>
+      current.map((line) => (line.name === name ? { ...line, quantity } : line)),
+    );
+
+  return (
+    <main>
+      <h1>Cart</h1>
+      <ul>
+        {lines.map((line) => (
+          <li key={line.name}>
+            <label>
+              {line.name}
+              <input
+                type="number"
+                aria-label={`${line.name} quantity`}
+                value={line.quantity}
+                onChange={(event) =>
+                  setQuantity(line.name, Number(event.target.value))
+                }
+              />
+            </label>
+            <output aria-label={`${line.name} total`}>
+              {formatPrice(lineTotal(line))}
+            </output>
+          </li>
+        ))}
+      </ul>
+      <label>
+        Discount code
+        <input value={code} onChange={(event) => setCode(event.target.value)} />
+      </label>
+      <dl>
+        <dt>Subtotal</dt>
+        <dd data-testid="subtotal">{formatPrice(subtotal(lines))}</dd>
+        <dt>Shipping</dt>
+        <dd data-testid="shipping">{formatPrice(shipping(subtotal(lines)))}</dd>
+        <dt>Total</dt>
+        <dd data-testid="total">{formatPrice(total(lines, code))}</dd>
+      </dl>
+      <Link to="/about">About</Link>
+    </main>
+  );
+}
+
+function About() {
+  return (
+    <main>
+      <h1>About</h1>
+      <Link to="/">Back to cart</Link>
+    </main>
+  );
+}
 
 export function App() {
   return (
-    <div>
-      <NxWelcome title="@spr/demo-app" />
-
-      {/* START: routes */}
-      {/* These routes and navigation have been generated for you */}
-      {/* Feel free to move and update them to fit your needs */}
-      <br />
-      <hr />
-      <br />
-      <nav>
-        <ul>
-          <li>
-            <Link to="/">Home</Link>
-          </li>
-          <li>
-            <Link to="/page-2">Page 2</Link>
-          </li>
-        </ul>
-      </nav>
-      <Routes>
-        <Route
-          path="/"
-          element={
-            <div>
-              This is the generated root route.{' '}
-              <Link to="/page-2">Click here for page 2.</Link>
-            </div>
-          }
-        />
-        <Route
-          path="/page-2"
-          element={
-            <div>
-              <Link to="/">Click here to go back to root page.</Link>
-            </div>
-          }
-        />
-      </Routes>
-      {/* END: routes */}
-    </div>
+    <Routes>
+      <Route path="/" element={<Cart />} />
+      <Route path="/about" element={<About />} />
+    </Routes>
   );
 }
 

@@ -50,3 +50,7 @@ test-output
 # Stryker
 .stryker-tmp
 reports
+
+# Local working artifacts
+decisions.tsv
+todo.md

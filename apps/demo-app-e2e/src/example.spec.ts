@@ -1,8 +1,12 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-test('has title', async ({ page }) => {
+test('navigates to the about page and back', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('link', { name: 'About' }).click();
 
-  // Expect h1 to contain a substring.
-  expect(await page.locator('h1').innerText()).toContain('Welcome');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('About');
+
+  await page.getByRole('link', { name: 'Back to cart' }).click();
+
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Cart');
 });
