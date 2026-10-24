@@ -55,3 +55,4 @@ reports
 decisions.tsv
 todo.md
 .stryker-tmp-*
+test-results

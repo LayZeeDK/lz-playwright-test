@@ -1,0 +1,5 @@
+{
+  "extends": "./packages/stryker-playwright-runner/tsconfig.json",
+  "compilerOptions": { "rootDir": "." },
+  "include": ["tools/**/*.ts", "stryker.*.config.ts", "oss/**/*.ts"]
+}

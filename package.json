@@ -49,5 +49,6 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "type": "module"
 }

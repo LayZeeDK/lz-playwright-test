@@ -1,0 +1,34 @@
+import { expect, type Page, test } from '@playwright/test';
+
+test('shows the greeting', async ({ page }) => {
+  await page.goto('/');
+
+  await expect(page.locator('#out')).toHaveText('Hello 3', { timeout: 1000 });
+});
+
+test('counts to three', async ({ page }) => {
+  await page.goto('/');
+
+  expect(await page.evaluate(() => window.countTo(3))).toBe(3);
+});
+
+test.describe.serial('with a page shared from beforeAll', () => {
+  let page: Page;
+
+  test.beforeAll(async ({ browser }) => {
+    page = await browser.newPage();
+    await page.goto('/');
+  });
+
+  test.afterAll(async () => {
+    await page.close();
+  });
+
+  test('first user of the shared page', async () => {
+    expect(await page.evaluate(() => window.countTo(1))).toBe(1);
+  });
+
+  test('second user of the shared page', async () => {
+    expect(await page.evaluate(() => window.countTo(2))).toBe(2);
+  });
+});

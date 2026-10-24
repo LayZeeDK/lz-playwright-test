@@ -1,8 +1,9 @@
+import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
+
 // Baseline: Stryker's command runner. STRYKER_BASELINE=define activates mutants through a Vite define
 // (the stryker-playwright-hello-world pattern); without it nothing reaches the browser.
 const define = process.env.STRYKER_BASELINE === 'define';
 
-/** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 export default {
   testRunner: 'command',
   commandRunner: {
@@ -14,4 +15,4 @@ export default {
   reporters: ['clear-text', 'progress', 'json'],
   jsonReporter: { fileName: `reports/e2e-command-${define ? 'define' : 'off'}/mutation.json` },
   tempDirName: '.stryker-tmp',
-};
+} satisfies PartialStrykerOptions;

@@ -1,4 +1,5 @@
-/** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
+import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
+
 export default {
   plugins: ['@spr/stryker-playwright-runner'],
   testRunner: 'playwright',
@@ -10,4 +11,4 @@ export default {
   reporters: ['clear-text', 'progress', 'json'],
   jsonReporter: { fileName: 'reports/e2e/mutation.json' },
   tempDirName: '.stryker-tmp',
-};
+} satisfies PartialStrykerOptions;

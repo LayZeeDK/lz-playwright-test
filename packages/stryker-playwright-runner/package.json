@@ -4,9 +4,9 @@
   "private": true,
   "description": "Prototype StrykerJS test runner plugin for Playwright Test (e2e and component tests)",
   "type": "module",
-  "main": "./src/index.js",
+  "main": "./src/index.ts",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.ts"
   },
   "peerDependencies": {
     "@playwright/test": ">=1.63.0",
@@ -14,5 +14,9 @@
   },
   "dependencies": {
     "@stryker-mutator/api": "10.1.1"
+  },
+  "scripts": {
+    "test": "node --test test/runner.test.ts",
+    "typecheck": "tsc -p tsconfig.json"
   }
 }

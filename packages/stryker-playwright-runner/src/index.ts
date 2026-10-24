@@ -1,10 +1,8 @@
 import { declareClassPlugin, PluginKind } from '@stryker-mutator/api/plugin';
 
-import { PlaywrightTestRunner } from './playwright-test-runner.js';
+import { PlaywrightTestRunner } from './playwright-test-runner.ts';
 
-export const strykerPlugins = [
-  declareClassPlugin(PluginKind.TestRunner, 'playwright', PlaywrightTestRunner),
-];
+export const strykerPlugins = [declareClassPlugin(PluginKind.TestRunner, 'playwright', PlaywrightTestRunner)];
 
 export const strykerValidationSchema = {
   $schema: 'http://json-schema.org/draft-07/schema#',
