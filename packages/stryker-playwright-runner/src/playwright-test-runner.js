@@ -14,11 +14,12 @@ import {
 } from '@stryker-mutator/api/test-runner';
 
 const HOOK = fileURLToPath(new URL('./worker-hook.cjs', import.meta.url)).replaceAll('\\', '/');
+const MIN_PLAYWRIGHT = [1, 63];
 const OUTCOME = { expected: TestStatus.Success, flaky: TestStatus.Success, unexpected: TestStatus.Failed, skipped: TestStatus.Skipped };
 
 /**
- * Hosts Playwright Test in-process through `playwright/lib/runner` (exported, undocumented; present in
- * 1.62 and 1.64). Global setup and `webServer` start once in init(); each run forks fresh workers,
+ * Hosts Playwright Test in-process through `playwright/lib/runner` (exported, undocumented), so it
+ * pins a minimum Playwright version. Global setup and `webServer` start once in init(); each run forks fresh workers,
  * which inherit process.env, so per-run settings travel to the worker hook as environment variables.
  */
 export class PlaywrightTestRunner {
@@ -39,6 +40,13 @@ export class PlaywrightTestRunner {
   async init() {
     const configFile = this.options.configFile ? path.resolve(this.options.configFile) : undefined;
     const playwrightRequire = createRequire(createRequire(configFile ?? path.resolve('package.json')).resolve('@playwright/test'));
+    const { version } = playwrightRequire('playwright/package.json');
+    const [major, minor] = version.split('.').map(Number);
+
+    if (major < MIN_PLAYWRIGHT[0] || (major === MIN_PLAYWRIGHT[0] && minor < MIN_PLAYWRIGHT[1])) {
+      throw new Error(`The Playwright test runner needs Playwright ${MIN_PLAYWRIGHT.join('.')} or later, found ${version}.`);
+    }
+
     const { testRunner } = playwrightRequire('playwright/lib/runner');
     const { configLoader } = playwrightRequire('playwright/lib/common');
 
@@ -85,7 +93,11 @@ export class PlaywrightTestRunner {
       return run;
     }
 
-    if (!run.snapshots.some((snapshot) => snapshot.mutantCoverage)) {
+    this.log.debug(`Dry run snapshots: ${JSON.stringify(run.snapshots)}`);
+
+    const failed = run.tests.some((test) => test.status === TestStatus.Failed);
+
+    if (!failed && !run.snapshots.some((snapshot) => snapshot.mutantCoverage)) {
       return {
         status: DryRunStatus.Error,
         errorMessage:
