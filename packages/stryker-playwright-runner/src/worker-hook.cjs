@@ -17,12 +17,13 @@ function install(playwrightRequire) {
   const ns = process.env.STRYKER_PW_NAMESPACE ?? '__stryker__';
   const activeMutant = process.env.__STRYKER_ACTIVE_MUTANT__;
   const hitLimit = process.env.STRYKER_PW_HIT_LIMIT ? Number(process.env.STRYKER_PW_HIT_LIMIT) : undefined;
+  const perTest = process.env.STRYKER_PW_COVERAGE === 'perTest';
   const outFile = path.join(process.env.STRYKER_PW_OUT_DIR, `worker-${process.pid}.ndjson`);
   const testIds = new WeakMap();
 
   instrumentation.addListener({
     async runAfterCreateBrowserContext(context) {
-      const testId = currentTestId(test);
+      const testId = perTest ? currentTestId(test) : undefined;
       testIds.set(context, testId);
       await context.addInitScript(initPage, { ns, activeMutant, testId, hitLimit });
     },
@@ -30,15 +31,34 @@ function install(playwrightRequire) {
       const snapshots = await Promise.all(
         context.pages().flatMap((page) => page.frames()).map((frame) => readNamespace(frame, ns)),
       );
+      // A context that outlives its test (created in beforeAll or a worker fixture) served several
+      // tests, so its coverage cannot be credited to one: report it as static, which runs every test.
+      const ownedByOneTest = testIds.get(context) !== undefined && testIds.get(context) === currentTestId(test);
       const lines = snapshots
         .filter(Boolean)
-        .map((snapshot) => JSON.stringify({ testId: testIds.get(context), ...snapshot }));
+        .map((snapshot) => JSON.stringify(ownedByOneTest ? snapshot : { ...snapshot, mutantCoverage: asStatic(snapshot.mutantCoverage) }));
 
       if (lines.length) {
         fs.appendFileSync(outFile, lines.join('\n') + '\n');
       }
     },
   });
+}
+
+function asStatic(coverage) {
+  if (!coverage) {
+    return coverage;
+  }
+
+  const all = { ...coverage.static };
+
+  for (const hits of Object.values(coverage.perTest ?? {})) {
+    for (const [mutantId, count] of Object.entries(hits)) {
+      all[mutantId] = (all[mutantId] ?? 0) + count;
+    }
+  }
+
+  return { static: all, perTest: {} };
 }
 
 function currentTestId(test) {

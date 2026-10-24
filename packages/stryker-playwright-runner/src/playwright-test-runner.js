@@ -28,6 +28,7 @@ export class PlaywrightTestRunner {
 
   constructor(options, log) {
     this.options = options.playwright ?? {};
+    this.timeoutMS = options.timeoutMS;
     this.log = log;
   }
 
@@ -45,8 +46,12 @@ export class PlaywrightTestRunner {
     process.env.STRYKER_PW_NAMESPACE = INSTRUMENTER_CONSTANTS.NAMESPACE;
     process.env.PLAYWRIGHT_HTML_OPEN = 'never';
 
-    this.playwright = new testRunner.TestRunner(configLoader.resolveConfigLocation(configFile), {});
+    this.playwright = new testRunner.TestRunner(configLoader.resolveConfigLocation(configFile), {
+      outputDir: fs.mkdtempSync(path.join(os.tmpdir(), 'stryker-pw-output-')),
+      use: { screenshot: 'off', trace: 'off', video: 'off' },
+    });
     await this.playwright.initialize({});
+    await this.warnAboutAssertionTimeouts();
 
     const reporter = new CollectingReporter();
     const { status } = await this.playwright.runGlobalSetup([reporter]);
@@ -56,15 +61,36 @@ export class PlaywrightTestRunner {
     }
   }
 
+  // A killed test fails only after its auto-waiting assertion gives up, but Stryker sizes its timeout
+  // from passing tests, so a short timeoutMS turns kills into timeouts.
+  async warnAboutAssertionTimeouts() {
+    const config = await this.playwright.loadConfig();
+    const expectTimeout = Math.max(...config.projects.map(({ project }) => project.expect?.timeout ?? 5000));
+
+    if (this.timeoutMS < expectTimeout * 2) {
+      this.log.warn(
+        `timeoutMS (${this.timeoutMS}) is below twice the Playwright expect timeout (${expectTimeout}); killed mutants may be reported as timeouts. Set timeoutMS to at least ${expectTimeout * 2}.`,
+      );
+    }
+  }
+
   async dispose() {
     await this.playwright?.runGlobalTeardown();
   }
 
-  async dryRun({ timeout, disableBail }) {
-    const run = await this.run({ timeout, disableBail });
+  async dryRun({ timeout, disableBail, coverageAnalysis }) {
+    const run = await this.run({ timeout, disableBail, coverageAnalysis });
 
-    if (run.status !== DryRunStatus.Complete) {
+    if (run.status !== DryRunStatus.Complete || coverageAnalysis === 'off') {
       return run;
+    }
+
+    if (!run.snapshots.some((snapshot) => snapshot.mutantCoverage)) {
+      return {
+        status: DryRunStatus.Error,
+        errorMessage:
+          'No page loaded instrumented code. Is the webServer serving the Stryker sandbox? A server that was already running (reuseExistingServer) serves the original sources.',
+      };
     }
 
     return { status: run.status, tests: run.tests, mutantCoverage: mergeCoverage(run.snapshots) };
@@ -73,17 +99,21 @@ export class PlaywrightTestRunner {
   async mutantRun({ activeMutant, testFilter, hitLimit, timeout, disableBail }) {
     const run = await this.run({ activeMutant: activeMutant.id, testFilter, hitLimit, timeout, disableBail });
     const hitCount = run.snapshots?.reduce((sum, snapshot) => sum + (snapshot.hitCount ?? 0), 0);
+    this.log.debug(
+      `Mutant ${activeMutant.id}: ${run.status}, hitCount ${hitCount}/${hitLimit}, ${run.tests?.length} tests, ${JSON.stringify(run.snapshots?.map((s) => s.hitCount))}`,
+    );
 
     return toMutantRunResult(determineHitLimitReached(hitCount, hitLimit) ?? run);
   }
 
-  async run({ activeMutant, testFilter, hitLimit, timeout, disableBail }) {
+  async run({ activeMutant, testFilter, hitLimit, timeout, disableBail, coverageAnalysis = 'off' }) {
     const outDir = fs.mkdtempSync(
       path.join(os.tmpdir(), `stryker-pw-${process.env.STRYKER_MUTATOR_WORKER ?? 0}-${this.runCounter++}-`),
     );
     setEnv('STRYKER_PW_OUT_DIR', outDir);
     setEnv('__STRYKER_ACTIVE_MUTANT__', activeMutant);
     setEnv('STRYKER_PW_HIT_LIMIT', hitLimit?.toString());
+    setEnv('STRYKER_PW_COVERAGE', coverageAnalysis);
 
     const reporter = new CollectingReporter();
     const run = this.playwright.runTests(reporter, {
@@ -94,18 +124,18 @@ export class PlaywrightTestRunner {
       maxFailures: disableBail ? undefined : 1,
       disableConfigReporters: true,
     });
-    // Stop on our own just before Stryker's timeout, so Stryker does not restart this process
-    // (which would restart the webServer too).
+    // Stop on our own before Stryker's timeout, so Stryker does not restart this process (which would
+    // restart the webServer too). A stop that takes longer is awaited by the next runTests call.
     let timer;
     const timedOut = new Promise((resolve) => {
-      timer = setTimeout(resolve, Math.max(timeout - 500, 1), 'timeout');
+      timer = setTimeout(resolve, Math.max(timeout - 2000, 1), 'timeout');
     });
 
     try {
       const outcome = await Promise.race([run, timedOut]);
 
       if (outcome === 'timeout') {
-        this.playwright.stopTests();
+        await Promise.race([this.playwright.stopTests(), sleep(1500)]);
 
         return { status: DryRunStatus.Timeout, reason: `Playwright did not finish within ${timeout} ms` };
       }
@@ -145,7 +175,7 @@ class CollectingReporter {
     };
 
     if (status === TestStatus.Failed) {
-      testResult.failureMessage = result.error?.message ?? 'Test failed';
+      testResult.failureMessage = result.error?.message ?? result.error?.value ?? 'Test failed';
     }
 
     this.tests.push(testResult);
@@ -154,6 +184,10 @@ class CollectingReporter {
   onError(error) {
     this.errors.push(error.message ?? String(error));
   }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function setEnv(name, value) {

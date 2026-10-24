@@ -15,6 +15,10 @@ export default defineConfig(() => ({
     host: 'localhost',
   },
   plugins: [react(), nxReadySignal()],
+  // Baseline only (stryker.e2e.command.config.mjs): bakes the command runner's active mutant into the page.
+  ...(process.env['STRYKER_BASELINE'] === 'define' && process.env['__STRYKER_ACTIVE_MUTANT__']
+    ? { define: { 'globalThis.__stryker__.activeMutant': JSON.stringify(process.env['__STRYKER_ACTIVE_MUTANT__']) } }
+    : {}),
   // Uncomment this if you are using workers.
   // worker: {
   //  plugins: [],

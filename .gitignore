@@ -54,3 +54,4 @@ reports
 # Local working artifacts
 decisions.tsv
 todo.md
+.stryker-tmp-*
