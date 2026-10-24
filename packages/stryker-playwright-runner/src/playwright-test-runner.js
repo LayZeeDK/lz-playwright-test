@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
@@ -14,16 +13,18 @@ import {
   toMutantRunResult,
 } from '@stryker-mutator/api/test-runner';
 
-import testId from './test-id.cjs';
+const HOOK = fileURLToPath(new URL('./worker-hook.cjs', import.meta.url)).replaceAll('\\', '/');
+const OUTCOME = { expected: TestStatus.Success, flaky: TestStatus.Success, unexpected: TestStatus.Failed, skipped: TestStatus.Skipped };
 
-const HOOK = fileURLToPath(new URL('./worker-hook.cjs', import.meta.url));
-const REPORTER = fileURLToPath(new URL('./reporter.cjs', import.meta.url));
-const STATUS = { passed: TestStatus.Success, failed: TestStatus.Failed, skipped: TestStatus.Skipped };
-
-let runCounter = 0;
-
+/**
+ * Hosts Playwright Test in-process through `playwright/lib/runner` (exported, undocumented; present in
+ * 1.62 and 1.64). Global setup and `webServer` start once in init(); each run forks fresh workers,
+ * which inherit process.env, so per-run settings travel to the worker hook as environment variables.
+ */
 export class PlaywrightTestRunner {
   static inject = [commonTokens.options, commonTokens.logger];
+
+  runCounter = 0;
 
   constructor(options, log) {
     this.options = options.playwright ?? {};
@@ -35,8 +36,28 @@ export class PlaywrightTestRunner {
   }
 
   async init() {
-    this.configFile = this.options.configFile ? path.resolve(this.options.configFile) : undefined;
-    this.cli = createRequire(this.configFile ?? path.resolve('package.json')).resolve('@playwright/test/cli');
+    const configFile = this.options.configFile ? path.resolve(this.options.configFile) : undefined;
+    const playwrightRequire = createRequire(createRequire(configFile ?? path.resolve('package.json')).resolve('@playwright/test'));
+    const { testRunner } = playwrightRequire('playwright/lib/runner');
+    const { configLoader } = playwrightRequire('playwright/lib/common');
+
+    process.env.NODE_OPTIONS = `${process.env.NODE_OPTIONS ?? ''} --require "${HOOK}"`.trim();
+    process.env.STRYKER_PW_NAMESPACE = INSTRUMENTER_CONSTANTS.NAMESPACE;
+    process.env.PLAYWRIGHT_HTML_OPEN = 'never';
+
+    this.playwright = new testRunner.TestRunner(configLoader.resolveConfigLocation(configFile), {});
+    await this.playwright.initialize({});
+
+    const reporter = new CollectingReporter();
+    const { status } = await this.playwright.runGlobalSetup([reporter]);
+
+    if (status !== 'passed') {
+      throw new Error(`Playwright global setup ${status}:\n${reporter.errors.join('\n')}`);
+    }
+  }
+
+  async dispose() {
+    await this.playwright?.runGlobalTeardown();
   }
 
   async dryRun({ timeout, disableBail }) {
@@ -46,7 +67,7 @@ export class PlaywrightTestRunner {
       return run;
     }
 
-    return { ...run, mutantCoverage: mergeCoverage(run.snapshots) };
+    return { status: run.status, tests: run.tests, mutantCoverage: mergeCoverage(run.snapshots) };
   }
 
   async mutantRun({ activeMutant, testFilter, hitLimit, timeout, disableBail }) {
@@ -58,97 +79,89 @@ export class PlaywrightTestRunner {
 
   async run({ activeMutant, testFilter, hitLimit, timeout, disableBail }) {
     const outDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), `stryker-pw-${process.env.STRYKER_MUTATOR_WORKER ?? 0}-${runCounter++}-`),
+      path.join(os.tmpdir(), `stryker-pw-${process.env.STRYKER_MUTATOR_WORKER ?? 0}-${this.runCounter++}-`),
     );
-    const reportFile = path.join(outDir, 'report.json');
-    const args = [this.cli, 'test', '--reporter', REPORTER, '--retries=0', `--workers=${this.options.workers ?? 1}`];
+    setEnv('STRYKER_PW_OUT_DIR', outDir);
+    setEnv('__STRYKER_ACTIVE_MUTANT__', activeMutant);
+    setEnv('STRYKER_PW_HIT_LIMIT', hitLimit?.toString());
 
-    if (this.configFile) {
-      args.push('--config', this.configFile);
-    }
-
-    if (!disableBail) {
-      args.push('--max-failures=1');
-    }
-
-    const selection = selectTests(testFilter, this.options.projects);
-    args.push(...selection.projects.map((project) => `--project=${project}`), ...selection.locations);
-
-    const env = {
-      ...process.env,
-      NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --require "${HOOK.replaceAll('\\', '/')}"`.trim(),
-      STRYKER_PW_OUT_DIR: outDir,
-      STRYKER_PW_REPORT_FILE: reportFile,
-      STRYKER_PW_NAMESPACE: INSTRUMENTER_CONSTANTS.NAMESPACE,
-      PLAYWRIGHT_HTML_OPEN: 'never',
-      FORCE_COLOR: '0',
-    };
-    delete env.__STRYKER_ACTIVE_MUTANT__;
-    delete env.STRYKER_PW_HIT_LIMIT;
-
-    if (activeMutant !== undefined) {
-      env.__STRYKER_ACTIVE_MUTANT__ = activeMutant;
-    }
-
-    if (hitLimit !== undefined) {
-      env.STRYKER_PW_HIT_LIMIT = String(hitLimit);
-    }
-
-    this.log.debug(`Running ${process.execPath} ${args.join(' ')}`);
+    const reporter = new CollectingReporter();
+    const run = this.playwright.runTests(reporter, {
+      locations: [],
+      testIds: testFilter,
+      projects: this.options.projects,
+      workers: this.options.workers ?? 1,
+      maxFailures: disableBail ? undefined : 1,
+      disableConfigReporters: true,
+    });
+    // Stop on our own just before Stryker's timeout, so Stryker does not restart this process
+    // (which would restart the webServer too).
+    let timer;
+    const timedOut = new Promise((resolve) => {
+      timer = setTimeout(resolve, Math.max(timeout - 500, 1), 'timeout');
+    });
 
     try {
-      const exit = await runProcess(process.execPath, args, env, timeout);
+      const outcome = await Promise.race([run, timedOut]);
 
-      if (exit.timedOut) {
+      if (outcome === 'timeout') {
+        this.playwright.stopTests();
+
         return { status: DryRunStatus.Timeout, reason: `Playwright did not finish within ${timeout} ms` };
       }
 
-      if (!fs.existsSync(reportFile)) {
-        return { status: DryRunStatus.Error, errorMessage: `Playwright exited with ${exit.code}:\n${exit.output}` };
+      const failed = reporter.tests.some((test) => test.status === TestStatus.Failed);
+
+      if (reporter.errors.length && !failed) {
+        return { status: DryRunStatus.Error, errorMessage: reporter.errors.join('\n') };
       }
 
-      const report = JSON.parse(fs.readFileSync(reportFile, 'utf8'));
-      const tests = report.tests.map(toTestResult);
-
-      if (report.errors.length && !tests.some((test) => test.status === TestStatus.Failed)) {
-        return { status: DryRunStatus.Error, errorMessage: report.errors.join('\n') };
-      }
-
-      return { status: DryRunStatus.Complete, tests, snapshots: readSnapshots(outDir) };
+      return { status: DryRunStatus.Complete, tests: reporter.tests, snapshots: readSnapshots(outDir) };
     } finally {
+      clearTimeout(timer);
       fs.rmSync(outDir, { recursive: true, force: true });
     }
   }
 }
 
-function selectTests(testFilter, configuredProjects = []) {
-  if (!testFilter) {
-    return { projects: configuredProjects, locations: [] };
+class CollectingReporter {
+  tests = [];
+  errors = [];
+
+  printsToStdio() {
+    return false;
   }
 
-  const parsed = testFilter.map(testId.parseTestId);
+  onTestEnd(test, result) {
+    const status = OUTCOME[test.outcome()];
+    const titles = test.titlePath().slice(1).filter(Boolean);
+    const testResult = {
+      id: test.id,
+      name: `[${titles[0]}] › ${titles.slice(1).join(' › ')}`,
+      status,
+      timeSpentMs: result.duration,
+      fileName: test.location.file,
+      startPosition: { line: test.location.line - 1, column: test.location.column - 1 },
+    };
 
-  return {
-    projects: [...new Set(parsed.map((test) => test.project))],
-    locations: [...new Set(parsed.map((test) => `${test.file}:${test.line}`))],
-  };
+    if (status === TestStatus.Failed) {
+      testResult.failureMessage = result.error?.message ?? 'Test failed';
+    }
+
+    this.tests.push(testResult);
+  }
+
+  onError(error) {
+    this.errors.push(error.message ?? String(error));
+  }
 }
 
-function toTestResult(test) {
-  const result = {
-    id: test.id,
-    name: test.id,
-    status: STATUS[test.status],
-    timeSpentMs: test.duration,
-    fileName: test.file,
-    startPosition: { line: test.line - 1, column: test.column - 1 },
-  };
-
-  if (result.status === TestStatus.Failed) {
-    result.failureMessage = test.error ?? 'Test failed';
+function setEnv(name, value) {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
   }
-
-  return result;
 }
 
 function readSnapshots(outDir) {
@@ -181,34 +194,4 @@ function mergeCoverage(snapshots) {
   }
 
   return coverage;
-}
-
-function runProcess(command, args, env, timeout) {
-  return new Promise((resolve) => {
-    const child = spawn(command, args, { env, stdio: ['ignore', 'pipe', 'pipe'], detached: process.platform !== 'win32' });
-    let output = '';
-    const collect = (chunk) => {
-      output = (output + chunk).slice(-8000);
-    };
-    child.stdout.on('data', collect);
-    child.stderr.on('data', collect);
-
-    const timer = setTimeout(() => {
-      killTree(child);
-      resolve({ timedOut: true, output });
-    }, timeout);
-
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      resolve({ code, output });
-    });
-  });
-}
-
-function killTree(child) {
-  if (process.platform === 'win32') {
-    spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
-  } else {
-    process.kill(-child.pid, 'SIGKILL');
-  }
 }

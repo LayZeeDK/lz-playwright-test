@@ -5,8 +5,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createRequire } = require('node:module');
 
-const { formatTestId } = require('./test-id.cjs');
-
 const entry = process.argv[1] ?? '';
 
 if (/[\\/]playwright[\\/]lib[\\/]worker[\\/]workerProcessEntry\.js$/.test(entry)) {
@@ -44,21 +42,11 @@ function install(playwrightRequire) {
 }
 
 function currentTestId(test) {
-  let info;
-
   try {
-    info = test.info();
+    return test.info().testId;
   } catch {
     return undefined;
   }
-
-  return formatTestId({
-    project: info.project.name,
-    file: path.relative(process.cwd(), info.file).replaceAll('\\', '/'),
-    line: info.line,
-    column: info.column,
-    titlePath: info.titlePath.slice(1),
-  });
 }
 
 async function readNamespace(frame, ns) {
