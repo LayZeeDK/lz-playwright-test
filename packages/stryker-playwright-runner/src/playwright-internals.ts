@@ -15,7 +15,10 @@ export interface RunTestsParams {
 
 export interface TestRunner {
   initialize(params: Record<string, never>): Promise<void>;
-  loadConfig(): Promise<{ projects: { project: { expect?: { timeout?: number } } }[] }>;
+  loadConfig(): Promise<{
+    projects: { project: { expect?: { timeout?: number } } }[];
+    webServers: { url?: string; port?: number }[];
+  }>;
   runGlobalSetup(reporters: Reporter[]): Promise<{ status: Status }>;
   runGlobalTeardown(): Promise<unknown>;
   runTests(reporter: Reporter, params: RunTestsParams): Promise<{ status: Status }>;

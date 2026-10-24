@@ -3,7 +3,16 @@ import { createServer } from 'node:http';
 
 const types: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript' };
 
-createServer(async (request, response) => {
+const server = createServer(async (request, response) => {
+  // Lets a test kill the server between runs.
+  if (request.url === '/__exit') {
+    response.end();
+    server.close();
+    server.closeAllConnections();
+
+    return;
+  }
+
   const file = new URL(request.url === '/' ? '/index.html' : (request.url ?? '/'), 'http://x').pathname;
 
   try {
@@ -13,4 +22,6 @@ createServer(async (request, response) => {
   } catch {
     response.writeHead(404).end();
   }
-}).listen(Number(process.env.PORT ?? 4321));
+});
+
+server.listen(Number(process.env.PORT ?? 4321));

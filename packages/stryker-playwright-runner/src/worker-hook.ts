@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
-import type { BrowserContext, Frame, TestType } from '@playwright/test';
+import type { Browser, BrowserContext, Frame, TestType } from '@playwright/test';
 import type { MutantCoverage } from '@stryker-mutator/api/core';
 
 import { ENV, type Snapshot } from './protocol.ts';
@@ -43,34 +43,59 @@ function install(playwrightRequire: NodeJS.Require) {
   const perTest = process.env[ENV.coverage] === 'perTest';
   const outFile = path.join(process.env[ENV.outDir]!, `worker-${process.pid}.ndjson`);
   const testIds = new WeakMap<BrowserContext, string | undefined>();
+  const collected = new WeakSet<BrowserContext>();
+  const patchedBrowsers = new WeakSet<Browser>();
+
+  async function collect(context: BrowserContext) {
+    if (collected.has(context)) {
+      return;
+    }
+
+    collected.add(context);
+    const snapshots = await Promise.all(
+      context
+        .pages()
+        .flatMap((page) => page.frames())
+        .map((frame) => readNamespace(frame, ns)),
+    );
+    // A context that outlives its test (created in beforeAll or a worker fixture) served several
+    // tests, so its coverage cannot be credited to one: report it as static, which runs every test.
+    const createdFor = testIds.get(context);
+    const ownedByOneTest = createdFor !== undefined && createdFor === currentTestId(test);
+    const lines = snapshots
+      .filter((snapshot) => snapshot !== undefined)
+      .map((snapshot) =>
+        JSON.stringify(ownedByOneTest ? snapshot : { ...snapshot, mutantCoverage: asStatic(snapshot.mutantCoverage) }),
+      );
+
+    if (lines.length) {
+      fs.appendFileSync(outFile, lines.join('\n') + '\n');
+    }
+  }
+
+  // browser.close() closes its contexts without the before-close hook, so read them first.
+  function collectBeforeBrowserCloses(browser: Browser | null) {
+    if (!browser || patchedBrowsers.has(browser)) {
+      return;
+    }
+
+    patchedBrowsers.add(browser);
+    const close = browser.close.bind(browser);
+    browser.close = async (options) => {
+      await Promise.all(browser.contexts().map(collect));
+
+      return close(options);
+    };
+  }
 
   instrumentation.addListener({
     async runAfterCreateBrowserContext(context) {
       const testId = perTest ? currentTestId(test) : undefined;
       testIds.set(context, testId);
+      collectBeforeBrowserCloses(context.browser());
       await context.addInitScript(initPage, { ns, activeMutant, testId, hitLimit } satisfies PageSettings);
     },
-    async runBeforeCloseBrowserContext(context) {
-      const snapshots = await Promise.all(
-        context
-          .pages()
-          .flatMap((page) => page.frames())
-          .map((frame) => readNamespace(frame, ns)),
-      );
-      // A context that outlives its test (created in beforeAll or a worker fixture) served several
-      // tests, so its coverage cannot be credited to one: report it as static, which runs every test.
-      const createdFor = testIds.get(context);
-      const ownedByOneTest = createdFor !== undefined && createdFor === currentTestId(test);
-      const lines = snapshots
-        .filter((snapshot) => snapshot !== undefined)
-        .map((snapshot) =>
-          JSON.stringify(ownedByOneTest ? snapshot : { ...snapshot, mutantCoverage: asStatic(snapshot.mutantCoverage) }),
-        );
-
-      if (lines.length) {
-        fs.appendFileSync(outFile, lines.join('\n') + '\n');
-      }
-    },
+    runBeforeCloseBrowserContext: collect,
   });
 }
 

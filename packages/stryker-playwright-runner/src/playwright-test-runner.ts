@@ -35,7 +35,6 @@ type RunResult =
   | Exclude<DryRunResult, { status: DryRunStatus.Complete }>;
 
 interface RunRequest {
-  timeout: number;
   disableBail: boolean;
   coverageAnalysis?: CoverageAnalysis;
   activeMutant?: string;
@@ -65,6 +64,8 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   private readonly timeoutMS: number;
   private readonly log: Logger;
   private playwright?: TestRunner;
+  private outputDir?: string;
+  private serverUrls: string[] = [];
   private runCounter = 0;
 
   constructor(options: StrykerOptions, log: Logger) {
@@ -96,25 +97,22 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     process.env[ENV.namespace] = INSTRUMENTER_CONSTANTS.NAMESPACE;
     process.env.PLAYWRIGHT_HTML_OPEN = 'never';
 
+    this.outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stryker-pw-output-'));
     this.playwright = new testRunner.TestRunner(configLoader.resolveConfigLocation(configFile), {
-      outputDir: fs.mkdtempSync(path.join(os.tmpdir(), 'stryker-pw-output-')),
+      outputDir: this.outputDir,
       use: { screenshot: 'off', trace: 'off', video: 'off' },
     });
     await this.playwright.initialize({});
-    await this.warnAboutAssertionTimeouts(this.playwright);
-
-    const reporter = new CollectingReporter();
-    const { status } = await this.playwright.runGlobalSetup([reporter]);
-
-    if (status !== 'passed') {
-      throw new Error(`Playwright global setup ${status}:\n${reporter.errors.join('\n')}\n${reporter.output}`);
-    }
+    await this.inspectConfig(this.playwright);
+    await this.runGlobalSetup(this.playwright);
   }
 
-  // A killed test fails only after its auto-waiting assertion gives up, but Stryker sizes its timeout
-  // from passing tests, so a short timeoutMS turns kills into timeouts.
-  private async warnAboutAssertionTimeouts(playwright: TestRunner) {
+  private async inspectConfig(playwright: TestRunner) {
     const config = await playwright.loadConfig();
+    this.serverUrls = config.webServers.map((server) => server.url ?? `http://localhost:${server.port}`);
+
+    // A killed test fails only after its auto-waiting assertion gives up, but Stryker sizes its timeout
+    // from passing tests, so a short timeoutMS turns kills into timeouts.
     const expectTimeout = Math.max(...config.projects.map(({ project }) => project.expect?.timeout ?? 5000));
 
     if (this.timeoutMS < expectTimeout * 2) {
@@ -126,10 +124,14 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
 
   async dispose(): Promise<void> {
     await this.playwright?.runGlobalTeardown();
+
+    if (this.outputDir) {
+      fs.rmSync(this.outputDir, { recursive: true, force: true, maxRetries: 3 });
+    }
   }
 
-  async dryRun({ timeout, disableBail, coverageAnalysis }: DryRunOptions): Promise<DryRunResult> {
-    const run = await this.run({ timeout, disableBail, coverageAnalysis });
+  async dryRun({ disableBail, coverageAnalysis }: DryRunOptions): Promise<DryRunResult> {
+    const run = await this.run({ disableBail, coverageAnalysis });
 
     if (run.status !== DryRunStatus.Complete) {
       return run;
@@ -154,8 +156,8 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     return { status: run.status, tests, mutantCoverage: mergeCoverage(snapshots) };
   }
 
-  async mutantRun({ activeMutant, testFilter, hitLimit, timeout, disableBail }: MutantRunOptions): Promise<MutantRunResult> {
-    const run = await this.run({ activeMutant: activeMutant.id, testFilter, hitLimit, timeout, disableBail });
+  async mutantRun({ activeMutant, testFilter, hitLimit, disableBail }: MutantRunOptions): Promise<MutantRunResult> {
+    const run = await this.run({ activeMutant: activeMutant.id, testFilter, hitLimit, disableBail });
     const hitCount =
       run.status === DryRunStatus.Complete
         ? run.snapshots.reduce((sum, snapshot) => sum + (snapshot.hitCount ?? 0), 0)
@@ -175,30 +177,21 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     setEnv(ENV.hitLimit, request.hitLimit?.toString());
     setEnv(ENV.coverage, request.coverageAnalysis ?? 'off');
 
+    await this.restartDeadServers(playwright);
+
+    // No timer of our own: on a timeout Stryker kills this process tree (Playwright workers and the
+    // webServer included) and starts a fresh one, so a cancelled run can never leak into the next.
     const reporter = new CollectingReporter();
-    const run = playwright.runTests(reporter, {
-      locations: [],
-      testIds: request.testFilter,
-      projects: this.options.projects,
-      workers: this.options.workers ?? 1,
-      maxFailures: request.disableBail ? undefined : 1,
-      disableConfigReporters: true,
-    });
-    // Stop on our own before Stryker's timeout, so Stryker does not restart this process (which would
-    // restart the webServer too). A stop that takes longer is awaited by the next runTests call.
-    let timer: NodeJS.Timeout | undefined;
-    const timedOut = new Promise<'timeout'>((resolve) => {
-      timer = setTimeout(resolve, Math.max(request.timeout - 2000, 1), 'timeout');
-    });
 
     try {
-      const outcome = await Promise.race([run, timedOut]);
-
-      if (outcome === 'timeout') {
-        await Promise.race([playwright.stopTests(), sleep(1500)]);
-
-        return { status: DryRunStatus.Timeout, reason: `Playwright did not finish within ${request.timeout} ms` };
-      }
+      await playwright.runTests(reporter, {
+        locations: [],
+        testIds: request.testFilter,
+        projects: this.options.projects,
+        workers: this.options.workers ?? 1,
+        maxFailures: request.disableBail ? undefined : 1,
+        disableConfigReporters: true,
+      });
 
       const failed = reporter.tests.some((test) => test.status === TestStatus.Failed);
 
@@ -208,9 +201,42 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
 
       return { status: DryRunStatus.Complete, tests: reporter.tests, snapshots: readSnapshots(outDir) };
     } finally {
-      clearTimeout(timer);
-      fs.rmSync(outDir, { recursive: true, force: true });
+      fs.rmSync(outDir, { recursive: true, force: true, maxRetries: 3 });
     }
+  }
+
+  // Playwright watches a webServer only while it starts. One that dies later would fail every
+  // remaining test, and Stryker would count each mutant as killed.
+  private async restartDeadServers(playwright: TestRunner) {
+    const alive = await Promise.all(this.serverUrls.map((url) => responds(url)));
+    const dead = this.serverUrls.filter((_, index) => !alive[index]);
+
+    if (dead.length === 0) {
+      return;
+    }
+
+    this.log.warn(`webServer at ${dead.join(', ')} stopped responding; restarting Playwright global setup.`);
+    await playwright.runGlobalTeardown();
+    await this.runGlobalSetup(playwright);
+  }
+
+  private async runGlobalSetup(playwright: TestRunner) {
+    const reporter = new CollectingReporter();
+    const { status } = await playwright.runGlobalSetup([reporter]);
+
+    if (status !== 'passed') {
+      throw new Error(`Playwright global setup ${status}:\n${reporter.errors.join('\n')}\n${reporter.output}`);
+    }
+  }
+}
+
+async function responds(url: string): Promise<boolean> {
+  try {
+    await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
+
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -257,10 +283,6 @@ function describe(error: TestError | undefined): string {
   return error?.message ?? error?.value ?? 'Test failed';
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function setEnv(name: string, value: string | undefined) {
   if (value === undefined) {
     delete process.env[name];
@@ -275,7 +297,14 @@ function readSnapshots(outDir: string): Snapshot[] {
     .filter((file) => file.endsWith('.ndjson'))
     .flatMap((file) => fs.readFileSync(path.join(outDir, file), 'utf8').split('\n'))
     .filter(Boolean)
-    .map((line) => JSON.parse(line) as Snapshot);
+    .flatMap((line) => {
+      try {
+        return [JSON.parse(line) as Snapshot];
+      } catch {
+        // A worker killed mid-write leaves a partial last line.
+        return [];
+      }
+    });
 }
 
 function mergeCoverage(snapshots: Snapshot[]): MutantCoverage {

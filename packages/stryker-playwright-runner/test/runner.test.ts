@@ -82,7 +82,7 @@ after(async () => {
 });
 
 test('dry run completes with every test passing', () => {
-  assert.equal(tests.length, 6);
+  assert.equal(tests.length, 8);
   assert.ok(
     tests.every((t) => t.status === TestStatus.Success),
     JSON.stringify(tests),
@@ -106,6 +106,19 @@ test('a page shared from beforeAll reports its coverage as static', () => {
 
   assert.ok(dryRun.mutantCoverage!.static[loopMutant], 'shared-page coverage lands in static');
   assert.equal(dryRun.mutantCoverage!.perTest[testId('first user of the shared page')], undefined);
+});
+
+test('coverage survives a navigation to a page without instrumented code', () => {
+  const greetingMutant = mutant('StringLiteral', '""').id;
+  const coverage = dryRun.mutantCoverage!.perTest[testId('keeps coverage across a navigation to a page without the app')];
+
+  assert.ok(coverage?.[greetingMutant]);
+});
+
+test('a page never closed before the worker closes the browser still reports coverage, as static', () => {
+  const doubleMutant = mutant('ArithmeticOperator', 'n / 2').id;
+
+  assert.ok(dryRun.mutantCoverage!.static[doubleMutant]);
 });
 
 test('reused contexts still get per-test coverage', () => {
@@ -144,6 +157,16 @@ test('an infinite loop trips the hit limit and reports a timeout', async () => {
   });
 
   assert.equal(result.status, MutantRunStatus.Timeout);
+});
+
+test('a webServer that dies between runs is restarted instead of failing every test', async () => {
+  await fetch('http://localhost:4321/__exit').catch(() => {});
+
+  const survived = await mutantRun(mutant('ArithmeticOperator', 'a - b'), { testFilter: [testId('counts to three')] });
+  const killed = await mutantRun(mutant('ArithmeticOperator', 'a - b'), { testFilter: [testId('shows the greeting')] });
+
+  assert.equal(survived.status, MutantRunStatus.Survived);
+  assert.equal(killed.status, MutantRunStatus.Killed);
 });
 
 test('no Playwright artifacts are written next to the config', () => {

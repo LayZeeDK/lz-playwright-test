@@ -14,5 +14,10 @@ export function countTo(n) {
   return i;
 }
 
+export function double(n) {
+  return n * 2;
+}
+
 document.querySelector('#out').textContent = `${GREETING} ${add(1, 2)}`;
 window.countTo = countTo;
+window.double = double;

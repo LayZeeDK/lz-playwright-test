@@ -32,3 +32,24 @@ test.describe.serial('with a page shared from beforeAll', () => {
     expect(await page.evaluate(() => window.countTo(2))).toBe(2);
   });
 });
+
+test('keeps coverage across a navigation to a page without the app', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#out')).toHaveText('Hello 3', { timeout: 1000 });
+  await page.goto('/blank.html');
+
+  await expect(page).toHaveTitle('blank');
+});
+
+test.describe.serial('with a page from beforeAll that is never closed', () => {
+  let page: Page;
+
+  test.beforeAll(async ({ browser }) => {
+    page = await browser.newPage();
+    await page.goto('/');
+  });
+
+  test('doubles on a page the worker closes', async () => {
+    expect(await page.evaluate(() => window.double(2))).toBe(4);
+  });
+});
