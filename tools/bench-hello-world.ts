@@ -30,7 +30,7 @@ const sides = [
   { name: 'command', config: 'stryker.config.mjs', vite: withDefine },
 ];
 
-console.log('round\tside\tseconds\tkilled\ttimeout\tsurvived');
+console.log('round\tside\tseconds\tkilled\ttimeout\tsurvived\texit');
 
 try {
   for (let round = 1; round <= Number(rounds); round++) {
@@ -46,7 +46,13 @@ try {
         cwd: dir,
         shell: true,
         encoding: 'utf8',
+        maxBuffer: 64 * 1024 * 1024,
       });
+
+      if (run.error) {
+        throw run.error;
+      }
+
       const seconds = Math.round((performance.now() - started) / 1000);
       const totals = run.stdout
         .split('\n')
@@ -55,9 +61,15 @@ try {
         .map((cell) => cell.trim());
 
       console.log(
-        [round, side.name, seconds, totals?.[3], totals?.[4], totals?.[5]].join(
-          '\t',
-        ),
+        [
+          round,
+          side.name,
+          seconds,
+          totals?.[3],
+          totals?.[4],
+          totals?.[5],
+          run.status,
+        ].join('\t'),
       );
     }
   }
