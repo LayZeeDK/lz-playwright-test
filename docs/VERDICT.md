@@ -83,6 +83,7 @@ indicative. Each row is a single run unless it says otherwise. Commands to rerun
 | Same, `timeoutMS` 1 and `timeoutFactor` 0 so Stryker's own timer fires first | this runner | 7 timeouts | 38s |
 | `angular-ngrx-nx-realworld-example-app` (Angular 21.2, Nx 22.7), 48 mutants in `auth.store.ts`, against the local API double | this runner, `timeoutMS` 10000 | 11 killed, 15 timeouts, 10 survived, 12 no coverage | 7m41s |
 | Same, with `use.actionTimeout: 5000` added to the copy's Playwright config | this runner, `timeoutMS` 10000 | 26 killed, 10 survived, 12 no coverage | 6m00s |
+| ngx-yeti (Angular, Nx, Playwright 1.63.0, static Storybook), 2 mutants in `cluster.ts`, 234 e2e tests | this runner, `playwright.workers` 2, `dryRunTimeoutMinutes` 20 | 2 killed | 3m51s (dry run 2m57s) |
 
 `packages/stryker-playwright-runner/test/runner.test.ts` checks the runner against a fixture
 instrumented by Stryker's own instrumenter. It checks that per-test coverage separates a test that
@@ -94,7 +95,8 @@ loop that times out inside its budget through the per-test timeout, the hit limi
 that no run settings stay in the environment, a `webServer` restarted after it dies between runs, and no
 artifacts on disk. Each of the three newest checks fails with its fix removed, and with activation
 disabled in the hook 6 of the 16 checks fail. It does not cover Stryker's own timeout restart,
-`coverageAnalysis` `'all'` or `'off'`, `workers` above 1, or the dry-run guard.
+`coverageAnalysis` `'all'` or `'off'`, `workers` above 1 (the ngx-yeti run below is the only evidence
+for that), or the dry-run guard.
 `test/run-result.test.ts` checks without a browser how a finished run maps to a Stryker result:
 retried tests, a kill next to a timeout, a timed-out test in the dry run, runs with no results, and
 skipped tests without the hook.
@@ -116,6 +118,13 @@ element that never appears, until the test timeout ends them. The survivors are 
 path that no signed-out test reaches, `navigateByUrl('')` where the original says `'/'`, and register,
 update, and logout branches no UI test drives. The 12 uncovered mutants are register and update, which
 the suite only calls through the API.
+
+The ngx-yeti run is the only one with `playwright.workers` above 1, which the integration test does not
+cover. Coverage still came back per test: each mutant was covered by 20 of the 234 tests, and Stryker
+stopped at the first kill, after 7 tests and after 1. On one worker the dry run passed Stryker's default
+5-minute `dryRunTimeoutMinutes`; with 2 workers it took 2m57s. The clone needed one step before Stryker
+could start its Storybook: building the workspace package `yeti-css` in the original
+(`nx run yeti-css:yeti-build`), for the reason in the npm-workspaces entry under Limits.
 
 ## What a mutant costs, and why
 
@@ -161,6 +170,13 @@ tests, so with the default `timeoutMS` kills turned into timeouts (8 of 11 in th
   config all 15 were kills, and the survivors and uncovered mutants did not change. Set
   `actionTimeout` below the per-test timeout for kills that say what broke. The wall time dropped from
   7m41s to 6m00s in one run each, not interleaved, which is indicative only.
+- Stryker links the sandbox's `node_modules` to the original project's, and npm links each workspace
+  package in `node_modules` to its folder in the original. So a workspace package's build output must
+  already exist in the original: a build that runs in the sandbox writes there, while the app and its
+  tools read the original through `node_modules`. The same holds for mutants: a mutated file in a
+  workspace package that the app imports through `node_modules` is never served, so its mutants survive
+  or show as NoCoverage. ngx-yeti hit the first part (its Storybook reads `node_modules/yeti-css/dist`).
+  This comes from Stryker's sandbox, not from this runner.
 - In an Nx workspace, `.stryker-tmp` must be in `.gitignore` (which `stryker init` adds) or `.nxignore`.
   A Stryker run that fails keeps its sandbox there, a full copy of the workspace, and Nx then finds every
   project twice and refuses to run any task, outside Stryker too.
