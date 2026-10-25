@@ -1,7 +1,7 @@
 // Points a disposable copy of stefanoslig/angular-ngrx-nx-realworld-example-app at the local API double
 // and adds a Stryker config for the Playwright runner. Idempotent.
 // Usage: node oss/realworld/prepare.ts <copy dir>
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -72,6 +72,23 @@ edit(
   (source) => source.replace(`test("View article's author"`, `test.fixme("View article's author"`),
   (source) => source.includes(`test.fixme("View article's author"`),
 );
+
+// The user id is made once per worker but registered before every test, so a second test in the same
+// worker fails (docs/filings.md). The runner runs one Playwright worker.
+edit(
+  'apps/conduit-e2e/src/auth/auth.spec.ts',
+  (source) => source.replace('test.beforeEach(async () => {', 'test.beforeAll(async () => {'),
+  (source) => source.includes('test.beforeAll(async () => {'),
+);
+
+// A Stryker run that fails keeps its sandbox, a full copy of the workspace, in .stryker-tmp. Nx would
+// then find every project twice and refuse to run, even outside Stryker.
+const nxignore = path.join(copy, '.nxignore');
+const ignored = existsSync(nxignore) ? readFileSync(nxignore, 'utf8') : '';
+
+if (!ignored.split(/\r?\n/).includes('.stryker-tmp')) {
+  writeFileSync(nxignore, `${ignored}${ignored && !ignored.endsWith('\n') ? '\n' : ''}.stryker-tmp\n`);
+}
 
 writeFileSync(
   path.join(copy, 'stryker.playwright.config.ts'),

@@ -35,6 +35,12 @@ avatar's initials, never the username. The `a.author` link next to it holds the 
 **Evidence.** The failure without Stryker: the plain Playwright run above, 2026-10-25, 1 failed and 6
 passed. The same failure in a Stryker dry run is in `D:/tmp/rw-run.log` (local, not kept).
 
+**Same suite: `auth.spec.ts` fails on one worker.** The spec makes `userId` once at module level and
+registers it in `test.beforeEach`, so the second test in a worker registers the same user again and
+fails with `{"errors":{"email":["has already been taken"],...}}`. Reproduce with `--workers=1`
+(2026-10-25: 1 failed, 1 skipped, 5 passed). With several workers each test can land in its own worker,
+which hides it. Possible fix: register in `test.beforeAll`, or make the id per test.
+
 **Also noticed.** `apps/conduit-e2e/playwright.config.ts` starts `npx nx run frontend:serve-static`,
 but the workspace has no `frontend` project (`nx show project frontend`: "Could not find project
 frontend"), so the suite works only next to a dev server someone already started on port 4200.
