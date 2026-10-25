@@ -38,7 +38,8 @@ component-specific branch.
   frames that did not answer in time and logs how much coverage came from shared contexts.
 - Each mutant run passes Stryker's timeout, less 5 s, to Playwright as the per-test timeout, and a test
   that hits it makes the mutant a Timeout. An infinite loop with no hit limit therefore ends inside
-  Playwright, and the worker and `webServer` stay up. Mutant runs turn off the page snapshot Playwright
+  Playwright, and the worker and `webServer` stay up, as long as the looping test starts within about
+  the first 5 s of the run and does not raise its own timeout. Mutant runs turn off the page snapshot Playwright
   takes of a failed test for its error prompt (`PLAYWRIGHT_NO_COPY_PROMPT`): on a page stuck in a loop
   it waits out a 5 s timeout, which pushed a timed-out run from about 7 s to 10 s and past Stryker's
   timer. Stryker's own timer stays as the backstop: when it
@@ -46,20 +47,25 @@ component-specific branch.
   starts.
 - Before each run, and again after a run with a failing test, the runner checks every `webServer` the way
   Playwright does at startup (an HTTP request for a `url`, a TCP connection for a `port`). When one is
-  down it reruns global setup and, after a failing run, reruns the mutant once. A server that dies cannot
-  turn mutants into kills.
+  down it reruns global setup and, after a failing run, reruns the mutant once. A server that dies does
+  not turn mutants into kills. The restart counts against the mutant's timeout, so a restart that takes
+  long (a server that builds first) turns that mutant into a Timeout instead.
 - Per-run settings, the active mutant, and the `NODE_OPTIONS` preload of the hook reach Playwright's
   workers through environment variables (`src/protocol.ts`) that are set only while a run lasts, because
   Playwright forks fresh workers for every run and they inherit `process.env`. The `webServer` and global
   setup never see them.
 - The runner fails loudly instead of reporting survivors when the internals it calls are missing, when
-  tests ran but the hook never installed, when none of the selected tests exist any more, or when the
-  Playwright run was interrupted.
+  tests ran but the hook never installed, when a run produced no test results, or when the Playwright
+  run was interrupted.
+- In a mutant run, a test that fails and then passes on a retry counts as failed: retries set with
+  `describe.configure({ retries })` outrank the runner's `retries: 0`. A test that fails on its own
+  kills the mutant even when another test in the run timed out. In the dry run, a timed-out test is
+  reported as a failed test.
 
 ## Evidence
 
-All numbers are from one Windows 11 arm64 machine shared with other sessions, and each row is a single
-run, so treat timings as indicative. Commands to rerun them are at the end.
+All numbers are from one Windows 11 arm64 machine shared with other sessions, so treat timings as
+indicative. Each row is a single run unless it says otherwise. Commands to rerun them are at the end.
 
 | Case | Runner | Score | Wall time |
 |---|---|---|---|
@@ -68,9 +74,12 @@ run, so treat timings as indicative. Commands to rerun them are at the end.
 | Same | this runner before the per-test timeout fix, `timeoutMS` 5000 | 26 killed, 1 timeout, 5 survived | 5m51s |
 | Same | `command` runner + Vite `define`, server restart per mutant | 27 killed, 5 survived | 12m35s |
 | Same | `command` runner, no activation (negative control) | 0 killed, 32 survived | 14m59s |
+| Same | this runner, `--concurrency 2` (one dev server per Stryker worker) | 27 killed, 5 survived | 2m24s |
 | Demo CT, 27 mutants in `price-tag.tsx` via `mount()` | this runner, `timeoutMS` 10000 | 21 killed, 6 survived | 2m29s |
-| `stryker-playwright-hello-world`, 7 mutants | this runner (repo's `define` removed) | 6 killed, 1 survived | 52s |
-| Same | the repo's own `command` runner setup | 6 killed, 1 survived | 1m31s |
+| Same | this runner, `--concurrency 2` | 21 killed, 6 survived | 1m29s |
+| `stryker-playwright-hello-world`, 7 mutants | this runner (repo's `define` removed) | 6 killed, 1 survived | median 46s (45 to 48s), 5 runs |
+| Same | the repo's own `command` runner setup | 6 killed, 1 survived | median 66s (58 to 69s), 5 runs |
+| Same, `timeoutMS` 1 and `timeoutFactor` 0 so Stryker's own timer fires first | this runner | 7 timeouts | 38s |
 
 `packages/stryker-playwright-runner/test/runner.test.ts` checks the runner against a fixture
 instrumented by Stryker's own instrumenter. It checks that per-test coverage separates a test that
@@ -83,6 +92,14 @@ that no run settings stay in the environment, a `webServer` restarted after it d
 artifacts on disk. Each of the three newest checks fails with its fix removed, and with activation
 disabled in the hook 6 of the 16 checks fail. It does not cover Stryker's own timeout restart,
 `coverageAnalysis` `'all'` or `'off'`, `workers` above 1, or the dry-run guard.
+`test/run-result.test.ts` checks without a browser how a finished run maps to a Stryker result:
+retried tests, a kill next to a timeout, a timed-out test in the dry run, runs with no results, and
+skipped tests without the hook.
+
+The hello-world runs alternated the two runners (A, B, A, B) five times. The `command` runner starts
+a Vite dev server for every mutant, which is the likeliest source of its extra 20 s; that is inferred,
+not profiled. In the forced-timeout run Stryker killed and restarted the worker for every mutant, and
+afterwards no browser, Vite, or extra Node process was left running.
 
 ## What a mutant costs, and why
 
@@ -126,12 +143,17 @@ tests, so with the default `timeoutMS` kills turned into timeouts (8 of 11 in th
 - App code that the Node test workers import (not the page) gets the active mutant but no coverage, so
   its mutants show as NoCoverage.
 - A timeout that reaches Stryker's own timer costs a full init: config load, global setup, and a
-  `webServer` start, including any build that start runs.
+  `webServer` start, including any build that start runs. That happens when the looping test starts
+  late in the run, or raises its own timeout with `test.slow()`, `test.setTimeout()`, or
+  `describe.configure({ timeout })`, which outrank the per-test timeout the runner sets. A run-level
+  timer that calls `stopTests()` could close this gap; whether `stopTests()` ends a hung test promptly
+  is not measured.
 - A project that already bakes the active mutant into its build (a Vite `define` of
   `globalThis.__stryker__.activeMutant`) overwrites the runner's value: remove that workaround first.
   The hello-world repo scored 0 of 7 until it was removed.
 - `concurrency` above 1 starts one `webServer` per Stryker worker, so each worker needs its own port. The
-  demo configs derive it from `STRYKER_MUTATOR_WORKER`.
+  demo configs derive it from `STRYKER_MUTATOR_WORKER` and turn off `reuseExistingServer` under
+  Stryker, so a server already on the default port is never reused.
 
 ## Rerun
 
@@ -139,12 +161,15 @@ tests, so with the default `timeoutMS` kills turned into timeouts (8 of 11 in th
 npm install
 npx playwright install chromium
 npx tsc -p packages/stryker-playwright-runner/tsconfig.json
-node --test packages/stryker-playwright-runner/test/runner.test.ts
+node --test packages/stryker-playwright-runner/test/runner.test.ts packages/stryker-playwright-runner/test/run-result.test.ts
 npx stryker run stryker.e2e.config.ts
 npx stryker run stryker.ct.config.ts
+npx stryker run stryker.e2e.config.ts --concurrency 2
+npx stryker run stryker.ct.config.ts --concurrency 2
 STRYKER_BASELINE=define npx stryker run stryker.e2e.command.config.ts
 STRYKER_BASELINE=off npx stryker run stryker.e2e.command.config.ts
 node tools/bench-playwright-runs.ts apps/demo-app-e2e/playwright.config.mts 3
+node tools/bench-hello-world.ts <stryker-playwright-hello-world checkout> 5
 ```
 
 Versions: StrykerJS 10.1.1, Playwright 1.64.1, Nx 24.0.1, Vite 8.3.5, Node 24.22.0.
