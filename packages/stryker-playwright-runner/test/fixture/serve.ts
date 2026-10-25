@@ -32,4 +32,4 @@ const server = createServer(async (request, response) => {
   }
 });
 
-server.listen(Number(process.env.PORT ?? 4321));
+server.listen(Number(process.env.PORT ?? 4321), 'localhost');
