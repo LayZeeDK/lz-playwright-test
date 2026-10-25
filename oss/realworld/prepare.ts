@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 const copy = path.resolve(process.argv[2] ?? '');
 const heroku = 'https://real-world-app-39656dff2ddc.herokuapp.com/api';
 const api = 'http://localhost:3100/api';
+const appPort = 4260;
 const server = fileURLToPath(new URL('../realworld-api/server.ts', import.meta.url)).replaceAll('\\', '/');
 const stateFile = path.join(copy, '.stryker-api-state.json').replaceAll('\\', '/');
 
@@ -50,6 +51,15 @@ edit('apps/conduit-e2e/playwright.config.ts', (source) =>
       ),
 );
 
+// Upstream starts a `frontend` project that does not exist and reuses whatever answers on 4200, so the
+// app gets a port of its own and is always started by the run.
+edit('apps/conduit-e2e/playwright.config.ts', (source) =>
+  source
+    .replaceAll('http://localhost:4200', `http://localhost:${appPort}`)
+    .replace('npx nx run frontend:serve-static', `npx nx run conduit:serve --port=${appPort}`)
+    .replace('reuseExistingServer: !process.env.CI,', 'reuseExistingServer: false,\n    timeout: 180_000,'),
+);
+
 writeFileSync(
   path.join(copy, 'stryker.playwright.config.ts'),
   `import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
@@ -58,6 +68,8 @@ export default {
   plugins: ['@spr/stryker-playwright-runner'],
   testRunner: 'playwright',
   playwright: { configFile: 'apps/conduit-e2e/playwright.config.ts' },
+  mutate: ['libs/auth/data-access/src/auth.store.ts'],
+  ignorers: ['angular'],
   coverageAnalysis: 'perTest',
   timeoutMS: 10_000,
   concurrency: 1,
