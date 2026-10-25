@@ -17,6 +17,7 @@ import { PlaywrightTestRunner } from '../src/playwright-test-runner.ts';
 import {
   CollectingReporter,
   listSerialGroups,
+  mergeCoverage,
   missingCoverageError,
   projectsThatRun,
   serialGroups,
@@ -366,4 +367,49 @@ test('init refuses --testFiles before it loads the Playwright config', async () 
   );
 
   await assert.rejects(runner.init(), { message: /--testFiles/ });
+});
+
+test('a page cannot reach Object.prototype through a __proto__ test id in its coverage', () => {
+  const perTest = JSON.parse('{ "__proto__": { "1": 1 } }') as Record<
+    string,
+    Record<string, number>
+  >;
+
+  try {
+    const coverage = mergeCoverage([
+      { mutantCoverage: { static: {}, perTest } },
+    ]);
+
+    assert.equal(({} as Record<string, unknown>)['1'], undefined);
+    assert.deepEqual({ ...coverage.perTest['__proto__'] }, { '1': 1 });
+  } finally {
+    delete (Object.prototype as Record<string, unknown>)['1'];
+  }
+});
+
+test('coverage merging drops counts that are not hit counts and sums the rest', () => {
+  const hits = { '1': 2, '2': NaN, '3': -1, '4': '3' } as unknown as Record<
+    string,
+    number
+  >;
+
+  const coverage = mergeCoverage([
+    { mutantCoverage: { static: hits, perTest: { a: hits } } },
+    { mutantCoverage: { static: { '1': 1 }, perTest: {} } },
+  ]);
+
+  assert.deepEqual({ ...coverage.static }, { '1': 3 });
+  assert.deepEqual({ ...coverage.perTest['a'] }, { '1': 2 });
+});
+
+test('coverage from a context that outlived its test counts as static', () => {
+  const coverage = mergeCoverage([
+    {
+      outlivedItsTest: true,
+      mutantCoverage: { static: {}, perTest: { a: { '1': 1 } } },
+    },
+  ]);
+
+  assert.deepEqual({ ...coverage.static }, { '1': 1 });
+  assert.deepEqual({ ...coverage.perTest }, {});
 });

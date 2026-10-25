@@ -6,7 +6,6 @@ import path from 'node:path';
 
 import {
   INSTRUMENTER_CONSTANTS,
-  type MutantCoverage,
   type StrykerOptions,
 } from '@stryker-mutator/api/core';
 import type { Logger } from '@stryker-mutator/api/logging';
@@ -38,7 +37,9 @@ import {
 } from './protocol.ts';
 import {
   CollectingReporter,
+  isHitCount,
   listSerialGroups,
+  mergeCoverage,
   missingCoverageError,
   projectsThatRun,
   type RunOutput,
@@ -486,47 +487,4 @@ function readSnapshots(outDir: string, files: string[]): Snapshot[] {
         return [];
       }
     });
-}
-
-function isHitCount(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
-}
-
-// Coverage comes from pages, so a key such as __proto__ or a count that is not a hit count must not
-// reach the merged object.
-function mergeCoverage(snapshots: Snapshot[]): MutantCoverage {
-  const coverage: MutantCoverage = {
-    static: Object.create(null),
-    perTest: Object.create(null),
-  };
-  const add = (
-    target: Record<string, number>,
-    hits: Record<string, number> | null | undefined,
-  ) => {
-    for (const [mutantId, count] of Object.entries(hits ?? {})) {
-      if (isHitCount(count)) {
-        target[mutantId] = (target[mutantId] ?? 0) + count;
-      }
-    }
-  };
-  const perTestTarget = (snapshot: Snapshot, testId: string) =>
-    snapshot.outlivedItsTest
-      ? coverage.static
-      : (coverage.perTest[testId] ??= Object.create(null));
-
-  for (const snapshot of snapshots) {
-    if (!snapshot.mutantCoverage) {
-      continue;
-    }
-
-    add(coverage.static, snapshot.mutantCoverage.static);
-
-    for (const [testId, hits] of Object.entries(
-      snapshot.mutantCoverage.perTest ?? {},
-    )) {
-      add(perTestTarget(snapshot, testId), hits);
-    }
-  }
-
-  return coverage;
 }
