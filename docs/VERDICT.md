@@ -82,6 +82,7 @@ indicative. Each row is a single run unless it says otherwise. Commands to rerun
 | Same | the repo's own `command` runner setup | 6 killed, 1 survived | median 66s (58 to 69s), 5 runs |
 | Same, `timeoutMS` 1 and `timeoutFactor` 0 so Stryker's own timer fires first | this runner | 7 timeouts | 38s |
 | `angular-ngrx-nx-realworld-example-app` (Angular 21.2, Nx 22.7), 48 mutants in `auth.store.ts`, against the local API double | this runner, `timeoutMS` 10000 | 11 killed, 15 timeouts, 10 survived, 12 no coverage | 7m41s |
+| Same, with `use.actionTimeout: 5000` added to the copy's Playwright config | this runner, `timeoutMS` 10000 | 26 killed, 10 survived, 12 no coverage | 6m00s |
 
 `packages/stryker-playwright-runner/test/runner.test.ts` checks the runner against a fixture
 instrumented by Stryker's own instrumenter. It checks that per-test coverage separates a test that
@@ -156,7 +157,10 @@ tests, so with the default `timeoutMS` kills turned into timeouts (8 of 11 in th
   so a mutant that removes or never renders an element ends its test by the test timeout. The runner
   reports that as a Timeout, not a kill. The mutation score is the same, because Stryker counts both as
   detected, and Stryker does not restart the worker for a timeout the runner reports. In the RealWorld
-  run, 15 of the 26 detected mutants were timeouts.
+  run, 15 of the 26 detected mutants were timeouts; with `use.actionTimeout: 5000` in the Playwright
+  config all 15 were kills, and the survivors and uncovered mutants did not change. Set
+  `actionTimeout` below the per-test timeout for kills that say what broke. The wall time dropped from
+  7m41s to 6m00s in one run each, not interleaved, which is indicative only.
 - In an Nx workspace, `.stryker-tmp` must be in `.gitignore` (which `stryker init` adds) or `.nxignore`.
   A Stryker run that fails keeps its sandbox there, a full copy of the workspace, and Nx then finds every
   project twice and refuses to run any task, outside Stryker too.
