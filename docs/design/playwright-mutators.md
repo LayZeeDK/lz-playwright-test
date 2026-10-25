@@ -20,7 +20,8 @@ Two designers worked independently from the same research and brief, on differen
 `docs/design/playwright-mutators-opus.md` and `docs/design/playwright-mutators-fable.md`. Both spikes
 rerun clean from `spikes/` (commands below). They agree on the top operators and on the integration
 route. Two independent designs that agree count for more than either draft alone. This design takes the
-Opus draft as the base and grafts five parts of the Fable draft.
+Opus draft as the base. From the Fable draft it takes the three rows marked Fable below and its upstream
+fix, and it keeps the Fable `ListExpression` for Later.
 
 | Question | Opus draft | Fable draft | Taken |
 |---|---|---|---|
@@ -161,7 +162,11 @@ The Opus prototype (`spikes/design-opus/ui-mutators.ts`) and both drafts use the
 prototype also predates six of the rules above: the `ConditionalElement` comparison and logical skip, the
 `ConditionalElement` limit to JSX children, the `EventHandler` single-reference skip, the `href`
 condition on the `a` swap, the skip of an empty value, and the attributes that `ElementToSpan` drops. The
-synthetic cases that test them run as `todo`. Its counts in `neutral-output.txt`
+synthetic cases that test them run as `todo`. Two more prototype behaviours differ from this design, and
+no case tests them. The prototype skips, without a word, an operator whose name is already registered
+(a case-sensitive `Set.has`), and wraps the placer only when it added every operator, where the design
+refuses the name. It also removes a string state value, so `aria-pressed="true"` becomes
+`aria-pressed={undefined}`, where `StateAttribute` flips it. Its counts in `neutral-output.txt`
 therefore include one `ConditionalRendering` (now `ConditionalElement`) mutant on
 `price-tag.tsx` line 22 (`off > 0 && (...)`) that the skip removes. With the skip, the demo's
 `price-tag.tsx` gets 2 UI mutants instead of 3, and `app.tsx` stays at 15. The verification plan's
