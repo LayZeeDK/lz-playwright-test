@@ -1,7 +1,7 @@
 // Points a disposable copy of stefanoslig/angular-ngrx-nx-realworld-example-app at the local API double
 // and adds a Stryker config for the Playwright runner. Idempotent.
 // Usage: node oss/realworld/prepare.ts <copy dir>
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -82,12 +82,11 @@ edit(
 );
 
 // A Stryker run that fails keeps its sandbox, a full copy of the workspace, in .stryker-tmp. Nx would
-// then find every project twice and refuse to run, even outside Stryker.
-const nxignore = path.join(copy, '.nxignore');
-const ignored = existsSync(nxignore) ? readFileSync(nxignore, 'utf8') : '';
+// then find every project twice and refuse to run, even outside Stryker. Same entry as `stryker init`.
+const gitignore = path.join(copy, '.gitignore');
 
-if (!ignored.split(/\r?\n/).includes('.stryker-tmp')) {
-  writeFileSync(nxignore, `${ignored}${ignored && !ignored.endsWith('\n') ? '\n' : ''}.stryker-tmp\n`);
+if (!readFileSync(gitignore, 'utf8').includes('.stryker-tmp')) {
+  appendFileSync(gitignore, '\n# stryker temp files\n.stryker-tmp\n');
 }
 
 writeFileSync(
