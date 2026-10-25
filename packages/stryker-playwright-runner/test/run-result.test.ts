@@ -1,0 +1,148 @@
+// How a finished Playwright run maps to a Stryker result, without a browser.
+// Run: node --test packages/stryker-playwright-runner/test/run-result.test.ts
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+import type {
+  FullResult,
+  TestCase,
+  TestResult,
+} from '@playwright/test/reporter';
+import { DryRunStatus, TestStatus } from '@stryker-mutator/api/test-runner';
+
+import {
+  CollectingReporter,
+  toRunResult,
+} from '../src/playwright-test-runner.ts';
+
+type Outcome = ReturnType<TestCase['outcome']>;
+
+function attempt(
+  reporter: CollectingReporter,
+  id: string,
+  outcome: Outcome,
+  status: TestResult['status'],
+) {
+  const testCase = {
+    id,
+    titlePath: () => ['', 'e2e', 'app.spec.ts', id],
+    location: { file: 'app.spec.ts', line: 1, column: 1 },
+    outcome: () => outcome,
+  } as unknown as TestCase;
+  const result = {
+    status,
+    duration: 10,
+    error: status === 'passed' ? undefined : { message: `${id} ${status}` },
+  } as unknown as TestResult;
+  reporter.onTestEnd(testCase, result);
+}
+
+function classify(
+  reporter: CollectingReporter,
+  {
+    status = 'failed',
+    mutant = true,
+    hookInstalled = true,
+    testFilter,
+  }: {
+    status?: FullResult['status'];
+    mutant?: boolean;
+    hookInstalled?: boolean;
+    testFilter?: string[];
+  } = {},
+) {
+  return toRunResult(
+    { status, reporter, snapshots: [], hookInstalled },
+    {
+      disableBail: true,
+      activeMutant: mutant ? '1' : undefined,
+      testFilter,
+    },
+  );
+}
+
+test('a mutant run fails a test that passes only on a retry', () => {
+  const reporter = new CollectingReporter({ flakyFails: true });
+  attempt(reporter, 'a', 'unexpected', 'failed');
+  attempt(reporter, 'a', 'flaky', 'passed');
+
+  const result = classify(reporter, { status: 'passed' });
+
+  assert.equal(result.status, DryRunStatus.Complete);
+  assert.deepEqual(
+    result.status === DryRunStatus.Complete &&
+      result.tests.map((t) => [t.id, t.status]),
+    [['a', TestStatus.Failed]],
+  );
+});
+
+test('the dry run counts a test that passes on a retry as passing', () => {
+  const reporter = new CollectingReporter();
+  attempt(reporter, 'a', 'unexpected', 'failed');
+  attempt(reporter, 'a', 'flaky', 'passed');
+
+  const result = classify(reporter, { status: 'passed', mutant: false });
+
+  assert.deepEqual(
+    result.status === DryRunStatus.Complete &&
+      result.tests.map((t) => t.status),
+    [TestStatus.Success],
+  );
+});
+
+test('a kill outranks a timeout in the same run', () => {
+  const reporter = new CollectingReporter({ flakyFails: true });
+  attempt(reporter, 'a', 'unexpected', 'timedOut');
+  attempt(reporter, 'b', 'unexpected', 'failed');
+
+  assert.equal(classify(reporter).status, DryRunStatus.Complete);
+});
+
+test('a timeout alone makes a mutant run a Timeout', () => {
+  const reporter = new CollectingReporter({ flakyFails: true });
+  attempt(reporter, 'a', 'unexpected', 'timedOut');
+  attempt(reporter, 'b', 'expected', 'passed');
+
+  assert.equal(classify(reporter).status, DryRunStatus.Timeout);
+});
+
+test('the dry run reports a timed-out test as a failed test', () => {
+  const reporter = new CollectingReporter();
+  attempt(reporter, 'a', 'unexpected', 'timedOut');
+
+  const result = classify(reporter, { mutant: false });
+
+  assert.deepEqual(
+    result.status === DryRunStatus.Complete &&
+      result.tests.map((t) => t.status),
+    [TestStatus.Failed],
+  );
+});
+
+test('a run without test results is an error, filtered or not', () => {
+  assert.equal(
+    classify(new CollectingReporter(), { testFilter: ['gone'] }).status,
+    DryRunStatus.Error,
+  );
+  assert.equal(classify(new CollectingReporter()).status, DryRunStatus.Error);
+});
+
+test('a run of skipped tests needs no hook', () => {
+  const reporter = new CollectingReporter({ flakyFails: true });
+  attempt(reporter, 'a', 'skipped', 'skipped');
+
+  assert.equal(
+    classify(reporter, { status: 'passed', hookInstalled: false }).status,
+    DryRunStatus.Complete,
+  );
+});
+
+test('tests that ran without the hook are an error', () => {
+  const reporter = new CollectingReporter({ flakyFails: true });
+  attempt(reporter, 'a', 'expected', 'passed');
+
+  assert.equal(
+    classify(reporter, { status: 'passed', hookInstalled: false }).status,
+    DryRunStatus.Error,
+  );
+});

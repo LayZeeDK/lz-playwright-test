@@ -32,11 +32,12 @@ import {
 
 import type {
   CommonModule,
+  CoreBundleModule,
   RunnerModule,
   TestRunner,
 } from './playwright-internals.ts';
 import {
-  INSTALLED_SUFFIX,
+  FRAME_READ_TIMEOUT_MS,
   RUN_SETTINGS,
   type RunSettings,
   type Snapshot,
@@ -78,10 +79,7 @@ interface ServerCheck {
   isUp(): Promise<boolean>;
 }
 
-type IsUrlAvailable = (
-  url: URL,
-  ignoreHTTPSErrors: boolean,
-) => Promise<boolean>;
+type IsUrlAvailable = CoreBundleModule['utils']['isURLAvailable'];
 
 const HOOK = new URL('./worker-hook.ts', import.meta.url).href;
 const MIN_PLAYWRIGHT = { major: 1, minor: 63 };
@@ -91,9 +89,12 @@ const OUTCOME = {
   unexpected: TestStatus.Failed,
   skipped: TestStatus.Skipped,
 } as const;
-// Leaves room to end a timed-out test before Stryker's own timer kills the worker: about 0.5 s to
-// fork the worker, up to 2 s for the hook to give up reading a hung page, and the context close.
-const TIMEOUT_HEADROOM_MS = 5000;
+// Leaves room to end a timed-out test before Stryker's own timer kills the worker: about 1.5 s to
+// load the config and fork the worker before the test starts, then the hook's read of the hung page
+// and the context close after it times out.
+const TIMEOUT_HEADROOM_MS = 3000 + FRAME_READ_TIMEOUT_MS;
+// Below this, real tests cannot finish, so Stryker's own timer ends the run instead.
+const MIN_TEST_TIMEOUT_MS = 2000;
 
 /**
  * Hosts Playwright Test in-process through `playwright/lib/runner` (exported, undocumented), so it
@@ -157,11 +158,10 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     const { configLoader } = playwrightRequire(
       'playwright/lib/common',
     ) as Partial<CommonModule>;
-    const isURLAvailable = (
-      playwrightRequire('playwright-core/lib/coreBundle') as {
-        utils?: { isURLAvailable?: IsUrlAvailable };
-      }
-    ).utils?.isURLAvailable;
+    const { utils } = playwrightRequire(
+      'playwright-core/lib/coreBundle',
+    ) as Partial<CoreBundleModule>;
+    const isURLAvailable = utils?.isURLAvailable;
 
     if (
       typeof testRunner?.TestRunner !== 'function' ||
@@ -286,7 +286,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
       testFilter,
       hitLimit,
       disableBail,
-      testTimeout: Math.max(timeout - TIMEOUT_HEADROOM_MS, 2000),
+      testTimeout: Math.max(timeout - TIMEOUT_HEADROOM_MS, MIN_TEST_TIMEOUT_MS),
     });
     const hitCount =
       run.status === DryRunStatus.Complete
@@ -344,7 +344,9 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
       // here; on a page stuck in a loop it waits out its 5 s timeout and pushes the run past Stryker's.
       PLAYWRIGHT_NO_COPY_PROMPT: '1',
     });
-    const reporter = new CollectingReporter();
+    const reporter = new CollectingReporter({
+      flakyFails: request.activeMutant !== undefined,
+    });
 
     try {
       const { status } = await playwright.runTests(reporter, {
@@ -362,7 +364,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
         status,
         reporter,
         snapshots: readSnapshots(outDir, files),
-        hookInstalled: files.some((file) => file.endsWith(INSTALLED_SUFFIX)),
+        hookInstalled: files.some((file) => file.endsWith('.ndjson')),
       };
     } finally {
       restoreEnv();
@@ -401,23 +403,10 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   }
 }
 
-function toRunResult(output: RunOutput, request: RunRequest): RunResult {
+export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
   const { status, reporter, snapshots, hookInstalled } = output;
-  const failed = reporter.failed();
-
-  if (reporter.timedOut) {
-    return {
-      status: DryRunStatus.Timeout,
-      reason: 'A test hit its timeout',
-    };
-  }
-
-  if (status === 'timedout') {
-    return {
-      status: DryRunStatus.Timeout,
-      reason: 'Playwright hit its global timeout',
-    };
-  }
+  const { tests } = reporter;
+  const isDryRun = request.activeMutant === undefined;
 
   if (status === 'interrupted') {
     return {
@@ -426,21 +415,28 @@ function toRunResult(output: RunOutput, request: RunRequest): RunResult {
     };
   }
 
-  if (reporter.errors.length && !failed) {
+  if (tests.length === 0) {
+    return {
+      status: DryRunStatus.Error,
+      errorMessage: reporter.errors.length
+        ? reporter.errors.join('\n')
+        : request.testFilter?.length
+          ? `None of the ${request.testFilter.length} selected tests ran; their Playwright test ids no longer match.`
+          : 'Playwright ran no tests.',
+    };
+  }
+
+  if (reporter.errors.length && !reporter.failed()) {
     return {
       status: DryRunStatus.Error,
       errorMessage: reporter.errors.join('\n'),
     };
   }
 
-  if (request.testFilter?.length && reporter.tests.length === 0) {
-    return {
-      status: DryRunStatus.Error,
-      errorMessage: `None of the ${request.testFilter.length} selected tests ran; their Playwright test ids no longer match.`,
-    };
-  }
-
-  if (reporter.tests.length > 0 && !hookInstalled) {
+  if (
+    !hookInstalled &&
+    tests.some((test) => test.status !== TestStatus.Skipped)
+  ) {
     return {
       status: DryRunStatus.Error,
       errorMessage:
@@ -448,7 +444,16 @@ function toRunResult(output: RunOutput, request: RunRequest): RunResult {
     };
   }
 
-  return { status: DryRunStatus.Complete, tests: reporter.tests, snapshots };
+  // A test that failed on its own kills the mutant even when another test timed out. The dry run
+  // reports a timed-out test as the failure it is.
+  if (reporter.timedOut() && !reporter.killed() && !isDryRun) {
+    return {
+      status: DryRunStatus.Timeout,
+      reason: 'A test hit its timeout',
+    };
+  }
+
+  return { status: DryRunStatus.Complete, tests, snapshots };
 }
 
 // The same test Playwright's webServer plugin uses at startup: an HTTP request for a url, a TCP
@@ -488,12 +493,25 @@ function acceptsConnections(port: number): Promise<boolean> {
   });
 }
 
-class CollectingReporter {
-  readonly tests: TestResult[] = [];
+export class CollectingReporter {
   readonly errors: string[] = [];
-  timedOut = false;
   // The tail of webServer and global setup output, which carries the reason a server failed to start.
   output = '';
+  // Playwright reports every attempt of a retried test; the last one decides.
+  private readonly results = new Map<string, TestResult>();
+  private readonly lastErrors = new Map<string, TestError>();
+  private readonly timedOutIds = new Set<string>();
+  // A test that passes only on a retry still failed against the mutant. Retries reach mutant runs
+  // through describe.configure({ retries }), which outranks the retries: 0 override.
+  private readonly flakyFails: boolean;
+
+  constructor({ flakyFails = false } = {}) {
+    this.flakyFails = flakyFails;
+  }
+
+  get tests(): TestResult[] {
+    return [...this.results.values()];
+  }
 
   printsToStdio() {
     return false;
@@ -501,6 +519,17 @@ class CollectingReporter {
 
   failed(): boolean {
     return this.tests.some((test) => test.status === TestStatus.Failed);
+  }
+
+  killed(): boolean {
+    return this.tests.some(
+      (test) =>
+        test.status === TestStatus.Failed && !this.timedOutIds.has(test.id),
+    );
+  }
+
+  timedOut(): boolean {
+    return this.timedOutIds.size > 0;
   }
 
   onTestEnd(test: TestCase, result: PlaywrightTestResult) {
@@ -515,12 +544,28 @@ class CollectingReporter {
         column: test.location.column - 1,
       },
     };
-    const status = OUTCOME[test.outcome()];
-    this.timedOut ||= result.status === 'timedOut';
+    const outcome = test.outcome();
+    const status =
+      outcome === 'flaky' && this.flakyFails
+        ? TestStatus.Failed
+        : OUTCOME[outcome];
 
-    this.tests.push(
+    if (result.status === 'timedOut') {
+      this.timedOutIds.add(test.id);
+    }
+
+    if (result.error) {
+      this.lastErrors.set(test.id, result.error);
+    }
+
+    this.results.set(
+      test.id,
       status === TestStatus.Failed
-        ? { ...base, status, failureMessage: describe(result.error) }
+        ? {
+            ...base,
+            status,
+            failureMessage: errorText(this.lastErrors.get(test.id)),
+          }
         : { ...base, status },
     );
   }
@@ -534,11 +579,11 @@ class CollectingReporter {
   }
 
   onError(error: TestError) {
-    this.errors.push(describe(error));
+    this.errors.push(errorText(error));
   }
 }
 
-function describe(error: TestError | undefined): string {
+function errorText(error: TestError | undefined): string {
   return error?.message ?? error?.value ?? 'Test failed';
 }
 

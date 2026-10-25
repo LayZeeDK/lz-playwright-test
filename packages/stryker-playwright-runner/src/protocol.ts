@@ -4,9 +4,9 @@ import type { MutantCoverage } from '@stryker-mutator/api/core';
 // the run's settings from the runner to the worker hook.
 export const RUN_SETTINGS = 'STRYKER_PLAYWRIGHT_RUN';
 
-// The hook drops a file with this suffix into outDir when it installs, so a run can tell "the hook
-// never installed" apart from "no page loaded instrumented code".
-export const INSTALLED_SUFFIX = '.installed';
+// How long the hook waits for a frame to answer before it counts the frame as lost. A timed-out test
+// spends this long on its hung page, so the runner's timeout headroom includes it.
+export const FRAME_READ_TIMEOUT_MS = 2000;
 
 export interface RunSettings {
   outDir: string;

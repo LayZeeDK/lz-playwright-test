@@ -1,5 +1,6 @@
-// The slice of `playwright/lib/runner` and `playwright/lib/common` the runner calls. These modules
-// are exported but undocumented, so their shape is written down here instead of imported.
+// The slice of `playwright/lib/runner`, `playwright/lib/common`, and `playwright-core/lib/coreBundle`
+// the runner calls. These modules are exported but undocumented, so their shape is written down here
+// instead of imported.
 import type { FullResult, Reporter } from '@playwright/test/reporter';
 
 type Status = FullResult['status'];
@@ -35,6 +36,12 @@ export interface RunnerModule {
       configLocation: unknown,
       overrides: Record<string, unknown>,
     ) => TestRunner;
+  };
+}
+
+export interface CoreBundleModule {
+  utils: {
+    isURLAvailable(url: URL, ignoreHTTPSErrors: boolean): Promise<boolean>;
   };
 }
 

@@ -15,7 +15,7 @@ import type {
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
 import {
-  INSTALLED_SUFFIX,
+  FRAME_READ_TIMEOUT_MS,
   readRunSettings,
   type RunSettings,
   type Snapshot,
@@ -26,6 +26,12 @@ interface Instrumentation {
     runAfterCreateBrowserContext?(context: BrowserContext): Promise<void>;
     runBeforeCloseBrowserContext?(context: BrowserContext): Promise<void>;
   }): void;
+}
+
+interface ContextState {
+  testId?: string;
+  closedPageSnapshots: Snapshot[];
+  collected: boolean;
 }
 
 interface PageSettings {
@@ -61,33 +67,37 @@ function install(
   const activeMutant =
     process.env[INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE];
   const outFile = path.join(outDir, `worker-${process.pid}.ndjson`);
-  const testIds = new WeakMap<BrowserContext, string | undefined>();
-  const closedPageSnapshots = new WeakMap<BrowserContext, Snapshot[]>();
-  const collected = new WeakSet<BrowserContext>();
+  const contexts = new WeakMap<BrowserContext, ContextState>();
+  const alreadyRead = new WeakSet<Page>();
   const patchedBrowsers = new WeakSet<Browser>();
 
-  fs.writeFileSync(
-    path.join(outDir, `worker-${process.pid}${INSTALLED_SUFFIX}`),
-    '',
-  );
+  // The file exists from install on, so the runner can tell "the hook never installed" apart from
+  // "no page loaded instrumented code".
+  fs.writeFileSync(outFile, '');
 
-  function ownedByCurrentTest(context: BrowserContext): boolean {
-    const createdFor = testIds.get(context);
+  // Closing a page that owns its context closes the context first, so the same page can come up twice.
+  function readOnce(pages: Page[]): Promise<Snapshot[]> {
+    const fresh = pages.filter((page) => !alreadyRead.has(page));
+    fresh.forEach((page) => alreadyRead.add(page));
 
-    return createdFor !== undefined && createdFor === currentTestId(test);
+    return readPages(fresh, ns);
   }
 
   async function collect(context: BrowserContext) {
-    if (collected.has(context)) {
+    const state = contexts.get(context);
+
+    if (!state || state.collected) {
       return;
     }
 
-    collected.add(context);
+    state.collected = true;
     const snapshots = [
-      ...(closedPageSnapshots.get(context) ?? []),
-      ...(await readPages(context.pages(), ns)),
+      ...state.closedPageSnapshots,
+      ...(await readOnce(context.pages())),
     ];
-    const outlivedItsTest = !ownedByCurrentTest(context);
+    const outlivedItsTest =
+      perTest &&
+      (state.testId === undefined || state.testId !== currentTestId(test));
     const lines = snapshots.map((snapshot) =>
       JSON.stringify({ ...snapshot, outlivedItsTest } satisfies Snapshot),
     );
@@ -98,12 +108,10 @@ function install(
   }
 
   // page.close() and browser.close() skip the before-close hook for what they close, so read first.
-  function collectBeforePageCloses(context: BrowserContext, page: Page) {
+  function collectBeforePageCloses(state: ContextState, page: Page) {
     const close = page.close.bind(page);
     page.close = async (options) => {
-      const snapshots = closedPageSnapshots.get(context) ?? [];
-      snapshots.push(...(await readPages([page], ns)));
-      closedPageSnapshots.set(context, snapshots);
+      state.closedPageSnapshots.push(...(await readOnce([page])));
 
       return close(options);
     };
@@ -125,14 +133,18 @@ function install(
 
   instrumentation.addListener({
     async runAfterCreateBrowserContext(context) {
-      const testId = perTest ? currentTestId(test) : undefined;
-      testIds.set(context, testId);
+      const state: ContextState = {
+        testId: perTest ? currentTestId(test) : undefined,
+        closedPageSnapshots: [],
+        collected: false,
+      };
+      contexts.set(context, state);
       collectBeforeBrowserCloses(context.browser());
-      context.on('page', (page) => collectBeforePageCloses(context, page));
+      context.on('page', (page) => collectBeforePageCloses(state, page));
       await context.addInitScript(initPage, {
         ns,
         activeMutant,
-        testId,
+        testId: state.testId,
         hitLimit,
       } satisfies PageSettings);
     },
@@ -163,7 +175,10 @@ async function readNamespace(
   ns: string,
 ): Promise<Snapshot | undefined> {
   const { promise: lost, resolve } = Promise.withResolvers<Snapshot>();
-  const timer = setTimeout(() => resolve({ lost: true }), 2000);
+  const timer = setTimeout(
+    () => resolve({ lost: true }),
+    FRAME_READ_TIMEOUT_MS,
+  );
   const read = frame
     .evaluate((name) => {
       const s = (globalThis as unknown as Record<string, Snapshot | undefined>)[
