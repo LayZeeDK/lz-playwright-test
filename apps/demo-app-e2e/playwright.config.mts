@@ -3,10 +3,16 @@ import { nxE2EPreset } from '@nx/playwright/preset';
 import { getReadyUrl, workspaceRoot } from '@nx/devkit';
 
 const isCI = !!process.env['CI'];
+// Each Stryker test runner process starts its own dev server, so each needs its own port, away from 4200.
+const strykerWorker = process.env['STRYKER_MUTATOR_WORKER'];
+const port =
+  strykerWorker === undefined
+    ? isCI
+      ? 4300
+      : 4200
+    : 4400 + Number(strykerWorker);
 // getReadyUrl moves the address to the port the server task reported.
-const webServerAddress = getReadyUrl(
-  isCI ? 'http://localhost:4300' : 'http://localhost:4200',
-);
+const webServerAddress = getReadyUrl(`http://localhost:${port}`);
 
 // For CI, you may want to set BASE_URL to the deployed application.
 const baseURL = process.env['BASE_URL'] || webServerAddress;
@@ -37,10 +43,10 @@ export default defineConfig({
   },
   webServer: {
     command: isCI
-      ? 'npx nx run @spr/demo-app:preview'
-      : 'npx nx run @spr/demo-app:dev',
+      ? `npx nx run @spr/demo-app:preview --port=${port}`
+      : `npx nx run @spr/demo-app:dev --port=${port}`,
     url: webServerAddress,
-    reuseExistingServer: true,
+    reuseExistingServer: strykerWorker === undefined,
     cwd: workspaceRoot,
   },
   projects: [
@@ -48,7 +54,6 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-
 
     // Uncomment for mobile browsers support
     /* {

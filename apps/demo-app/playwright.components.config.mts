@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const galleryURL = 'http://localhost:4210/playwright/gallery/index.html';
+// Each Stryker test runner process starts its own dev server, so each needs its own port.
+const strykerWorker = process.env['STRYKER_MUTATOR_WORKER'];
+const port = strykerWorker === undefined ? 4210 : 4500 + Number(strykerWorker);
+const galleryURL = `http://localhost:${port}/playwright/gallery/index.html`;
 
 export default defineConfig({
   testDir: './component-tests',
@@ -17,9 +20,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npx vite --port 4210 --strictPort',
+    command: `npx vite --port ${port} --strictPort`,
     cwd: import.meta.dirname,
     url: galleryURL,
-    reuseExistingServer: !process.env['CI'],
+    reuseExistingServer: !process.env['CI'] && strykerWorker === undefined,
   },
 });
