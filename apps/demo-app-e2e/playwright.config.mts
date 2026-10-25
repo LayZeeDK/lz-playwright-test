@@ -3,14 +3,13 @@ import { nxE2EPreset } from '@nx/playwright/preset';
 import { getReadyUrl, workspaceRoot } from '@nx/devkit';
 
 const isCI = !!process.env['CI'];
-// Each Stryker test runner process starts its own dev server, so each needs its own port, away from 4200.
+// Each Stryker test runner process starts its own server on its own port. It is always the dev
+// server: `preview` builds first, and every worker would rebuild the one dist folder of the sandbox.
 const strykerWorker = process.env['STRYKER_MUTATOR_WORKER'];
+const preview = isCI && strykerWorker === undefined;
+const defaultPort = preview ? 4300 : 4200;
 const port =
-  strykerWorker === undefined
-    ? isCI
-      ? 4300
-      : 4200
-    : 4400 + Number(strykerWorker);
+  strykerWorker === undefined ? defaultPort : 4400 + Number(strykerWorker);
 // getReadyUrl moves the address to the port the server task reported.
 const webServerAddress = getReadyUrl(`http://localhost:${port}`);
 
@@ -42,7 +41,7 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: isCI
+    command: preview
       ? `npx nx run @spr/demo-app:preview --port=${port}`
       : `npx nx run @spr/demo-app:dev --port=${port}`,
     url: webServerAddress,
