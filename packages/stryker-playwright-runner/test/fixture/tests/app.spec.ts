@@ -73,7 +73,10 @@ test('halves on a second page it closes before the test ends', async ({
 
 test('a worker thread it starts does not install the Stryker hook', async () => {
   const worker = new Worker(
-    path.join(path.dirname(test.info().file), '../thread-probe.mjs'),
+    path.join(
+      path.dirname(test.info().file),
+      '../thread-probe/playwright/lib/worker/workerProcessEntry.js',
+    ),
   );
   const [probe] = await once(worker, 'message');
   await worker.terminate();
