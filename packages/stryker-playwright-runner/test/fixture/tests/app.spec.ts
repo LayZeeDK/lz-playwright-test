@@ -33,7 +33,9 @@ test.describe.serial('with a page shared from beforeAll', () => {
   });
 });
 
-test('keeps coverage across a navigation to a page without the app', async ({ page }) => {
+test('keeps coverage across a navigation to a page without the app', async ({
+  page,
+}) => {
   await page.goto('/');
   await expect(page.locator('#out')).toHaveText('Hello 3', { timeout: 1000 });
   await page.goto('/blank.html');
@@ -52,4 +54,15 @@ test.describe.serial('with a page from beforeAll that is never closed', () => {
   test('doubles on a page the worker closes', async () => {
     expect(await page.evaluate(() => window.double(2))).toBe(4);
   });
+});
+
+test('halves on a second page it closes before the test ends', async ({
+  context,
+}) => {
+  const second = await context.newPage();
+  await second.goto('/');
+
+  expect(await second.evaluate(() => window.half(4))).toBe(2);
+
+  await second.close();
 });

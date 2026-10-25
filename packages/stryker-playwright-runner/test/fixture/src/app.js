@@ -18,6 +18,11 @@ export function double(n) {
   return n * 2;
 }
 
+export function half(n) {
+  return n / 2;
+}
+
 document.querySelector('#out').textContent = `${GREETING} ${add(1, 2)}`;
 window.countTo = countTo;
 window.double = double;
+window.half = half;

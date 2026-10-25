@@ -1,10 +1,20 @@
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
-import type { TestCase, TestError, TestResult as PlaywrightTestResult } from '@playwright/test/reporter';
-import { INSTRUMENTER_CONSTANTS, type MutantCoverage, type StrykerOptions } from '@stryker-mutator/api/core';
+import type {
+  FullResult,
+  TestCase,
+  TestError,
+  TestResult as PlaywrightTestResult,
+} from '@playwright/test/reporter';
+import {
+  INSTRUMENTER_CONSTANTS,
+  type MutantCoverage,
+  type StrykerOptions,
+} from '@stryker-mutator/api/core';
 import type { Logger } from '@stryker-mutator/api/logging';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 import {
@@ -20,8 +30,17 @@ import {
   toMutantRunResult,
 } from '@stryker-mutator/api/test-runner';
 
-import type { CommonModule, RunnerModule, TestRunner } from './playwright-internals.ts';
-import { ENV, type Snapshot } from './protocol.ts';
+import type {
+  CommonModule,
+  RunnerModule,
+  TestRunner,
+} from './playwright-internals.ts';
+import {
+  INSTALLED_SUFFIX,
+  RUN_SETTINGS,
+  type RunSettings,
+  type Snapshot,
+} from './protocol.ts';
 
 export interface PlaywrightRunnerOptions {
   configFile?: string;
@@ -31,7 +50,11 @@ export interface PlaywrightRunnerOptions {
 
 type CoverageAnalysis = DryRunOptions['coverageAnalysis'];
 type RunResult =
-  | { status: DryRunStatus.Complete; tests: TestResult[]; snapshots: Snapshot[] }
+  | {
+      status: DryRunStatus.Complete;
+      tests: TestResult[];
+      snapshots: Snapshot[];
+    }
   | Exclude<DryRunResult, { status: DryRunStatus.Complete }>;
 
 interface RunRequest {
@@ -40,22 +63,41 @@ interface RunRequest {
   activeMutant?: string;
   testFilter?: string[];
   hitLimit?: number;
+  testTimeout?: number;
 }
 
+interface RunOutput {
+  status: FullResult['status'];
+  reporter: CollectingReporter;
+  snapshots: Snapshot[];
+  hookInstalled: boolean;
+}
+
+interface ServerCheck {
+  name: string;
+  isUp(): Promise<boolean>;
+}
+
+type IsUrlAvailable = (
+  url: URL,
+  ignoreHTTPSErrors: boolean,
+) => Promise<boolean>;
+
 const HOOK = new URL('./worker-hook.ts', import.meta.url).href;
-const MIN_PLAYWRIGHT = [1, 63];
+const MIN_PLAYWRIGHT = { major: 1, minor: 63 };
 const OUTCOME = {
   expected: TestStatus.Success,
   flaky: TestStatus.Success,
   unexpected: TestStatus.Failed,
   skipped: TestStatus.Skipped,
 } as const;
+// Leaves room to end a timed-out test before Stryker's own timer kills the worker: about 0.5 s to
+// fork the worker, up to 2 s for the hook to give up reading a hung page, and the context close.
+const TIMEOUT_HEADROOM_MS = 5000;
 
 /**
  * Hosts Playwright Test in-process through `playwright/lib/runner` (exported, undocumented), so it
- * pins a minimum Playwright version. Global setup and `webServer` start once in init(); each run forks
- * fresh workers, which inherit process.env, so per-run settings travel to the worker hook as
- * environment variables.
+ * pins a minimum Playwright version and probes the internals it calls.
  */
 export class PlaywrightTestRunner implements StrykerTestRunner {
   static inject = tokens(commonTokens.options, commonTokens.logger);
@@ -63,13 +105,16 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   private readonly options: PlaywrightRunnerOptions;
   private readonly timeoutMS: number;
   private readonly log: Logger;
+  private readonly baseNodeOptions = process.env.NODE_OPTIONS;
   private playwright?: TestRunner;
   private outputDir?: string;
-  private serverUrls: string[] = [];
+  private servers: ServerCheck[] = [];
   private runCounter = 0;
 
   constructor(options: StrykerOptions, log: Logger) {
-    this.options = (options as StrykerOptions & { playwright?: PlaywrightRunnerOptions }).playwright ?? {};
+    this.options =
+      (options as StrykerOptions & { playwright?: PlaywrightRunnerOptions })
+        .playwright ?? {};
     this.timeoutMS = options.timeoutMS;
     this.log = log;
   }
@@ -79,41 +124,83 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   }
 
   async init(): Promise<void> {
-    const configFile = this.options.configFile ? path.resolve(this.options.configFile) : undefined;
-    const playwrightRequire = createRequire(
-      createRequire(configFile ?? path.resolve('package.json')).resolve('@playwright/test'),
+    const configFile = this.options.configFile
+      ? path.resolve(this.options.configFile)
+      : undefined;
+    const testRequire = createRequire(
+      createRequire(configFile ?? path.resolve('package.json')).resolve(
+        '@playwright/test',
+      ),
     );
-    const { version } = playwrightRequire('playwright/package.json') as { version: string };
+    // playwright-core is a dependency of playwright, not of @playwright/test, so resolve it from
+    // playwright for layouts that do not hoist (pnpm).
+    const playwrightRequire = createRequire(
+      testRequire.resolve('playwright/package.json'),
+    );
+    const { version } = playwrightRequire('./package.json') as {
+      version: string;
+    };
     const [major, minor] = version.split('.').map(Number);
+    const supported =
+      major > MIN_PLAYWRIGHT.major ||
+      (major === MIN_PLAYWRIGHT.major && minor >= MIN_PLAYWRIGHT.minor);
 
-    if (major < MIN_PLAYWRIGHT[0] || (major === MIN_PLAYWRIGHT[0] && minor < MIN_PLAYWRIGHT[1])) {
-      throw new Error(`The Playwright test runner needs Playwright ${MIN_PLAYWRIGHT.join('.')} or later, found ${version}.`);
+    if (!supported) {
+      throw new Error(
+        `The Playwright test runner needs Playwright ${MIN_PLAYWRIGHT.major}.${MIN_PLAYWRIGHT.minor} or later, found ${version}.`,
+      );
     }
 
-    const { testRunner } = playwrightRequire('playwright/lib/runner') as RunnerModule;
-    const { configLoader } = playwrightRequire('playwright/lib/common') as CommonModule;
+    const { testRunner } = playwrightRequire(
+      'playwright/lib/runner',
+    ) as Partial<RunnerModule>;
+    const { configLoader } = playwrightRequire(
+      'playwright/lib/common',
+    ) as Partial<CommonModule>;
+    const isURLAvailable = (
+      playwrightRequire('playwright-core/lib/coreBundle') as {
+        utils?: { isURLAvailable?: IsUrlAvailable };
+      }
+    ).utils?.isURLAvailable;
 
-    process.env.NODE_OPTIONS = `${process.env.NODE_OPTIONS ?? ''} --import "${HOOK}"`.trim();
-    process.env[ENV.namespace] = INSTRUMENTER_CONSTANTS.NAMESPACE;
-    process.env.PLAYWRIGHT_HTML_OPEN = 'never';
+    if (
+      typeof testRunner?.TestRunner !== 'function' ||
+      typeof configLoader?.resolveConfigLocation !== 'function' ||
+      typeof isURLAvailable !== 'function'
+    ) {
+      throw new Error(
+        `Playwright ${version} changed the internals this runner calls (playwright/lib/runner TestRunner, playwright/lib/common configLoader, playwright-core coreBundle isURLAvailable).`,
+      );
+    }
 
-    this.outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stryker-pw-output-'));
-    this.playwright = new testRunner.TestRunner(configLoader.resolveConfigLocation(configFile), {
-      outputDir: this.outputDir,
-      use: { screenshot: 'off', trace: 'off', video: 'off' },
-    });
+    this.outputDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'stryker-pw-output-'),
+    );
+    this.playwright = new testRunner.TestRunner(
+      configLoader.resolveConfigLocation(configFile),
+      {
+        outputDir: this.outputDir,
+        use: { screenshot: 'off', trace: 'off', video: 'off' },
+      },
+    );
     await this.playwright.initialize({});
-    await this.inspectConfig(this.playwright);
+
+    const config = await this.playwright.loadConfig();
+    this.servers = config.webServers.flatMap((server) =>
+      serverCheck(server, isURLAvailable),
+    );
+    this.warnAboutAssertionTimeouts(config);
     await this.runGlobalSetup(this.playwright);
   }
 
-  private async inspectConfig(playwright: TestRunner) {
-    const config = await playwright.loadConfig();
-    this.serverUrls = config.webServers.map((server) => server.url ?? `http://localhost:${server.port}`);
-
+  private warnAboutAssertionTimeouts(
+    config: Awaited<ReturnType<TestRunner['loadConfig']>>,
+  ) {
     // A killed test fails only after its auto-waiting assertion gives up, but Stryker sizes its timeout
     // from passing tests, so a short timeoutMS turns kills into timeouts.
-    const expectTimeout = Math.max(...config.projects.map(({ project }) => project.expect?.timeout ?? 5000));
+    const expectTimeout = Math.max(
+      ...config.projects.map((project) => project.expect?.timeout ?? 5000),
+    );
 
     if (this.timeoutMS < expectTimeout * 2) {
       this.log.warn(
@@ -123,26 +210,32 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   }
 
   async dispose(): Promise<void> {
+    // Stryker disposes a timed-out runner while its run is still going, and kills it 2 s later.
+    await this.playwright?.stopTests();
     await this.playwright?.runGlobalTeardown();
 
     if (this.outputDir) {
-      fs.rmSync(this.outputDir, { recursive: true, force: true, maxRetries: 3 });
+      fs.rmSync(this.outputDir, {
+        recursive: true,
+        force: true,
+        maxRetries: 3,
+      });
     }
   }
 
-  async dryRun({ disableBail, coverageAnalysis }: DryRunOptions): Promise<DryRunResult> {
+  async dryRun({
+    disableBail,
+    coverageAnalysis,
+  }: DryRunOptions): Promise<DryRunResult> {
     const run = await this.run({ disableBail, coverageAnalysis });
 
-    if (run.status !== DryRunStatus.Complete) {
-      return run;
+    if (run.status !== DryRunStatus.Complete || coverageAnalysis === 'off') {
+      return run.status === DryRunStatus.Complete
+        ? { status: run.status, tests: run.tests }
+        : run;
     }
 
     const { tests, snapshots } = run;
-
-    if (coverageAnalysis === 'off') {
-      return { status: run.status, tests };
-    }
-
     const failed = tests.some((test) => test.status === TestStatus.Failed);
 
     if (!failed && !snapshots.some((snapshot) => snapshot.mutantCoverage)) {
@@ -153,71 +246,147 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
       };
     }
 
-    return { status: run.status, tests, mutantCoverage: mergeCoverage(snapshots) };
+    this.reportCoverageGaps(snapshots);
+
+    return {
+      status: run.status,
+      tests,
+      mutantCoverage: mergeCoverage(snapshots),
+    };
   }
 
-  async mutantRun({ activeMutant, testFilter, hitLimit, disableBail }: MutantRunOptions): Promise<MutantRunResult> {
-    const run = await this.run({ activeMutant: activeMutant.id, testFilter, hitLimit, disableBail });
+  private reportCoverageGaps(snapshots: Snapshot[]) {
+    const lost = snapshots.filter((snapshot) => snapshot.lost).length;
+    const shared = snapshots.filter(
+      (snapshot) => snapshot.outlivedItsTest && snapshot.mutantCoverage,
+    ).length;
+
+    if (lost > 0) {
+      this.log.warn(
+        `${lost} frame(s) did not answer before their context closed; their coverage is missing, so mutants only they reached show as NoCoverage.`,
+      );
+    }
+
+    if (shared > 0) {
+      this.log.info(
+        `${shared} frame(s) belonged to contexts that outlived their test (beforeAll or worker fixtures); their coverage counts as static, so every test runs for those mutants.`,
+      );
+    }
+  }
+
+  async mutantRun({
+    activeMutant,
+    testFilter,
+    hitLimit,
+    disableBail,
+    timeout,
+  }: MutantRunOptions): Promise<MutantRunResult> {
+    const run = await this.run({
+      activeMutant: activeMutant.id,
+      testFilter,
+      hitLimit,
+      disableBail,
+      testTimeout: Math.max(timeout - TIMEOUT_HEADROOM_MS, 2000),
+    });
     const hitCount =
       run.status === DryRunStatus.Complete
-        ? run.snapshots.reduce((sum, snapshot) => sum + (snapshot.hitCount ?? 0), 0)
+        ? run.snapshots.reduce(
+            (sum, snapshot) => sum + (snapshot.hitCount ?? 0),
+            0,
+          )
         : undefined;
-    this.log.debug(`Mutant ${activeMutant.id}: ${run.status}, hitCount ${hitCount}/${hitLimit}`);
+    this.log.debug(
+      `Mutant ${activeMutant.id}: ${run.status}, hitCount ${hitCount}/${hitLimit}`,
+    );
 
-    return toMutantRunResult(determineHitLimitReached(hitCount, hitLimit) ?? run);
+    return toMutantRunResult(
+      determineHitLimitReached(hitCount, hitLimit) ?? run,
+    );
   }
 
   private async run(request: RunRequest): Promise<RunResult> {
     const playwright = this.playwright!;
-    const outDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), `stryker-pw-${process.env.STRYKER_MUTATOR_WORKER ?? 0}-${this.runCounter++}-`),
-    );
-    setEnv(ENV.outDir, outDir);
-    setEnv(ENV.activeMutant, request.activeMutant);
-    setEnv(ENV.hitLimit, request.hitLimit?.toString());
-    setEnv(ENV.coverage, request.coverageAnalysis ?? 'off');
-
     await this.restartDeadServers(playwright);
+    let output = await this.runOnce(playwright, request);
 
-    // No timer of our own: on a timeout Stryker kills this process tree (Playwright workers and the
-    // webServer included) and starts a fresh one, so a cancelled run can never leak into the next.
+    // A server that died during this run fails its tests for a reason the mutant did not cause.
+    if (
+      output.reporter.failed() &&
+      (await this.restartDeadServers(playwright))
+    ) {
+      output = await this.runOnce(playwright, request);
+    }
+
+    return toRunResult(output, request);
+  }
+
+  private async runOnce(
+    playwright: TestRunner,
+    request: RunRequest,
+  ): Promise<RunOutput> {
+    const outDir = fs.mkdtempSync(
+      path.join(
+        os.tmpdir(),
+        `stryker-pw-${process.env.STRYKER_MUTATOR_WORKER ?? 0}-${this.runCounter++}-`,
+      ),
+    );
+    const settings: RunSettings = {
+      outDir,
+      perTest: request.coverageAnalysis === 'perTest',
+      hitLimit: request.hitLimit,
+    };
+    // Only the workers this run forks see these; the webServer started earlier never does.
+    const restoreEnv = overrideEnv({
+      NODE_OPTIONS: `${this.baseNodeOptions ?? ''} --import "${HOOK}"`.trim(),
+      [RUN_SETTINGS]: JSON.stringify(settings),
+      [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: request.activeMutant,
+      // A failed test's page gets an aria snapshot for Playwright's error prompt, which nobody reads
+      // here; on a page stuck in a loop it waits out its 5 s timeout and pushes the run past Stryker's.
+      PLAYWRIGHT_NO_COPY_PROMPT: '1',
+    });
     const reporter = new CollectingReporter();
 
     try {
-      await playwright.runTests(reporter, {
+      const { status } = await playwright.runTests(reporter, {
         locations: [],
         testIds: request.testFilter,
         projects: this.options.projects,
         workers: this.options.workers ?? 1,
         maxFailures: request.disableBail ? undefined : 1,
+        timeout: request.testTimeout,
         disableConfigReporters: true,
       });
+      const files = fs.readdirSync(outDir);
 
-      const failed = reporter.tests.some((test) => test.status === TestStatus.Failed);
-
-      if (reporter.errors.length && !failed) {
-        return { status: DryRunStatus.Error, errorMessage: reporter.errors.join('\n') };
-      }
-
-      return { status: DryRunStatus.Complete, tests: reporter.tests, snapshots: readSnapshots(outDir) };
+      return {
+        status,
+        reporter,
+        snapshots: readSnapshots(outDir, files),
+        hookInstalled: files.some((file) => file.endsWith(INSTALLED_SUFFIX)),
+      };
     } finally {
+      restoreEnv();
       fs.rmSync(outDir, { recursive: true, force: true, maxRetries: 3 });
     }
   }
 
   // Playwright watches a webServer only while it starts. One that dies later would fail every
   // remaining test, and Stryker would count each mutant as killed.
-  private async restartDeadServers(playwright: TestRunner) {
-    const alive = await Promise.all(this.serverUrls.map((url) => responds(url)));
-    const dead = this.serverUrls.filter((_, index) => !alive[index]);
+  private async restartDeadServers(playwright: TestRunner): Promise<boolean> {
+    const up = await Promise.all(this.servers.map((server) => server.isUp()));
+    const dead = this.servers.filter((_, index) => !up[index]);
 
     if (dead.length === 0) {
-      return;
+      return false;
     }
 
-    this.log.warn(`webServer at ${dead.join(', ')} stopped responding; restarting Playwright global setup.`);
-    await playwright.runGlobalTeardown();
+    const names = dead.map((server) => server.name).join(', ');
+    this.log.warn(
+      `webServer at ${names} stopped answering; rerunning Playwright global setup (global teardown runs first).`,
+    );
     await this.runGlobalSetup(playwright);
+
+    return true;
   }
 
   private async runGlobalSetup(playwright: TestRunner) {
@@ -225,29 +394,113 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     const { status } = await playwright.runGlobalSetup([reporter]);
 
     if (status !== 'passed') {
-      throw new Error(`Playwright global setup ${status}:\n${reporter.errors.join('\n')}\n${reporter.output}`);
+      throw new Error(
+        `Playwright global setup ${status}:\n${reporter.errors.join('\n')}\n${reporter.output}`,
+      );
     }
   }
 }
 
-async function responds(url: string): Promise<boolean> {
-  try {
-    await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(5000) });
+function toRunResult(output: RunOutput, request: RunRequest): RunResult {
+  const { status, reporter, snapshots, hookInstalled } = output;
+  const failed = reporter.failed();
 
-    return true;
-  } catch {
-    return false;
+  if (reporter.timedOut) {
+    return {
+      status: DryRunStatus.Timeout,
+      reason: 'A test hit its timeout',
+    };
   }
+
+  if (status === 'timedout') {
+    return {
+      status: DryRunStatus.Timeout,
+      reason: 'Playwright hit its global timeout',
+    };
+  }
+
+  if (status === 'interrupted') {
+    return {
+      status: DryRunStatus.Error,
+      errorMessage: 'The Playwright run was interrupted',
+    };
+  }
+
+  if (reporter.errors.length && !failed) {
+    return {
+      status: DryRunStatus.Error,
+      errorMessage: reporter.errors.join('\n'),
+    };
+  }
+
+  if (request.testFilter?.length && reporter.tests.length === 0) {
+    return {
+      status: DryRunStatus.Error,
+      errorMessage: `None of the ${request.testFilter.length} selected tests ran; their Playwright test ids no longer match.`,
+    };
+  }
+
+  if (reporter.tests.length > 0 && !hookInstalled) {
+    return {
+      status: DryRunStatus.Error,
+      errorMessage:
+        'Tests ran but the Stryker worker hook did not install in any Playwright worker; this Playwright version may have changed its worker entry point.',
+    };
+  }
+
+  return { status: DryRunStatus.Complete, tests: reporter.tests, snapshots };
+}
+
+// The same test Playwright's webServer plugin uses at startup: an HTTP request for a url, a TCP
+// connection for a port.
+function serverCheck(
+  server: { url?: string; port?: number; ignoreHTTPSErrors?: boolean },
+  isURLAvailable: IsUrlAvailable,
+): ServerCheck[] {
+  if (server.url) {
+    const url = new URL(server.url);
+
+    return [
+      {
+        name: server.url,
+        isUp: () => isURLAvailable(url, !!server.ignoreHTTPSErrors),
+      },
+    ];
+  }
+
+  const port = server.port;
+
+  return port === undefined
+    ? []
+    : [{ name: `port ${port}`, isUp: () => acceptsConnections(port) }];
+}
+
+function acceptsConnections(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = net.connect({ host: 'localhost', port, timeout: 5000 });
+    const done = (ok: boolean) => {
+      socket.destroy();
+      resolve(ok);
+    };
+    socket.once('connect', () => done(true));
+    socket.once('error', () => done(false));
+    socket.once('timeout', () => done(false));
+  });
 }
 
 class CollectingReporter {
   readonly tests: TestResult[] = [];
   readonly errors: string[] = [];
+  timedOut = false;
   // The tail of webServer and global setup output, which carries the reason a server failed to start.
   output = '';
 
   printsToStdio() {
     return false;
+  }
+
+  failed(): boolean {
+    return this.tests.some((test) => test.status === TestStatus.Failed);
   }
 
   onTestEnd(test: TestCase, result: PlaywrightTestResult) {
@@ -257,12 +510,18 @@ class CollectingReporter {
       name: `[${titles[0]}] › ${titles.slice(1).join(' › ')}`,
       timeSpentMs: result.duration,
       fileName: test.location.file,
-      startPosition: { line: test.location.line - 1, column: test.location.column - 1 },
+      startPosition: {
+        line: test.location.line - 1,
+        column: test.location.column - 1,
+      },
     };
     const status = OUTCOME[test.outcome()];
+    this.timedOut ||= result.status === 'timedOut';
 
     this.tests.push(
-      status === TestStatus.Failed ? { ...base, status, failureMessage: describe(result.error) } : { ...base, status },
+      status === TestStatus.Failed
+        ? { ...base, status, failureMessage: describe(result.error) }
+        : { ...base, status },
     );
   }
 
@@ -283,19 +542,30 @@ function describe(error: TestError | undefined): string {
   return error?.message ?? error?.value ?? 'Test failed';
 }
 
-function setEnv(name: string, value: string | undefined) {
-  if (value === undefined) {
-    delete process.env[name];
-  } else {
-    process.env[name] = value;
-  }
+function overrideEnv(values: Record<string, string | undefined>): () => void {
+  const previous = Object.fromEntries(
+    Object.keys(values).map((name) => [name, process.env[name]]),
+  );
+  const apply = (next: Record<string, string | undefined>) => {
+    for (const [name, value] of Object.entries(next)) {
+      if (value === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
+    }
+  };
+  apply(values);
+
+  return () => apply(previous);
 }
 
-function readSnapshots(outDir: string): Snapshot[] {
-  return fs
-    .readdirSync(outDir)
+function readSnapshots(outDir: string, files: string[]): Snapshot[] {
+  return files
     .filter((file) => file.endsWith('.ndjson'))
-    .flatMap((file) => fs.readFileSync(path.join(outDir, file), 'utf8').split('\n'))
+    .flatMap((file) =>
+      fs.readFileSync(path.join(outDir, file), 'utf8').split('\n'),
+    )
     .filter(Boolean)
     .flatMap((line) => {
       try {
@@ -309,21 +579,30 @@ function readSnapshots(outDir: string): Snapshot[] {
 
 function mergeCoverage(snapshots: Snapshot[]): MutantCoverage {
   const coverage: MutantCoverage = { static: {}, perTest: {} };
-  const add = (target: Record<string, number>, hits: Record<string, number> = {}) => {
+  const add = (
+    target: Record<string, number>,
+    hits: Record<string, number> = {},
+  ) => {
     for (const [mutantId, count] of Object.entries(hits)) {
       target[mutantId] = (target[mutantId] ?? 0) + count;
     }
   };
+  const perTestTarget = (snapshot: Snapshot, testId: string) =>
+    snapshot.outlivedItsTest
+      ? coverage.static
+      : (coverage.perTest[testId] ??= {});
 
-  for (const { mutantCoverage } of snapshots) {
-    if (!mutantCoverage) {
+  for (const snapshot of snapshots) {
+    if (!snapshot.mutantCoverage) {
       continue;
     }
 
-    add(coverage.static, mutantCoverage.static);
+    add(coverage.static, snapshot.mutantCoverage.static);
 
-    for (const [id, hits] of Object.entries(mutantCoverage.perTest ?? {})) {
-      add((coverage.perTest[id] ??= {}), hits);
+    for (const [testId, hits] of Object.entries(
+      snapshot.mutantCoverage.perTest ?? {},
+    )) {
+      add(perTestTarget(snapshot, testId), hits);
     }
   }
 

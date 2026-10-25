@@ -9,5 +9,10 @@ export default defineConfig({
     { name: 'e2e', testIgnore: /reuse/ },
     { name: 'reuse', testMatch: /reuse/, use: { reuseContext: true } },
   ],
-  webServer: { command: 'node serve.ts', cwd: import.meta.dirname, url: baseURL, reuseExistingServer: false },
+  webServer: {
+    command: 'node serve.ts',
+    cwd: import.meta.dirname,
+    url: baseURL,
+    reuseExistingServer: false,
+  },
 });

@@ -1,6 +1,6 @@
 # Verdict: a StrykerJS test runner for Playwright Test
 
-Status: prototype, 2026-10-24. Throwaway code; the decisions transfer, the code does not have to.
+Status: prototype, 2026-10-24. Throwaway code. The decisions transfer, and the code does not have to.
 
 ## The question
 
@@ -33,19 +33,32 @@ component-specific branch.
   every frame.
 - Coverage survives same-origin navigations through `sessionStorage`. A context that outlives its test
   (created in `beforeAll` or a worker fixture) reports its coverage as static, so Stryker runs every test
-  for those mutants instead of crediting the wrong one. `browser.close()` skips the before-close hook,
-  so the hook also reads a browser's contexts just before the browser closes.
-- The runner sets no timer of its own. On a timeout Stryker kills the worker's process tree, Playwright
-  workers and `webServer` included, and starts a fresh worker, so a cancelled run never leaks into the
-  next mutant. Before each run the runner checks that every `webServer` URL still answers and restarts
-  global setup when one does not, so a server that dies mid-run cannot turn every later mutant into a
-  kill.
-- Per-run settings reach the hook as environment variables (`src/protocol.ts`), because Playwright forks
-  fresh workers for every run and they inherit `process.env`.
+  for those mutants instead of crediting the wrong one. `page.close()` and `browser.close()` skip the
+  before-close hook for what they close, so the hook reads those pages first. The dry run warns about
+  frames that did not answer in time and logs how much coverage came from shared contexts.
+- Each mutant run passes Stryker's timeout, less 5 s, to Playwright as the per-test timeout, and a test
+  that hits it makes the mutant a Timeout. An infinite loop with no hit limit therefore ends inside
+  Playwright, and the worker and `webServer` stay up. Mutant runs turn off the page snapshot Playwright
+  takes of a failed test for its error prompt (`PLAYWRIGHT_NO_COPY_PROMPT`): on a page stuck in a loop
+  it waits out a 5 s timeout, which pushed a timed-out run from about 7 s to 10 s and past Stryker's
+  timer. Stryker's own timer stays as the backstop: when it
+  fires, the runner stops the Playwright run, Stryker kills the worker's process tree, and a fresh worker
+  starts.
+- Before each run, and again after a run with a failing test, the runner checks every `webServer` the way
+  Playwright does at startup (an HTTP request for a `url`, a TCP connection for a `port`). When one is
+  down it reruns global setup and, after a failing run, reruns the mutant once. A server that dies cannot
+  turn mutants into kills.
+- Per-run settings, the active mutant, and the `NODE_OPTIONS` preload of the hook reach Playwright's
+  workers through environment variables (`src/protocol.ts`) that are set only while a run lasts, because
+  Playwright forks fresh workers for every run and they inherit `process.env`. The `webServer` and global
+  setup never see them.
+- The runner fails loudly instead of reporting survivors when the internals it calls are missing, when
+  tests ran but the hook never installed, when none of the selected tests exist any more, or when the
+  Playwright run was interrupted.
 
 ## Evidence
 
-All numbers are from one Windows 11 arm64 machine shared with other sessions; treat timings as
+All numbers are from one Windows 11 arm64 machine shared with other sessions, so treat timings as
 indicative. Commands to rerun them are at the end.
 
 | Case | Runner | Score | Wall time |
@@ -70,7 +83,7 @@ timeout restart, `coverageAnalysis` `'all'` or `'off'`, `workers` above 1, or th
 ## What a mutant costs, and why
 
 A mutant run costs about 2.7 s of fixed Playwright overhead (config load 1.4 s, worker start to first
-test 1.3 s; `tools/bench-playwright-runs.ts`) plus the selected tests. Sharing one browser across runs
+test 1.3 s, measured with `tools/bench-playwright-runs.ts`) plus the selected tests. Sharing one browser across runs
 through `connectWsEndpoint` saved nothing measurable, so browser launch is not the cost.
 
 A killed mutant usually costs more than a surviving one: the failing test waits out its auto-waiting
@@ -81,20 +94,35 @@ tests, so with the default `timeoutMS` kills turned into timeouts (8 of 11 in th
 ## Limits
 
 - Requires Playwright 1.63 or later. `playwright/lib/runner` is exported but undocumented, so a
-  Playwright release can break the runner; the runner refuses older versions with a clear error.
+  Playwright release can break the runner. The runner refuses older versions with a clear error.
 - Only code that runs in the page is activated. Server-side code (SSR, API routes) runs in the
-  `webServer` process, which starts once without an active mutant. Those mutants survive unless the
-  server is restarted per mutant, which this design avoids on purpose.
+  `webServer` process, which starts once without an active mutant and reports no coverage, so those
+  mutants show as NoCoverage. Code that runs on both sides (SSR plus hydration) is activated only in the
+  page, and a mutated client against an unmutated server render can fail hydration, which counts as a
+  kill.
+- Dependency projects (a `setup` project that logs in) run unfiltered, with the mutant active, on every
+  mutant run, because Playwright adds them whenever a dependent test is selected. They add their time
+  to every mutant, and a mutant that breaks the setup flow is killed by the setup test. Login in
+  `globalSetup` runs once instead.
 - Web workers and service workers are not covered by `addInitScript`.
-- Coverage from a page the test closes before the context closes is lost, and so is coverage across a
-  cross-origin navigation or from a test that ends on `about:blank`. A popup opened with `window.open`
+- Coverage across a cross-origin navigation, from a page that closes itself (`window.close()`), or from
+  a test that ends on `about:blank` is lost. A popup opened with `window.open`
   copies `sessionStorage`, so its coverage counts twice (harmless for test selection).
-- `NODE_OPTIONS` carries the `.ts` worker hook into every Node process Playwright starts, including the
-  `webServer`; it does nothing outside Playwright workers. Node refuses to strip types under
-  `node_modules`, so a published package needs a JavaScript build of the hook. The prototype is used
+- Node refuses to strip types under `node_modules`, so a published package needs a JavaScript build of
+  the hook and the runner. The prototype is used
   through a symlink, which Node resolves outside `node_modules`.
 - `disableBail` cannot lift a `maxFailures` set in the user's Playwright config.
-- A timeout restarts the worker and its `webServer`, so each timeout costs one server start.
+- The runner runs Playwright with `playwright.workers` from the Stryker config (default 1), not the
+  `workers` value in the Playwright config.
+- One server serves every mutant run, so state the app writes to its server or backend during one run is
+  still there in the next. A suite that passes when run twice in a row against one dev server is fine.
+  A suite that depends on a fresh backend can produce false kills or false survivors.
+- With Stryker's `ignoreStatic`, mutants covered only by a shared `beforeAll` page count as static and
+  are ignored.
+- App code that the Node test workers import (not the page) gets the active mutant but no coverage, so
+  its mutants show as NoCoverage.
+- A timeout that reaches Stryker's own timer costs a full init: config load, global setup, and a
+  `webServer` start, including any build that start runs.
 - A project that already bakes the active mutant into its build (a Vite `define` of
   `globalThis.__stryker__.activeMutant`) overwrites the runner's value: remove that workaround first.
   The hello-world repo scored 0 of 7 until it was removed.

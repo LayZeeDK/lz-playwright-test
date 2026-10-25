@@ -10,27 +10,36 @@ export interface RunTestsParams {
   projects?: string[];
   workers?: number;
   maxFailures?: number;
+  timeout?: number;
   disableConfigReporters?: boolean;
 }
 
 export interface TestRunner {
   initialize(params: Record<string, never>): Promise<void>;
   loadConfig(): Promise<{
-    projects: { project: { expect?: { timeout?: number } } }[];
-    webServers: { url?: string; port?: number }[];
+    projects: { expect?: { timeout?: number } }[];
+    webServers: { url?: string; port?: number; ignoreHTTPSErrors?: boolean }[];
   }>;
   runGlobalSetup(reporters: Reporter[]): Promise<{ status: Status }>;
   runGlobalTeardown(): Promise<unknown>;
-  runTests(reporter: Reporter, params: RunTestsParams): Promise<{ status: Status }>;
+  runTests(
+    reporter: Reporter,
+    params: RunTestsParams,
+  ): Promise<{ status: Status }>;
   stopTests(): Promise<void>;
 }
 
 export interface RunnerModule {
   testRunner: {
-    TestRunner: new (configLocation: unknown, overrides: Record<string, unknown>) => TestRunner;
+    TestRunner: new (
+      configLocation: unknown,
+      overrides: Record<string, unknown>,
+    ) => TestRunner;
   };
 }
 
 export interface CommonModule {
-  configLoader: { resolveConfigLocation(configFile: string | undefined): unknown };
+  configLoader: {
+    resolveConfigLocation(configFile: string | undefined): unknown;
+  };
 }

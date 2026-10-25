@@ -1,14 +1,25 @@
-// Preloaded into every Node process the runner's Playwright spawns (NODE_OPTIONS=--import), and active
-// only in Playwright Test worker processes. It injects the Stryker namespace into every page through
-// Playwright's client instrumentation, so one build that contains every mutant serves all runs.
+// Preloaded into Playwright's worker processes (NODE_OPTIONS=--import, set only while a run lasts).
+// It injects the Stryker namespace into every page through Playwright's client instrumentation, so
+// one build that contains every mutant serves all runs.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
-import type { Browser, BrowserContext, Frame, TestType } from '@playwright/test';
-import type { MutantCoverage } from '@stryker-mutator/api/core';
+import type {
+  Browser,
+  BrowserContext,
+  Frame,
+  Page,
+  TestType,
+} from '@playwright/test';
+import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
-import { ENV, type Snapshot } from './protocol.ts';
+import {
+  INSTALLED_SUFFIX,
+  readRunSettings,
+  type RunSettings,
+  type Snapshot,
+} from './protocol.ts';
 
 interface Instrumentation {
   addListener(listener: {
@@ -27,24 +38,44 @@ interface PageSettings {
 type Test = TestType<object, object>;
 
 const entry = process.argv[1] ?? '';
+const settings = readRunSettings(process.env);
 
-if (/[\\/]playwright[\\/]lib[\\/]worker[\\/]workerProcessEntry\.js$/.test(entry)) {
-  install(createRequire(entry));
+if (
+  settings &&
+  /[\\/]playwright[\\/]lib[\\/]worker[\\/]workerProcessEntry\.js$/.test(entry)
+) {
+  install(createRequire(entry), settings);
 }
 
-function install(playwrightRequire: NodeJS.Require) {
+function install(
+  playwrightRequire: NodeJS.Require,
+  { outDir, perTest, hitLimit }: RunSettings,
+) {
   const { test } = playwrightRequire('playwright/test') as { test: Test };
-  const { _instrumentation: instrumentation } = playwrightRequire('playwright-core') as {
+  const { _instrumentation: instrumentation } = playwrightRequire(
+    'playwright-core',
+  ) as {
     _instrumentation: Instrumentation;
   };
-  const ns = process.env[ENV.namespace] ?? '__stryker__';
-  const activeMutant = process.env[ENV.activeMutant];
-  const hitLimit = process.env[ENV.hitLimit] ? Number(process.env[ENV.hitLimit]) : undefined;
-  const perTest = process.env[ENV.coverage] === 'perTest';
-  const outFile = path.join(process.env[ENV.outDir]!, `worker-${process.pid}.ndjson`);
+  const ns = INSTRUMENTER_CONSTANTS.NAMESPACE;
+  const activeMutant =
+    process.env[INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE];
+  const outFile = path.join(outDir, `worker-${process.pid}.ndjson`);
   const testIds = new WeakMap<BrowserContext, string | undefined>();
+  const closedPageSnapshots = new WeakMap<BrowserContext, Snapshot[]>();
   const collected = new WeakSet<BrowserContext>();
   const patchedBrowsers = new WeakSet<Browser>();
+
+  fs.writeFileSync(
+    path.join(outDir, `worker-${process.pid}${INSTALLED_SUFFIX}`),
+    '',
+  );
+
+  function ownedByCurrentTest(context: BrowserContext): boolean {
+    const createdFor = testIds.get(context);
+
+    return createdFor !== undefined && createdFor === currentTestId(test);
+  }
 
   async function collect(context: BrowserContext) {
     if (collected.has(context)) {
@@ -52,28 +83,32 @@ function install(playwrightRequire: NodeJS.Require) {
     }
 
     collected.add(context);
-    const snapshots = await Promise.all(
-      context
-        .pages()
-        .flatMap((page) => page.frames())
-        .map((frame) => readNamespace(frame, ns)),
+    const snapshots = [
+      ...(closedPageSnapshots.get(context) ?? []),
+      ...(await readPages(context.pages(), ns)),
+    ];
+    const outlivedItsTest = !ownedByCurrentTest(context);
+    const lines = snapshots.map((snapshot) =>
+      JSON.stringify({ ...snapshot, outlivedItsTest } satisfies Snapshot),
     );
-    // A context that outlives its test (created in beforeAll or a worker fixture) served several
-    // tests, so its coverage cannot be credited to one: report it as static, which runs every test.
-    const createdFor = testIds.get(context);
-    const ownedByOneTest = createdFor !== undefined && createdFor === currentTestId(test);
-    const lines = snapshots
-      .filter((snapshot) => snapshot !== undefined)
-      .map((snapshot) =>
-        JSON.stringify(ownedByOneTest ? snapshot : { ...snapshot, mutantCoverage: asStatic(snapshot.mutantCoverage) }),
-      );
 
     if (lines.length) {
       fs.appendFileSync(outFile, lines.join('\n') + '\n');
     }
   }
 
-  // browser.close() closes its contexts without the before-close hook, so read them first.
+  // page.close() and browser.close() skip the before-close hook for what they close, so read first.
+  function collectBeforePageCloses(context: BrowserContext, page: Page) {
+    const close = page.close.bind(page);
+    page.close = async (options) => {
+      const snapshots = closedPageSnapshots.get(context) ?? [];
+      snapshots.push(...(await readPages([page], ns)));
+      closedPageSnapshots.set(context, snapshots);
+
+      return close(options);
+    };
+  }
+
   function collectBeforeBrowserCloses(browser: Browser | null) {
     if (!browser || patchedBrowsers.has(browser)) {
       return;
@@ -93,26 +128,16 @@ function install(playwrightRequire: NodeJS.Require) {
       const testId = perTest ? currentTestId(test) : undefined;
       testIds.set(context, testId);
       collectBeforeBrowserCloses(context.browser());
-      await context.addInitScript(initPage, { ns, activeMutant, testId, hitLimit } satisfies PageSettings);
+      context.on('page', (page) => collectBeforePageCloses(context, page));
+      await context.addInitScript(initPage, {
+        ns,
+        activeMutant,
+        testId,
+        hitLimit,
+      } satisfies PageSettings);
     },
     runBeforeCloseBrowserContext: collect,
   });
-}
-
-function asStatic(coverage: MutantCoverage | undefined): MutantCoverage | undefined {
-  if (!coverage) {
-    return coverage;
-  }
-
-  const all = { ...coverage.static };
-
-  for (const hits of Object.values(coverage.perTest ?? {})) {
-    for (const [mutantId, count] of Object.entries(hits)) {
-      all[mutantId] = (all[mutantId] ?? 0) + count;
-    }
-  }
-
-  return { static: all, perTest: {} };
 }
 
 function currentTestId(test: Test): string | undefined {
@@ -123,23 +148,50 @@ function currentTestId(test: Test): string | undefined {
   }
 }
 
-async function readNamespace(frame: Frame, ns: string): Promise<Snapshot | undefined> {
-  const timeout = new Promise<undefined>((resolve) => setTimeout(resolve, 2000, undefined));
+async function readPages(pages: Page[], ns: string): Promise<Snapshot[]> {
+  const snapshots = await Promise.all(
+    pages
+      .flatMap((page) => page.frames())
+      .map((frame) => readNamespace(frame, ns)),
+  );
+
+  return snapshots.filter((snapshot) => snapshot !== undefined);
+}
+
+async function readNamespace(
+  frame: Frame,
+  ns: string,
+): Promise<Snapshot | undefined> {
+  const { promise: lost, resolve } = Promise.withResolvers<Snapshot>();
+  const timer = setTimeout(() => resolve({ lost: true }), 2000);
   const read = frame
     .evaluate((name) => {
-      const s = (globalThis as unknown as Record<string, Snapshot | undefined>)[name];
+      const s = (globalThis as unknown as Record<string, Snapshot | undefined>)[
+        name
+      ];
 
-      return s ? { mutantCoverage: s.mutantCoverage, hitCount: s.hitCount } : undefined;
+      return s
+        ? { mutantCoverage: s.mutantCoverage, hitCount: s.hitCount }
+        : undefined;
     }, ns)
-    .catch(() => undefined);
+    .catch(() =>
+      frame.isDetached() ? undefined : ({ lost: true } satisfies Snapshot),
+    );
 
-  return Promise.race([read, timeout]);
+  try {
+    return await Promise.race([read, lost]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // Runs in the browser before any page script. Coverage and the hit count are carried across
 // same-origin navigations of the top frame through sessionStorage, which survives a page load.
 function initPage({ ns, activeMutant, testId, hitLimit }: PageSettings) {
-  const scope = globalThis as unknown as Record<string, Record<string, unknown> | undefined>;
+  const scope = globalThis as unknown as Record<
+    string,
+    Record<string, unknown> | undefined
+  >;
   const s = (scope[ns] ??= {});
   const key = `${ns}:carry`;
 
@@ -161,7 +213,9 @@ function initPage({ ns, activeMutant, testId, hitLimit }: PageSettings) {
   }
 
   try {
-    const carried = JSON.parse(sessionStorage.getItem(key) ?? 'null') as Snapshot | null;
+    const carried = JSON.parse(
+      sessionStorage.getItem(key) ?? 'null',
+    ) as Snapshot | null;
 
     if (carried) {
       s.mutantCoverage = carried.mutantCoverage;
@@ -172,7 +226,13 @@ function initPage({ ns, activeMutant, testId, hitLimit }: PageSettings) {
     }
 
     addEventListener('pagehide', () => {
-      sessionStorage.setItem(key, JSON.stringify({ mutantCoverage: s.mutantCoverage, hitCount: s.hitCount }));
+      sessionStorage.setItem(
+        key,
+        JSON.stringify({
+          mutantCoverage: s.mutantCoverage,
+          hitCount: s.hitCount,
+        }),
+      );
     });
   } catch {
     // Opaque origins (about:blank, data: URLs) have no sessionStorage.
