@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { isMainThread } from 'node:worker_threads';
 
 import type {
   Browser,
@@ -49,6 +50,7 @@ const settings = readRunSettings(process.env);
 
 if (
   settings &&
+  isMainThread &&
   /[\\/]playwright[\\/]lib[\\/]worker[\\/]workerProcessEntry\.js$/.test(entry)
 ) {
   install(createRequire(entry), settings);

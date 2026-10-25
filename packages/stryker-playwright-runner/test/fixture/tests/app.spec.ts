@@ -1,3 +1,7 @@
+import { once } from 'node:events';
+import path from 'node:path';
+import { Worker } from 'node:worker_threads';
+
 import { expect, type Page, test } from '@playwright/test';
 
 test('shows the greeting', async ({ page }) => {
@@ -65,4 +69,14 @@ test('halves on a second page it closes before the test ends', async ({
   expect(await second.evaluate(() => window.half(4))).toBe(2);
 
   await second.close();
+});
+
+test('a worker thread it starts does not install the Stryker hook', async () => {
+  const worker = new Worker(
+    path.join(path.dirname(test.info().file), '../thread-probe.mjs'),
+  );
+  const [probe] = await once(worker, 'message');
+  await worker.terminate();
+
+  expect(probe).toMatchObject({ isMainThread: false, hookInstalled: false });
 });

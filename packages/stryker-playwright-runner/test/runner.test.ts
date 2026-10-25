@@ -136,11 +136,21 @@ after(async () => {
 });
 
 test('dry run completes with every test passing', () => {
-  assert.equal(tests.length, 9);
+  assert.equal(tests.length, 10);
   assert.ok(
     tests.every((t) => t.status === TestStatus.Success),
     JSON.stringify(tests),
   );
+});
+
+test('the hook stays out of worker threads that a test starts', () => {
+  const probe = tests.find((t) =>
+    t.name.endsWith(
+      'a worker thread it starts does not install the Stryker hook',
+    ),
+  );
+
+  assert.equal(probe?.status, TestStatus.Success, JSON.stringify(probe));
 });
 
 test('init finds the describe.serial groups', () => {
