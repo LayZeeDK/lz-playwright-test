@@ -10,7 +10,7 @@ import { createApiServer } from './server.ts';
 async function start(stateFile?: string): Promise<{ server: Server; base: string }> {
   const server = createApiServer({ stateFile });
 
-  await new Promise<void>((resolve) => server.listen(0, resolve));
+  await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
 
   return { server, base: `http://localhost:${(server.address() as AddressInfo).port}/api` };
 }
@@ -141,6 +141,7 @@ describe('realworld api double', async () => {
     assert.equal((await api('/articles?author=jake')).json.articlesCount, 2);
     assert.equal((await api('/articles?favorited=anne')).json.articlesCount, 1);
     assert.equal((await api('/articles?limit=abc&offset=x')).json.articles.length, 5);
+    assert.equal((await api('/articles?limit=0')).json.articles.length, 0);
     assert.equal((await api('/articles/%E0%A4%A')).status, 404);
 
     const tags = await api('/tags');
@@ -183,6 +184,7 @@ describe('realworld api double', async () => {
 
     assert.equal(updated.status, 200);
     assert.equal(updated.json.article.slug, 'renamed');
+    assert.equal((await api(`/articles/renamed`, { method: 'PUT', token, body: { article: 'text' } })).status, 422);
     assert.equal(updated.json.article.body, 'new body');
     assert.equal(updated.json.article.description, 'desc');
     slug = updated.json.article.slug;

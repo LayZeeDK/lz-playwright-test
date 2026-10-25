@@ -11,7 +11,8 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 const AVATAR =
   'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 8 8%22%3E%3Crect width=%228%22 height=%228%22 fill=%22%23ccc%22/%3E%3C/svg%3E';
 const COOKIE = 'jwt';
-// The CORS headers reflect any Origin with credentials, which is safe only on a loopback-only listener.
+// The double ships seeded users with known passwords and has no rate limits, so it listens on
+// loopback only.
 const HOST = 'localhost';
 
 type Errors = Record<string, string[]>;
@@ -363,8 +364,8 @@ export function createApiServer({
     query: URLSearchParams,
     me?: User,
   ): Result => {
-    const limit = Number(query.get('limit')) || 20;
-    const offset = Number(query.get('offset')) || 0;
+    const limit = countParam(query.get('limit'), 20);
+    const offset = countParam(query.get('offset'), 0);
     const sorted = [...articles].sort((a, b) =>
       b.createdAt.localeCompare(a.createdAt),
     );
@@ -639,6 +640,10 @@ export function createApiServer({
 
         requireOwner(me, article.authorId);
 
+        if (typeof input !== 'object' || input === null) {
+          throw unprocessable({ article: ['must be an object'] });
+        }
+
         const errors: Errors = {};
 
         for (const field of ['title', 'description', 'body']) {
@@ -880,6 +885,14 @@ export function createApiServer({
       }
     }
   });
+}
+
+function countParam(value: string | null, fallback: number): number {
+  const count = Number(value);
+
+  return value === null || value === '' || !Number.isInteger(count) || count < 0
+    ? fallback
+    : count;
 }
 
 function decodeParam(value: string): string {
