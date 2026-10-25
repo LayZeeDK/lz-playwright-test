@@ -4,6 +4,10 @@ import type { MutantCoverage } from '@stryker-mutator/api/core';
 // the run's settings from the runner to the worker hook.
 export const RUN_SETTINGS = 'STRYKER_PLAYWRIGHT_RUN';
 
+// Each Playwright worker's hook writes its snapshots, one JSON object per line, to a file in outDir
+// with this suffix.
+export const SNAPSHOT_SUFFIX = '.ndjson';
+
 // How long the hook waits for a frame to answer before it counts the frame as lost. A timed-out test
 // spends this long on its hung page, so the runner's timeout headroom includes it.
 export const FRAME_READ_TIMEOUT_MS = 2000;

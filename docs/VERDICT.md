@@ -55,12 +55,13 @@ component-specific branch.
   Playwright forks fresh workers for every run and they inherit `process.env`. The `webServer` and global
   setup never see them.
 - The runner fails loudly instead of reporting survivors when the internals it calls are missing, when
-  tests ran but the hook never installed, when a run produced no test results, or when the Playwright
-  run was interrupted.
+  tests ran but the hook never installed, when a mutant run produced no test results, or when the
+  Playwright run was interrupted. A dry run without tests comes back empty, so Stryker's own
+  `allowEmpty` decides.
 - In a mutant run, a test that fails and then passes on a retry counts as failed: retries set with
-  `describe.configure({ retries })` outrank the runner's `retries: 0`. A test that fails on its own
-  kills the mutant even when another test in the run timed out. In the dry run, a timed-out test is
-  reported as a failed test.
+  `describe.configure({ retries })` outrank the runner's `retries: 0`. A test attempt that fails on its
+  own kills the mutant even when another attempt or another test timed out; a `test.fail()` test that
+  fails as expected is no kill. In the dry run, a timed-out test is reported as a failed test.
 
 ## Evidence
 
@@ -99,7 +100,9 @@ skipped tests without the hook.
 The hello-world runs alternated the two runners (A, B, A, B) five times. The `command` runner starts
 a Vite dev server for every mutant, which is the likeliest source of its extra 20 s; that is inferred,
 not profiled. In the forced-timeout run Stryker killed and restarted the worker for every mutant, and
-afterwards no browser, Vite, or extra Node process was left running.
+afterwards no browser, Vite, or extra Node process was left running, and no temp directory of the
+runner was left in the system temp folder (before a fix in `dispose`, each kill left Playwright's
+output directory behind).
 
 ## What a mutant costs, and why
 
@@ -153,7 +156,9 @@ tests, so with the default `timeoutMS` kills turned into timeouts (8 of 11 in th
   The hello-world repo scored 0 of 7 until it was removed.
 - `concurrency` above 1 starts one `webServer` per Stryker worker, so each worker needs its own port. The
   demo configs derive it from `STRYKER_MUTATOR_WORKER` and turn off `reuseExistingServer` under
-  Stryker, so a server already on the default port is never reused.
+  Stryker, so a server already on the default port is never reused. Under Stryker the e2e config also
+  starts the dev server in CI, because a `preview` server builds first and every worker would rebuild
+  the sandbox's one `dist` folder.
 
 ## Rerun
 

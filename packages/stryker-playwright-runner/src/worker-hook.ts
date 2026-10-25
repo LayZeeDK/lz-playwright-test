@@ -18,6 +18,7 @@ import {
   FRAME_READ_TIMEOUT_MS,
   readRunSettings,
   type RunSettings,
+  SNAPSHOT_SUFFIX,
   type Snapshot,
 } from './protocol.ts';
 
@@ -66,14 +67,15 @@ function install(
   const ns = INSTRUMENTER_CONSTANTS.NAMESPACE;
   const activeMutant =
     process.env[INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE];
-  const outFile = path.join(outDir, `worker-${process.pid}.ndjson`);
+  const outFile = path.join(outDir, `worker-${process.pid}${SNAPSHOT_SUFFIX}`);
   const contexts = new WeakMap<BrowserContext, ContextState>();
   const alreadyRead = new WeakSet<Page>();
   const patchedBrowsers = new WeakSet<Browser>();
 
   // The file exists from install on, so the runner can tell "the hook never installed" apart from
-  // "no page loaded instrumented code".
-  fs.writeFileSync(outFile, '');
+  // "no page loaded instrumented code". Appending keeps the snapshots of an earlier worker in this
+  // run that had the same pid.
+  fs.writeFileSync(outFile, '', { flag: 'a' });
 
   // Closing a page that owns its context closes the context first, so the same page can come up twice.
   function readOnce(pages: Page[]): Promise<Snapshot[]> {
