@@ -229,20 +229,26 @@ test('the missing-coverage error names lost frames when every frame was lost', (
   );
 });
 
-test('a snapshot JSON cannot hold is written as a lost frame', () => {
+test('a snapshot with a BigInt hit count is written as a lost frame', () => {
+  const snapshot: Snapshot = { hitCount: 1n as unknown as number };
+
+  assert.deepEqual(JSON.parse(serializeSnapshot(snapshot, true)), {
+    lost: true,
+    outlivedItsTest: true,
+  });
+});
+
+test('a snapshot with cyclic coverage is written as a lost frame', () => {
   const cyclic: Record<string, unknown> = {};
   cyclic.self = cyclic;
-  const hostile: Snapshot[] = [
-    { hitCount: 1n as unknown as number },
-    { mutantCoverage: cyclic as unknown as Snapshot['mutantCoverage'] },
-  ];
+  const snapshot: Snapshot = {
+    mutantCoverage: cyclic as unknown as Snapshot['mutantCoverage'],
+  };
 
-  for (const snapshot of hostile) {
-    assert.deepEqual(JSON.parse(serializeSnapshot(snapshot, true)), {
-      lost: true,
-      outlivedItsTest: true,
-    });
-  }
+  assert.deepEqual(JSON.parse(serializeSnapshot(snapshot, true)), {
+    lost: true,
+    outlivedItsTest: true,
+  });
 });
 
 test('the missing-coverage error says no page opened instead of blaming the webServer', () => {
