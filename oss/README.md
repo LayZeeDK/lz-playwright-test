@@ -5,7 +5,7 @@ Never apply these to the upstream clone itself. `docs/VERDICT.md` (Evidence) has
 
 Every copy also needs this runner and StrykerJS installed. Link the runner as a directory junction or
 an absolute link. Node resolves the link and strips the runner's TypeScript outside `node_modules`.
-Every Stryker config here loads the runner by its package name, `@layzeedk/stryker-playwright-runner`.
+Every Stryker config here loads the runner by its package name, `@layzee/stryker-playwright-runner`.
 
 ```sh
 npm install -D @stryker-mutator/core@^10.1.1 file:<this repo>/packages/stryker-playwright-runner
@@ -41,7 +41,7 @@ it uses is `oss/realworld-api`. Then run `npx stryker run stryker.playwright.con
 1. Install with pnpm, not the npm line above: `pnpm add -D @stryker-mutator/core@10.1.1
    @playwright/test@^1.64.1`. The copy's own `@playwright/test` is `^1.58.2`, below the runner's 1.63
    floor; the copy's `package.json` diff after the run showed both versions. Then link the runner as a
-   junction at `node_modules/@layzeedk/stryker-playwright-runner`, the name that
+   junction at `node_modules/@layzee/stryker-playwright-runner`, the name that
    `analog/stryker.playwright.config.ts` loads.
 2. Apply `analog/copy.patch` and copy `analog/stryker.playwright.config.ts` into the copy. The patch:
    - starts the built SSR server instead of `nx serve-nitro`, whose `PORT=3000 node ...` cannot run

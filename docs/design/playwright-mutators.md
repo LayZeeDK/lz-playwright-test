@@ -194,7 +194,7 @@ remain:
 
 ## Integration
 
-- **Package.** `@layzeedk/stryker-ui-mutators`. The user lists it in `plugins` and lists its ignorer in
+- **Package.** `@layzee/stryker-ui-mutators`. The user lists it in `plugins` and lists its ignorer in
   `ignorers`, or imports it from a JavaScript or TypeScript config (see "Fail loud"). No other options in v1. Users exclude operators with
   `mutator.excludedMutations` and with `// Stryker disable` comments, both of which already match custom
   mutator names.
@@ -225,11 +225,11 @@ remain:
   next to it.
   Without it, a successful install still registers and runs every operator, because registration
   happens at import. A failed install falls back to core's warning
-  `Error during loading "@layzeedk/stryker-ui-mutators" plugin`, and the run finishes without UI mutants. The
+  `Error during loading "@layzee/stryker-ui-mutators" plugin`, and the run finishes without UI mutants. The
   plugin cannot detect the missing entry in that case, because the code that would check is the code
   that failed.
 - **A config import fails loud with one entry.** A config written as a JavaScript or TypeScript module
-  can `import '@layzeedk/stryker-ui-mutators'` on its first line instead. The module installs with a
+  can `import '@layzee/stryker-ui-mutators'` on its first line instead. The module installs with a
   top-level `await`, so an install or self-check error rejects the config import, and the run stops
   before it starts, with no `ignorers` entry. The thermos plugin's Node operators use this route
   (`stryker.config.mjs:1`). A JSON config cannot import, so it keeps `plugins` and `ignorers`. This route

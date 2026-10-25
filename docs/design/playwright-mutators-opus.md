@@ -147,7 +147,7 @@ Common rules for every attribute operator [checked: prototype `classifyValue` in
 
 ### 3.1 Package shape
 
-One package, `packages/stryker-ui-mutators` (`@layzeedk/stryker-ui-mutators`), ESM, TypeScript source run by Node type stripping like the runner package (`"main": "./src/index.ts"` [checked: `packages/stryker-playwright-runner/package.json`]). Three modules:
+One package, `packages/stryker-ui-mutators` (`@layzee/stryker-ui-mutators`), ESM, TypeScript source run by Node type stripping like the runner package (`"main": "./src/index.ts"` [checked: `packages/stryker-playwright-runner/package.json`]). Three modules:
 
 | Module | Contents | Depends on |
 |---|---|---|
@@ -167,7 +167,7 @@ Splitting `operators.ts` into its own package (the weapon-regex shape) waits unt
 4. It imports `dist/src/mutators/mutate.js` and `dist/src/mutant-placers/index.js` by file URL (the `exports` map exposes only `.`, research 3.2), pushes one `NodeMutator` per enabled operator into `allMutators`, which `transformBabel` reads by reference (`babel-transformer.ts:36`), and patches the placer (3.3). It is idempotent: a second call adds nothing [checked: `spike.ts` asserts `again.added` is empty].
 5. The module exports only `strykerValidationSchema`, not `strykerPlugins`. Core puts a module in `pluginModulePaths` only when it exports plugins [checked: `node_modules/@stryker-mutator/core/dist/src/di/plugin-loader.js:41-56`], so the module (and Babel) is not imported again into every test-runner and checker child process.
 
-Known weakness: core downgrades any error thrown while importing a plugin to a warning and continues [checked: `plugin-loader.js:112-120`], so a version mismatch prints `Error during loading "@layzeedk/stryker-ui-mutators" plugin: ...` and the run proceeds with built-in mutators only. The report then shows no UI mutator names. Section 5 lists this risk.
+Known weakness: core downgrades any error thrown while importing a plugin to a warning and continues [checked: `plugin-loader.js:112-120`], so a version mismatch prints `Error during loading "@layzee/stryker-ui-mutators" plugin: ...` and the run proceeds with built-in mutators only. The report then shows no UI mutator names. Section 5 lists this risk.
 
 ### 3.3 JSX-safe placement
 
@@ -200,7 +200,7 @@ Example (this repository's config style [checked: `stryker.e2e.config.ts`]):
 
 ```ts
 export default {
-  plugins: ['@layzeedk/stryker-playwright-runner', '@layzeedk/stryker-ui-mutators'],
+  plugins: ['@layzee/stryker-playwright-runner', '@layzee/stryker-ui-mutators'],
   testRunner: 'playwright',
   playwright: { configFile: 'apps/demo-app-e2e/playwright.config.mts' },
   mutate: ['apps/demo-app/src/app/**/*.tsx', '!**/*.story.tsx'],

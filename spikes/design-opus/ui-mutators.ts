@@ -1,4 +1,4 @@
-// Prototype of @layzeedk/stryker-ui-mutators for the design spike. Erasable TypeScript only.
+// Prototype of @layzee/stryker-ui-mutators for the design spike. Erasable TypeScript only.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
