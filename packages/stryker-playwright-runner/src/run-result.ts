@@ -215,6 +215,15 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
     };
   }
 
+  // Playwright catches its own internal errors, prints them, and fails the run without reporting them.
+  if (status === 'failed' && tests.length === 0) {
+    return {
+      status: DryRunStatus.Error,
+      errorMessage:
+        'Playwright failed without running a test; rerun Stryker with --logLevel trace to see its error.',
+    };
+  }
+
   if (tests.length === 0) {
     return emptyRunResult(request);
   }
@@ -251,6 +260,26 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
   }
 
   return { status: DryRunStatus.Complete, tests, snapshots };
+}
+
+export function missingCoverageError(
+  tests: TestResult[],
+  snapshots: Snapshot[],
+): string | undefined {
+  const ran = tests.some((test) => test.status !== TestStatus.Skipped);
+  const failed = tests.some((test) => test.status === TestStatus.Failed);
+
+  if (!ran || failed || snapshots.some((snapshot) => snapshot.mutantCoverage)) {
+    return undefined;
+  }
+
+  const lost = snapshots.filter((snapshot) => snapshot.lost).length;
+
+  if (lost === snapshots.length && lost > 0) {
+    return `No page reported coverage: all ${lost} frame(s) did not answer before their context closed.`;
+  }
+
+  return 'No page loaded instrumented code. Is the webServer serving the Stryker sandbox? A server that was already running (reuseExistingServer) serves the original sources.';
 }
 
 function emptyRunResult(request: RunRequest): RunResult {

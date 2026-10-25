@@ -17,6 +17,7 @@ import { PlaywrightTestRunner } from '../src/playwright-test-runner.ts';
 import {
   CollectingReporter,
   listSerialGroups,
+  missingCoverageError,
   projectsThatRun,
   serialGroups,
   toRunResult,
@@ -154,10 +155,16 @@ test('the dry run reports a timed-out test as a failed test', () => {
 
 test('a mutant run without test results is an error, filtered or not', () => {
   assert.equal(
-    classify(new CollectingReporter(), { testFilter: ['gone'] }).status,
+    classify(new CollectingReporter(), {
+      status: 'passed',
+      testFilter: ['gone'],
+    }).status,
     DryRunStatus.Error,
   );
-  assert.equal(classify(new CollectingReporter()).status, DryRunStatus.Error);
+  assert.equal(
+    classify(new CollectingReporter(), { status: 'passed' }).status,
+    DryRunStatus.Error,
+  );
 });
 
 test('an unfiltered dry run without tests completes empty, so Stryker applies allowEmpty', () => {
@@ -171,6 +178,53 @@ test('an unfiltered dry run without tests completes empty, so Stryker applies al
     tests: [],
     snapshots: [],
   });
+});
+
+test('a run that Playwright failed without a test or an error is an error, not an empty run', () => {
+  const result = classify(new CollectingReporter(), {
+    status: 'failed',
+    mutant: false,
+  });
+
+  assert.deepEqual(result, {
+    status: DryRunStatus.Error,
+    errorMessage:
+      'Playwright failed without running a test; rerun Stryker with --logLevel trace to see its error.',
+  });
+});
+
+test('a dry run with coverage off still fails when no page loaded instrumented code', async () => {
+  const runner = new PlaywrightTestRunner(
+    { timeoutMS: 10_000 } as unknown as StrykerOptions,
+    {} as Logger,
+  );
+  const reporter = new CollectingReporter();
+  attempt(reporter, 'a', 'expected', 'passed');
+  Object.assign(runner, {
+    run: async () => classify(reporter, { status: 'passed', mutant: false }),
+  });
+
+  const result = await runner.dryRun({
+    timeout: 60_000,
+    disableBail: false,
+    coverageAnalysis: 'off',
+  });
+
+  assert.equal(result.status, DryRunStatus.Error);
+});
+
+test('the missing-coverage error names lost frames when every frame was lost', () => {
+  const passed = {
+    id: 'a',
+    name: 'a',
+    status: TestStatus.Success,
+    timeSpentMs: 10,
+  } as const;
+
+  assert.match(
+    missingCoverageError([passed], [{ lost: true }, { lost: true }]) ?? '',
+    /all 2 frame\(s\) did not answer/,
+  );
 });
 
 test('a run of skipped tests needs no hook', () => {

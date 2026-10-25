@@ -19,7 +19,6 @@ import {
   type MutantRunOptions,
   type MutantRunResult,
   type TestRunner as StrykerTestRunner,
-  TestStatus,
   toMutantRunResult,
 } from '@stryker-mutator/api/test-runner';
 
@@ -40,6 +39,7 @@ import {
 import {
   CollectingReporter,
   listSerialGroups,
+  missingCoverageError,
   projectsThatRun,
   type RunOutput,
   type RunRequest,
@@ -237,25 +237,19 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   }: DryRunOptions): Promise<DryRunResult> {
     const run = await this.run({ disableBail, coverageAnalysis });
 
-    if (run.status !== DryRunStatus.Complete || coverageAnalysis === 'off') {
-      return run.status === DryRunStatus.Complete
-        ? { status: run.status, tests: run.tests }
-        : run;
+    if (run.status !== DryRunStatus.Complete) {
+      return run;
     }
 
     const { tests, snapshots } = run;
-    const failed = tests.some((test) => test.status === TestStatus.Failed);
+    const errorMessage = missingCoverageError(tests, snapshots);
 
-    if (
-      tests.some((test) => test.status !== TestStatus.Skipped) &&
-      !failed &&
-      !snapshots.some((snapshot) => snapshot.mutantCoverage)
-    ) {
-      return {
-        status: DryRunStatus.Error,
-        errorMessage:
-          'No page loaded instrumented code. Is the webServer serving the Stryker sandbox? A server that was already running (reuseExistingServer) serves the original sources.',
-      };
+    if (errorMessage) {
+      return { status: DryRunStatus.Error, errorMessage };
+    }
+
+    if (coverageAnalysis === 'off') {
+      return { status: run.status, tests };
     }
 
     this.reportCoverageGaps(snapshots);
