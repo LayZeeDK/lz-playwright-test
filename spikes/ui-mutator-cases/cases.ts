@@ -32,6 +32,8 @@ const YETI = 'ngx-yeti@87d4377:apps/yeti-app/src/app/fixtures/';
 const ANALOG = 'analog@a377078ec:';
 const HELLO = 'stryker-playwright-hello-world@fa6dd64:';
 const DEMO = 'stryker-playwright-runner@f00806e:apps/demo-app/src/app/';
+const SPAN =
+  'ElementToSpan drops href, type and disabled, which a span cannot take; the prototype keeps them';
 
 export const cases: readonly Case[] = [
   {
@@ -126,12 +128,10 @@ export const cases: readonly Case[] = [
     origin: `${RW}libs/articles/feature-article/src/article-meta/article-meta.component.html:2`,
     jsx: '<a data-testid="article-author" href={\'/profile/\' + username}></a>',
     expect: [
-      [
-        'ElementRole',
-        '<span data-testid="article-author" href={\'/profile/\' + username}></span>',
-      ],
+      ['ElementRole', '<span data-testid="article-author"></span>'],
       ['UrlAttribute', 'href=""'],
     ],
+    gap: SPAN,
   },
   {
     id: 'realworld-11',
@@ -139,13 +139,11 @@ export const cases: readonly Case[] = [
     origin: `${RW}apps/conduit/src/app/layout/navbar/navbar.component.html:11`,
     jsx: '<a className="nav-link" href="/login">Sign in</a>',
     expect: [
-      [
-        'ElementRole',
-        '<span className="nav-link" href="/login">Sign in</span>',
-      ],
+      ['ElementRole', '<span className="nav-link">Sign in</span>'],
       ['UrlAttribute', 'href=""'],
       ['TextLiteral', ''],
     ],
+    gap: SPAN,
   },
   {
     id: 'realworld-12',
@@ -153,13 +151,11 @@ export const cases: readonly Case[] = [
     origin: `${RW}libs/auth/feature-auth/src/login/login.component.html:36`,
     jsx: '<button data-testid="sign-in" disabled={form.invalid || form.pending} type="submit">Sign in</button>',
     expect: [
-      [
-        'ElementRole',
-        '<span data-testid="sign-in" disabled={form.invalid || form.pending} type="submit">Sign in</span>',
-      ],
+      ['ElementRole', '<span data-testid="sign-in">Sign in</span>'],
       ['DisabledAttribute', 'disabled={false}'],
       ['TextLiteral', ''],
     ],
+    gap: SPAN,
   },
   {
     id: 'realworld-13',
@@ -167,13 +163,11 @@ export const cases: readonly Case[] = [
     origin: `${RW}libs/auth/feature-auth/src/login/login.component.html:33`,
     jsx: '<button data-testid="sign-in" disabled={form.invalid || form.pending} type="submit">Sign in</button>',
     expect: [
-      [
-        'ElementRole',
-        '<span data-testid="sign-in" disabled={form.invalid || form.pending} type="submit">Sign in</span>',
-      ],
+      ['ElementRole', '<span data-testid="sign-in">Sign in</span>'],
       ['DisabledAttribute', 'disabled={false}'],
       ['TextLiteral', ''],
     ],
+    gap: SPAN,
   },
   {
     id: 'realworld-14',
@@ -223,15 +217,16 @@ export const cases: readonly Case[] = [
     origin: `${RW}libs/articles/feature-article/src/article.component.html:43`,
     jsx: '<><a href="/login">Sign in</a> or <a href="/register">sign up</a> to add comments on this article.</>',
     expect: [
-      ['ElementRole', '<span href="/login">Sign in</span>'],
+      ['ElementRole', '<span>Sign in</span>'],
       ['UrlAttribute', 'href=""'],
       ['TextLiteral', ''],
       ['TextLiteral', ''],
-      ['ElementRole', '<span href="/register">sign up</span>'],
+      ['ElementRole', '<span>sign up</span>'],
       ['UrlAttribute', 'href=""'],
       ['TextLiteral', ''],
       ['TextLiteral', ''],
     ],
+    gap: SPAN,
   },
   {
     id: 'realworld-21',
@@ -257,11 +252,12 @@ export const cases: readonly Case[] = [
     expect: [
       [
         'ElementRole',
-        '<span type="button" disabled={!live} onClick={() => setLive(false)}>Remove the live buttons</span>',
+        '<span onClick={() => setLive(false)}>Remove the live buttons</span>',
       ],
       ['DisabledAttribute', 'disabled={false}'],
       ['TextLiteral', ''],
     ],
+    gap: SPAN,
   },
   {
     id: 'ngx-yeti-2',
@@ -277,11 +273,11 @@ export const cases: readonly Case[] = [
     origin: `${YETI}fragment-links-fixture.ts:38`,
     jsx: '<div>{page !== null && <a href="../two">Open page two</a>}</div>',
     expect: [
-      ['ElementRole', '<span href="../two">Open page two</span>'],
+      ['ElementRole', '<span>Open page two</span>'],
       ['UrlAttribute', 'href=""'],
       ['TextLiteral', ''],
     ],
-    gap: 'ConditionalElement skips a comparison or logical guard; the prototype does not',
+    gap: `ConditionalElement skips a comparison or logical guard; the prototype does not. ${SPAN}`,
   },
   {
     id: 'ngx-yeti-4',
@@ -300,15 +296,12 @@ export const cases: readonly Case[] = [
     origin: `${YETI}button-fixture.ts:61`,
     jsx: '<a id="next" disabled={last} href={last ? null : \'/replay\'}>Next</a>',
     expect: [
-      [
-        'ElementRole',
-        '<span id="next" disabled={last} href={last ? null : \'/replay\'}>Next</span>',
-      ],
+      ['ElementRole', '<span id="next">Next</span>'],
       ['DisabledAttribute', 'disabled={false}'],
       ['UrlAttribute', 'href=""'],
       ['TextLiteral', ''],
     ],
-    gap: 'ConditionalElement forces a JSX ternary only; the prototype counts a null branch as JSX',
+    gap: `ConditionalElement forces a JSX ternary only; the prototype counts a null branch as JSX. ${SPAN}`,
   },
   {
     id: 'ngx-yeti-6',
@@ -316,13 +309,11 @@ export const cases: readonly Case[] = [
     origin: `${YETI}button-fixture.ts:24`,
     jsx: '<a href="/replay">Leave for a page without buttons</a>',
     expect: [
-      [
-        'ElementRole',
-        '<span href="/replay">Leave for a page without buttons</span>',
-      ],
+      ['ElementRole', '<span>Leave for a page without buttons</span>'],
       ['UrlAttribute', 'href=""'],
       ['TextLiteral', ''],
     ],
+    gap: SPAN,
   },
   {
     id: 'ngx-yeti-7',
@@ -330,13 +321,11 @@ export const cases: readonly Case[] = [
     origin: `${YETI}button-fixture.ts:92`,
     jsx: '<a id="contact-link" href="#contact">Contact us</a>',
     expect: [
-      [
-        'ElementRole',
-        '<span id="contact-link" href="#contact">Contact us</span>',
-      ],
+      ['ElementRole', '<span id="contact-link">Contact us</span>'],
       ['UrlAttribute', 'href=""'],
       ['TextLiteral', ''],
     ],
+    gap: SPAN,
   },
   {
     id: 'ngx-yeti-8',
@@ -402,12 +391,12 @@ export const cases: readonly Case[] = [
     expect: [
       [
         'ElementRole',
-        '<span id="bold" type="button" aria-pressed={bold} onClick={pressBold}>Bold</span>',
+        '<span id="bold" aria-pressed={bold} onClick={pressBold}>Bold</span>',
       ],
       ['StateAttribute', 'aria-pressed={!bold}'],
       ['TextLiteral', ''],
     ],
-    gap: 'EventHandler skips a same-file handler referenced once; the prototype does not',
+    gap: `EventHandler skips a same-file handler referenced once; the prototype does not. ${SPAN}`,
   },
   {
     id: 'ngx-yeti-16',
@@ -416,19 +405,14 @@ export const cases: readonly Case[] = [
     setup: 'const pressBold = () => {\n  setBold((b) => !b);\n};',
     jsx: '<div><button id="bold" type="button" onClick={pressBold}>Bold</button><button id="bold-key" type="button" onClick={pressBold}>Bold</button></div>',
     expect: [
-      [
-        'ElementRole',
-        '<span id="bold" type="button" onClick={pressBold}>Bold</span>',
-      ],
+      ['ElementRole', '<span id="bold" onClick={pressBold}>Bold</span>'],
       ['EventHandler', 'onClick={undefined}'],
       ['TextLiteral', ''],
-      [
-        'ElementRole',
-        '<span id="bold-key" type="button" onClick={pressBold}>Bold</span>',
-      ],
+      ['ElementRole', '<span id="bold-key" onClick={pressBold}>Bold</span>'],
       ['EventHandler', 'onClick={undefined}'],
       ['TextLiteral', ''],
     ],
+    gap: SPAN,
   },
   {
     id: 'ngx-yeti-17',
@@ -445,11 +429,12 @@ export const cases: readonly Case[] = [
     expect: [
       [
         'ElementRole',
-        '<span id="busy" type="button" aria-busy={waiting} aria-disabled={waiting}>Saving</span>',
+        '<span id="busy" aria-busy={waiting} aria-disabled={waiting}>Saving</span>',
       ],
       ['DisabledAttribute', 'aria-disabled={false}'],
       ['TextLiteral', ''],
     ],
+    gap: SPAN,
   },
   {
     id: 'ngx-yeti-19',
@@ -468,9 +453,18 @@ export const cases: readonly Case[] = [
     origin: `${YETI}button-fixture.ts:28`,
     jsx: '<button id="save" type="button">Save</button>',
     expect: [
-      ['ElementRole', '<span id="save" type="button">Save</span>'],
+      ['ElementRole', '<span id="save">Save</span>'],
       ['TextLiteral', ''],
     ],
+    gap: SPAN,
+  },
+  {
+    id: 'ngx-yeti-21',
+    title: 'an alt that is already empty gets no mutant',
+    origin: 'ngx-yeti@87d4377:packages/ngx-yeti/layer/src/layer.stories.ts:153',
+    jsx: '<img src={trail} width="1600" height="900" alt="" />',
+    expect: [],
+    gap: 'an attribute that is already empty gets no mutant; the prototype empties it again',
   },
   {
     id: 'analog-1',
@@ -478,10 +472,11 @@ export const cases: readonly Case[] = [
     origin: `${ANALOG}libs/top-bar/src/lib/top-bar/template.html:16`,
     jsx: '<a href="/"><h1>My Store</h1></a>',
     expect: [
-      ['ElementRole', '<span href="/"><h1>My Store</h1></span>'],
+      ['ElementRole', '<span><h1>My Store</h1></span>'],
       ['UrlAttribute', 'href=""'],
       ['TextLiteral', ''],
     ],
+    gap: SPAN,
   },
   {
     id: 'analog-2',
@@ -491,12 +486,13 @@ export const cases: readonly Case[] = [
     expect: [
       [
         'ElementRole',
-        '<span href="/cart" className="button fancy-button"><i className="material-icons">shopping_cart</i>Checkout</span>',
+        '<span className="button fancy-button"><i className="material-icons">shopping_cart</i>Checkout</span>',
       ],
       ['UrlAttribute', 'href=""'],
       ['TextLiteral', ''],
       ['TextLiteral', ''],
     ],
+    gap: SPAN,
   },
   {
     id: 'analog-3',
@@ -507,11 +503,12 @@ export const cases: readonly Case[] = [
     expect: [
       [
         'ElementRole',
-        "<span title={product.name + ' details'} href={`/products/${product.id}`}>{product.name}</span>",
+        "<span title={product.name + ' details'}>{product.name}</span>",
       ],
       ['ChildExpression', 'null'],
       ['LabelAttribute', 'title=""'],
     ],
+    gap: SPAN,
   },
   {
     id: 'analog-4',
@@ -532,10 +529,10 @@ export const cases: readonly Case[] = [
       "const share = () => {\n  window.alert('The product has been shared!');\n};",
     jsx: '<button type="button" onClick={share}>Share</button>',
     expect: [
-      ['ElementRole', '<span type="button" onClick={share}>Share</span>'],
+      ['ElementRole', '<span onClick={share}>Share</span>'],
       ['TextLiteral', ''],
     ],
-    gap: 'EventHandler skips a same-file handler referenced once; the prototype does not',
+    gap: `EventHandler skips a same-file handler referenced once; the prototype does not. ${SPAN}`,
   },
   {
     id: 'analog-6',
@@ -544,10 +541,11 @@ export const cases: readonly Case[] = [
     setup: "import { share } from './share';",
     jsx: '<button type="button" onClick={share}>Share</button>',
     expect: [
-      ['ElementRole', '<span type="button" onClick={share}>Share</span>'],
+      ['ElementRole', '<span onClick={share}>Share</span>'],
       ['EventHandler', 'onClick={undefined}'],
       ['TextLiteral', ''],
     ],
+    gap: SPAN,
   },
   {
     id: 'analog-7',
@@ -565,13 +563,10 @@ export const cases: readonly Case[] = [
     origin: `${ANALOG}apps/analog-app/src/app/product-alerts/product-alerts.component.ts:7`,
     jsx: '<div>{product() && product()!.price > 700 && (<p><button type="button" onClick={() => notify.emit()}>Notify Me</button></p>)}</div>',
     expect: [
-      [
-        'ElementRole',
-        '<span type="button" onClick={() => notify.emit()}>Notify Me</span>',
-      ],
+      ['ElementRole', '<span onClick={() => notify.emit()}>Notify Me</span>'],
       ['TextLiteral', ''],
     ],
-    gap: 'ConditionalElement skips a comparison or logical guard; the prototype does not',
+    gap: `ConditionalElement skips a comparison or logical guard; the prototype does not. ${SPAN}`,
   },
   {
     id: 'analog-9',
@@ -589,9 +584,10 @@ export const cases: readonly Case[] = [
       ],
       ['TextLiteral', ''],
       ['ChildExpression', 'null'],
-      ['ElementRole', '<span type="submit">Submit</span>'],
+      ['ElementRole', '<span>Submit</span>'],
       ['TextLiteral', ''],
     ],
+    gap: SPAN,
   },
   {
     id: 'analog-10',
@@ -645,9 +641,10 @@ export const cases: readonly Case[] = [
     origin: `${ANALOG}apps/analog-app/src/app/pages/cart.page.ts:36`,
     jsx: '<button className="button" type="submit">Purchase</button>',
     expect: [
-      ['ElementRole', '<span className="button" type="submit">Purchase</span>'],
+      ['ElementRole', '<span className="button">Purchase</span>'],
       ['TextLiteral', ''],
     ],
+    gap: SPAN,
   },
   {
     id: 'analog-16',
@@ -685,12 +682,10 @@ export const cases: readonly Case[] = [
       ],
       ['ChildExpression', 'null'],
       ['ChildExpression', 'null'],
-      [
-        'ElementRole',
-        '<span type="button" onClick={() => addToCart(product)}>Buy</span>',
-      ],
+      ['ElementRole', '<span onClick={() => addToCart(product)}>Buy</span>'],
       ['TextLiteral', ''],
     ],
+    gap: SPAN,
   },
   {
     id: 'analog-20',
@@ -721,10 +716,11 @@ export const cases: readonly Case[] = [
     origin: `${ANALOG}apps/analog-app/src/app/pages/cart.page.ts:15`,
     jsx: '<a href="/shipping">Shipping Prices</a>',
     expect: [
-      ['ElementRole', '<span href="/shipping">Shipping Prices</span>'],
+      ['ElementRole', '<span>Shipping Prices</span>'],
       ['UrlAttribute', 'href=""'],
       ['TextLiteral', ''],
     ],
+    gap: SPAN,
   },
   {
     id: 'hello-1',

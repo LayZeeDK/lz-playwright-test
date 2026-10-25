@@ -41,9 +41,9 @@ are in the Opus draft, section 2. Where this list differs from the draft, this l
 3. `EventHandler`: `onX={handler}` becomes `onX={undefined}` when the handler is not inline, so the operator never repeats the built-in `ArrowFunction` mutant. It also skips a handler that is a function declared in the same file (a function declaration, or a `const` whose initializer is a function or an arrow) when this attribute is the handler's only reference. Babel's scope binding gives that reference count. Killed by the assertion after a `click` or `fill`.
 4. `ConditionalElement`: forces `x && <A/>` to render, and forces each branch of a JSX ternary. It skips a shape when the `&&` left operand, or the ternary test, is a `BinaryExpression` with `==`, `!=`, `===`, `!==`, `<`, `<=`, `>`, or `>=`, or a `LogicalExpression` with `&&` or `||`. For those shapes the built-in `ConditionalExpression` already makes the same mutants: `true` for the left operand of `&&`, which renders the element, and `true` and `false` for a ternary test, which force each branch. So `{open && <p/>}` and `{busy ? <A/> : <B/>}` get operator mutants, and `{off > 0 && <s/>}` and `{n > 1 ? <A/> : <B/>}` get none. Killed by `toBeVisible`, `toHaveCount(0)`.
 5. `UrlAttribute`: `href`, `to`, and `action` become `""`, from a string or a bound expression; a template literal is left to `StringLiteral`, as for `LabelAttribute`. Killed by `toHaveURL`.
-6. `DisabledAttribute`: forces `disabled`, `readOnly`, and `aria-disabled` off, and skips shapes that `BooleanLiteral` already flips. Killed by `toBeDisabled`, `toBeEditable`.
+6. `DisabledAttribute`: forces `disabled`, `readOnly`, and `aria-disabled` off, and skips boolean-literal values (`disabled={true}`), which `BooleanLiteral` already flips. Killed by `toBeDisabled`, `toBeEditable`.
 7. `HiddenAttribute`: forces `hidden` and `aria-hidden` off. It never forces an element hidden. Killed by `toBeVisible`, `getByRole` (hidden elements leave the tree).
-8. `ElementRole`: removes `role`, or swaps a semantic tag for `span`: `button` always, and `a` only when it has an `href`. An `<a>` without `href` has no `link` role, so swapping it would be an equivalent mutant. Killed by `getByRole`.
+8. `ElementRole`: removes `role`, or swaps a semantic tag for `span`: `button` always, and `a` only when it has an `href`. An `<a>` without `href` has no `link` role, so swapping it would be an equivalent mutant. The `span` drops `href`, `type`, and `disabled`, which a `span` cannot take (see "Rules the synthetic cases settled"). Killed by `getByRole`.
 9. `ChildExpression`: a `{value}` child becomes `null`. Killed by `toHaveText`.
 10. `StateAttribute`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, `aria-selected`. Killed by `toHaveAttribute` and role queries with state options.
 
@@ -103,7 +103,7 @@ attribute or the tag that gives an element its implicit role.
 
 ## Rules the synthetic cases settled
 
-`spikes/ui-mutator-cases/` holds 93 synthetic cases: JSX versions of UI shapes in the repos the runner was
+`spikes/ui-mutator-cases/` holds 94 synthetic cases: JSX versions of UI shapes in the repos the runner was
 exercised on (RealWorld, ngx-yeti, Analog and hello-world at the commits `oss/README.md` names, and the demo
 app), each with the exact UI mutants it must give. They run against the prototype. The design was silent on
 these points; Claude settled them on 2026-10-25 from the prototype's behaviour and the Opus draft:
@@ -120,14 +120,35 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
 - `EventHandler` applies to an `onX` prop on a component as well as on an element.
 - `ConditionalElement` forces branches of a ternary rendered as a JSX child only, not a ternary inside an
   attribute value (`href={last ? null : '/replay'}`).
+- An attribute whose value is already empty (`alt=""`, `href=""`) gets no mutant, because emptying it
+  changes nothing. The built-in `StringLiteral` skips the same no-op, and the Opus draft's common rule
+  states it.
+- A negated or other non-literal expression is still forced off: `disabled={!live}` and
+  `hidden={!canModify}` become `{false}`. The built-in `BooleanLiteral` mutant `disabled={live}` also
+  disables an enabled button, so any test that clicks it kills that mutant. `{false}` changes the element
+  only while it is disabled, so only a test that checks the disabled state kills it. The operator
+  mutant is the stronger one, and the Fable draft's skip of `!` is not taken.
+- `ElementToSpan` drops `href`, `type`, and `disabled` from the `span`. React's types do not allow them
+  on a `span` (`HTMLAttributes` in `@types/react` 19.3.0), so a swap that kept them fails to compile under
+  Stryker's TypeScript checker and reports CompileError, not a test result. A `span` ignores them at run
+  time, so dropping them keeps the same role change. Claude measured the compile errors with
+  `npx tsc --jsx react-jsx --strict` on `<span href="/a">`, `<span type="submit">`, and
+  `<span disabled>`: each gives TS2322. Other attributes a `span` accepts, such as `className`, `id`,
+  `aria-*`, and handlers, stay.
+- Three skips from the Opus draft (section 2) hold here too. `LabelAttribute` skips `htmlFor` on a
+  `label` that also wraps its control, because nesting keeps the association. `TextLiteral` skips text
+  inside `style` and `script`, which is CSS or code, not rendered text. `ElementRole` skips a `role` equal
+  to the element's implicit role, such as `<button role="button">`, because removing it changes nothing.
+  No synthetic case covers these three yet.
 
 The prototype also matches `formAction`, `inert`, `aria-current`, `aria-invalid` and `checked`, which this
 design does not list; they stay out of the first release.
 
 The Opus prototype (`spikes/design-opus/ui-mutators.ts`) and both drafts use the earlier names. The
-prototype also predates four of the rules above: the `ConditionalElement` comparison and logical skip, the
-`ConditionalElement` limit to JSX children, the `EventHandler` single-reference skip, and the `href`
-condition on the `a` swap. The synthetic cases that test them run as `todo`. Its counts in `neutral-output.txt`
+prototype also predates six of the rules above: the `ConditionalElement` comparison and logical skip, the
+`ConditionalElement` limit to JSX children, the `EventHandler` single-reference skip, the `href`
+condition on the `a` swap, the skip of an empty value, and the attributes that `ElementToSpan` drops. The
+synthetic cases that test them run as `todo`. Its counts in `neutral-output.txt`
 therefore include one `ConditionalRendering` (now `ConditionalElement`) mutant on
 `price-tag.tsx` line 22 (`off > 0 && (...)`) that the skip removes. With the skip, the demo's
 `price-tag.tsx` gets 2 UI mutants instead of 3, and `app.tsx` stays at 15. The verification plan's
@@ -241,6 +262,10 @@ It catches a broken install of the resolved copy, and it names a second copy onl
 and path in its message. The gate is a real `stryker run` through core with `testRunner: 'command'` and
 no browser, asserting that `mutation.json` lists the operator names (Opus draft, section 5, risk 3). Run
 it before calling the self-check enough, and on every StrykerJS bump.
+
+The `ElementToSpan` rule rests on `tsc` output for three hand-written elements, not on a Stryker run.
+The run for the Opus draft's risk 7 (`@stryker-mutator/typescript-checker` on the demo app) tests it: no `ElementToSpan`
+mutant may report CompileError.
 
 ## What the verification plan adds
 
