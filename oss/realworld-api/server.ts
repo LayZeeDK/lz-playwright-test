@@ -852,7 +852,9 @@ export function createApiServer({
     try {
       // A remote page that rebinds its own host name to 127.0.0.1 still sends that name.
       if (!LOOPBACK_HOST.test(req.headers.host ?? '')) {
-        return respond(req, res, 403, { errors: { host: ['is not loopback'] } });
+        return respond(req, res, 403, {
+          errors: { host: ['is not loopback'] },
+        });
       }
 
       if (req.method === 'OPTIONS') {
