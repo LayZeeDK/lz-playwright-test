@@ -1,7 +1,8 @@
 # Design: UI mutation operators that Playwright tests can kill
 
-Status: chosen design, 2026-10-25, by Claude during an AFK run. Not built yet. Operator names are a
-proposal for Lars (public vocabulary).
+Status: chosen design, 2026-10-25, by Claude during an AFK run. Not built yet. The naming convention
+follows Lars's direction of 2026-10-25 (see Names); the names themselves are Claude's proposal (public
+vocabulary).
 
 ## Why
 
@@ -24,35 +25,77 @@ Opus draft as the base and grafts five parts of the Fable draft.
 |---|---|---|---|
 | Attribute placement | switch inside the attribute value: `aria-label={c ? "" : "Close"}` | the attribute becomes a spread object `{...c ? {...} : {...}}` | Opus: smaller output, React sees the same props, no `key`/`ref` exception, handles `&amp;` |
 | Emptied text | `null`, identical render to the original | `""` | Opus |
-| Element-level mutants (tag swap) | yes, with the JSX child wrap | none in v1 | Opus (`Role` can swap a tag) |
+| Element-level mutants (tag swap) | yes, with the JSX child wrap | none in v1 | Opus (`ElementRole` can swap a tag) |
 | Conditional with a comparison or logical test | no skip, so it repeats the built-in `ConditionalExpression` mutants | skips the test shapes that `ConditionalExpression` already forces (`builtInForcesTrue`) | Fable |
 | Silent plugin failure | warning only | import-time self-check that throws | Fable, moved to an `Ignore` plugin factory (see Integration) |
 | Version drift | peer pinned to `10.1.1` exactly | peer `~10.1.0` plus a runtime warning | Fable |
 | Upstream fixes found | JSX comment directives are ignored for every mutator | built-in `ConditionalExpression` makes a duplicate `true` mutant for JSX `&&` | both |
-| Names | framework-neutral (`TextContent`) | `Jsx` prefix | Opus, because Angular templates come later |
+| Names | framework-neutral (`TextContent`) | `Jsx` prefix | neither: renamed to the StrykerJS convention, still framework-neutral (see Names) |
 
 ## Operators in the first release
 
 Ranked by how often realistic Playwright suites would kill them. Full patterns, examples and skip rules
 are in the Opus draft, section 2. Where this list differs from the draft, this list wins.
 
-1. `TextContent`: empties JSX text that has a letter or digit. Killed by `getByText`, `getByRole({ name })`, `toHaveText`.
-2. `AccessibleName`: empties plain-string `aria-label`, `aria-labelledby`, `alt`, `title`, `placeholder`, and `htmlFor`. Killed by `getByLabel`, `getByRole({ name })`, `getByPlaceholder`, `getByAltText`.
+1. `TextLiteral`: empties JSX text that has a letter or digit. Killed by `getByText`, `getByRole({ name })`, `toHaveText`.
+2. `LabelAttribute`: empties plain-string `aria-label`, `aria-labelledby`, `alt`, `title`, `placeholder`, and `htmlFor`. Killed by `getByLabel`, `getByRole({ name })`, `getByPlaceholder`, `getByAltText`.
 3. `EventHandler`: `onX={handler}` becomes `onX={undefined}` when the handler is not inline, so the operator never repeats the built-in `ArrowFunction` mutant. It also skips a handler that is a function declared in the same file (a function declaration, or a `const` whose initializer is a function or an arrow) when this attribute is the handler's only reference. Babel's scope binding gives that reference count. Killed by the assertion after a `click` or `fill`.
-4. `ConditionalRendering`: forces `x && <A/>` to render, and forces each branch of a JSX ternary. It skips a shape when the `&&` left operand, or the ternary test, is a `BinaryExpression` with `==`, `!=`, `===`, `!==`, `<`, `<=`, `>`, or `>=`, or a `LogicalExpression` with `&&` or `||`. For those shapes the built-in `ConditionalExpression` already makes the same mutants: `true` for the left operand of `&&`, which renders the element, and `true` and `false` for a ternary test, which force each branch. So `{open && <p/>}` and `{busy ? <A/> : <B/>}` get operator mutants, and `{off > 0 && <s/>}` and `{n > 1 ? <A/> : <B/>}` get none. Killed by `toBeVisible`, `toHaveCount(0)`.
-5. `NavigationTarget`: `href`, `to`, and `action` become `""`. Killed by `toHaveURL`.
-6. `DisabledState`: forces `disabled`, `readOnly`, and `aria-disabled` off, and skips shapes that `BooleanLiteral` already flips. Killed by `toBeDisabled`, `toBeEditable`.
-7. `HiddenState`: forces `hidden` and `aria-hidden` off. It never forces an element hidden. Killed by `toBeVisible`, `getByRole` (hidden elements leave the tree).
-8. `Role`: removes `role`, or swaps a semantic tag for `span`: `button` always, and `a` only when it has an `href`. An `<a>` without `href` has no `link` role, so swapping it would be an equivalent mutant. Killed by `getByRole`.
+4. `ConditionalElement`: forces `x && <A/>` to render, and forces each branch of a JSX ternary. It skips a shape when the `&&` left operand, or the ternary test, is a `BinaryExpression` with `==`, `!=`, `===`, `!==`, `<`, `<=`, `>`, or `>=`, or a `LogicalExpression` with `&&` or `||`. For those shapes the built-in `ConditionalExpression` already makes the same mutants: `true` for the left operand of `&&`, which renders the element, and `true` and `false` for a ternary test, which force each branch. So `{open && <p/>}` and `{busy ? <A/> : <B/>}` get operator mutants, and `{off > 0 && <s/>}` and `{n > 1 ? <A/> : <B/>}` get none. Killed by `toBeVisible`, `toHaveCount(0)`.
+5. `UrlAttribute`: `href`, `to`, and `action` become `""`. Killed by `toHaveURL`.
+6. `DisabledAttribute`: forces `disabled`, `readOnly`, and `aria-disabled` off, and skips shapes that `BooleanLiteral` already flips. Killed by `toBeDisabled`, `toBeEditable`.
+7. `HiddenAttribute`: forces `hidden` and `aria-hidden` off. It never forces an element hidden. Killed by `toBeVisible`, `getByRole` (hidden elements leave the tree).
+8. `ElementRole`: removes `role`, or swaps a semantic tag for `span`: `button` always, and `a` only when it has an `href`. An `<a>` without `href` has no `link` role, so swapping it would be an equivalent mutant. Killed by `getByRole`.
 9. `ChildExpression`: a `{value}` child becomes `null`. Killed by `toHaveText`.
-10. `AriaState`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, `aria-selected`. Killed by `toHaveAttribute` and role queries with state options.
+10. `StateAttribute`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, `aria-selected`. Killed by `toHaveAttribute` and role queries with state options.
 
-Later: `ListTruncate` (`.map` becomes `.slice(0, 1).map`, from the Fable draft), button `type` swap, Angular
+Later: `ListExpression` (`.map` becomes `.slice(0, 1).map`, from the Fable draft), button `type` swap, Angular
 templates, and CSS. Each waits for a reason given in the drafts' "later" sections.
 
-The Opus prototype (`spikes/design-opus/ui-mutators.ts`) predates three of these rules: the
-`ConditionalRendering` skip, the `EventHandler` single-reference skip, and the `href` condition on the
-`a` swap. Its counts in `neutral-output.txt` therefore include one `ConditionalRendering` mutant on
+## Names
+
+Lars, 2026-10-25: "Align with names of 1st-party StrykerJS and weapon-regex mutation operators", and
+"You may also seek inspiration in Stryker .NET and Scala". Claude read the names in the local clones:
+StrykerJS `v10.1.1` (`packages/instrumenter/src/mutators/`), weapon-regex `v2.0.6`
+(`core/src/main/scala/weaponregex/internal/mutator/`), Stryker.NET (`src/Stryker.Abstractions/Mutator.cs`)
+and stryker4s (`modules/core/src/main/scala/stryker4s/mutation/`), both at their current heads.
+
+- **Operator names follow StrykerJS.** A StrykerJS mutator name is the kind of syntax it changes, then
+  the syntax category: `ArithmeticOperator`, `EqualityOperator`, `BooleanLiteral`, `StringLiteral`,
+  `ConditionalExpression`, `BlockStatement`, `ArrowFunction`. stryker4s uses the same names, and
+  Stryker.NET uses the short forms (`Equality`, `String`, `Statement`). The operator name is what users
+  write in `mutator.excludedMutations` and `// Stryker disable`, and what reports show as `mutatorName`.
+  The UI operators keep that shape with markup categories that fit JSX and Angular templates alike:
+  `Literal` for static text, `Attribute`, `Element`, `Expression`, and `Handler`. StrykerJS groups one
+  syntax by meaning (equality, logical and arithmetic operators are all binary expressions), so the
+  attribute operators are grouped by what the attribute does.
+- **Mutation names follow weapon-regex.** A weapon-regex mutation name is the construct, then the change:
+  `QuantifierRemoval`, `CharClassNegation`, and `GroupToNCGroup` for "X to Y". StrykerJS reports only the
+  operator name (the built-in `Regex` mutator reports weapon-regex's mutations as `Regex`), so these names
+  appear in docs, tests and the operator table that upstreaming would add (see Upstream path), not in
+  `mutatorName`.
+
+| Operator | Mutations | Earlier name (drafts, spike) |
+|---|---|---|
+| `TextLiteral` | `TextRemoval` | `TextContent` |
+| `LabelAttribute` | `LabelRemoval` | `AccessibleName` |
+| `EventHandler` | `EventHandlerRemoval` | `EventHandler` |
+| `ConditionalElement` | `ConditionalGuardRemoval` (`x && <A/>` to `<A/>`), `ConditionalToConsequent`, `ConditionalToAlternate` | `ConditionalRendering` |
+| `UrlAttribute` | `UrlRemoval` | `NavigationTarget` |
+| `DisabledAttribute` | `DisabledRemoval` | `DisabledState` |
+| `HiddenAttribute` | `HiddenRemoval` | `HiddenState` |
+| `ElementRole` | `RoleRemoval`, `ElementToSpan` | `Role` |
+| `ChildExpression` | `ChildExpressionRemoval` | `ChildExpression` |
+| `StateAttribute` | `StateNegation` | `AriaState` |
+| `ListExpression` (later) | `ListTruncation` | `ListTruncate` |
+
+Two names do not fit the pattern exactly, the way StrykerJS's `ConditionalExpression` also mutates `if`
+tests and loops. `DisabledAttribute` also covers `readOnly`, and `ElementRole` changes either the `role`
+attribute or the tag that gives an element its implicit role.
+
+The Opus prototype (`spikes/design-opus/ui-mutators.ts`) and both drafts use the earlier names. The
+prototype also predates three of the rules above: the `ConditionalElement` skip, the `EventHandler`
+single-reference skip, and the `href` condition on the `a` swap. Its counts in `neutral-output.txt`
+therefore include one `ConditionalRendering` (now `ConditionalElement`) mutant on
 `price-tag.tsx` line 22 (`off > 0 && (...)`) that the skip removes. With the skip, the demo's
 `price-tag.tsx` gets 2 UI mutants instead of 3, and `app.tsx` stays at 15. The verification plan's
 must-not-generate rows (Opus draft, section 6.1) gain `n > 0 && <A/>`, `a === b ? <A/> : <B/>`, a
@@ -68,7 +111,7 @@ remove the cases that are cheap to detect. These remain:
   the native submit through. The two differ only when the handler is shared or a parent handler relies
   on the event bubbling. Examples are a handler imported from another file, or a handler passed in
   through props and emptied in the parent's file.
-- `ConditionalRendering` on an empty list renders an empty `<ul>`, which Playwright reports as not
+- `ConditionalElement` on an empty list renders an empty `<ul>`, which Playwright reports as not
   visible. The mutant is not equivalent, but `toBeHidden` does not kill it. `toHaveCount(0)` on the items
   does.
 
@@ -117,7 +160,7 @@ remove the cases that are cheap to detect. These remain:
   worker, for example a mutation run of a test that starts Stryker, the inner main process inherits the
   variable. The ignorer then throws the "install did not run" error, so the run stops instead of
   silently losing UI mutants.
-- **Reports.** Each operator keeps its own `mutatorName`, so reports and filters show `TextContent` next
+- **Reports.** Each operator keeps its own `mutatorName`, so reports and filters show `TextLiteral` next
   to `StringLiteral`.
 
 Claude read the call sites cited in this section in the StrykerJS `v10.1.1` tag
