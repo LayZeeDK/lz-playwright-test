@@ -38,14 +38,15 @@ edit('apps/conduit-e2e/playwright.config.ts', (source) =>
     ? source
     : source.replace(
         /webServer: \{([\s\S]*?)\n {2}\},/,
-        `webServer: [
+        // JSON literals and a quoted path keep a space, quote or shell character in a path inert.
+        (_match, upstream: string) => `webServer: [
     {
-      command: 'node ${server}',
-      url: '${api}/tags',
+      command: ${JSON.stringify(`node "${server}"`)},
+      url: ${JSON.stringify(`${api}/tags`)},
       reuseExistingServer: false,
-      env: { PORT: '3100', STATE_FILE: '${stateFile}' },
+      env: { PORT: '3100', STATE_FILE: ${JSON.stringify(stateFile)} },
     },
-    {$1
+    {${upstream}
     },
   ],`,
       ),
