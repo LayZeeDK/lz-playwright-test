@@ -274,6 +274,10 @@ export function missingCoverageError(
     return undefined;
   }
 
+  if (snapshots.length === 0) {
+    return 'Tests ran, but none opened a page, so no page loaded instrumented code. The dry run needs at least one test that loads the app in a page.';
+  }
+
   const lost = snapshots.filter((snapshot) => snapshot.lost).length;
 
   if (lost === snapshots.length && lost > 0) {

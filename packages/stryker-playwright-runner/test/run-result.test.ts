@@ -228,6 +228,20 @@ test('the missing-coverage error names lost frames when every frame was lost', (
   );
 });
 
+test('the missing-coverage error says no page opened instead of blaming the webServer', () => {
+  const passed = {
+    id: 'a',
+    name: 'a',
+    status: TestStatus.Success,
+    timeSpentMs: 10,
+  } as const;
+
+  assert.equal(
+    missingCoverageError([passed], []),
+    'Tests ran, but none opened a page, so no page loaded instrumented code. The dry run needs at least one test that loads the app in a page.',
+  );
+});
+
 test('a run of skipped tests needs no hook', () => {
   const reporter = new CollectingReporter();
   attempt(reporter, 'a', 'skipped', 'skipped');
