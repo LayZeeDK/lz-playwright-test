@@ -96,7 +96,8 @@ export class CollectingReporter {
   }
 }
 
-// The projects runTests runs: the option's, else the default ones. Unnamed, listTests adds default: false.
+// The projects runTests runs: the option's, else the default ones. Given no names, listTests would also
+// load the default: false projects.
 export function projectsThatRun(
   option: string[] | undefined,
   projects: { default: boolean; project: { name: string } }[],

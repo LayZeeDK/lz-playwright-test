@@ -144,7 +144,7 @@ Each entry: AST pattern (Babel node types, from `@babel/types` 8.0.8 as nested i
 
 ### 3.1 Package shape
 
-One workspace package, `packages/stryker-ui-mutators`, published as `@layzeedk/stryker-ui-mutators` (the Playwright runner is `@layzeedk/stryker-playwright-runner` [checked: `packages/stryker-playwright-runner/package.json`]). It is a Stryker plugin module: listed in `plugins`, imported by core's `PluginLoader` in the main process before instrumentation [checked: `packages/core/src/di/plugin-loader.ts:171` imports the module; research 3.2 for the executor order].
+One workspace package, `packages/stryker-ui-mutators`, named `@layzeedk/stryker-ui-mutators` (the Playwright runner is `@layzeedk/stryker-playwright-runner` [checked: `packages/stryker-playwright-runner/package.json`]). It is a Stryker plugin module: listed in `plugins`, imported by core's `PluginLoader` in the main process before instrumentation [checked: `packages/core/src/di/plugin-loader.ts:171` imports the module; research 3.2 for the executor order].
 
 ```
 packages/stryker-ui-mutators/
