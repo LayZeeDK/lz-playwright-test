@@ -1,4 +1,6 @@
 // Forces Stryker's own timeout to fire before Playwright's per-test timeout (floor 2000 ms).
+import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
+
 export default {
   plugins: ['@spr/stryker-playwright-runner'],
   testRunner: 'playwright',
@@ -9,4 +11,4 @@ export default {
   concurrency: 1,
   reporters: ['clear-text'],
   tempDirName: '.stryker-tmp-forced',
-};
+} satisfies PartialStrykerOptions;

@@ -1,3 +1,5 @@
+import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
+
 export default {
   plugins: ['@spr/stryker-playwright-runner'],
   testRunner: 'playwright',
@@ -7,4 +9,4 @@ export default {
   concurrency: 1,
   reporters: ['clear-text', 'progress'],
   tempDirName: '.stryker-tmp-pw',
-};
+} satisfies PartialStrykerOptions;
