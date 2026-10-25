@@ -18,7 +18,8 @@ Yes, with one plugin (`testRunner: 'playwright'`) for both kinds of test. Playwr
 `@playwright/experimental-ct-*` packages. Component tests are now plain `@playwright/test` tests that
 call the built-in `mount()` fixture against your own dev server. The same runner code runs both, with no
 component-specific branch. The price is a dependency on undocumented Playwright internals, which any
-Playwright release can change. Limits lists the six the runner uses.
+Playwright release can change. Limits lists the six internals and the one undocumented environment
+variable that the runner uses.
 
 It also ran, with no runner change, on copies of four open-source repos: the hello-world repo (7
 mutants), the Angular/Nx RealWorld app (48), ngx-yeti (2, with 234 e2e tests), and Analog (8). Treat
@@ -45,15 +46,15 @@ lists the changes, and Limits lists the general ones.
   whose context stays open, skip the before-close hook for what they close, so the hook reads those
   pages first. The dry run warns about frames that did not answer in time and logs how much coverage
   came from shared contexts.
-- Each mutant run passes Stryker's timeout, less 5 s, to Playwright as the per-test timeout. A test that
-  hits that timeout makes the mutant a Timeout. If the looping test starts within about the first 3 s of
-  the run and does not raise its own timeout, an infinite loop with no hit limit ends inside Playwright,
-  and the worker and `webServer` stay up. The 5 s is a 3 s budget for the run to start plus 2 s for
-  reading coverage from the hung page, so a test that starts later runs past Stryker's timer (inferred
-  from the constants in `playwright-test-runner.ts`). Stryker's own timer still applies. When it fires,
-  the runner stops the Playwright run, Stryker kills the worker's process tree, and a fresh worker
-  starts.
-- Mutant runs turn off the page snapshot that Playwright takes of a failed test for its error prompt
+- Each mutant run passes Stryker's timeout, less 5 s but at least 2 s, to Playwright as the per-test
+  timeout. A test that hits that timeout makes the mutant a Timeout. If the looping test starts within
+  about the first 3 s of the run and does not raise its own timeout, an infinite loop with no hit limit
+  ends inside Playwright, and the worker and `webServer` stay up. The 5 s is a 3 s budget for the run
+  to start plus 2 s for reading coverage from the hung page, so a test that starts later runs past
+  Stryker's timer (inferred from the constants in `playwright-test-runner.ts`). Stryker's own timer
+  still applies. When it fires, the runner stops the Playwright run, Stryker kills the worker's process
+  tree, and a fresh worker starts.
+- Every run turns off the page snapshot that Playwright takes of a failed test for its error prompt
   (`PLAYWRIGHT_NO_COPY_PROMPT`). On a page stuck in a loop, that snapshot waits out a 5 s timeout. With
   the snapshot on, a timed-out run took 12.5 s on an 8 s budget, past Stryker's timer. With it off, the
   same run took about 7 s. Both times are from the decision log and were not rerun.
@@ -70,8 +71,9 @@ lists the changes, and Limits lists the general ones.
 - The runner fails loudly instead of reporting survivors when the internals it calls are missing, when
   tests ran but the hook never installed, when a mutant run produced no test results, when Playwright
   failed without running a test, or when the Playwright run was interrupted. The dry run also fails
-  when tests ran but no page loaded instrumented code, whatever the `coverageAnalysis` setting. When
-  frames did not answer in time, that error says so instead of blaming only the server. A dry run that
+  when tests ran but no page loaded instrumented code, whatever the `coverageAnalysis` setting. That
+  error asks whether the `webServer` serves the Stryker sandbox, with two exceptions. When no test opened
+  a page, it says so. When every frame failed to answer in time, it says that instead. A dry run that
   finds no tests and does not fail comes back empty, so Stryker's own `allowEmpty` decides.
 - In a mutant run, a test that fails and then passes on a retry counts as failed: retries set with
   `describe.configure({ retries })` outrank the `retries: 0` that Playwright's `TestRunner.runTests`
@@ -139,23 +141,29 @@ reaches a function from one that does not, coverage across a navigation to a pag
 static coverage for a shared `beforeAll` page and for a page the worker closes, per-test coverage for a
 page the test closes, per-test coverage under `reuseContext`, a runtime kill, a static (module-level)
 kill, a survivor followed by a clean kill, an Error when the selected tests no longer exist, an infinite
-loop that times out inside its budget through the per-test timeout, the hit limit on an infinite loop,
-that no run settings stay in the environment, a `webServer` restarted after it dies between runs, no
-`test-results` folder next to the fixture's Playwright config, and that `dispose` removes the temp
+loop that times out inside its budget through the per-test timeout, the hit limit on an infinite loop
+with the hit limit as the Timeout's reason, that a worker thread a test starts does not install the
+hook, that no run settings stay in the environment, a `webServer` restarted after it dies between runs,
+no `test-results` folder next to the fixture's Playwright config, and that `dispose` removes the temp
 directory the runner kept its output and runs in. Commit b4fedce added four of these
 checks: the page the test closes, the missing tests, the per-test timeout, and the clean environment.
 When they were added, each one failed with its fix removed, and with activation disabled in the hook
 6 of the 16 checks then in the file failed. Those two results are from the decision log of 2026-10-25
 and have not been rerun since. `runner.test.ts` does not cover Stryker's own timeout restart,
 `coverageAnalysis` `'all'` or `'off'`, `workers` above 1 (the ngx-yeti run below is the only evidence
-for that), or the dry-run guard.
+for that), or the dry-run guard. `run-result.test.ts` checks that guard with a stubbed run.
 `test/run-result.test.ts` checks without a browser how a finished run maps to a Stryker result:
-retried tests, a kill next to a timeout, a timed-out test in the dry run, runs with no results,
-skipped tests without the hook, and selecting whole `describe.serial` groups (that check fails with the
-group selection removed). In the browser suite, `runner.test.ts` checks that `init` finds the members
-of the fixture's first `describe.serial` group from Playwright's own test list. No browser check runs a
-widened mutant: each fixture group opens its page in `beforeAll`, that coverage counts as static, so
-their mutants already run every test.
+retried tests, a kill next to a timeout, a timed-out test in the dry run, runs with no results, a run
+that Playwright failed without running a test, skipped tests without the hook, and selecting whole
+`describe.serial` groups (that check fails with the group selection removed). It also checks that `init`
+refuses `--testFiles`, that grouping fails when suites lose `_parallelMode`, and that the dry run fails
+under `coverageAnalysis: 'off'` when no page loaded instrumented code. Two more checks cover the text
+of that error when every frame was lost and when no test opened a page. Three check the coverage merge:
+a `__proto__` test id, counts that are not hit counts, and a context that outlived its test. In the
+browser suite, `runner.test.ts` checks that `init` finds the members of the fixture's first
+`describe.serial` group from Playwright's own test list. No browser check runs a widened mutant: each
+fixture group opens its page in `beforeAll`, that coverage counts as static, so their mutants already
+run every test.
 
 The hello-world runs alternated the two runners (A, B, A, B) five times. The `command` runner starts
 a Vite dev server for every mutant, which is the likeliest source of its extra 20 s. That cause is
@@ -242,6 +250,10 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   A moved worker entry leaves the hook uninstalled, and a missing `_instrumentation` makes the hook throw
   in the worker. Either one fails the dry run. A missing `_parallelMode` stops the runner with an error
   that names it.
+- The runner also sets `PLAYWRIGHT_NO_COPY_PROMPT`, an environment variable that Playwright reads but
+  does not document, to turn off the page snapshot for its error prompt. If a release renames or drops
+  that variable, nothing fails. A timed-out mutant run then takes about 12.5 s on an 8 s budget again,
+  reaches Stryker's own timer, and costs a full init per such mutant.
 - The runner refuses Stryker's `--testFiles` option and fails at startup with "The Playwright test runner
   does not support the --testFiles option."
 - Only code that runs in the page is activated. Server-side code (SSR, API routes) runs in the
@@ -320,7 +332,8 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   pages make such mutants common with this runner.
 - App code that the Node test workers import (not the page) gets the active mutant but no coverage.
   With coverage analysis on, its mutants show as NoCoverage. With `coverageAnalysis: 'off'`, every test
-  runs against them.
+  runs against them. Even with `'off'`, the dry run needs at least one test that loads instrumented code
+  in a page. A suite in which no page loads instrumented code fails the dry run.
 - A timeout that reaches Stryker's own timer costs a full init: config load, global setup, and a
   `webServer` start, including any build that start runs. That happens when the looping test starts
   late in the run, or raises its own timeout with `test.slow()`, `test.setTimeout()`, or

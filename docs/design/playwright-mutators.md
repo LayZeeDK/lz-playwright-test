@@ -326,7 +326,9 @@ decides each operator.
    demo app and the fixtures. An operator that misses one moves to Later, with its counts recorded.
    - The corpus diff shows that its mutants differ from every built-in mutant at the same site.
    - Each of its mutants is classified by hand as killed, survived with a test gap, equivalent, or error
-     (CompileError, Timeout). Equivalent and error mutants together are at most one in ten.
+     (CompileError, Timeout). Equivalent and error mutants together are at most one in ten. This limit
+     is a starting value, not a measured one. Tune it against the real ratios once the first operators
+     have been classified by hand.
    - A Playwright test written for the behaviour kills at least one of its mutants.
 
 ## Rerun the evidence
