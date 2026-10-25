@@ -19,6 +19,11 @@ Yes, with one plugin (`testRunner: 'playwright'`) for both kinds of test. Playwr
 call the built-in `mount()` fixture against your own dev server. The same runner code runs both, with no
 component-specific branch.
 
+It also ran unchanged on four open-source repos: the hello-world repo, the Angular/Nx RealWorld app,
+ngx-yeti (a static Storybook with 234 e2e tests), and Analog (server-side rendering). None of those runs
+needed a runner change. Each needed changes to its copy instead: an upstream test bug, a build switch,
+or an ignore entry. The Evidence section lists them, and Limits lists the general ones.
+
 ## How it works
 
 - Stryker compiles every mutant into one instrumented build (mutant schemata). The instrumented code
