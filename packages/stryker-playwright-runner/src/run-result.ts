@@ -12,7 +12,7 @@ import {
   TestStatus,
 } from '@stryker-mutator/api/test-runner';
 
-import type { SuiteInternals } from './playwright-internals.ts';
+import type { SuiteInternals, TestRunner } from './playwright-internals.ts';
 import type { Snapshot } from './protocol.ts';
 
 type CoverageAnalysis = DryRunOptions['coverageAnalysis'];
@@ -48,16 +48,26 @@ const OUTCOME = {
   skipped: TestStatus.Skipped,
 } as const;
 
-/** Records what Playwright reports. How that maps to a Stryker result is up to `toRunResult`. */
+/** Records what Playwright reports, for `toRunResult` after a run and `listSerialGroups` after a listing. */
 export class CollectingReporter {
   readonly errors: string[] = [];
   // The tail of webServer and global setup output, which carries the reason a server failed to start.
   output = '';
   // Playwright reports each attempt of a retried test with the same TestCase, which holds them all.
   readonly testCases = new Map<string, TestCase>();
+  private suite?: Suite;
 
   printsToStdio() {
     return false;
+  }
+
+  onBegin(_config: unknown, suite: Suite) {
+    this.suite = suite;
+  }
+
+  // Every test Playwright loaded, run or not.
+  get listedTests(): TestCase[] {
+    return this.suite?.allTests() ?? [];
   }
 
   anyAttemptFailed(): boolean {
@@ -84,6 +94,47 @@ export class CollectingReporter {
   onError(error: TestError) {
     this.errors.push(errorText(error));
   }
+}
+
+// The projects runTests runs: the option's, else the default ones. Unnamed, listTests adds default: false.
+export function projectsThatRun(
+  option: string[] | undefined,
+  projects: { default: boolean; project: { name: string } }[],
+): string[] {
+  return option?.length
+    ? option
+    : projects
+        .filter((project) => project.default)
+        .map(({ project }) => project.name);
+}
+
+export async function listSerialGroups(
+  playwright: Pick<TestRunner, 'listTests'>,
+  projects: string[],
+): Promise<Map<string, string[]>> {
+  const reporter = new CollectingReporter();
+  const result = await playwright.listTests(reporter, { projects });
+
+  if (!result) {
+    throw new Error(
+      'Playwright threw while listing the tests. Rerun Stryker with --logLevel trace to see its error.',
+    );
+  }
+
+  if (result.status !== 'passed') {
+    throw new Error(
+      `Playwright could not list the tests (${result.status}):\n${reporter.errors.join('\n')}`,
+    );
+  }
+
+  // A file that fails to load leaves the status "passed", and its serial groups would be missing.
+  if (reporter.errors.length) {
+    throw new Error(
+      `Playwright could not load every test file:\n${reporter.errors.join('\n')}`,
+    );
+  }
+
+  return serialGroups(reporter.listedTests);
 }
 
 /**
@@ -242,6 +293,6 @@ function toTestResult(test: TestCase, isMutantRun: boolean): TestResult {
   };
 }
 
-export function errorText(error: TestError | undefined): string {
+function errorText(error: TestError | undefined): string {
   return error?.message ?? error?.value ?? 'Test failed';
 }

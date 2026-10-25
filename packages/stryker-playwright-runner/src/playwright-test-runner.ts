@@ -4,7 +4,6 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
-import type { TestCase } from '@playwright/test/reporter';
 import {
   INSTRUMENTER_CONSTANTS,
   type MutantCoverage,
@@ -24,11 +23,12 @@ import {
   toMutantRunResult,
 } from '@stryker-mutator/api/test-runner';
 
-import type {
-  CommonModule,
-  CoreBundleModule,
-  RunnerModule,
-  TestRunner,
+import {
+  type CommonModule,
+  type CoreBundleModule,
+  type RunnerModule,
+  TEST_RUNNER_METHODS,
+  type TestRunner,
 } from './playwright-internals.ts';
 import {
   FRAME_READ_TIMEOUT_MS,
@@ -39,11 +39,11 @@ import {
 } from './protocol.ts';
 import {
   CollectingReporter,
-  errorText,
+  listSerialGroups,
+  projectsThatRun,
   type RunOutput,
   type RunRequest,
   type RunResult,
-  serialGroups,
   toRunResult,
   withSerialGroups,
 } from './run-result.ts';
@@ -88,7 +88,6 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   private runsDir?: string;
   private servers: ServerCheck[] = [];
   private serialGroups = new Map<string, string[]>();
-  // The runner's own per-test timeout never exceeds the largest one the config sets.
   private configTestTimeout = Infinity;
   private runCounter = 0;
 
@@ -143,13 +142,18 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     ) as Partial<CoreBundleModule>;
     const isURLAvailable = utils?.isURLAvailable;
 
+    const prototype = testRunner?.TestRunner?.prototype;
+
     if (
-      typeof testRunner?.TestRunner?.prototype?.listTests !== 'function' ||
+      typeof testRunner?.TestRunner !== 'function' ||
+      TEST_RUNNER_METHODS.some(
+        (method) => typeof prototype?.[method] !== 'function',
+      ) ||
       typeof configLoader?.resolveConfigLocation !== 'function' ||
       typeof isURLAvailable !== 'function'
     ) {
       throw new Error(
-        `Playwright ${version} changed the internals this runner calls (playwright/lib/runner TestRunner and its listTests, playwright/lib/common configLoader, playwright-core coreBundle isURLAvailable).`,
+        `Playwright ${version} changed the internals this runner calls (playwright/lib/runner TestRunner with ${TEST_RUNNER_METHODS.join(', ')}; playwright/lib/common configLoader; playwright-core coreBundle isURLAvailable).`,
       );
     }
 
@@ -180,33 +184,17 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     this.warnAboutAssertionTimeouts(config);
     // Every project, setup dependencies included: the one timeout override applies to all that run.
     const timeouts = config.projects.map(({ project }) => project.timeout);
-    this.configTestTimeout = timeouts.includes(0)
-      ? Infinity
-      : Math.max(...timeouts);
-    // Every Stryker test runner process needs the groups, and only one of them runs the dry run.
-    this.serialGroups = await this.listSerialGroups(this.playwright);
+    this.configTestTimeout =
+      timeouts.length === 0 || timeouts.includes(0)
+        ? Infinity
+        : Math.max(...timeouts);
     await this.runGlobalSetup(this.playwright);
-  }
-
-  private async listSerialGroups(playwright: TestRunner) {
-    const testCases: TestCase[] = [];
-    const errors: string[] = [];
-    const { status } = await playwright.listTests(
-      {
-        printsToStdio: () => false,
-        onBegin: (_config, suite) => testCases.push(...suite.allTests()),
-        onError: (error) => errors.push(errorText(error)),
-      },
-      { projects: this.options.projects },
+    // Every Stryker test runner process needs the groups, and only one of them runs the dry run. Listed
+    // after global setup, like Playwright's own CLI, because test files may read what it creates.
+    this.serialGroups = await listSerialGroups(
+      this.playwright,
+      projectsThatRun(this.options.projects, config.projects),
     );
-
-    if (status !== 'passed') {
-      throw new Error(
-        `Playwright could not list the tests (${status}):\n${errors.join('\n')}`,
-      );
-    }
-
-    return serialGroups(testCases);
   }
 
   private warnAboutAssertionTimeouts(

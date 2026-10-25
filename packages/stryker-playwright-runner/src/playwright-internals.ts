@@ -19,15 +19,17 @@ export interface TestRunner {
   initialize(params: Record<string, never>): Promise<void>;
   loadConfig(): Promise<{
     projects: {
+      default: boolean;
       expect?: { timeout?: number };
       project: { name: string; timeout: number };
     }[];
     webServers: { url?: string; port?: number; ignoreHTTPSErrors?: boolean }[];
   }>;
+  // Resolves to undefined when Playwright throws, after printing the error to stderr.
   listTests(
     reporter: Reporter,
     params: { projects?: string[] },
-  ): Promise<{ status: Status }>;
+  ): Promise<{ status: Status } | undefined>;
   runGlobalSetup(reporters: Reporter[]): Promise<{ status: Status }>;
   runGlobalTeardown(): Promise<unknown>;
   runTests(
@@ -36,6 +38,17 @@ export interface TestRunner {
   ): Promise<{ status: Status }>;
   stopTests(): Promise<void>;
 }
+
+// The compiler keeps this list and the interface above in step.
+export const TEST_RUNNER_METHODS = Object.keys({
+  initialize: true,
+  loadConfig: true,
+  listTests: true,
+  runGlobalSetup: true,
+  runGlobalTeardown: true,
+  runTests: true,
+  stopTests: true,
+} satisfies Record<keyof TestRunner, true>) as (keyof TestRunner)[];
 
 export interface RunnerModule {
   testRunner: {

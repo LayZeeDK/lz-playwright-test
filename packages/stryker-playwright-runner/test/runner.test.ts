@@ -143,7 +143,7 @@ test('dry run completes with every test passing', () => {
   );
 });
 
-test('init finds the describe.serial groups, so a runner that never ran the dry run widens a filter too', () => {
+test('init finds the describe.serial groups', () => {
   const { serialGroups } = runner as unknown as {
     serialGroups: Map<string, string[]>;
   };

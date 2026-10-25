@@ -5,6 +5,7 @@ import { test } from 'node:test';
 
 import type {
   FullResult,
+  Suite,
   TestCase,
   TestResult,
 } from '@playwright/test/reporter';
@@ -12,6 +13,8 @@ import { DryRunStatus, TestStatus } from '@stryker-mutator/api/test-runner';
 
 import {
   CollectingReporter,
+  listSerialGroups,
+  projectsThatRun,
   serialGroups,
   toRunResult,
   withSerialGroups,
@@ -207,4 +210,80 @@ test('a mutant run selects every test of a describe.serial group, not one test a
     'edit',
   ]);
   assert.equal(withSerialGroups(undefined, groups), undefined);
+});
+
+// Stands in for Playwright's TestRunner: reports the given errors and tests, then resolves to result.
+function listing(
+  result: { status: FullResult['status'] } | undefined,
+  errors: string[] = [],
+  tests: TestCase[] = [],
+) {
+  const calls: string[][] = [];
+  const playwright = {
+    async listTests(
+      reporter: CollectingReporter,
+      params: { projects?: string[] },
+    ) {
+      calls.push(params.projects ?? []);
+      errors.forEach((message) => reporter.onError({ message }));
+      reporter.onBegin(undefined, {
+        allTests: () => tests,
+      } as unknown as Suite);
+
+      return result;
+    },
+  };
+
+  return { playwright, calls };
+}
+
+test('without a projects option, listing covers the default projects, which are what a run runs', () => {
+  const projects = [
+    { default: true, project: { name: 'chromium' } },
+    { default: false, project: { name: 'smoke' } },
+    { default: true, project: { name: 'setup' } },
+  ];
+
+  assert.deepEqual(projectsThatRun(undefined, projects), ['chromium', 'setup']);
+  assert.deepEqual(projectsThatRun([], projects), ['chromium', 'setup']);
+  assert.deepEqual(projectsThatRun(['smoke'], projects), ['smoke']);
+});
+
+test('listing passes the projects to Playwright and groups the describe.serial tests it lists', async () => {
+  const serial = { _parallelMode: 'serial', parent: undefined };
+  const tests = ['create', 'edit'].map(
+    (id) => ({ id, parent: serial }) as unknown as TestCase,
+  );
+  const { playwright, calls } = listing({ status: 'passed' }, [], tests);
+
+  const groups = await listSerialGroups(playwright, ['chromium']);
+
+  assert.deepEqual(groups.get('edit'), ['create', 'edit']);
+  assert.deepEqual(calls, [['chromium']]);
+});
+
+test('listing fails when a test file does not load, though the status says passed', async () => {
+  const { playwright } = listing({ status: 'passed' }, [
+    'SyntaxError in a.spec.ts',
+  ]);
+
+  await assert.rejects(listSerialGroups(playwright, []), {
+    message: /could not load every test file:\nSyntaxError in a\.spec\.ts/,
+  });
+});
+
+test('listing fails with the status Playwright reports', async () => {
+  const { playwright } = listing({ status: 'failed' }, ['config error']);
+
+  await assert.rejects(listSerialGroups(playwright, []), {
+    message: /could not list the tests \(failed\):\nconfig error/,
+  });
+});
+
+test('listing fails and points at the trace log when Playwright throws', async () => {
+  const { playwright } = listing(undefined);
+
+  await assert.rejects(listSerialGroups(playwright, []), {
+    message: /--logLevel trace/,
+  });
 });

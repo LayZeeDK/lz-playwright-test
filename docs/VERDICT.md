@@ -73,8 +73,9 @@ lists the changes, and Limits lists the general ones.
   fails as expected is no kill. In the dry run, a timed-out test is reported as a failed test.
 - A mutant run that selects one test of a `describe.serial` group runs the whole group, because a later
   test of the chain fails on its own and would count as a kill. Every runner process lists the tests
-  when it starts and finds the groups through Playwright's internal suite flag (`_parallelMode`), so a
-  process that never ran the dry run widens the selection too.
+  of the projects it runs when it starts, after global setup, and finds the groups through Playwright's
+  internal suite flag (`_parallelMode`), so a process that never ran the dry run widens the selection
+  too. A test file that fails to load fails the runner's start instead of dropping its groups.
 - The per-test timeout the runner sets is the smaller of Stryker's budget and the largest test timeout
   over every project in the Playwright config, setup projects included. When all projects share one
   timeout, a slow mutant cannot pass a test that the user's own timeout would fail. Otherwise a test
