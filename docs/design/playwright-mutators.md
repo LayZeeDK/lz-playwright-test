@@ -17,7 +17,7 @@ ever made. These operators make them.
 Two designers worked independently from the same research and brief, on different models:
 `docs/design/playwright-mutators-opus.md` and `docs/design/playwright-mutators-fable.md`. Both spikes
 rerun clean from `spikes/` (commands below). They agree on the top operators and on the integration
-route, which is the strongest signal in the comparison. This design takes the Opus draft as the base and
+route, and two independent designs agreeing counts for more than either draft alone. This design takes the Opus draft as the base and
 grafts four parts of the Fable draft.
 
 | Question | Opus draft | Fable draft | Taken |
@@ -58,11 +58,25 @@ templates, and CSS. Each waits for a reason given in the drafts' "later" section
   `@stryker-mutator/core` will use (resolved from core's own folder), pushes its mutators into the live
   `allMutators` array, and wraps `expressionMutantPlacer.canPlace` and `place` so that `JSXAttribute` and
   `JSXText` become placement sites. Details: Opus draft, sections 3.2 and 3.3.
-- **Fail loud.** Still at import, the plugin instruments a one-line JSX sample and throws if its mutants
-  are missing. That catches a duplicate or bundled instrumenter, which would otherwise drop every UI
-  mutant without a word. A version outside the tested range logs a warning.
+- **Fail loud.** Still at import, the plugin instruments a one-line JSX sample and checks that its
+  mutants come back. That catches a duplicate or bundled instrumenter, which would otherwise drop every
+  UI mutant without a word. Core turns a plugin import error into a warning and runs on without the
+  mutators, so throwing at import is not enough. The failure must surface on a path core does not
+  swallow, for example the factory of an `Ignore` plugin that the config lists in `ignorers` (not yet
+  spiked). A version outside the tested range logs a warning.
+- **Options, later.** A plugin module can export `strykerValidationSchema`, so options such as extra
+  accessible-name props validate against the Stryker config. Mutators still cannot read them at run
+  time, because `NodeMutatorContext` carries only `isExpressionContext`. The `Ignore` plugin factory,
+  which receives the full options before `instrument()`, is the hook that can pass them on.
+- **Process placement.** Core re-imports a module that exports `strykerPlugins` in every worker process.
+  A mutator package that exports only `strykerValidationSchema` stays in the main process, which is the
+  only process that instruments.
 - **Reports.** Each operator keeps its own `mutatorName`, so reports and filters show `TextContent` next
   to `StringLiteral`.
+
+The three integration notes above on import errors, options, and process placement come from the
+thermos-claude-plugin session's read of the StrykerJS 10.1.1 source, recorded in that repository at
+`plans/node-test-mutators/research.md`. Claude has not re-read those call sites.
 
 ## Upstream path
 
