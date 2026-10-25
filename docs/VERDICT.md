@@ -17,7 +17,8 @@ the active mutant into the browser: a Vite `define` and a dev-server restart per
 Yes, with one plugin (`testRunner: 'playwright'`) for both kinds of test. Playwright 1.63 removed the
 `@playwright/experimental-ct-*` packages. Component tests are now plain `@playwright/test` tests that
 call the built-in `mount()` fixture against your own dev server. The same runner code runs both, with no
-component-specific branch.
+component-specific branch. The price is a dependency on undocumented Playwright internals, which any
+Playwright release can change. Limits lists the six the runner uses.
 
 It also ran, with no runner change, on copies of four open-source repos: the hello-world repo (7
 mutants), the Angular/Nx RealWorld app (48), ngx-yeti (2, with 234 e2e tests), and Analog (8). Treat
@@ -231,6 +232,7 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
 ## Limits
 
 - Requires Playwright 1.63 or later. The runner refuses older versions with a clear error.
+- The runner is tested only with Chromium. Firefox and WebKit are untested.
 - The runner depends on six Playwright internals, any of which a Playwright release can change:
   `TestRunner` from `playwright/lib/runner`, `configLoader` from `playwright/lib/common`, `isURLAvailable`
   from `playwright-core/lib/coreBundle`, the path of Playwright's worker entry file

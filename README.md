@@ -6,6 +6,16 @@ Playwright component tests (`mount()`) as Stryker tests, with per-test coverage,
 
 The answer to whether this works, the evidence, and the limits are in `docs/VERDICT.md`.
 
+## Requirements
+
+- Playwright 1.63 or later, tested on 1.63.0 and 1.64.1. The runner calls Playwright internals that a
+  release can change. The Limits section of `docs/VERDICT.md` lists them.
+- StrykerJS 10, tested on 10.1.1.
+- A Node.js version that strips TypeScript types by default, tested on 24.22.0. The package ships its
+  TypeScript source, and Node does not strip types under `node_modules`. Reach the runner through a
+  symlink that Node resolves outside `node_modules`, such as an npm workspace or `npm link`.
+- Chromium. The runner is tested only with Chromium. Firefox and WebKit are untested.
+
 ## Layout
 
 - `packages/stryker-playwright-runner`: the runner, package `@layzeedk/stryker-playwright-runner`.
@@ -13,9 +23,15 @@ The answer to whether this works, the evidence, and the limits are in `docs/VERD
   (`playwright.components.config.mts`).
 - `apps/demo-app-e2e`: the demo app's Playwright e2e tests.
 - `stryker.e2e.config.ts`, `stryker.ct.config.ts`: Stryker configs for the demo.
+- `stryker.e2e.command.config.ts`: the demo baselines on Stryker's `command` runner, selected with
+  `STRYKER_BASELINE=define` or `STRYKER_BASELINE=off`.
 - `oss/`: the configs, patches, and scripts that copies of four open-source repos needed for a Stryker
   run. `oss/README.md` describes each copy.
+- `tools/`: the benchmark scripts that the Rerun section of `docs/VERDICT.md` calls.
 - `docs/research/`: the research behind the design.
+- `docs/filings.md`: drafts of upstream issues found while validating the runner, none filed.
+- `docs/design/`: the design for UI mutation operators that Playwright tests can kill. Not built yet.
+- `spikes/`: throwaway experiments and the test cases behind that design.
 
 ## Options
 
