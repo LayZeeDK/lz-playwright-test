@@ -10,12 +10,13 @@ const heroku = 'https://real-world-app-39656dff2ddc.herokuapp.com/api';
 const api = 'http://localhost:3100/api';
 const appPort = 4260;
 const server = fileURLToPath(new URL('../realworld-api/server.ts', import.meta.url)).replaceAll('\\', '/');
+const serverDir = path.posix.dirname(server);
 const stateFile = path.join(copy, '.stryker-api-state.json').replaceAll('\\', '/');
 
 function edit(
   file: string,
   change: (source: string) => string,
-  applied = (source: string) => source.includes(api) || source.includes(server),
+  applied = (source: string) => source.includes(api) || source.includes(serverDir),
 ) {
   const target = path.join(copy, file);
   const before = readFileSync(target, 'utf8');
@@ -38,14 +39,16 @@ for (const file of [
 }
 
 edit('apps/conduit-e2e/playwright.config.ts', (source) =>
-  source.includes(server)
+  source.includes(serverDir)
     ? source
     : source.replace(
         /webServer: \{([\s\S]*?)\n {2}\},/,
-        // JSON literals and a quoted path keep a space, quote or shell character in a path inert.
+        // Paths go in as JSON literals and as cwd, never into the shell command, so a space, quote, or
+        // shell character in a path stays inert.
         (_match, upstream: string) => `webServer: [
     {
-      command: ${JSON.stringify(`node "${server}"`)},
+      command: 'node server.ts',
+      cwd: ${JSON.stringify(serverDir)},
       url: ${JSON.stringify(`${api}/tags`)},
       reuseExistingServer: false,
       env: { PORT: '3100', STATE_FILE: ${JSON.stringify(stateFile)} },
@@ -87,6 +90,11 @@ const gitignore = path.join(copy, '.gitignore');
 
 if (!readFileSync(gitignore, 'utf8').includes('.stryker-tmp')) {
   appendFileSync(gitignore, '\n# stryker temp files\n.stryker-tmp\n');
+}
+
+// The API double's state file holds its token secret and the users' passwords.
+if (!readFileSync(gitignore, 'utf8').includes('.stryker-api-state.json')) {
+  appendFileSync(gitignore, '.stryker-api-state.json\n');
 }
 
 writeFileSync(
