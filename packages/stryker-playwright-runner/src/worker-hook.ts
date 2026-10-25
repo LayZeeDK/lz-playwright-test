@@ -104,8 +104,9 @@ function install(
       JSON.stringify({ ...snapshot, outlivedItsTest } satisfies Snapshot),
     );
 
+    // The leading newline ends a partial line a killed worker with the same pid left behind.
     if (lines.length) {
-      fs.appendFileSync(outFile, lines.join('\n') + '\n');
+      fs.appendFileSync(outFile, '\n' + lines.join('\n') + '\n');
     }
   }
 

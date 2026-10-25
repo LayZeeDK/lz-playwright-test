@@ -6,6 +6,8 @@ Never apply these to the upstream clone itself. `docs/VERDICT.md` (Evidence) has
 Every copy also needs this runner and StrykerJS installed. Link the runner as a directory junction or
 an absolute link. Node resolves the link and strips the runner's TypeScript outside `node_modules`.
 Every Stryker config here loads the runner by its package name, `@spr/stryker-playwright-runner`.
+That name is not published to npm, where the `@spr` scope is already taken, so install the runner from
+this repo as below, never by name from the registry.
 
 ```sh
 npm install -D @stryker-mutator/core@^10.1.1 file:<this repo>/packages/stryker-playwright-runner
