@@ -19,6 +19,7 @@ import {
   FRAME_READ_TIMEOUT_MS,
   readRunSettings,
   type RunSettings,
+  serializeSnapshot,
   SNAPSHOT_SUFFIX,
   type Snapshot,
 } from './protocol.ts';
@@ -103,7 +104,7 @@ function install(
       perTest &&
       (state.testId === undefined || state.testId !== currentTestId(test));
     const lines = snapshots.map((snapshot) =>
-      JSON.stringify({ ...snapshot, outlivedItsTest } satisfies Snapshot),
+      serializeSnapshot(snapshot, outlivedItsTest),
     );
 
     // The leading newline ends a partial line a killed worker with the same pid left behind.

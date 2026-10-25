@@ -14,6 +14,7 @@ import type { Logger } from '@stryker-mutator/api/logging';
 import { DryRunStatus, TestStatus } from '@stryker-mutator/api/test-runner';
 
 import { PlaywrightTestRunner } from '../src/playwright-test-runner.ts';
+import { serializeSnapshot, type Snapshot } from '../src/protocol.ts';
 import {
   CollectingReporter,
   listSerialGroups,
@@ -226,6 +227,22 @@ test('the missing-coverage error names lost frames when every frame was lost', (
     missingCoverageError([passed], [{ lost: true }, { lost: true }]) ?? '',
     /all 2 frame\(s\) did not answer/,
   );
+});
+
+test('a snapshot JSON cannot hold is written as a lost frame', () => {
+  const cyclic: Record<string, unknown> = {};
+  cyclic.self = cyclic;
+  const hostile: Snapshot[] = [
+    { hitCount: 1n as unknown as number },
+    { mutantCoverage: cyclic as unknown as Snapshot['mutantCoverage'] },
+  ];
+
+  for (const snapshot of hostile) {
+    assert.deepEqual(JSON.parse(serializeSnapshot(snapshot, true)), {
+      lost: true,
+      outlivedItsTest: true,
+    });
+  }
 });
 
 test('the missing-coverage error says no page opened instead of blaming the webServer', () => {

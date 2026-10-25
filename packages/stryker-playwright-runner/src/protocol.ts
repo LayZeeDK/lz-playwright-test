@@ -27,6 +27,21 @@ export interface Snapshot {
   lost?: boolean;
 }
 
+/**
+ * One line of a snapshot file. A page can put a BigInt or a cyclic object in its namespace, which JSON
+ * cannot hold; that frame counts as lost, so the hook never throws inside Playwright's context close.
+ */
+export function serializeSnapshot(
+  snapshot: Snapshot,
+  outlivedItsTest: boolean,
+): string {
+  try {
+    return JSON.stringify({ ...snapshot, outlivedItsTest } satisfies Snapshot);
+  } catch {
+    return JSON.stringify({ lost: true, outlivedItsTest } satisfies Snapshot);
+  }
+}
+
 export function readRunSettings(
   env: NodeJS.ProcessEnv,
 ): RunSettings | undefined {
