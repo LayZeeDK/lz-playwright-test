@@ -1,10 +1,10 @@
 {
-  "name": "@spr/demo-app-e2e",
+  "name": "@layzeedk/demo-app-e2e",
   "version": "0.0.1",
   "private": true,
   "nx": {
     "implicitDependencies": [
-      "@spr/demo-app"
+      "@layzeedk/demo-app"
     ]
   }
 }

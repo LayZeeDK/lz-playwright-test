@@ -8,8 +8,8 @@ The answer to whether this works, the evidence, and the limits are in `docs/VERD
 
 ## Layout
 
-- `packages/stryker-playwright-runner`: the runner, package `@spr/stryker-playwright-runner`.
-- `apps/demo-app` (Nx project `@spr/demo-app`): the demo app and its Playwright component tests
+- `packages/stryker-playwright-runner`: the runner, package `@layzeedk/stryker-playwright-runner`.
+- `apps/demo-app` (Nx project `@layzeedk/demo-app`): the demo app and its Playwright component tests
   (`playwright.components.config.mts`).
 - `apps/demo-app-e2e`: the demo app's Playwright e2e tests.
 - `stryker.e2e.config.ts`, `stryker.ct.config.ts`: Stryker configs for the demo.

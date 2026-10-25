@@ -74,7 +74,7 @@ remove the cases that are cheap to detect. These remain:
 
 ## Integration
 
-- **Package.** `@spr/stryker-ui-mutators`. The user lists it in `plugins` and lists its ignorer in
+- **Package.** `@layzeedk/stryker-ui-mutators`. The user lists it in `plugins` and lists its ignorer in
   `ignorers` (see "Fail loud"). No other options in v1. Users exclude operators with
   `mutator.excludedMutations` and with `// Stryker disable` comments, both of which already match custom
   mutator names.
@@ -99,7 +99,7 @@ remove the cases that are cheap to detect. These remain:
   documented config therefore always has `ignorers: ['ui-mutators']` next to the `plugins` entry.
   Without it, a successful install still registers and runs every operator, because registration
   happens at import. A failed install falls back to core's warning
-  `Error during loading "@spr/stryker-ui-mutators" plugin`, and the run finishes without UI mutants. The
+  `Error during loading "@layzeedk/stryker-ui-mutators" plugin`, and the run finishes without UI mutants. The
   plugin cannot detect the missing entry in that case, because the code that would check is the code
   that failed.
 - **Options, later.** A plugin module can export `strykerValidationSchema`, so options such as extra

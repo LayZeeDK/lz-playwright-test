@@ -144,7 +144,7 @@ Each entry: AST pattern (Babel node types, from `@babel/types` 8.0.8 as nested i
 
 ### 3.1 Package shape
 
-One workspace package, `packages/stryker-ui-mutators`, published as `@spr/stryker-ui-mutators` (the Playwright runner is `@spr/stryker-playwright-runner` [checked: `packages/stryker-playwright-runner/package.json`]). It is a Stryker plugin module: listed in `plugins`, imported by core's `PluginLoader` in the main process before instrumentation [checked: `packages/core/src/di/plugin-loader.ts:171` imports the module; research 3.2 for the executor order].
+One workspace package, `packages/stryker-ui-mutators`, published as `@layzeedk/stryker-ui-mutators` (the Playwright runner is `@layzeedk/stryker-playwright-runner` [checked: `packages/stryker-playwright-runner/package.json`]). It is a Stryker plugin module: listed in `plugins`, imported by core's `PluginLoader` in the main process before instrumentation [checked: `packages/core/src/di/plugin-loader.ts:171` imports the module; research 3.2 for the executor order].
 
 ```
 packages/stryker-ui-mutators/
@@ -161,7 +161,7 @@ packages/stryker-ui-mutators/
 
 The plugin depends on `@babel/types` only through the instrumenter's own nested copy (`createRequire(<instrumenter>/package.json)('@babel/core').types`), so there is exactly one Babel in play; the spike does this [checked: `spike-jsx-placement.ts:19-24`]. The root `node_modules/@babel/types` is 7.29 while the instrumenter nests 8.0.8 [checked]; using the root copy would make `path.replaceWith` validate against a different version.
 
-The lazier alternative, shipping the operators inside `@spr/stryker-playwright-runner` and registering them from its `index.ts`, saves a package but couples two unrelated concerns (a test runner and a mutator set) and would register mutators in every process that loads the runner plugin, including the test-runner child processes where they are useless. Separate package.
+The lazier alternative, shipping the operators inside `@layzeedk/stryker-playwright-runner` and registering them from its `index.ts`, saves a package but couples two unrelated concerns (a test runner and a mutator set) and would register mutators in every process that loads the runner plugin, including the test-runner child processes where they are useless. Separate package.
 
 ### 3.2 Registering with StrykerJS 10.1.1 without upstream changes
 

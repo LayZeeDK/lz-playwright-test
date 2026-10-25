@@ -102,7 +102,7 @@ writeFileSync(
   `import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 
 export default {
-  plugins: ['@spr/stryker-playwright-runner'],
+  plugins: ['@layzeedk/stryker-playwright-runner'],
   testRunner: 'playwright',
   playwright: { configFile: 'apps/conduit-e2e/playwright.config.ts' },
   mutate: ['libs/auth/data-access/src/auth.store.ts'],

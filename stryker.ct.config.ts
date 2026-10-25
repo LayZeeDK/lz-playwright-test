@@ -1,7 +1,7 @@
 import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 
 export default {
-  plugins: ['@spr/stryker-playwright-runner'],
+  plugins: ['@layzeedk/stryker-playwright-runner'],
   testRunner: 'playwright',
   playwright: { configFile: 'apps/demo-app/playwright.components.config.mts' },
   mutate: ['apps/demo-app/src/app/price-tag.tsx'],
