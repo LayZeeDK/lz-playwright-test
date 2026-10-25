@@ -79,6 +79,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   static inject = tokens(commonTokens.options, commonTokens.logger);
 
   private readonly options: PlaywrightRunnerOptions;
+  private readonly testFiles: string[] | undefined;
   private readonly timeoutMS: number;
   private readonly log: Logger;
   private readonly baseNodeOptions = process.env.NODE_OPTIONS;
@@ -95,6 +96,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     this.options =
       (options as StrykerOptions & { playwright?: PlaywrightRunnerOptions })
         .playwright ?? {};
+    this.testFiles = options.testFiles;
     this.timeoutMS = options.timeoutMS;
     this.log = log;
   }
@@ -104,6 +106,12 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   }
 
   async init(): Promise<void> {
+    if (this.testFiles?.length) {
+      throw new Error(
+        'The Playwright test runner does not support the --testFiles option.',
+      );
+    }
+
     const configFile = this.options.configFile
       ? path.resolve(this.options.configFile)
       : undefined;

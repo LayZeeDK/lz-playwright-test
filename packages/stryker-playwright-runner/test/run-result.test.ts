@@ -9,8 +9,11 @@ import type {
   TestCase,
   TestResult,
 } from '@playwright/test/reporter';
+import type { StrykerOptions } from '@stryker-mutator/api/core';
+import type { Logger } from '@stryker-mutator/api/logging';
 import { DryRunStatus, TestStatus } from '@stryker-mutator/api/test-runner';
 
+import { PlaywrightTestRunner } from '../src/playwright-test-runner.ts';
 import {
   CollectingReporter,
   listSerialGroups,
@@ -286,4 +289,18 @@ test('listing fails and points at the trace log when Playwright throws', async (
   await assert.rejects(listSerialGroups(playwright, []), {
     message: /--logLevel trace/,
   });
+});
+
+test('init refuses --testFiles before it loads the Playwright config', async () => {
+  const options = {
+    testFiles: ['a.spec.ts'],
+    timeoutMS: 10_000,
+    playwright: { configFile: 'missing.playwright.config.ts' },
+  };
+  const runner = new PlaywrightTestRunner(
+    options as unknown as StrykerOptions,
+    {} as Logger,
+  );
+
+  await assert.rejects(runner.init(), { message: /--testFiles/ });
 });
