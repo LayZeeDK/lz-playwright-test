@@ -21,9 +21,10 @@ Check: `node --test D:/projects/sandbox/stryker-playwright-runner/oss/realworld-
 Use `localhost`, not `127.0.0.1`, everywhere: auth is a `jwt` cookie (the app sends no `Authorization` header), and the cookie is only
 shared between `localhost:4200` and `localhost:3100` when both use the same host name.
 
-The double listens on loopback only, answers only requests whose `Host` is a loopback name, and grants CORS with credentials only to
-`http://` origins on a loopback name. The state file holds the token secret and the seeded passwords; it is written readable by its
-owner only, and `oss/realworld-api/state.json` is gitignored.
+The double listens on loopback only, answers only requests whose `Host` is a loopback name, refuses any request whose `Origin` is not
+an `http://` origin on a loopback name, and grants CORS with credentials only to those origins. The state file holds the token secret
+and the seeded passwords. On POSIX it is written with mode 0600; on Windows the mode is ignored and the folder's ACL decides who can
+read it. `oss/realworld-api/state.json` is gitignored.
 
 ## Edits for a disposable copy of the app
 

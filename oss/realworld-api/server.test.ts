@@ -278,8 +278,17 @@ describe('realworld api double', async () => {
 
     const remote = await api('/tags', { headers: { Origin: 'https://example.com' } });
 
+    assert.equal(remote.status, 403);
     assert.equal(remote.headers.get('access-control-allow-origin'), null);
     assert.equal(remote.headers.get('access-control-allow-credentials'), null);
+
+    const crossSiteWrite = await api('/users', {
+      method: 'POST',
+      headers: { Origin: 'https://example.com', 'Content-Type': 'text/plain' },
+      body: { user: { username: 'xsite', email: 'xsite@example.com', password: 'secret123' } },
+    });
+
+    assert.equal(crossSiteWrite.status, 403);
     assert.equal((await api('/nothing')).status, 404);
 
     const port = new URL(base).port;

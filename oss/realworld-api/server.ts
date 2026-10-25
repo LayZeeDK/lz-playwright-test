@@ -857,6 +857,16 @@ export function createApiServer({
         });
       }
 
+      // CORS only hides responses; a simple cross-site POST would still register users and rewrite state.
+      if (
+        req.headers.origin !== undefined &&
+        !loopbackOrigin(req.headers.origin)
+      ) {
+        return respond(req, res, 403, {
+          errors: { origin: ['is not loopback'] },
+        });
+      }
+
       if (req.method === 'OPTIONS') {
         return respond(req, res, 204);
       }
