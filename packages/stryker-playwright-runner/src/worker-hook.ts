@@ -112,7 +112,8 @@ function install(
     }
   }
 
-  // page.close() and browser.close() skip the before-close hook for what they close, so read first.
+  // browser.close(), and page.close() on a page whose context stays open, skip the before-close hook for
+  // what they close, so read first.
   function collectBeforePageCloses(state: ContextState, page: Page) {
     const close = page.close.bind(page);
     page.close = async (options) => {
