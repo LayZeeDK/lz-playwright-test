@@ -15,13 +15,26 @@ import type {
 
 const [configArg, runsArg = '3', ...testIds] = process.argv.slice(2);
 const configFile = path.resolve(configArg);
-const playwrightRequire = createRequire(createRequire(configFile).resolve('@playwright/test'));
-const { testRunner } = playwrightRequire('playwright/lib/runner') as RunnerModule;
-const { configLoader } = playwrightRequire('playwright/lib/common') as CommonModule;
-const { chromium } = playwrightRequire('playwright-core') as { chromium: BrowserType };
+const playwrightRequire = createRequire(
+  createRequire(configFile).resolve('@playwright/test'),
+);
+const { testRunner } = playwrightRequire(
+  'playwright/lib/runner',
+) as RunnerModule;
+const { configLoader } = playwrightRequire(
+  'playwright/lib/common',
+) as CommonModule;
+const { chromium } = playwrightRequire('playwright-core') as {
+  chromium: BrowserType;
+};
 
-const browserServer = process.env.BENCH_SHARED_BROWSER ? await chromium.launchServer() : undefined;
-const runner = new testRunner.TestRunner(configLoader.resolveConfigLocation(configFile), {});
+const browserServer = process.env.BENCH_SHARED_BROWSER
+  ? await chromium.launchServer()
+  : undefined;
+const runner = new testRunner.TestRunner(
+  configLoader.resolveConfigLocation(configFile),
+  {},
+);
 await runner.initialize({});
 
 let t0 = performance.now();
@@ -30,27 +43,30 @@ const onError = (error: TestError) => console.error(error.message);
 await runner.runGlobalSetup([{ onError }]);
 console.log(`globalSetup (webServer) ${ms()} ms`);
 
-for (let i = 0; i < Number(runsArg); i++) {
-  const marks: { loaded?: number; firstTest?: number; lastTestEnd?: number } = {};
-  const reporter = {
-    onBegin: () => (marks.loaded = ms()),
-    onTestBegin: () => (marks.firstTest ??= ms()),
-    onTestEnd: () => (marks.lastTestEnd = ms()),
-    onError,
-  };
-  t0 = performance.now();
-  const params: RunTestsParams & { connectWsEndpoint?: string } = {
-    locations: [],
-    testIds: testIds.length ? testIds : undefined,
-    workers: 1,
-    connectWsEndpoint: browserServer?.wsEndpoint(),
-    disableConfigReporters: true,
-  };
-  const { status } = await runner.runTests(reporter, params);
-  console.log(
-    `run ${i}: ${status} load ${marks.loaded} ms, first test begins ${marks.firstTest} ms, last test ends ${marks.lastTestEnd} ms, done ${ms()} ms`,
-  );
+try {
+  for (let i = 0; i < Number(runsArg); i++) {
+    const marks: { loaded?: number; firstTest?: number; lastTestEnd?: number } =
+      {};
+    const reporter = {
+      onBegin: () => (marks.loaded = ms()),
+      onTestBegin: () => (marks.firstTest ??= ms()),
+      onTestEnd: () => (marks.lastTestEnd = ms()),
+      onError,
+    };
+    t0 = performance.now();
+    const params: RunTestsParams & { connectWsEndpoint?: string } = {
+      locations: [],
+      testIds: testIds.length ? testIds : undefined,
+      workers: 1,
+      connectWsEndpoint: browserServer?.wsEndpoint(),
+      disableConfigReporters: true,
+    };
+    const { status } = await runner.runTests(reporter, params);
+    console.log(
+      `run ${i}: ${status} load ${marks.loaded} ms, first test begins ${marks.firstTest} ms, last test ends ${marks.lastTestEnd} ms, done ${ms()} ms`,
+    );
+  }
+} finally {
+  await runner.runGlobalTeardown();
+  await browserServer?.close();
 }
-
-await runner.runGlobalTeardown();
-await browserServer?.close();

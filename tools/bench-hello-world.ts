@@ -1,7 +1,7 @@
 // Interleaved A/B on a stryker-playwright-hello-world checkout: this runner against the repo's own
 // command runner, five rounds, so warmup and drift hit both sides alike.
 // Run: node tools/bench-hello-world.ts <hello-world dir> [rounds]
-// The checkout needs this runner installed and a stryker.playwright.config.mjs (testRunner 'playwright').
+// The checkout needs this runner installed and oss/hello-world/stryker.playwright.config.ts copied in.
 // The command side rebuilds the repo's docs/ folder, so run it in a scratch checkout.
 import { spawnSync } from 'node:child_process';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -21,10 +21,19 @@ const viteConfig = path.join(dir, 'vite.config.js');
 const withDefine = readFileSync(viteConfig, 'utf8');
 const withoutDefine =
   'import { defineConfig } from "vite";\n\nexport default defineConfig({});\n';
+
+// An interrupted run skips the restore below and leaves the stripped file behind, which would become
+// the command side's baseline and score 0 kills without any sign.
+if (withDefine === withoutDefine) {
+  throw new Error(
+    `${viteConfig} has no define: restore the repo's version (git checkout -- vite.config.js) first.`,
+  );
+}
+
 const sides = [
   {
     name: 'runner',
-    config: 'stryker.playwright.config.mjs',
+    config: 'stryker.playwright.config.ts',
     vite: withoutDefine,
   },
   { name: 'command', config: 'stryker.config.mjs', vite: withDefine },
