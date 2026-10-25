@@ -19,10 +19,12 @@ Yes, with one plugin (`testRunner: 'playwright'`) for both kinds of test. Playwr
 call the built-in `mount()` fixture against your own dev server. The same runner code runs both, with no
 component-specific branch.
 
-It also ran unchanged on four open-source repos: the hello-world repo, the Angular/Nx RealWorld app,
-ngx-yeti (a static Storybook with 234 e2e tests), and Analog (server-side rendering). None of those runs
-needed a runner change. Each needed changes to its copy instead: an upstream test bug, a build switch,
-or an ignore entry. The Evidence section lists them, and Limits lists the general ones.
+It also ran, with no runner change, on copies of four open-source repos: the hello-world repo (7
+mutants), the Angular/Nx RealWorld app (48), ngx-yeti (2, with 234 e2e tests), and Analog (8). Treat
+that as a smoke test, not a broad validation. The runner's author chose each file to mutate, every copy
+needed changes before its suite passed (an upstream test bug, a build switch, an ignore entry), and the
+Analog file has no server-only code, so it does not exercise server-side rendering. The Evidence section
+lists the changes, and Limits lists the general ones.
 
 ## How it works
 
@@ -71,6 +73,9 @@ or an ignore entry. The Evidence section lists them, and Limits lists the genera
 
 All numbers are from one Windows 11 arm64 machine shared with other sessions, so treat timings as
 indicative. Each row is a single run unless it says otherwise. Commands to rerun them are at the end.
+The demo rows were measured before the last runner change (the run-classification rewrite and the
+security fixes). The browser test suite, the forced-timeout check, and the RealWorld, ngx-yeti, and
+Analog rows ran on the final code.
 
 | Case | Runner | Score | Wall time |
 |---|---|---|---|
@@ -128,8 +133,9 @@ The ngx-yeti run is the only one with `playwright.workers` above 1, which the in
 cover. Coverage still came back per test. Each mutant was covered by 20 of the 234 tests, and Stryker
 stopped at the first kill, after 7 tests for one mutant and after 1 for the other. On one worker the dry
 run ran longer than Stryker's default 5-minute `dryRunTimeoutMinutes`. With 2 workers it took 2m57s. The clone needed one step before Stryker
-could start its Storybook: building the workspace package `yeti-css` in the original
-(`nx run yeti-css:yeti-build`), for the reason in the npm-workspaces entry under Limits.
+could start its Storybook: building the workspace package `yeti-css` in the clone itself, outside
+Stryker's sandbox (`nx run yeti-css:yeti-build`), for the reason in the npm-workspaces entry under
+Limits.
 
 Analog serves its pages from a production SSR build that the `webServer` starts once, and the page
 component also runs in the browser after hydration. The four kills are the `share()` and `onNotify()`
@@ -194,7 +200,8 @@ tests, so with the default `timeoutMS` kills turned into timeouts (8 of 11 in th
   widens a type a template uses: `// @ts-nocheck`, which Stryker adds to every instrumented file, does
   not reach Angular's template type-check. Analog's `{ requireSync: true }` on `toSignal` became
   "possibly undefined" in `data().products`. Turn off the build's type checking for the mutation run
-  (Analog: `disableTypeChecking: true`). Turning it off does not change the built code.
+  (Analog: `disableTypeChecking: true`). Type checking only reports diagnostics, so turning it off
+  should not change the built code. That is inferred from the plugin source, not measured.
 - An Nx task that the `webServer` starts in Stryker's sandbox starts an Nx daemon rooted in the sandbox.
   The daemon outlives the run, holds the sandbox open, and Stryker fails to delete it ("Failed to delete
   stryker temp directory"). The Analog run hit this. `nx daemon --stop` from the sandbox ended the

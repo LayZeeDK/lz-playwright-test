@@ -33,7 +33,7 @@ avatar's initials, never the username. The `a.author` link next to it holds the 
 **Possible fix.** Read the name from the `a.author` link, or move `data-testid="article-author"` to it.
 
 **Evidence.** The failure without Stryker: the plain Playwright run above, 2026-10-25, 1 failed and 6
-passed. The same failure in a Stryker dry run is in `D:/tmp/rw-run.log` (local, not kept).
+passed. The same failure in a Stryker dry run is in a log that later runs overwrote, so the plain Playwright run above is the reproduction to rely on.
 
 **Same suite: `auth.spec.ts` fails on one worker.** The spec makes `userId` once at module level and
 registers it in `test.beforeEach`, so the second test in a worker registers the same user again and
