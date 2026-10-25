@@ -19,8 +19,8 @@ clears it on logout, and accepts either that cookie or `Authorization: Token <jw
 | POST | `/profiles/:username/follow` | `libs/articles/data-access/src/services/actions.service.ts:11` | none | yes |
 | DELETE | `/profiles/:username/follow` | `actions.service.ts:15` | none | yes |
 | GET | `/tags` | `libs/home/feature-home/src/home.service.ts:10` | `article-list/article-list.spec.ts:3` (home page load) | yes |
-| GET | `/articles` (query: `limit`, `offset`, `tag`, `author`, `favorited`) | `libs/articles/data-access/src/services/articles.service.ts:42` | `article-list/article-list.spec.ts:3-5` (global feed) | yes |
-| GET | `/articles/feed` (query: `limit`, `offset`) | `articles.service.ts:42` | none | yes |
+| GET | `/articles` (query: `limit`, `offset`, `tag`, `author`, `favorited`) | `libs/articles/data-access/src/services/articles.service.ts:43` | `article-list/article-list.spec.ts:3-5` (global feed) | yes |
+| GET | `/articles/feed` (query: `limit`, `offset`) | `articles.service.ts:43` | none | yes |
 | GET | `/articles/:slug` | `articles.service.ts:20` | `article-list/article-list.spec.ts:8,19`, `article-list/new-article.spec.ts:16` | yes |
 | POST | `/articles/` | `articles.service.ts:49` | `article-list/new-article.spec.ts:7` | yes |
 | PUT | `/articles/:slug` | `articles.service.ts:53` | none | yes |
@@ -39,5 +39,5 @@ clears it on logout, and accepts either that cookie or `Authorization: Token <jw
 - The app treats a 401 as "go to /login" (`libs/core/error-handler`) and a 404 as "go to /", so those codes are not interchangeable.
 - `POST /users` answers `{ user }` per the RealWorld spec. `AuthStore.register` (`libs/auth/data-access/src/auth.store.ts:48-52`) stores the whole response as `user`; that is how the app is written, not something the double can fix.
 - Tags sent as `"e2e, testing, playwright"` arrive from the editor as `["e2e"," testing"," playwright"]`; the double trims them and drops empties.
-- Seed: users `jake`, `anne`, `carl` (emails `<name>@example.com`, password `password123`; `anne` follows `jake`), five articles, tags, one comment.
+- Seed: users `jake`, `anne`, and `carl`, five articles, tags, and one comment. Each seed user's email is the user name at the reserved `example.com` domain, and every password is `password123`. `anne` follows `jake`.
 - Every endpoint the app or the specs call was determined and is implemented. Spec extras the app never calls (for example `GET /user` variants or pagination headers) are not implemented.

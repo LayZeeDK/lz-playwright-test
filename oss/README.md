@@ -4,12 +4,15 @@ Each folder holds what a disposable copy of an upstream repo needed for a Stryke
 Never apply these to the upstream clone itself. `docs/VERDICT.md` (Evidence) has the results.
 
 Every copy also needs this runner and StrykerJS installed. Link the runner as a directory junction or
-an absolute link; Node resolves the link and strips the runner's TypeScript outside `node_modules`.
+an absolute link. Node resolves the link and strips the runner's TypeScript outside `node_modules`.
+Every Stryker config here loads the runner by its package name, `@spr/stryker-playwright-runner`.
 
 ```sh
-npm install -D @stryker-mutator/core@^10.1.1 @playwright/test@^1.64.1 \
-  file:<this repo>/packages/stryker-playwright-runner
+npm install -D @stryker-mutator/core@^10.1.1 file:<this repo>/packages/stryker-playwright-runner
 ```
+
+The runner needs `@playwright/test` 1.63 or later. If the copy has an older one or none, also install
+`@playwright/test@^1.64.1`. ngx-yeti ran on its own `@playwright/test` 1.63.0.
 
 ## realworld: stefanoslig/angular-ngrx-nx-realworld-example-app at bc7158d
 
@@ -18,8 +21,8 @@ it uses is `oss/realworld-api`. Then run `npx stryker run stryker.playwright.con
 
 ## hello-world: Huluvu424242/stryker-playwright-hello-world at fa6dd64
 
-1. Copy `hello-world/stryker.playwright.config.mjs` (and `stryker.forced-timeout.config.mjs` for the
-   forced-timeout check) into the copy.
+1. Copy `hello-world/stryker.playwright.config.ts` into the copy. For the forced-timeout check, also
+   copy `hello-world/stryker.forced-timeout.config.ts`.
 2. Remove the repo's Vite `define` of the active mutant, which overrides the runner's value.
    `tools/bench-hello-world.ts` does this itself and restores the file afterwards.
 
@@ -35,7 +38,9 @@ it uses is `oss/realworld-api`. Then run `npx stryker run stryker.playwright.con
 
 ## analog: analogjs/analog `beta` at a377078ec
 
-1. Install with pnpm (`pnpm add -D` with the packages above; link the runner as a junction).
+1. Install with pnpm: `pnpm add -D` with the packages above. Link the runner as a junction at
+   `node_modules/@spr/stryker-playwright-runner`, the name that `analog/stryker.playwright.config.ts`
+   loads.
 2. Apply `analog/copy.patch` and copy `analog/stryker.playwright.config.ts` into the copy. The patch:
    - starts the built SSR server instead of `nx serve-nitro`, whose `PORT=3000 node ...` cannot run
      in cmd.exe;

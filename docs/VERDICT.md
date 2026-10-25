@@ -1,6 +1,6 @@
 # Verdict: a StrykerJS test runner for Playwright Test
 
-Status: prototype, 2026-10-24. Throwaway code. The decisions transfer, and the code does not have to.
+Status: prototype, 2026-10-25. Throwaway code. The decisions transfer, and the code does not have to.
 
 ## The question
 
@@ -44,12 +44,15 @@ lists the changes, and Limits lists the general ones.
   before-close hook for what they close, so the hook reads those pages first. The dry run warns about
   frames that did not answer in time and logs how much coverage came from shared contexts.
 - Each mutant run passes Stryker's timeout, less 5 s, to Playwright as the per-test timeout. A test that
-  hits that timeout makes the mutant a Timeout. If the looping test starts within about the first 5 s of
+  hits that timeout makes the mutant a Timeout. If the looping test starts within about the first 3 s of
   the run and does not raise its own timeout, an infinite loop with no hit limit ends inside Playwright,
-  and the worker and `webServer` stay up. Mutant runs turn off the page snapshot that Playwright takes of
-  a failed test for its error prompt (`PLAYWRIGHT_NO_COPY_PROMPT`). On a page stuck in a loop, that
-  snapshot waits out a 5 s timeout. The wait pushed a timed-out run from about 7 s to 10 s and past
-  Stryker's timer. Stryker's own timer stays as the backstop. When it fires, the runner stops the
+  and the worker and `webServer` stay up. The 5 s is a 3 s budget for the run to start plus 2 s for
+  reading coverage from the hung page, so a test that starts later runs past Stryker's timer (inferred
+  from the constants in `playwright-test-runner.ts`). Mutant runs turn off the page snapshot that
+  Playwright takes of a failed test for its error prompt (`PLAYWRIGHT_NO_COPY_PROMPT`). On a page stuck
+  in a loop, that snapshot waits out a 5 s timeout. With the snapshot on, a timed-out run took 12.5 s on
+  an 8 s budget, past Stryker's timer. With it off, the same run took about 7 s. Stryker's own timer
+  stays as the backstop. When it fires, the runner stops the
   Playwright run, Stryker kills the worker's process tree, and a fresh worker starts.
 - Before each run, and again after a run with a failing test, the runner checks every `webServer` the way
   Playwright does at startup (an HTTP request for a `url`, a TCP connection for a `port`). When a server is
@@ -68,32 +71,44 @@ lists the changes, and Limits lists the general ones.
   `describe.configure({ retries })` outrank the runner's `retries: 0`. A test attempt that fails on its
   own kills the mutant even when another attempt or another test timed out. A `test.fail()` test that
   fails as expected is no kill. In the dry run, a timed-out test is reported as a failed test.
+- A mutant run that selects one test of a `describe.serial` group runs the whole group, because a later
+  test of the chain fails on its own and would count as a kill. The dry run finds the groups through
+  Playwright's internal suite flag (`_parallelMode`).
+- The per-test timeout the runner sets never exceeds the largest test timeout in the Playwright config,
+  so a slow mutant cannot pass a test that the user's own timeout would fail.
 
 ## Evidence
 
 All numbers are from one Windows 11 arm64 machine shared with other sessions, so treat timings as
 indicative. Each row is a single run unless it says otherwise. Commands to rerun them are at the end.
-The demo rows were measured before the last runner change (the run-classification rewrite and the
-security fixes). The browser test suite, the forced-timeout check, and the RealWorld, ngx-yeti, and
-Analog rows ran on the final code.
 
-| Case | Runner | Score | Wall time |
-|---|---|---|---|
-| Demo e2e, 32 mutants in `cart.ts` | this runner, `timeoutMS` 10000 | 27 killed, 5 survived | 4m05s |
-| Same | this runner before the per-test timeout fix, `timeoutMS` 10000 | 26 killed, 1 timeout, 5 survived | 4m39s |
-| Same | this runner before the per-test timeout fix, `timeoutMS` 5000 | 26 killed, 1 timeout, 5 survived | 5m51s |
-| Same | `command` runner + Vite `define`, server restart per mutant | 27 killed, 5 survived | 12m35s |
-| Same | `command` runner, no activation (negative control) | 0 killed, 32 survived | 14m59s |
-| Same | this runner, `--concurrency 2` (one dev server per Stryker worker) | 27 killed, 5 survived | 2m24s |
-| Demo CT, 27 mutants in `price-tag.tsx` via `mount()` | this runner, `timeoutMS` 10000 | 21 killed, 6 survived | 2m29s |
-| Same | this runner, `--concurrency 2` | 21 killed, 6 survived | 1m29s |
-| `stryker-playwright-hello-world`, 7 mutants | this runner (repo's `define` removed) | 6 killed, 1 survived | median 46s (45 to 48s), 5 runs |
-| Same | the repo's own `command` runner setup | 6 killed, 1 survived | median 66s (58 to 69s), 5 runs |
-| Same, `timeoutMS` 1 and `timeoutFactor` 0 so Stryker's own timer fires first | this runner | 7 timeouts | 38s |
-| `angular-ngrx-nx-realworld-example-app` (Angular 21.2, Nx 22.7), 48 mutants in `auth.store.ts`, against the local API double | this runner, `timeoutMS` 10000 | 11 killed, 15 timeouts, 10 survived, 12 no coverage | 7m41s |
-| Same, with `use.actionTimeout: 5000` added to the copy's Playwright config | this runner, `timeoutMS` 10000 | 26 killed, 10 survived, 12 no coverage | 6m00s |
-| ngx-yeti (Angular, Nx, Playwright 1.63.0, static Storybook), 2 mutants in `cluster.ts`, 234 e2e tests | this runner, `playwright.workers` 2, `dryRunTimeoutMinutes` 20 | 2 killed | 3m51s (dry run 2m57s) |
-| Analog 2.8.0 `beta` (Angular 22.2, Nx 23.2, SSR), 8 mutants in `(home).page.ts`, 11 e2e tests against the built SSR server | this runner, `disableTypeChecking: true` in the copy's Vite config | 4 killed, 4 survived | 1m45s |
+The Code column names the runner commit a row ran on. The last runner change is 53a5aa6, which moves
+Playwright's output and run directories into one private temp folder. Before it, fca053d rewrote how a
+run's test results become a mutant result. A row marked "before fca053d" ran on earlier code, and its
+log times do not pin it to one commit. The RealWorld, ngx-yeti, and Analog logs all fall between the
+two commits. A `command` runner row does not use this runner, so it has no commit.
+
+Wall time is Stryker's own "Done in" from the run's log. The define row has no kept log, so its time is
+the shell's elapsed time for the whole command.
+
+| Case | Runner | Code | Score | Wall time |
+|---|---|---|---|---|
+| Demo e2e, 32 mutants in `cart.ts` | this runner, `timeoutMS` 10000 | before fca053d | 27 killed, 5 survived | 4m02s |
+| Same | this runner before the per-test timeout fix, `timeoutMS` 10000 | before fca053d | 26 killed, 1 timeout, 5 survived | 4m35s |
+| Same | this runner before the per-test timeout fix, `timeoutMS` 5000 | before fca053d | 26 killed, 1 timeout, 5 survived | 5m51s |
+| Same | `command` runner + Vite `define`, server restart per mutant | - | 27 killed, 5 survived | 12m38s (shell) |
+| Same | `command` runner, no activation (negative control) | - | 0 killed, 32 survived | 14m59s |
+| Same | this runner, `--concurrency 2` (one dev server per Stryker worker) | before fca053d | 27 killed, 5 survived | 2m21s |
+| Same, lines 11 to 17 (7 mutants), `timeoutMS` 1 and `timeoutFactor` 0 so Stryker's own timer fires first | this runner | 53a5aa6 | 7 timeouts | 1m28s |
+| Demo CT, 27 mutants in `price-tag.tsx` via `mount()` | this runner, `timeoutMS` 10000 | before fca053d | 21 killed, 6 survived | 2m30s |
+| Same | this runner, `--concurrency 2` | before fca053d | 21 killed, 6 survived | 1m26s |
+| `stryker-playwright-hello-world`, 7 mutants | this runner (repo's `define` removed) | before fca053d | 6 killed, 1 survived | median 44s (43 to 46s), 5 runs |
+| Same | the repo's own `command` runner setup | - | 6 killed, 1 survived | median 64s (57 to 66s), 5 runs |
+| Same, `timeoutMS` 1 and `timeoutFactor` 0 so Stryker's own timer fires first | this runner | before fca053d | 7 timeouts | 36s and 32s, 2 runs |
+| `angular-ngrx-nx-realworld-example-app` (Angular 21.2, Nx 22.7), 48 mutants in `auth.store.ts`, against the local API double | this runner, `timeoutMS` 10000 | fca053d | 11 killed, 15 timeouts, 10 survived, 12 no coverage | 7m41s |
+| Same, with `use.actionTimeout: 5000` added to the copy's Playwright config | this runner, `timeoutMS` 10000 | fca053d | 26 killed, 10 survived, 12 no coverage | 6m00s |
+| ngx-yeti (Angular, Nx, Playwright 1.63.0, static Storybook), 2 mutants in `cluster.ts`, 234 e2e tests | this runner, `playwright.workers` 2, `dryRunTimeoutMinutes` 20 | fca053d | 2 killed | 3m51s (dry run 2m57s) |
+| Analog 2.8.0 `beta` (Angular 22.2, Nx 23.2, SSR), 8 mutants in `(home).page.ts`, 11 e2e tests against the built SSR server | this runner, `disableTypeChecking: true` in the copy's Vite config | fca053d | 4 killed, 4 survived | 1m45s |
 
 `packages/stryker-playwright-runner/test/runner.test.ts` checks the runner against a fixture
 instrumented by Stryker's own instrumenter. It checks that per-test coverage separates a test that
@@ -102,21 +117,29 @@ static coverage for a shared `beforeAll` page and for a page the worker closes, 
 page the test closes, per-test coverage under `reuseContext`, a runtime kill, a static (module-level)
 kill, a survivor followed by a clean kill, an Error when the selected tests no longer exist, an infinite
 loop that times out inside its budget through the per-test timeout, the hit limit on an infinite loop,
-that no run settings stay in the environment, a `webServer` restarted after it dies between runs, and no
-artifacts on disk. Each of the three newest checks fails with its fix removed, and with activation
-disabled in the hook 6 of the 16 checks fail. `runner.test.ts` does not cover Stryker's own timeout restart,
+that no run settings stay in the environment, a `webServer` restarted after it dies between runs, no
+`test-results` folder next to the fixture's Playwright config, and that `dispose` removes the temp
+directory the runner kept its output and runs in. Commit b4fedce added four of these
+checks: the page the test closes, the missing tests, the per-test timeout, and the clean environment.
+When they were added, each one failed with its fix removed, and with activation disabled in the hook
+6 of the 16 checks then in the file failed. Those two results are from the decision log of 2026-10-25 and were not rerun
+since. `runner.test.ts` does not cover Stryker's own timeout restart,
 `coverageAnalysis` `'all'` or `'off'`, `workers` above 1 (the ngx-yeti run below is the only evidence
 for that), or the dry-run guard.
 `test/run-result.test.ts` checks without a browser how a finished run maps to a Stryker result:
-retried tests, a kill next to a timeout, a timed-out test in the dry run, runs with no results, and
-skipped tests without the hook.
+retried tests, a kill next to a timeout, a timed-out test in the dry run, runs with no results,
+skipped tests without the hook, and selecting whole `describe.serial` groups (that check fails with the
+group selection removed). The serial-group selection has no browser check: the fixture has no serial
+group.
 
 The hello-world runs alternated the two runners (A, B, A, B) five times. The `command` runner starts
 a Vite dev server for every mutant, which is the likeliest source of its extra 20 s. That cause is
-inferred, not profiled. In the forced-timeout run, Stryker killed and restarted the worker for every
-mutant. Afterwards no browser, Vite, or extra Node process was left running, and no temp directory of
-the runner was left in the system temp folder. Before a fix in `dispose`, each kill left Playwright's
-output directory behind.
+inferred, not profiled.
+
+In the forced-timeout run on the demo app (53a5aa6), Stryker killed and restarted the worker for every
+mutant. Afterwards no `stryker-pw` temp folder of the runner was left in the system temp folder, no
+extra Node process was running, and no port was left open. That check was made by hand after the run.
+Before a fix in `dispose` (fca053d), each kill left Playwright's output directory behind.
 
 The RealWorld run needed no change to the runner. Its disposable copy needed four, all made by
 `oss/realworld/prepare.ts`. The app talks to the local API double instead of the public API. The app
@@ -124,18 +147,29 @@ gets its own port, because upstream starts a project that does not exist and reu
 Two upstream tests that fail without Stryker are fixed or skipped (`docs/filings.md`). And
 `.stryker-tmp` goes into `.gitignore`. Every timeout came from a mutant that breaks app startup (the
 store's `providedIn`, its factory, or the `getUser` call every page makes). The tests then wait for an
-element that never appears, until the test timeout ends them. The survivors are the `getUser` error
-path that no signed-out test reaches, `navigateByUrl('')` where the original says `'/'`, and register,
-update, and logout branches no UI test drives. The 12 uncovered mutants are register and update, which
-the suite only calls through the API.
+element that never appears, until the test timeout ends them. Both RealWorld runs left the same 10
+survivors in their JSON reports:
 
-The ngx-yeti run is the only one with `playwright.workers` above 1, which the integration test does not
+- 4 mutants in the `getUser` error handler. Two tests reach it, but it only repeats the
+  `loggedIn: false` that the loading step already set (inferred from the source).
+- `loggedIn: true` instead of `false` in the `getUser` loading step. The response sets the final value
+  right after it (inferred from the source).
+- The `exhaustMap` callbacks of register and update, which no UI test calls.
+- Login's `navigateByUrl('/')` and logout's `navigateByUrl('login')`, each changed to
+  `navigateByUrl('')`.
+- Logout's error handler, which no test triggers.
+
+`logout.spec.ts` runs logout and covers both logout survivors, so those survive a test that runs them.
+It does not detect the navigation to the empty URL. The 12 uncovered mutants are the inner callbacks of
+register and update, which the suite only calls through the API.
+
+The ngx-yeti run is the only one with `playwright.workers` above 1, which `runner.test.ts` does not
 cover. Coverage still came back per test. Each mutant was covered by 20 of the 234 tests, and Stryker
 stopped at the first kill, after 7 tests for one mutant and after 1 for the other. On one worker the dry
-run ran longer than Stryker's default 5-minute `dryRunTimeoutMinutes`. With 2 workers it took 2m57s. The clone needed one step before Stryker
-could start its Storybook: building the workspace package `yeti-css` in the clone itself, outside
-Stryker's sandbox (`nx run yeti-css:yeti-build`), for the reason in the npm-workspaces entry under
-Limits.
+run ran longer than Stryker's default 5-minute `dryRunTimeoutMinutes`. With 2 workers it took 2m57s.
+The clone needed one step before Stryker could start its Storybook: building the workspace package
+`yeti-css` in the clone itself, outside Stryker's sandbox (`nx run yeti-css:yeti-build`), for the
+reason in the npm-workspaces entry under Limits.
 
 Analog serves its pages from a production SSR build that the `webServer` starts once, and the page
 component also runs in the browser after hydration. The four kills are the `share()` and `onNotify()`
@@ -154,7 +188,8 @@ cost.
 
 A killed mutant usually costs more than a surviving one: the failing test waits out its auto-waiting
 assertion (`expect.timeout`, 5 s by default) before it fails. Stryker sizes its timeout from passing
-tests, so with the default `timeoutMS` kills turned into timeouts (8 of 11 in the first CT run). Set
+tests, so with the default `timeoutMS` kills turned into timeouts. In the first CT run, 8 of 11
+mutants timed out. That count is from the decision log, and the run's own log was not kept. Set
 `timeoutMS` to at least twice the expect timeout. The runner warns at startup when it is lower.
 
 ## Limits
@@ -172,15 +207,21 @@ tests, so with the default `timeoutMS` kills turned into timeouts (8 of 11 in th
 - Web workers and service workers are not covered by `addInitScript`.
 - Coverage across a cross-origin navigation, from a page that closes itself (`window.close()`), or from
   a test that ends on `about:blank` is lost. A popup opened with `window.open`
-  copies `sessionStorage`, so its coverage counts twice (harmless for test selection).
+  copies `sessionStorage`, so its coverage counts twice (harmless for test selection). An iframe that
+  navigates within its origin drops the earlier document's coverage without counting it as lost, so
+  mutants only that document reached show as NoCoverage.
+- A runner that Stryker kills while its teardown hangs (a page stuck in a loop can keep `stopTests()`
+  past Stryker's 2 s of grace) leaves its temp directory behind, one per such kill. Playwright's
+  output directory sits inside a private temp directory, so that on a shared `/tmp` no other user can
+  claim its name while Playwright deletes and recreates it, and that directory is removed last.
 - Node refuses to strip types under `node_modules`, so a published package needs a JavaScript build of
   the hook and the runner. The prototype is used through a symlink, which Node resolves outside
   `node_modules`.
 - `disableBail` cannot lift a `maxFailures` set in the user's Playwright config.
 - The runner runs Playwright with `playwright.workers` from the Stryker config (default 1), not the
   `workers` value in the Playwright config. A suite that passes only when its tests spread over several
-  workers fails the dry run. RealWorld's `auth.spec.ts` registered one user per worker before every
-  test and failed the same way under plain `npx playwright test --workers=1`.
+  workers fails the dry run. RealWorld's `auth.spec.ts` makes its user id once per worker and registers
+  that user before every test, so it failed the same way under plain `npx playwright test --workers=1`.
 - Playwright actions such as `click()` have no timeout of their own unless `use.actionTimeout` is set,
   so a mutant that removes or never renders an element ends its test by the test timeout. The runner
   reports that as a Timeout, not a kill. The mutation score is the same, because Stryker counts both as
@@ -192,9 +233,10 @@ tests, so with the default `timeoutMS` kills turned into timeouts (8 of 11 in th
 - Stryker links the sandbox's `node_modules` to the original project's, and npm links each workspace
   package in `node_modules` to its folder in the original. So a workspace package's build output must
   already exist in the original. A build that runs in the sandbox writes its output in the sandbox,
-  while the app and its tools read the original through `node_modules`. The same holds for mutants: a mutated file in a
-  workspace package that the app imports through `node_modules` is never served, so its mutants survive
-  or show as NoCoverage. ngx-yeti hit the first part (its Storybook reads `node_modules/yeti-css/dist`).
+  while the app and its tools read the original through `node_modules`. The same holds for mutants: a
+  mutated file in a workspace package that the app imports through `node_modules` is never served, so
+  its mutants survive or show as NoCoverage. ngx-yeti hit the first part (its Storybook reads
+  `node_modules/yeti-css/dist`).
   The cause is Stryker's sandbox, not this runner.
 - A build that type-checks Angular templates rejects Stryker's instrumented code when a mutant switch
   widens a type a template uses: `// @ts-nocheck`, which Stryker adds to every instrumented file, does
@@ -244,11 +286,19 @@ npx stryker run stryker.e2e.config.ts --concurrency 2
 npx stryker run stryker.ct.config.ts --concurrency 2
 STRYKER_BASELINE=define npx stryker run stryker.e2e.command.config.ts
 STRYKER_BASELINE=off npx stryker run stryker.e2e.command.config.ts
+npx stryker run stryker.e2e.config.ts --mutate apps/demo-app/src/app/cart.ts:11-17 --timeoutMS 1 --timeoutFactor 0
 node tools/bench-playwright-runs.ts apps/demo-app-e2e/playwright.config.mts 3
 node tools/bench-hello-world.ts <stryker-playwright-hello-world checkout> 5
 node oss/realworld/prepare.ts <disposable copy of angular-ngrx-nx-realworld-example-app>
 npx stryker run stryker.playwright.config.ts   # in that copy, after npm install and linking this runner
 ```
+
+The demo forced-timeout run used a config file with the same settings as that command line. The
+command line itself was not run.
+
+For the RealWorld row with `use.actionTimeout: 5000`, add `actionTimeout: 5000` to the top-level `use` block of
+the copy's `apps/conduit-e2e/playwright.config.ts` after `prepare.ts` has run. `prepare.ts` does not
+add it. `oss/README.md` gives the steps for the hello-world forced-timeout row, ngx-yeti, and Analog.
 
 Versions: StrykerJS 10.1.1, Playwright 1.64.1, Nx 24.0.1, Vite 8.3.5, Node 24.22.0.
 

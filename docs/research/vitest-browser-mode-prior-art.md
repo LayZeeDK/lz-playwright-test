@@ -1,5 +1,7 @@
 # Vitest Browser Mode in StrykerJS: prior art for the Playwright runner
 
+Note, 2026-10-25: The "prototype" statements and the `PROTO` and `HOOK` citations describe an earlier prototype, not the current runner. Commit 67df91a replaced those JavaScript files with TypeScript. `docs/VERDICT.md` describes the current runner. The `RESEARCH.md` this file builds on is `D:/projects/github/LayZeeDK/ngx-yeti/tmp/afk-m003/stryker-spike/RESEARCH.md`, which is outside this repo.
+
 Scope: what `@stryker-mutator/vitest-runner` (StrykerJS v10.1.1) does in Vitest Browser Mode, and which of its choices carry over to the prototype `stryker-playwright-runner`. Builds on `ngx-yeti/tmp/afk-m003/stryker-spike/RESEARCH.md` section 1 and does not repeat it.
 
 Labels: [checked] = read in source, git history, or an issue/PR, with a citation. [inferred] = reasoning from checked facts.

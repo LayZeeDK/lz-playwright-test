@@ -1,5 +1,7 @@
 # Karma runner: prior art for the Playwright runner
 
+Note, 2026-10-25: The "Prototype today" lines describe an earlier prototype, not the current runner. Their `PW:` citations point to `playwright-test-runner.js` and other JavaScript files that commit 67df91a replaced with TypeScript. `docs/VERDICT.md` describes the current runner. This file does not cite the external `RESEARCH.md` that the other research files build on.
+
 Scope: what StrykerJS's first-party `@stryker-mutator/karma-runner` (StrykerJS v10.1.1) does to run mutants in real browsers, and which of its choices carry over to the prototype `stryker-playwright-runner`.
 
 Labels: [checked] = read in source, docs, an issue or PR, with a citation. [inferred] = reasoning from checked facts.
@@ -103,7 +105,7 @@ Does not transfer:
 ## Lessons for the Playwright runner
 
 L1. Keep the browser alive across runs.
-- Prototype today: every `runTests` forks new workers and each launches a new browser; measured fixed cost about 2.7 s per run (config load 1.4 s, worker start 1.3 s). [checked `PW:playwright-test-runner.js:19-23,88-96`; numbers from the caller's brief]
+- Prototype today: every `runTests` forks new workers and each launches a new browser; measured fixed cost about 2.7 s per run (config load 1.4 s, worker start 1.3 s). [checked `PW:playwright-test-runner.js:19-23,88-96`, numbers from `decisions.tsv` row `perf` 2026-10-24T20:34:21Z]
 - Karma: server and browser live for the whole Stryker worker; a run is a context reload. [checked section 1]
 - Recommendation: **adapt**. Launch one browser server in `init()` (`browserType.launchServer()`), point workers at it with `use.connectOptions.wsEndpoint`, and close it in `dispose()`. Playwright still makes a new context per test, so isolation holds. Measure first: it only pays off if browser launch is a large part of the 1.3 s worker start. Config load (1.4 s) is the larger cost and is outside this change; see whether the `TestRunner` can reuse the loaded config between `runTests` calls. [inferred]
 

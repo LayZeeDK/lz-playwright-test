@@ -1,5 +1,7 @@
 # Prior art: mutation testing with end-to-end, browser and GUI test runners
 
+Note, 2026-10-25: Statements about "the prototype" describe an earlier prototype, not the current runner. `docs/VERDICT.md` describes the current runner. The `RESEARCH.md` this file cites is `D:/projects/github/LayZeeDK/ngx-yeti/tmp/afk-m003/stryker-spike/RESEARCH.md`, which is outside this repo. The scratch files behind the claims checked by a research worker were not committed either (see the end of this file).
+
 Researched 2026-10-24 for the StrykerJS Playwright test-runner prototype in this repository.
 
 Labels: **[checked]** means Claude opened the source, paper, issue, repository or page named next to the claim (URL or local path given). **[inferred]** means reasoning from checked facts. Nothing was installed or run; nothing outside this file was edited; no issue, comment or star was posted.
