@@ -38,7 +38,8 @@ it uses is `oss/realworld-api`. Then run `npx stryker run stryker.playwright.con
 
 ## analog: analogjs/analog `beta` at a377078ec
 
-1. Install with pnpm: `pnpm add -D` with the packages above. Link the runner as a junction at
+1. Install StrykerJS with pnpm (`pnpm add -D @stryker-mutator/core@^10.1.1`), not the `file:` runner
+   from the npm line above. Then link the runner as a junction at
    `node_modules/@spr/stryker-playwright-runner`, the name that `analog/stryker.playwright.config.ts`
    loads.
 2. Apply `analog/copy.patch` and copy `analog/stryker.playwright.config.ts` into the copy. The patch:

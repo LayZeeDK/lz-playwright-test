@@ -13,8 +13,8 @@ The answer to whether this works, the evidence, and the limits are in `docs/VERD
   (`playwright.components.config.mts`).
 - `apps/demo-app-e2e`: the demo app's Playwright e2e tests.
 - `stryker.e2e.config.ts`, `stryker.ct.config.ts`: Stryker configs for the demo.
-- `oss/`: what the copies of four open-source repos needed for a Stryker run. `oss/README.md`
-  describes each copy.
+- `oss/`: the configs, patches, and scripts that copies of four open-source repos needed for a Stryker
+  run. `oss/README.md` describes each copy.
 - `docs/research/`: the research behind the design.
 
 ## Type-check and test the runner
@@ -30,4 +30,4 @@ node --test packages/stryker-playwright-runner/test/runner.test.ts packages/stry
 
 To run Stryker on the demo app, use `npx stryker run stryker.e2e.config.ts` or
 `npx stryker run stryker.ct.config.ts`. The Rerun section of `docs/VERDICT.md` lists the commands for
-every measured row.
+the measured rows, and `oss/README.md` gives the steps for the open-source copies.
