@@ -6,11 +6,13 @@ operator and mutation names in Names, without a namespace prefix, on 2026-10-25 
 ## Why
 
 StrykerJS 10.1.1 mutates expressions. It leaves the parts of a component that Playwright tests look at
-untouched: JSX text, plain attribute strings such as `aria-label`, `role`, `href`, and `data-testid`,
-bare `hidden` and `disabled`, and event props that point at a named handler
+untouched: JSX text, plain attribute strings such as `aria-label`, `role`, and `href`, bare `hidden`
+and `disabled`, and event props that point at a named handler
 (`docs/research/playwright-mutation-operators.md`, section 2). A suite that finds elements by role,
 label, and text can be strong and still look weak, or weak and look strong, because Stryker never makes
-those changes. These operators make them.
+those changes. These operators make them. They never change `className`, `style`, `data-testid`, or
+`key`. A changed `data-testid` tests the test's own hook, not the app (the research's "Candidate
+operator inventory", row 22).
 
 ## How this design was chosen
 
@@ -49,6 +51,17 @@ are in the Opus draft, section 2. Where this list differs from the draft, this l
 
 Later: `ListExpression` (`.map` becomes `.slice(0, 1).map`, from the Fable draft), button `type` swap, Angular
 templates, and CSS. Each waits for a reason given in the drafts' "later" sections.
+
+Tag swaps beyond `button` and `a` also wait: a heading for a `p`, a list, landmark, or `label` for a
+`div`, and a `th` for a `td`. Ma11y injects two of them, the heading and the `th` swaps, as F2 and F91
+(`docs/research/playwright-mutation-operators.md`, section 1.1), and `getByRole('heading')` or a table
+role query would kill them. A tag swap copies the element's whole subtree once per mutant, and headings,
+lists, and landmarks wrap far larger subtrees than buttons and links. The first release measures that
+cost on `button` and `a` first.
+
+Deleting an element has no operator. It is the first of the four JSX operators proposed in StrykerJS
+issue #4375 (`docs/research/jsx-prior-art.md`, section 1.1), and `ConditionalElement` covers it only
+where a condition already guards the element.
 
 ## Names
 
@@ -158,7 +171,12 @@ handler referenced once, and `<a>x</a>` without `href`.
 ## Equivalent mutants
 
 Some operator mutants behave the same as a mutant StrykerJS or the source already gives. The skips above
-remove the cases that are cheap to detect. These remain:
+remove the cases that are cheap to detect. Each operator's match rule holds its skips. StrykerJS's
+`NodeMutator.filter` hook (`node-mutator.ts:14`) cannot hold them: it sees only the mutants of the node
+and its subtree, without the ones that carry an ignore reason (`babel-transformer.ts:122-153`). A skip
+written as a filter would then change with the user's `excludedMutations`, and the `EventHandler`
+single-reference skip needs the handler's binding, which is outside the attribute's subtree. These
+remain:
 
 - `EventHandler` on a handler that the skip does not catch can still match the built-in `BlockStatement`
   mutant, which empties the handler's body. A click does nothing in both, and for `onSubmit` both let
@@ -244,6 +262,25 @@ instrumenter owns Babel, placement, ids and reports, and the operator rules live
    support inside JSX, and no `true` mutant for a JSX `&&`.
 2. The operators, off by default, enabled by a new `mutator.includedMutations` option.
 3. The operator table as its own package, when Angular template support starts.
+
+The upstream record shapes this order (`docs/research/jsx-prior-art.md`, section 1.1). StrykerJS issue
+#4375 asked for JSX text mutation in 2023, and a maintainer declined it on scope ("Stryker for
+Javascript and not Stryker for HTML"), not on mechanism. PR 2 therefore ships the operators off, and its
+text cites #4375 as the user demand. Issue #701 (2018) added the `JSXAttribute` skip to `StringLiteral`
+after `class="row"` became `class=""`. These operators change attributes by what they mean to a user, so
+PR 2 says why they do not bring that mutant back. Issue #4141 complained about too many JSX mutants, and
+the answer was Ignore plugins, the plugin kind that "Fail loud" uses. For Angular templates, the nearest
+precedent is `azat-io/mootant`, which mutates Svelte and Vue template expressions but not static markup
+(section 1.2).
+
+StrykerJS has no mutation level or family per mutator. The `mutator` option takes only `plugins` and
+`excludedMutations` (`packages/api/schema/stryker-core.json:186-212`), and the built-in `Regex` mutator
+pins weapon-regex to `mutationLevels: [1]` (`regex-mutator.ts:31`). Stryker.NET gates each mutator on a
+`MutationLevel` (`MutatorBase.cs:23-27`), and weapon-regex groups its mutations by level
+(`BuiltinMutators.scala:46-70`). PR 2 could ask for a level option instead of `includedMutations`. A
+level is a new concept in the StrykerJS schema that every built-in would need a value for, while
+`includedMutations` names operators the way `excludedMutations` already does. The design asks for
+`includedMutations` and leaves levels to the maintainers. The names in Names stay either way.
 
 ## Risks that remain
 
