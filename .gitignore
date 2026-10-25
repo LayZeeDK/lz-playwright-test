@@ -58,3 +58,5 @@ todo.md
 test-results
 spikes/**/out
 .audit
+# The API double's STATE_FILE holds its token secret and the users' passwords.
+oss/realworld-api/state.json

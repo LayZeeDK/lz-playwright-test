@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
-import type { Server } from 'node:http';
+import { request, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -275,7 +275,24 @@ describe('realworld api double', async () => {
     const plain = await api('/tags', { headers: { Origin: 'http://localhost:4200' } });
 
     assert.equal(plain.headers.get('access-control-allow-origin'), 'http://localhost:4200');
+
+    const remote = await api('/tags', { headers: { Origin: 'https://example.com' } });
+
+    assert.equal(remote.headers.get('access-control-allow-origin'), null);
+    assert.equal(remote.headers.get('access-control-allow-credentials'), null);
     assert.equal((await api('/nothing')).status, 404);
+
+    const port = new URL(base).port;
+    const rebound = await new Promise<number | undefined>((resolve, reject) =>
+      request({ host: 'localhost', port, path: '/api/tags', headers: { Host: `attacker.example:${port}` } }, (res) => {
+        res.resume();
+        resolve(res.statusCode);
+      })
+        .on('error', reject)
+        .end(),
+    );
+
+    assert.equal(rebound, 403);
   });
 });
 

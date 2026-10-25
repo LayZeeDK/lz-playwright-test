@@ -205,7 +205,8 @@ function loadDb(file: string | undefined): Db {
   return db;
 }
 
-// Temp file in the same directory + rename: a crash never leaves a half-written state file.
+// Temp file in the same directory + rename: a crash never leaves a half-written state file. The file
+// holds the token secret and the passwords, so only its owner can read it.
 function saveDb(file: string, db: Db) {
   const tmp = `${file}.${process.pid}.tmp`;
 
@@ -214,8 +215,28 @@ function saveDb(file: string, db: Db) {
     JSON.stringify(db, (_key: string, value: unknown) =>
       value instanceof Set ? [...value] : value,
     ),
+    { flag: 'w', mode: 0o600 },
   );
   renameSync(tmp, file);
+}
+
+const LOOPBACK_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+
+// Only pages served from this machine get CORS access with credentials.
+function loopbackOrigin(origin: string | undefined): string | undefined {
+  if (!origin) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(origin);
+
+    return url.protocol === 'http:' && LOOPBACK_HOST.test(url.host)
+      ? origin
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function slugify(title: string) {
@@ -800,11 +821,15 @@ export function createApiServer({
     body?: unknown,
     headers: Record<string, string> = {},
   ) => {
-    const origin = req.headers.origin;
+    const origin = loopbackOrigin(req.headers.origin);
 
     res.writeHead(status, {
-      'Access-Control-Allow-Origin': origin ?? '*',
-      'Access-Control-Allow-Credentials': 'true',
+      ...(origin
+        ? {
+            'Access-Control-Allow-Origin': origin,
+            'Access-Control-Allow-Credentials': 'true',
+          }
+        : {}),
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers':
         req.headers['access-control-request-headers'] ??
@@ -825,6 +850,11 @@ export function createApiServer({
 
   return createServer(async (req, res) => {
     try {
+      // A remote page that rebinds its own host name to 127.0.0.1 still sends that name.
+      if (!LOOPBACK_HOST.test(req.headers.host ?? '')) {
+        return respond(req, res, 403, { errors: { host: ['is not loopback'] } });
+      }
+
       if (req.method === 'OPTIONS') {
         return respond(req, res, 204);
       }
