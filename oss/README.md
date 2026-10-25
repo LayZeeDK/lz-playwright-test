@@ -38,10 +38,11 @@ it uses is `oss/realworld-api`. Then run `npx stryker run stryker.playwright.con
 
 ## analog: analogjs/analog `beta` at a377078ec
 
-1. Install StrykerJS with pnpm (`pnpm add -D @stryker-mutator/core@^10.1.1`), not the `file:` runner
-   from the npm line above. Then link the runner as a junction at
-   `node_modules/@spr/stryker-playwright-runner`, the name that `analog/stryker.playwright.config.ts`
-   loads.
+1. Install with pnpm, not the npm line above: `pnpm add -D @stryker-mutator/core@10.1.1
+   @playwright/test@^1.64.1`. The copy's own `@playwright/test` is `^1.58.2`, below the runner's 1.63
+   floor; the copy's `package.json` diff after the run showed both versions. Then link the runner as a
+   junction at `node_modules/@spr/stryker-playwright-runner`, the name that
+   `analog/stryker.playwright.config.ts` loads.
 2. Apply `analog/copy.patch` and copy `analog/stryker.playwright.config.ts` into the copy. The patch:
    - starts the built SSR server instead of `nx serve-nitro`, whose `PORT=3000 node ...` cannot run
      in cmd.exe;

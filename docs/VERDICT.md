@@ -75,9 +75,10 @@ lists the changes, and Limits lists the general ones.
   test of the chain fails on its own and would count as a kill. Every runner process lists the tests
   when it starts and finds the groups through Playwright's internal suite flag (`_parallelMode`), so a
   process that never ran the dry run widens the selection too.
-- The per-test timeout the runner sets never exceeds the largest test timeout in the Playwright config.
-  With one project, a slow mutant cannot pass a test that the user's own timeout would fail. With
-  several projects, a test in a project with a smaller timeout gets the largest one.
+- The per-test timeout the runner sets is the smaller of Stryker's budget and the largest test timeout
+  over every project in the Playwright config, setup projects included. When all projects share one
+  timeout, a slow mutant cannot pass a test that the user's own timeout would fail. Otherwise a test
+  in a project with a smaller timeout can run up to the largest one.
 
 ## Evidence
 
@@ -133,10 +134,10 @@ for that), or the dry-run guard.
 `test/run-result.test.ts` checks without a browser how a finished run maps to a Stryker result:
 retried tests, a kill next to a timeout, a timed-out test in the dry run, runs with no results,
 skipped tests without the hook, and selecting whole `describe.serial` groups (that check fails with the
-group selection removed). In the browser suite, `runner.test.ts` checks that `init` finds the
-fixture's two `describe.serial` groups from Playwright's own test list. No browser check runs a widened
-mutant: both fixture groups share a `beforeAll` page, whose coverage counts as static, so their mutants
-already run every test.
+group selection removed). In the browser suite, `runner.test.ts` checks that `init` finds the members
+of the fixture's first `describe.serial` group from Playwright's own test list. No browser check runs a
+widened mutant: each fixture group opens its page in `beforeAll`, that coverage counts as static, so
+their mutants already run every test.
 
 The hello-world runs alternated the two runners (A, B, A, B) five times. The `command` runner starts
 a Vite dev server for every mutant, which is the likeliest source of its extra 20 s. That cause is
@@ -168,9 +169,9 @@ survivors in their JSON reports:
 - Logout's error handler, which no test triggers.
 
 `logout.spec.ts` runs logout but does not detect the navigation to the empty URL. Logout's error-handler
-mutant counts as covered only because its arrow function is created when the store is set up. No test
-runs it. The 12 uncovered mutants are the inner callbacks of
-register and update, which the suite only calls through the API.
+mutant counts as covered because logout creates the handler, but no test makes logout fail, so the
+handler never runs. The 12 uncovered mutants are the inner callbacks of register and update, which the
+suite only calls through the API.
 
 The ngx-yeti run is the only one with `playwright.workers` above 1, which `runner.test.ts` does not
 cover. Coverage still came back per test. Each mutant was covered by 20 of the 234 tests, and Stryker
@@ -221,12 +222,13 @@ mutants timed out. That count is from the decision log, and the run's own log wa
   mutants only that document reached show as NoCoverage (inferred from the hook's code, not run).
 - A runner that Stryker kills while its teardown hangs (a page stuck in a loop can keep `stopTests()`
   past Stryker's 2 s of grace) leaves its private temp directory behind, one per such kill (inferred
-  from the code, not run). The runner removes that directory last on purpose: Playwright's output
-  directory sits inside it, so on a shared `/tmp` no other user can claim the output directory's name
-  while Playwright deletes and recreates it.
+  from the code, not run). The runner removes that directory last because the test that `stopTests()`
+  ends still writes its error context into it. The private directory exists so that, on a shared
+  `/tmp`, no other user can claim the name of Playwright's output directory while Playwright deletes
+  and recreates it.
 - A mutant run that widens its selection to a whole `describe.serial` group keeps the timeout Stryker
   set for the tests that cover the mutant. A long group can run past it, and the mutant counts as a
-  Timeout, which Stryker counts as detected.
+  Timeout, which Stryker counts as detected (inferred from the code, not run).
 - Node refuses to strip types under `node_modules`, so a published package needs a JavaScript build of
   the hook and the runner. The prototype is used through a symlink, which Node resolves outside
   `node_modules`.
