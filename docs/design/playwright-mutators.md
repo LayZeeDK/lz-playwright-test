@@ -6,19 +6,19 @@ proposal for Lars (public vocabulary).
 ## Why
 
 StrykerJS 10.1.1 mutates expressions. It leaves the parts of a component that Playwright tests look at
-untouched: JSX text, plain attribute strings such as `aria-label`, `role`, `href` and `data-testid`, bare
-`hidden` and `disabled`, and event props that point at a named handler
-(`docs/research/playwright-mutation-operators.md`, section 2). A suite that finds elements by role, label
-and text can be strong and still look weak, or weak and look strong, because none of those changes are
-ever made. These operators make them.
+untouched: JSX text, plain attribute strings such as `aria-label`, `role`, `href`, and `data-testid`,
+bare `hidden` and `disabled`, and event props that point at a named handler
+(`docs/research/playwright-mutation-operators.md`, section 2). A suite that finds elements by role,
+label, and text can be strong and still look weak, or weak and look strong, because Stryker never makes
+those changes. These operators make them.
 
 ## How this design was chosen
 
 Two designers worked independently from the same research and brief, on different models:
 `docs/design/playwright-mutators-opus.md` and `docs/design/playwright-mutators-fable.md`. Both spikes
 rerun clean from `spikes/` (commands below). They agree on the top operators and on the integration
-route, and two independent designs agreeing counts for more than either draft alone. This design takes the Opus draft as the base and
-grafts four parts of the Fable draft.
+route. Two independent designs that agree count for more than either draft alone. This design takes the
+Opus draft as the base and grafts four parts of the Fable draft.
 
 | Question | Opus draft | Fable draft | Taken |
 |---|---|---|---|
@@ -37,10 +37,10 @@ are in the Opus draft, section 2.
 
 1. `TextContent`: empties JSX text that has a letter or digit. Killed by `getByText`, `getByRole({ name })`, `toHaveText`.
 2. `AccessibleName`: empties plain-string `aria-label`, `alt`, `placeholder`, `title`, `htmlFor`, `label`. Killed by `getByLabel`, `getByRole({ name })`, `getByPlaceholder`, `getByAltText`.
-3. `EventHandler`: `onX={handler}` becomes `onX={undefined}` when the handler is not inline, so it never repeats the built-in `ArrowFunction` mutant. Killed by the assertion after a `click` or `fill`.
+3. `EventHandler`: `onX={handler}` becomes `onX={undefined}` when the handler is not inline, so the operator never repeats the built-in `ArrowFunction` mutant. Killed by the assertion after a `click` or `fill`.
 4. `ConditionalRendering`: forces `x && <A/>` to render, and forces each branch of a JSX ternary. Killed by `toBeVisible`, `toHaveCount(0)`.
-5. `NavigationTarget`: `href`, `to` and `action` become `""`. Killed by `toHaveURL`.
-6. `DisabledState`: forces `disabled`, `readOnly` and `aria-disabled` off, skipping shapes `BooleanLiteral` already flips. Killed by `toBeDisabled`, `toBeEditable`.
+5. `NavigationTarget`: `href`, `to`, and `action` become `""`. Killed by `toHaveURL`.
+6. `DisabledState`: forces `disabled`, `readOnly`, and `aria-disabled` off, and skips shapes that `BooleanLiteral` already flips. Killed by `toBeDisabled`, `toBeEditable`.
 7. `HiddenState`: flips `hidden` and `aria-hidden`. Killed by `toBeVisible`, `getByRole` (hidden elements leave the tree).
 8. `Role`: removes `role`, or swaps a semantic tag (`button` to `span`). Killed by `getByRole`.
 9. `ChildExpression`: a `{value}` child becomes `null`. Killed by `toHaveText`.
@@ -59,8 +59,8 @@ templates, and CSS. Each waits for a reason given in the drafts' "later" section
   `allMutators` array, and wraps `expressionMutantPlacer.canPlace` and `place` so that `JSXAttribute` and
   `JSXText` become placement sites. Details: Opus draft, sections 3.2 and 3.3.
 - **Fail loud.** Still at import, the plugin instruments a one-line JSX sample and checks that its
-  mutants come back. That catches a duplicate or bundled instrumenter, which would otherwise drop every
-  UI mutant without a word. Core turns a plugin import error into a warning and runs on without the
+  mutants come back. The check catches a duplicate or bundled instrumenter, which would otherwise drop
+  every UI mutant silently. Core turns a plugin import error into a warning and runs on without the
   mutators, so throwing at import is not enough. The failure must surface on a path core does not
   swallow, for example the factory of an `Ignore` plugin that the config lists in `ignorers` (not yet
   spiked). A version outside the tested range logs a warning.
@@ -90,10 +90,10 @@ instrumenter owns Babel, placement, ids and reports, and the operator rules live
 
 ## Risks that remain
 
-None of this has gone through `stryker run` with a browser yet. The spikes prove the instrumented TSX
+Nothing in this design has gone through `stryker run` with a browser yet. The spikes prove the instrumented TSX
 re-parses and renders like the hand-made mutation in React (61 mutants in the Opus spike, 26 of 26 UI
-mutants change the render in the Fable spike). They do not prove Vite builds it or that a Playwright test
-kills it. The first build step is the verification plan in the Opus draft, section 6: a fixture per
+mutants change the render in the Fable spike). They do not prove that Vite builds the instrumented TSX
+or that a Playwright test kills its mutants. The first build step is the verification plan in the Opus draft, section 6: a fixture per
 operator through `packages/stryker-playwright-runner/test/runner.test.ts`, then the demo app.
 
 ## Rerun the evidence
