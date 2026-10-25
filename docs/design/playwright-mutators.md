@@ -37,10 +37,10 @@ Ranked by how often realistic Playwright suites would kill them. Full patterns, 
 are in the Opus draft, section 2. Where this list differs from the draft, this list wins.
 
 1. `TextLiteral`: empties JSX text that has a letter or digit. Killed by `getByText`, `getByRole({ name })`, `toHaveText`.
-2. `LabelAttribute`: empties plain-string `aria-label`, `aria-labelledby`, `alt`, `title`, `placeholder`, and `htmlFor`. Killed by `getByLabel`, `getByRole({ name })`, `getByPlaceholder`, `getByAltText`.
+2. `LabelAttribute`: empties `aria-label`, `aria-labelledby`, `alt`, `title`, `placeholder`, and `htmlFor`, whether the value is a string or a bound expression (`alt={username}`). A template literal is left to the built-in `StringLiteral`, which already empties it. Killed by `getByLabel`, `getByRole({ name })`, `getByPlaceholder`, `getByAltText`.
 3. `EventHandler`: `onX={handler}` becomes `onX={undefined}` when the handler is not inline, so the operator never repeats the built-in `ArrowFunction` mutant. It also skips a handler that is a function declared in the same file (a function declaration, or a `const` whose initializer is a function or an arrow) when this attribute is the handler's only reference. Babel's scope binding gives that reference count. Killed by the assertion after a `click` or `fill`.
 4. `ConditionalElement`: forces `x && <A/>` to render, and forces each branch of a JSX ternary. It skips a shape when the `&&` left operand, or the ternary test, is a `BinaryExpression` with `==`, `!=`, `===`, `!==`, `<`, `<=`, `>`, or `>=`, or a `LogicalExpression` with `&&` or `||`. For those shapes the built-in `ConditionalExpression` already makes the same mutants: `true` for the left operand of `&&`, which renders the element, and `true` and `false` for a ternary test, which force each branch. So `{open && <p/>}` and `{busy ? <A/> : <B/>}` get operator mutants, and `{off > 0 && <s/>}` and `{n > 1 ? <A/> : <B/>}` get none. Killed by `toBeVisible`, `toHaveCount(0)`.
-5. `UrlAttribute`: `href`, `to`, and `action` become `""`. Killed by `toHaveURL`.
+5. `UrlAttribute`: `href`, `to`, and `action` become `""`, from a string or a bound expression; a template literal is left to `StringLiteral`, as for `LabelAttribute`. Killed by `toHaveURL`.
 6. `DisabledAttribute`: forces `disabled`, `readOnly`, and `aria-disabled` off, and skips shapes that `BooleanLiteral` already flips. Killed by `toBeDisabled`, `toBeEditable`.
 7. `HiddenAttribute`: forces `hidden` and `aria-hidden` off. It never forces an element hidden. Killed by `toBeVisible`, `getByRole` (hidden elements leave the tree).
 8. `ElementRole`: removes `role`, or swaps a semantic tag for `span`: `button` always, and `a` only when it has an `href`. An `<a>` without `href` has no `link` role, so swapping it would be an equivalent mutant. Killed by `getByRole`.
@@ -98,9 +98,33 @@ Two names do not fit the pattern exactly, the way StrykerJS's `ConditionalExpres
 tests and loops. `DisabledAttribute` also covers `readOnly`, and `ElementRole` changes either the `role`
 attribute or the tag that gives an element its implicit role.
 
+## Rules the synthetic cases settled
+
+`spikes/ui-mutator-cases/` holds 93 synthetic cases: JSX versions of UI shapes in the repos the runner was
+exercised on (RealWorld, ngx-yeti, Analog and hello-world at the commits `oss/README.md` names, and the demo
+app), each with the exact UI mutants it must give. They run against the prototype. The design was silent on
+these points; Claude settled them on 2026-10-25 from the prototype's behaviour and the Opus draft:
+
+- `LabelAttribute` takes bound values, as the Opus draft's rule did (2.2); the earlier "plain-string"
+  wording here narrowed it without a reason, and no built-in mutant empties a bound label.
+- `HiddenAttribute` skips a boolean-literal value, as `DisabledAttribute` does, because `BooleanLiteral`
+  already flips it.
+- Forcing an attribute off removes a string or bare value (`disabled={undefined}`) and sets an expression to
+  `{false}`; both give the same accessibility tree as `"false"`. `RoleRemoval` prints `role={undefined}`.
+- `ChildExpression` empties an identifier, a member expression, an optional chain, or a call, and skips a
+  string literal, a conditional (left to `ConditionalElement`), and a `.map`, `.filter` or `.flatMap` list,
+  which the later `ListExpression` owns. Until then a rendered list gets no UI mutant of its own.
+- `EventHandler` applies to an `onX` prop on a component as well as on an element.
+- `ConditionalElement` forces branches of a ternary rendered as a JSX child only, not a ternary inside an
+  attribute value (`href={last ? null : '/replay'}`).
+
+The prototype also matches `formAction`, `inert`, `aria-current`, `aria-invalid` and `checked`, which this
+design does not list; they stay out of the first release.
+
 The Opus prototype (`spikes/design-opus/ui-mutators.ts`) and both drafts use the earlier names. The
-prototype also predates three of the rules above: the `ConditionalElement` skip, the `EventHandler`
-single-reference skip, and the `href` condition on the `a` swap. Its counts in `neutral-output.txt`
+prototype also predates four of the rules above: the `ConditionalElement` comparison and logical skip, the
+`ConditionalElement` limit to JSX children, the `EventHandler` single-reference skip, and the `href`
+condition on the `a` swap. The synthetic cases that test them run as `todo`. Its counts in `neutral-output.txt`
 therefore include one `ConditionalRendering` (now `ConditionalElement`) mutant on
 `price-tag.tsx` line 22 (`off > 0 && (...)`) that the skip removes. With the skip, the demo's
 `price-tag.tsx` gets 2 UI mutants instead of 3, and `app.tsx` stays at 15. The verification plan's
@@ -208,6 +232,7 @@ MODE=patched node spikes/design-opus/neutral.ts
 MODE=ui node spikes/design-opus/neutral.ts
 node spikes/design-opus/directive.ts
 node spikes/design-fable/spike-jsx-placement.ts
+node --test spikes/ui-mutator-cases/cases.test.ts
 ```
 
 `MODE=patched` shows that the placer patch leaves built-in mutants unchanged, and `MODE=ui` prints the
