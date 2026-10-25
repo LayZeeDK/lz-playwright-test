@@ -4,6 +4,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
+import type { TestCase } from '@playwright/test/reporter';
 import {
   INSTRUMENTER_CONSTANTS,
   type MutantCoverage,
@@ -38,6 +39,7 @@ import {
 } from './protocol.ts';
 import {
   CollectingReporter,
+  errorText,
   type RunOutput,
   type RunRequest,
   type RunResult,
@@ -86,8 +88,8 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   private runsDir?: string;
   private servers: ServerCheck[] = [];
   private serialGroups = new Map<string, string[]>();
-  // The largest test timeout the config sets, 0 for none. The runner's own timeout never exceeds it.
-  private configTestTimeout = 0;
+  // The runner's own per-test timeout never exceeds the largest one the config sets.
+  private configTestTimeout = Infinity;
   private runCounter = 0;
 
   constructor(options: StrykerOptions, log: Logger) {
@@ -142,12 +144,12 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     const isURLAvailable = utils?.isURLAvailable;
 
     if (
-      typeof testRunner?.TestRunner !== 'function' ||
+      typeof testRunner?.TestRunner?.prototype?.listTests !== 'function' ||
       typeof configLoader?.resolveConfigLocation !== 'function' ||
       typeof isURLAvailable !== 'function'
     ) {
       throw new Error(
-        `Playwright ${version} changed the internals this runner calls (playwright/lib/runner TestRunner, playwright/lib/common configLoader, playwright-core coreBundle isURLAvailable).`,
+        `Playwright ${version} changed the internals this runner calls (playwright/lib/runner TestRunner and its listTests, playwright/lib/common configLoader, playwright-core coreBundle isURLAvailable).`,
       );
     }
 
@@ -176,17 +178,35 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
       serverCheck(server, isURLAvailable),
     );
     this.warnAboutAssertionTimeouts(config);
-    const timeouts = config.projects
-      .filter(
-        ({ project }) =>
-          !this.options.projects ||
-          this.options.projects.includes(project.name),
-      )
-      .map(({ project }) => project.timeout);
+    // Every project, setup dependencies included: the one timeout override applies to all that run.
+    const timeouts = config.projects.map(({ project }) => project.timeout);
     this.configTestTimeout = timeouts.includes(0)
-      ? 0
-      : Math.max(0, ...timeouts);
+      ? Infinity
+      : Math.max(...timeouts);
+    // Every Stryker test runner process needs the groups, and only one of them runs the dry run.
+    this.serialGroups = await this.listSerialGroups(this.playwright);
     await this.runGlobalSetup(this.playwright);
+  }
+
+  private async listSerialGroups(playwright: TestRunner) {
+    const testCases: TestCase[] = [];
+    const errors: string[] = [];
+    const { status } = await playwright.listTests(
+      {
+        printsToStdio: () => false,
+        onBegin: (_config, suite) => testCases.push(...suite.allTests()),
+        onError: (error) => errors.push(errorText(error)),
+      },
+      { projects: this.options.projects },
+    );
+
+    if (status !== 'passed') {
+      throw new Error(
+        `Playwright could not list the tests (${status}):\n${errors.join('\n')}`,
+      );
+    }
+
+    return serialGroups(testCases);
   }
 
   private warnAboutAssertionTimeouts(
@@ -286,9 +306,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
       testFilter: withSerialGroups(testFilter, this.serialGroups),
       hitLimit,
       disableBail,
-      testTimeout: this.configTestTimeout
-        ? Math.min(testTimeout, this.configTestTimeout)
-        : testTimeout,
+      testTimeout: Math.min(testTimeout, this.configTestTimeout),
     });
     const hitCount =
       run.status === DryRunStatus.Complete
@@ -317,10 +335,6 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
       (await this.restartDeadServers(playwright))
     ) {
       output = await this.runOnce(playwright, request);
-    }
-
-    if (request.activeMutant === undefined) {
-      this.serialGroups = serialGroups(output.reporter.testCases.values());
     }
 
     return toRunResult(output, request);

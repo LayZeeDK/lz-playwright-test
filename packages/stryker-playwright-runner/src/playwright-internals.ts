@@ -24,6 +24,10 @@ export interface TestRunner {
     }[];
     webServers: { url?: string; port?: number; ignoreHTTPSErrors?: boolean }[];
   }>;
+  listTests(
+    reporter: Reporter,
+    params: { projects?: string[] },
+  ): Promise<{ status: Status }>;
   runGlobalSetup(reporters: Reporter[]): Promise<{ status: Status }>;
   runGlobalTeardown(): Promise<unknown>;
   runTests(

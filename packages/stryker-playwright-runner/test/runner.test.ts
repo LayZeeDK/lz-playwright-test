@@ -143,6 +143,18 @@ test('dry run completes with every test passing', () => {
   );
 });
 
+test('init finds the describe.serial groups, so a runner that never ran the dry run widens a filter too', () => {
+  const { serialGroups } = runner as unknown as {
+    serialGroups: Map<string, string[]>;
+  };
+
+  assert.deepEqual(serialGroups.get(testId('second user of the shared page')), [
+    testId('first user of the shared page'),
+    testId('second user of the shared page'),
+  ]);
+  assert.equal(serialGroups.has(testId('shows the greeting')), false);
+});
+
 test('per-test coverage separates tests that reach different code', () => {
   const { perTest } = dryRun.mutantCoverage!;
   const greeting = perTest[testId('shows the greeting')];
