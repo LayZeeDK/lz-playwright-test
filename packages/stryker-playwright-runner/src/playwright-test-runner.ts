@@ -79,6 +79,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   private readonly log: Logger;
   private readonly baseNodeOptions = process.env.NODE_OPTIONS;
   private playwright?: TestRunner;
+  private rootDir?: string;
   private outputDir?: string;
   private runsDir?: string;
   private servers: ServerCheck[] = [];
@@ -145,16 +146,17 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
       );
     }
 
-    this.outputDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'stryker-pw-output-'),
-    );
-    // Not inside outputDir: Playwright empties that on global setup.
-    this.runsDir = fs.mkdtempSync(
+    // Playwright deletes and recreates outputDir on global setup, so both directories live in a private
+    // root that it never touches: on a shared /tmp no other user can claim either name in between.
+    this.rootDir = fs.mkdtempSync(
       path.join(
         os.tmpdir(),
-        `stryker-pw-runs-${process.env.STRYKER_MUTATOR_WORKER ?? 0}-`,
+        `stryker-pw-${process.env.STRYKER_MUTATOR_WORKER ?? 0}-`,
       ),
     );
+    this.outputDir = path.join(this.rootDir, 'output');
+    this.runsDir = path.join(this.rootDir, 'runs');
+    fs.mkdirSync(this.runsDir);
     this.playwright = new testRunner.TestRunner(
       configLoader.resolveConfigLocation(configFile),
       {
@@ -190,20 +192,12 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
 
   async dispose(): Promise<void> {
     // Stryker disposes a timed-out runner while its run is still going, and kills it 2 s later, so
-    // the directories go first: the run's own cleanup never comes. The test that stopTests ends then
-    // writes its error context into outputDir, so that goes again after teardown.
-    this.removeDirs();
+    // the run's directories go first: the run's own cleanup never comes. The root stays until the
+    // workers are gone, because the test that stopTests ends still writes its error context.
+    removeDirs([this.runsDir, this.outputDir]);
     await this.playwright?.stopTests();
     await this.playwright?.runGlobalTeardown();
-    this.removeDirs();
-  }
-
-  private removeDirs() {
-    for (const dir of [this.runsDir, this.outputDir]) {
-      if (dir) {
-        fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
-      }
-    }
+    removeDirs([this.rootDir]);
   }
 
   async dryRun({
@@ -424,6 +418,14 @@ function acceptsConnections(port: number): Promise<boolean> {
   });
 }
 
+function removeDirs(dirs: (string | undefined)[]) {
+  for (const dir of dirs) {
+    if (dir) {
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+    }
+  }
+}
+
 function overrideEnv(values: Record<string, string | undefined>): () => void {
   const previous = Object.fromEntries(
     Object.keys(values).map((name) => [name, process.env[name]]),
@@ -471,9 +473,9 @@ function mergeCoverage(snapshots: Snapshot[]): MutantCoverage {
   };
   const add = (
     target: Record<string, number>,
-    hits: Record<string, number> = {},
+    hits: Record<string, number> | null = {},
   ) => {
-    for (const [mutantId, count] of Object.entries(hits)) {
+    for (const [mutantId, count] of Object.entries(hits ?? {})) {
       if (isHitCount(count)) {
         target[mutantId] = (target[mutantId] ?? 0) + count;
       }
