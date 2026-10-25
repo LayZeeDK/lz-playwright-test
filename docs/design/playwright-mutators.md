@@ -90,9 +90,12 @@ and stryker4s (`modules/core/src/main/scala/stryker4s/mutation/`), both at their
 Every name is letters only, because a `// Stryker disable` comment accepts only letters in mutator names,
 and StrykerJS matches those names against every registered mutator ignoring case
 (`directive-bookkeeper.ts:63` and `:73`). The names carry no namespace prefix, like the built-ins they
-sit next to, and like the upstream route would need. The install therefore refuses an operator whose
-name equals, ignoring case, a mutator that is already registered, so a future built-in with the same
-name fails the run loudly instead of sharing a filter key.
+sit next to, and like the upstream route would need. The install therefore checks every name before it
+changes `allMutators`. It refuses a name that equals, ignoring case, another of its own operators or a
+mutator that other code registered, and then registers nothing. A future built-in with the same name thus
+fails the run loudly instead of sharing a filter key. `mutator.excludedMutations` does not ignore case:
+StrykerJS matches it with `includes` (`babel-transformer.ts:278`), so users write those names exactly as
+the table spells them.
 
 Two names do not fit the pattern exactly, the way StrykerJS's `ConditionalExpression` also mutates `if`
 tests and loops. `DisabledAttribute` also covers `readOnly`, and `ElementRole` changes either the `role`
@@ -148,19 +151,24 @@ remove the cases that are cheap to detect. These remain:
 ## Integration
 
 - **Package.** `@layzeedk/stryker-ui-mutators`. The user lists it in `plugins` and lists its ignorer in
-  `ignorers` (see "Fail loud"). No other options in v1. Users exclude operators with
+  `ignorers`, or imports it from a JavaScript or TypeScript config (see "Fail loud"). No other options in v1. Users exclude operators with
   `mutator.excludedMutations` and with `// Stryker disable` comments, both of which already match custom
   mutator names.
 - **Version range.** Peer dependency `@stryker-mutator/core` `~10.1.0`. At run time the plugin reads the
   version of the instrumenter it resolved. A version other than `10.1.1`, the tested one, logs a warning
   and the install goes on. The self-check, not the version, decides whether the run may continue. The
   prototype throws on any other version. The plugin will warn instead.
-- **Registration without an upstream change.** On import, the plugin finds the instrumenter that
-  `@stryker-mutator/core` will use (resolved from core's own folder), pushes its mutators into the live
-  `allMutators` array, and wraps `expressionMutantPlacer.canPlace` and `place` so that `JSXAttribute` and
+- **Registration without an upstream change.** On import, the plugin finds the instrumenter that the
+  running `@stryker-mutator/core` uses. When `process.argv[1]`, after `realpath`, is core's
+  `bin/stryker.js`, the plugin resolves the instrumenter from that core's folder, so a global or
+  differently hoisted `stryker` gets the operators too. Otherwise, as when a program calls Stryker's API,
+  it resolves core from its own folder. The thermos plugin's Node operators resolve core the same way
+  (`LayZeeDK/thermos-claude-plugin`, `tools/stryker-node-mutators/install.ts`). The plugin then pushes its
+  mutators into the live `allMutators` array, and wraps `expressionMutantPlacer.canPlace` and `place` so that `JSXAttribute` and
   `JSXText` become placement sites. Details: Opus draft, sections 3.2 and 3.3.
-- **Fail loud.** Still at import, the plugin instruments a one-line JSX sample and checks that its
-  mutants come back. Core turns a plugin import error into a warning and runs on without the mutators
+- **Fail loud.** Still at import, the plugin instruments one JSX sample per operator and checks that
+  each sample gives a mutant of its operator. The error names every operator whose sample gave none, so
+  one operator that a StrykerJS change breaks cannot hide behind the others. Core turns a plugin import error into a warning and runs on without the mutators
   (`packages/core/src/di/plugin-loader.ts:193-209`), so throwing at import is not enough. The plugin
   therefore keeps any install or self-check error and exports an `Ignore` plugin named `ui-mutators`.
   Core creates every ignorer listed in `ignorers` right before `instrument()`
@@ -168,13 +176,23 @@ remove the cases that are cheap to detect. These remain:
   the run. The factory throws the kept error, or an "install did not run" error when the install was
   skipped. Otherwise it returns an ignorer that ignores nothing. This route is not spiked yet.
 - **The `ignorers` entry is required.** `ignorers` defaults to `[]`
-  (`packages/api/schema/stryker-core.json:509-516`), and core creates only the listed names. The
-  documented config therefore always has `ignorers: ['ui-mutators']` next to the `plugins` entry.
+  (`packages/api/schema/stryker-core.json:509-516`), and core creates only the listed names. A
+  documented config that lists the plugin in `plugins` therefore always has `ignorers: ['ui-mutators']`
+  next to it.
   Without it, a successful install still registers and runs every operator, because registration
   happens at import. A failed install falls back to core's warning
   `Error during loading "@layzeedk/stryker-ui-mutators" plugin`, and the run finishes without UI mutants. The
   plugin cannot detect the missing entry in that case, because the code that would check is the code
   that failed.
+- **A config import fails loud with one entry.** A config written as a JavaScript or TypeScript module
+  can `import '@layzeedk/stryker-ui-mutators'` on its first line instead. The module installs with a
+  top-level `await`, so an install or self-check error rejects the config import, and the run stops
+  before it starts, with no `ignorers` entry. The thermos plugin's Node operators use this route
+  (`stryker.config.mjs:1`). A JSON config cannot import, so it keeps `plugins` and `ignorers`. This route
+  is not spiked for the UI operators yet.
+- **A second install adds nothing.** A config that both imports the module and lists it in `plugins`
+  installs twice in one process. The second install skips the operators that the first one registered,
+  the name check does not count them as collisions, and the placer is wrapped once.
 - **Options, later.** A plugin module can export `strykerValidationSchema`, so options such as extra
   accessible-name props validate against the Stryker config. Mutators still cannot read them at run
   time, because `NodeMutatorContext` carries only `isExpressionContext`. The `ui-mutators` ignorer
@@ -223,6 +241,26 @@ It catches a broken install of the resolved copy, and it names a second copy onl
 and path in its message. The gate is a real `stryker run` through core with `testRunner: 'command'` and
 no browser, asserting that `mutation.json` lists the operator names (Opus draft, section 5, risk 3). Run
 it before calling the self-check enough, and on every StrykerJS bump.
+
+## What the verification plan adds
+
+The Opus draft's section 6 says what to run. These steps add the checks that can fail and the bar that
+decides each operator.
+
+1. **Corpus diff.** Instrument the demo app with the operators off and on, and diff the two sorted lists
+   of `line:col mutator replacement`. A built-in mutant that is in one list and not in the other means
+   that an operator suppressed or moved it. `spikes/design-opus/neutral.ts` prints counts only today, so
+   this diff runs on the built package, not the prototype.
+2. **Negative control for fail loud.** Break the install on purpose: give one operator a sample that it
+   cannot mutate. Then assert that `stryker run` exits non-zero with that operator's name in the error,
+   once through the `ignorers` entry and once through the config import. Without this control, a green
+   gate cannot tell a working fail-loud route from an install that never failed.
+3. **The bar per operator.** An operator stays in the first release only when all of these hold on the
+   demo app and the fixtures. An operator that misses one moves to Later, with its counts recorded.
+   - The corpus diff shows that its mutants differ from every built-in mutant at the same site.
+   - Each of its mutants is classified by hand as killed, survived with a test gap, equivalent, or error
+     (CompileError, Timeout). Equivalent and error mutants together are at most one in ten.
+   - A Playwright test written for the behaviour kills at least one of its mutants.
 
 ## Rerun the evidence
 
