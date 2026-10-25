@@ -350,7 +350,8 @@ function toTestResult(test: TestCase, isMutantRun: boolean): TestResult {
   const last = test.results.at(-1);
   const outcome = test.outcome();
   // A test that passes only on a retry still failed against the mutant. Retries reach mutant runs
-  // through describe.configure({ retries }), which outranks the retries: 0 override.
+  // through describe.configure({ retries }), which outranks the retries: 0 that Playwright's
+  // runTests sets.
   const status =
     outcome === 'flaky' && isMutantRun ? TestStatus.Failed : OUTCOME[outcome];
   const base = {
