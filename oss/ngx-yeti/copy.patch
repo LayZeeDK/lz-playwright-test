@@ -1,0 +1,10 @@
+diff --git a/.gitignore b/.gitignore
+index a706a85..a51ef7e 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -66,3 +66,5 @@ vitest.config.*.timestamp*
+ .env
+ .env.*
+ .*.env
++.stryker-tmp
++reports/mutation

@@ -1,0 +1,42 @@
+diff --git a/.gitignore b/.gitignore
+index 8e5ba3268..4c107bf35 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -81,3 +81,6 @@ vitest.config.*.timestamp*
+ 
+ # Vitest output
+ .vitest/
++
++# stryker temp files
++.stryker-tmp
+diff --git a/apps/analog-app-e2e/playwright.config.ts b/apps/analog-app-e2e/playwright.config.ts
+index d7979ea1a..f68c958e1 100644
+--- a/apps/analog-app-e2e/playwright.config.ts
++++ b/apps/analog-app-e2e/playwright.config.ts
+@@ -18,9 +18,11 @@ export default defineConfig({
+     },
+   ],
+   webServer: {
+-    command: 'npx nx serve-nitro analog-app',
++    // serve-nitro uses POSIX `PORT=3000 node ...`, which cmd.exe cannot run.
++    command: 'npx nx build analog-app && node dist/apps/analog-app/analog/server/index.mjs',
++    env: { PORT: '3000' },
+     url: 'http://localhost:3000',
+-    reuseExistingServer: !process.env['CI'],
++    reuseExistingServer: false,
+     cwd: '../..',
+     timeout: 120000,
+   },
+diff --git a/apps/analog-app/vite.config.ts b/apps/analog-app/vite.config.ts
+index 1d8ff671b..691b4eede 100644
+--- a/apps/analog-app/vite.config.ts
++++ b/apps/analog-app/vite.config.ts
+@@ -51,6 +51,8 @@ export default defineConfig(({ mode }) => {
+     plugins: [
+       analog({
+         apiPrefix: 'api',
++        // Stryker's mutant switches widen inferred types; the build's template type-check rejects them.
++        disableTypeChecking: true,
+         experimental: { typedRouting: true },
+         additionalPagesDirs: ['/libs/shared/feature'],
+         additionalAPIDirs: ['/libs/shared/feature/src/api'],
