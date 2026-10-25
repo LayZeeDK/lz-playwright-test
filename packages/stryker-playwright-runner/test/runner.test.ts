@@ -306,6 +306,10 @@ test('an infinite loop trips the hit limit and reports a timeout', async () => {
   });
 
   assert.equal(result.status, MutantRunStatus.Timeout);
+  assert.match(
+    result.status === MutantRunStatus.Timeout ? (result.reason ?? '') : '',
+    /Hit limit reached/,
+  );
 });
 
 test('a webServer that dies between runs is restarted instead of failing every test', async () => {
