@@ -64,7 +64,11 @@ interface Context {
   me: User;
 }
 
-type Result = [status: number, body?: unknown, headers?: Record<string, string>];
+type Result = [
+  status: number,
+  body?: unknown,
+  headers?: Record<string, string>,
+];
 
 class HttpError extends Error {
   status: number;
@@ -83,7 +87,8 @@ const hasErrors = (errors: object) => Object.keys(errors).length > 0;
 // ponytail: passwords are stored in plain text; this is a test double, not an auth server.
 function createDb(): Db {
   const now = Date.now();
-  const at = (minutesAgo: number) => new Date(now - minutesAgo * 60_000).toISOString();
+  const at = (minutesAgo: number) =>
+    new Date(now - minutesAgo * 60_000).toISOString();
   const db: Db = {
     secret: randomBytes(32).toString('hex'),
     users: [],
@@ -104,7 +109,14 @@ function createDb(): Db {
       image: '',
       following: new Set(),
     });
-  const addArticle = (author: number, minutesAgo: number, title: string, description: string, body: string, tagList: string[]) =>
+  const addArticle = (
+    author: number,
+    minutesAgo: number,
+    title: string,
+    description: string,
+    body: string,
+    tagList: string[],
+  ) =>
     db.articles.push({
       id: db.nextArticleId++,
       slug: slugify(title),
@@ -123,13 +135,55 @@ function createDb(): Db {
   addUser('carl', '');
   db.users[1].following.add(1);
 
-  addArticle(1, 50, 'How to train your dragon', 'Ever wonder how?', 'It takes a Jacobian.', ['dragons', 'training']);
-  addArticle(2, 40, 'Mutation testing in practice', 'Kill the mutants.', 'Change code, run tests, count survivors.', ['testing', 'mutation']);
-  addArticle(3, 30, 'Playwright end to end', 'Browsers under control.', 'Drive a real browser from a script.', ['testing', 'playwright']);
-  addArticle(1, 20, 'Angular signals tour', 'Reactive state, simply.', 'Signals notify only what changed.', ['angular']);
-  addArticle(2, 10, 'Nx workspaces', 'One repo, many projects.', 'Affected commands save CI time.', ['nx', 'angular']);
+  addArticle(
+    1,
+    50,
+    'How to train your dragon',
+    'Ever wonder how?',
+    'It takes a Jacobian.',
+    ['dragons', 'training'],
+  );
+  addArticle(
+    2,
+    40,
+    'Mutation testing in practice',
+    'Kill the mutants.',
+    'Change code, run tests, count survivors.',
+    ['testing', 'mutation'],
+  );
+  addArticle(
+    3,
+    30,
+    'Playwright end to end',
+    'Browsers under control.',
+    'Drive a real browser from a script.',
+    ['testing', 'playwright'],
+  );
+  addArticle(
+    1,
+    20,
+    'Angular signals tour',
+    'Reactive state, simply.',
+    'Signals notify only what changed.',
+    ['angular'],
+  );
+  addArticle(
+    2,
+    10,
+    'Nx workspaces',
+    'One repo, many projects.',
+    'Affected commands save CI time.',
+    ['nx', 'angular'],
+  );
 
-  db.comments.push({ id: db.nextCommentId++, articleId: 1, body: 'Great read!', createdAt: at(5), updatedAt: at(5), authorId: 2 });
+  db.comments.push({
+    id: db.nextCommentId++,
+    articleId: 1,
+    body: 'Great read!',
+    createdAt: at(5),
+    updatedAt: at(5),
+    authorId: 2,
+  });
   db.articles[0].favoritedBy.add(2);
 
   return db;
@@ -152,16 +206,28 @@ function loadDb(file: string | undefined): Db {
 function saveDb(file: string, db: Db) {
   const tmp = `${file}.${process.pid}.tmp`;
 
-  writeFileSync(tmp, JSON.stringify(db, (_key: string, value: unknown) => (value instanceof Set ? [...value] : value)));
+  writeFileSync(
+    tmp,
+    JSON.stringify(db, (_key: string, value: unknown) =>
+      value instanceof Set ? [...value] : value,
+    ),
+  );
   renameSync(tmp, file);
 }
 
 function slugify(title: string) {
-  return String(title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'article';
+  return (
+    String(title)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'article'
+  );
 }
 
-const b64 = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url');
-const sign = (secret: string, data: string) => createHmac('sha256', secret).update(data).digest('base64url');
+const b64 = (value: unknown) =>
+  Buffer.from(JSON.stringify(value)).toString('base64url');
+const sign = (secret: string, data: string) =>
+  createHmac('sha256', secret).update(data).digest('base64url');
 
 function issueToken(secret: string, user: User) {
   const head = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ id: user.id, username: user.username })}`;
@@ -169,7 +235,10 @@ function issueToken(secret: string, user: User) {
   return `${head}.${sign(secret, head)}`;
 }
 
-function verifyToken(secret: string, token: string): { id: number; username: string } | null {
+function verifyToken(
+  secret: string,
+  token: string,
+): { id: number; username: string } | null {
   const [h, p, s] = token.split('.');
 
   if (!s || sign(secret, `${h}.${p}`) !== s) {
@@ -191,7 +260,9 @@ function tokenFrom(req: IncomingMessage) {
     return header[1];
   }
 
-  const cookie = new RegExp(`(?:^|;\\s*)${COOKIE}=([^;]+)`).exec(req.headers.cookie ?? '');
+  const cookie = new RegExp(`(?:^|;\\s*)${COOKIE}=([^;]+)`).exec(
+    req.headers.cookie ?? '',
+  );
 
   return cookie ? cookie[1] : null;
 }
@@ -200,12 +271,15 @@ const cookieHeader = (value: string, maxAge: number) => ({
   'Set-Cookie': `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`,
 });
 
-export function createApiServer({ stateFile = process.env.STATE_FILE }: { stateFile?: string } = {}) {
+export function createApiServer({
+  stateFile = process.env.STATE_FILE,
+}: { stateFile?: string } = {}) {
   const db = loadDb(stateFile);
   const issue = (user: User) => issueToken(db.secret, user);
   const userById = (id: number) => db.users.find((u) => u.id === id) as User;
   const maybeUserById = (id: number) => db.users.find((u) => u.id === id);
-  const userByName = (name: string) => db.users.find((u) => u.username === name);
+  const userByName = (name: string) =>
+    db.users.find((u) => u.username === name);
 
   const userView = (u: User, token = issue(u)) => ({
     email: u.email,
@@ -265,23 +339,43 @@ export function createApiServer({ stateFile = process.env.STATE_FILE }: { stateF
   };
 
   const tagListOf = (value: unknown): string[] =>
-    Array.isArray(value) ? value.map((t) => String(t).trim()).filter(Boolean) : [];
+    Array.isArray(value)
+      ? value.map((t) => String(t).trim()).filter(Boolean)
+      : [];
   const required = (source: any, fields: string[]): Errors =>
     Object.fromEntries(
-      fields.filter((f) => typeof source?.[f] !== 'string' || !source[f].trim()).map((f) => [f, ["can't be blank"]]),
+      fields
+        .filter((f) => typeof source?.[f] !== 'string' || !source[f].trim())
+        .map((f) => [f, ["can't be blank"]]),
     );
   const uniqueSlug = (title: string, selfId?: number) => {
     const base = slugify(title);
 
-    return db.articles.some((a) => a.slug === base && a.id !== selfId) ? `${base}-${randomBytes(3).toString('hex')}` : base;
+    return db.articles.some((a) => a.slug === base && a.id !== selfId)
+      ? `${base}-${randomBytes(3).toString('hex')}`
+      : base;
   };
 
-  const listArticles = (articles: Article[], query: URLSearchParams, me?: User): Result => {
+  const listArticles = (
+    articles: Article[],
+    query: URLSearchParams,
+    me?: User,
+  ): Result => {
     const limit = Number(query.get('limit') ?? 20);
     const offset = Number(query.get('offset') ?? 0);
-    const sorted = [...articles].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const sorted = [...articles].sort((a, b) =>
+      b.createdAt.localeCompare(a.createdAt),
+    );
 
-    return [200, { articles: sorted.slice(offset, offset + limit).map((a) => articleView(a, me)), articlesCount: sorted.length }];
+    return [
+      200,
+      {
+        articles: sorted
+          .slice(offset, offset + limit)
+          .map((a) => articleView(a, me)),
+        articlesCount: sorted.length,
+      },
+    ];
   };
 
   const setFavorite = (slug: string, me: User, on: boolean): Result => {
@@ -302,217 +396,368 @@ export function createApiServer({ stateFile = process.env.STATE_FILE }: { stateF
   // Handlers return [status, body?, headers?]. auth: 'required' (401 without a valid token),
   // 'optional' (me is set when a valid token is present) or undefined (token ignored).
   // Order matters: '/articles/feed' must precede '/articles/:slug'.
-  const table: [method: string, pattern: string, auth: 'required' | 'optional' | undefined, handler: (ctx: Context) => Result][] = [
-    ['POST', '/users', undefined, ({ body }) => {
-      const input = body?.user;
-      const errors = required(input, ['username', 'email', 'password']);
+  const table: [
+    method: string,
+    pattern: string,
+    auth: 'required' | 'optional' | undefined,
+    handler: (ctx: Context) => Result,
+  ][] = [
+    [
+      'POST',
+      '/users',
+      undefined,
+      ({ body }) => {
+        const input = body?.user;
+        const errors = required(input, ['username', 'email', 'password']);
 
-      if (!errors.email && db.users.some((u) => u.email === input.email)) {
-        errors.email = ['has already been taken'];
-      }
-
-      if (!errors.username && userByName(input.username)) {
-        errors.username = ['has already been taken'];
-      }
-
-      if (hasErrors(errors)) {
-        throw unprocessable(errors);
-      }
-
-      const user: User = { id: db.nextUserId++, username: input.username, email: input.email, password: input.password, bio: '', image: '', following: new Set<number>() };
-      const token = issue(user);
-
-      db.users.push(user);
-
-      return [201, { user: userView(user, token) }, cookieHeader(token, 86400)];
-    }],
-    ['POST', '/users/login', undefined, ({ body }) => {
-      const input = body?.user;
-      const errors = required(input, ['email', 'password']);
-
-      if (hasErrors(errors)) {
-        throw unprocessable(errors);
-      }
-
-      const user = db.users.find((u) => u.email === input.email && u.password === input.password);
-
-      if (!user) {
-        throw unprocessable({ message: ['User not found'] });
-      }
-
-      const token = issue(user);
-
-      return [200, { user: userView(user, token) }, cookieHeader(token, 86400)];
-    }],
-    ['POST', '/users/logout', undefined, () => [200, { message: 'Logged out' }, cookieHeader('', 0)]],
-    ['GET', '/user', 'required', ({ me }) => [200, { user: userView(me) }]],
-    ['PUT', '/user', 'required', ({ me, body }) => {
-      const input = body?.user ?? {};
-      const errors: Errors = {};
-
-      if (typeof input.email === 'string' && input.email !== me.email) {
-        if (!input.email.trim()) {
-          errors.email = ["can't be blank"];
-        } else if (db.users.some((u) => u.email === input.email)) {
+        if (!errors.email && db.users.some((u) => u.email === input.email)) {
           errors.email = ['has already been taken'];
         }
-      }
 
-      if (typeof input.username === 'string' && input.username !== me.username) {
-        if (!input.username.trim()) {
-          errors.username = ["can't be blank"];
-        } else if (userByName(input.username)) {
+        if (!errors.username && userByName(input.username)) {
           errors.username = ['has already been taken'];
         }
-      }
 
-      if (hasErrors(errors)) {
-        throw unprocessable(errors);
-      }
-
-      for (const field of ['email', 'username', 'bio', 'image'] as const) {
-        if (typeof input[field] === 'string') {
-          me[field] = input[field];
+        if (hasErrors(errors)) {
+          throw unprocessable(errors);
         }
-      }
 
-      if (typeof input.password === 'string' && input.password) {
-        me.password = input.password;
-      }
+        const user: User = {
+          id: db.nextUserId++,
+          username: input.username,
+          email: input.email,
+          password: input.password,
+          bio: '',
+          image: '',
+          following: new Set<number>(),
+        };
+        const token = issue(user);
 
-      return [200, { user: userView(me) }];
-    }],
+        db.users.push(user);
 
-    ['GET', '/profiles/:username', 'optional', ({ params, me }) => [200, { profile: profileView(findUser(params.username), me) }]],
-    ['POST', '/profiles/:username/follow', 'required', ({ params, me }) => setFollow(params.username, me, true)],
-    ['DELETE', '/profiles/:username/follow', 'required', ({ params, me }) => setFollow(params.username, me, false)],
+        return [
+          201,
+          { user: userView(user, token) },
+          cookieHeader(token, 86400),
+        ];
+      },
+    ],
+    [
+      'POST',
+      '/users/login',
+      undefined,
+      ({ body }) => {
+        const input = body?.user;
+        const errors = required(input, ['email', 'password']);
 
-    ['GET', '/tags', undefined, () => [200, { tags: [...new Set(db.articles.flatMap((a) => a.tagList))] }]],
-
-    ['GET', '/articles/feed', 'required', ({ query, me }) =>
-      listArticles(db.articles.filter((a) => me.following.has(a.authorId)), query, me)],
-    ['GET', '/articles', 'optional', ({ query, me }) => {
-      const tag = query.get('tag');
-      const author = query.get('author');
-      const favorited = query.get('favorited');
-      const matches = db.articles.filter(
-        (a) =>
-          (!tag || a.tagList.includes(tag)) &&
-          (!author || userById(a.authorId).username === author) &&
-          (!favorited || [...a.favoritedBy].some((id) => userById(id).username === favorited)),
-      );
-
-      return listArticles(matches, query, me);
-    }],
-    ['POST', '/articles', 'required', ({ me, body }) => {
-      const input = body?.article;
-      const errors = required(input, ['title', 'description', 'body']);
-
-      if (hasErrors(errors)) {
-        throw unprocessable(errors);
-      }
-
-      const now = new Date().toISOString();
-      const article: Article = {
-        id: db.nextArticleId++,
-        slug: uniqueSlug(input.title),
-        title: input.title,
-        description: input.description,
-        body: input.body,
-        tagList: tagListOf(input.tagList),
-        createdAt: now,
-        updatedAt: now,
-        authorId: me.id,
-        favoritedBy: new Set(),
-      };
-
-      db.articles.push(article);
-
-      return [201, { article: articleView(article, me) }];
-    }],
-    ['GET', '/articles/:slug', 'optional', ({ params, me }) => [200, { article: articleView(findArticle(params.slug), me) }]],
-    ['PUT', '/articles/:slug', 'required', ({ params, me, body }) => {
-      const article = findArticle(params.slug);
-      const input = body?.article ?? {};
-
-      requireOwner(me, article.authorId);
-
-      const errors: Errors = {};
-
-      for (const field of ['title', 'description', 'body']) {
-        if (field in input && (typeof input[field] !== 'string' || !input[field].trim())) {
-          errors[field] = ["can't be blank"];
+        if (hasErrors(errors)) {
+          throw unprocessable(errors);
         }
-      }
 
-      if (hasErrors(errors)) {
-        throw unprocessable(errors);
-      }
+        const user = db.users.find(
+          (u) => u.email === input.email && u.password === input.password,
+        );
 
-      for (const field of ['title', 'description', 'body'] as const) {
-        if (field in input) {
-          article[field] = input[field];
+        if (!user) {
+          throw unprocessable({ message: ['User not found'] });
         }
-      }
 
-      if ('title' in input) {
-        article.slug = uniqueSlug(article.title, article.id);
-      }
+        const token = issue(user);
 
-      if ('tagList' in input) {
-        article.tagList = tagListOf(input.tagList);
-      }
+        return [
+          200,
+          { user: userView(user, token) },
+          cookieHeader(token, 86400),
+        ];
+      },
+    ],
+    [
+      'POST',
+      '/users/logout',
+      undefined,
+      () => [200, { message: 'Logged out' }, cookieHeader('', 0)],
+    ],
+    ['GET', '/user', 'required', ({ me }) => [200, { user: userView(me) }]],
+    [
+      'PUT',
+      '/user',
+      'required',
+      ({ me, body }) => {
+        const input = body?.user ?? {};
+        const errors: Errors = {};
 
-      article.updatedAt = new Date().toISOString();
+        if (typeof input.email === 'string' && input.email !== me.email) {
+          if (!input.email.trim()) {
+            errors.email = ["can't be blank"];
+          } else if (db.users.some((u) => u.email === input.email)) {
+            errors.email = ['has already been taken'];
+          }
+        }
 
-      return [200, { article: articleView(article, me) }];
-    }],
-    ['DELETE', '/articles/:slug', 'required', ({ params, me }) => {
-      const article = findArticle(params.slug);
+        if (
+          typeof input.username === 'string' &&
+          input.username !== me.username
+        ) {
+          if (!input.username.trim()) {
+            errors.username = ["can't be blank"];
+          } else if (userByName(input.username)) {
+            errors.username = ['has already been taken'];
+          }
+        }
 
-      requireOwner(me, article.authorId);
-      db.articles = db.articles.filter((a) => a !== article);
-      db.comments = db.comments.filter((c) => c.articleId !== article.id);
+        if (hasErrors(errors)) {
+          throw unprocessable(errors);
+        }
 
-      return [204];
-    }],
-    ['POST', '/articles/:slug/favorite', 'required', ({ params, me }) => setFavorite(params.slug, me, true)],
-    ['DELETE', '/articles/:slug/favorite', 'required', ({ params, me }) => setFavorite(params.slug, me, false)],
+        for (const field of ['email', 'username', 'bio', 'image'] as const) {
+          if (typeof input[field] === 'string') {
+            me[field] = input[field];
+          }
+        }
 
-    ['GET', '/articles/:slug/comments', 'optional', ({ params, me }) => {
-      const article = findArticle(params.slug);
-      const comments = db.comments.filter((c) => c.articleId === article.id).sort((a, b) => b.id - a.id);
+        if (typeof input.password === 'string' && input.password) {
+          me.password = input.password;
+        }
 
-      return [200, { comments: comments.map((c) => commentView(c, me)) }];
-    }],
-    ['POST', '/articles/:slug/comments', 'required', ({ params, me, body }) => {
-      const article = findArticle(params.slug);
-      const errors = required(body?.comment, ['body']);
+        return [200, { user: userView(me) }];
+      },
+    ],
 
-      if (hasErrors(errors)) {
-        throw unprocessable(errors);
-      }
+    [
+      'GET',
+      '/profiles/:username',
+      'optional',
+      ({ params, me }) => [
+        200,
+        { profile: profileView(findUser(params.username), me) },
+      ],
+    ],
+    [
+      'POST',
+      '/profiles/:username/follow',
+      'required',
+      ({ params, me }) => setFollow(params.username, me, true),
+    ],
+    [
+      'DELETE',
+      '/profiles/:username/follow',
+      'required',
+      ({ params, me }) => setFollow(params.username, me, false),
+    ],
 
-      const now = new Date().toISOString();
-      const comment: Comment = { id: db.nextCommentId++, articleId: article.id, body: body.comment.body, createdAt: now, updatedAt: now, authorId: me.id };
+    [
+      'GET',
+      '/tags',
+      undefined,
+      () => [
+        200,
+        { tags: [...new Set(db.articles.flatMap((a) => a.tagList))] },
+      ],
+    ],
 
-      db.comments.push(comment);
+    [
+      'GET',
+      '/articles/feed',
+      'required',
+      ({ query, me }) =>
+        listArticles(
+          db.articles.filter((a) => me.following.has(a.authorId)),
+          query,
+          me,
+        ),
+    ],
+    [
+      'GET',
+      '/articles',
+      'optional',
+      ({ query, me }) => {
+        const tag = query.get('tag');
+        const author = query.get('author');
+        const favorited = query.get('favorited');
+        const matches = db.articles.filter(
+          (a) =>
+            (!tag || a.tagList.includes(tag)) &&
+            (!author || userById(a.authorId).username === author) &&
+            (!favorited ||
+              [...a.favoritedBy].some(
+                (id) => userById(id).username === favorited,
+              )),
+        );
 
-      return [201, { comment: commentView(comment, me) }];
-    }],
-    ['DELETE', '/articles/:slug/comments/:id', 'required', ({ params, me }) => {
-      const article = findArticle(params.slug);
-      const comment = db.comments.find((c) => c.id === Number(params.id) && c.articleId === article.id);
+        return listArticles(matches, query, me);
+      },
+    ],
+    [
+      'POST',
+      '/articles',
+      'required',
+      ({ me, body }) => {
+        const input = body?.article;
+        const errors = required(input, ['title', 'description', 'body']);
 
-      if (!comment) {
-        throw new HttpError(404, { comment: ['not found'] });
-      }
+        if (hasErrors(errors)) {
+          throw unprocessable(errors);
+        }
 
-      requireOwner(me, comment.authorId);
-      db.comments = db.comments.filter((c) => c !== comment);
+        const now = new Date().toISOString();
+        const article: Article = {
+          id: db.nextArticleId++,
+          slug: uniqueSlug(input.title),
+          title: input.title,
+          description: input.description,
+          body: input.body,
+          tagList: tagListOf(input.tagList),
+          createdAt: now,
+          updatedAt: now,
+          authorId: me.id,
+          favoritedBy: new Set(),
+        };
 
-      return [204];
-    }],
+        db.articles.push(article);
+
+        return [201, { article: articleView(article, me) }];
+      },
+    ],
+    [
+      'GET',
+      '/articles/:slug',
+      'optional',
+      ({ params, me }) => [
+        200,
+        { article: articleView(findArticle(params.slug), me) },
+      ],
+    ],
+    [
+      'PUT',
+      '/articles/:slug',
+      'required',
+      ({ params, me, body }) => {
+        const article = findArticle(params.slug);
+        const input = body?.article ?? {};
+
+        requireOwner(me, article.authorId);
+
+        const errors: Errors = {};
+
+        for (const field of ['title', 'description', 'body']) {
+          if (
+            field in input &&
+            (typeof input[field] !== 'string' || !input[field].trim())
+          ) {
+            errors[field] = ["can't be blank"];
+          }
+        }
+
+        if (hasErrors(errors)) {
+          throw unprocessable(errors);
+        }
+
+        for (const field of ['title', 'description', 'body'] as const) {
+          if (field in input) {
+            article[field] = input[field];
+          }
+        }
+
+        if ('title' in input) {
+          article.slug = uniqueSlug(article.title, article.id);
+        }
+
+        if ('tagList' in input) {
+          article.tagList = tagListOf(input.tagList);
+        }
+
+        article.updatedAt = new Date().toISOString();
+
+        return [200, { article: articleView(article, me) }];
+      },
+    ],
+    [
+      'DELETE',
+      '/articles/:slug',
+      'required',
+      ({ params, me }) => {
+        const article = findArticle(params.slug);
+
+        requireOwner(me, article.authorId);
+        db.articles = db.articles.filter((a) => a !== article);
+        db.comments = db.comments.filter((c) => c.articleId !== article.id);
+
+        return [204];
+      },
+    ],
+    [
+      'POST',
+      '/articles/:slug/favorite',
+      'required',
+      ({ params, me }) => setFavorite(params.slug, me, true),
+    ],
+    [
+      'DELETE',
+      '/articles/:slug/favorite',
+      'required',
+      ({ params, me }) => setFavorite(params.slug, me, false),
+    ],
+
+    [
+      'GET',
+      '/articles/:slug/comments',
+      'optional',
+      ({ params, me }) => {
+        const article = findArticle(params.slug);
+        const comments = db.comments
+          .filter((c) => c.articleId === article.id)
+          .sort((a, b) => b.id - a.id);
+
+        return [200, { comments: comments.map((c) => commentView(c, me)) }];
+      },
+    ],
+    [
+      'POST',
+      '/articles/:slug/comments',
+      'required',
+      ({ params, me, body }) => {
+        const article = findArticle(params.slug);
+        const errors = required(body?.comment, ['body']);
+
+        if (hasErrors(errors)) {
+          throw unprocessable(errors);
+        }
+
+        const now = new Date().toISOString();
+        const comment: Comment = {
+          id: db.nextCommentId++,
+          articleId: article.id,
+          body: body.comment.body,
+          createdAt: now,
+          updatedAt: now,
+          authorId: me.id,
+        };
+
+        db.comments.push(comment);
+
+        return [201, { comment: commentView(comment, me) }];
+      },
+    ],
+    [
+      'DELETE',
+      '/articles/:slug/comments/:id',
+      'required',
+      ({ params, me }) => {
+        const article = findArticle(params.slug);
+        const comment = db.comments.find(
+          (c) => c.id === Number(params.id) && c.articleId === article.id,
+        );
+
+        if (!comment) {
+          throw new HttpError(404, { comment: ['not found'] });
+        }
+
+        requireOwner(me, comment.authorId);
+        db.comments = db.comments.filter((c) => c !== comment);
+
+        return [204];
+      },
+    ],
   ];
   const routes = table.map(([method, pattern, auth, handler]) => ({
     method,
@@ -541,17 +786,27 @@ export function createApiServer({ stateFile = process.env.STATE_FILE }: { stateF
     }
   };
 
-  const respond = (req: IncomingMessage, res: ServerResponse, status: number, body?: unknown, headers: Record<string, string> = {}) => {
+  const respond = (
+    req: IncomingMessage,
+    res: ServerResponse,
+    status: number,
+    body?: unknown,
+    headers: Record<string, string> = {},
+  ) => {
     const origin = req.headers.origin;
 
     res.writeHead(status, {
       'Access-Control-Allow-Origin': origin ?? '*',
       'Access-Control-Allow-Credentials': 'true',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': req.headers['access-control-request-headers'] ?? 'Content-Type, Authorization, Accept',
+      'Access-Control-Allow-Headers':
+        req.headers['access-control-request-headers'] ??
+        'Content-Type, Authorization, Accept',
       'Access-Control-Max-Age': '600',
       Vary: 'Origin',
-      ...(body === undefined ? {} : { 'Content-Type': 'application/json; charset=utf-8' }),
+      ...(body === undefined
+        ? {}
+        : { 'Content-Type': 'application/json; charset=utf-8' }),
       ...headers,
     });
     res.end(body === undefined ? undefined : JSON.stringify(body));
@@ -568,8 +823,12 @@ export function createApiServer({ stateFile = process.env.STATE_FILE }: { stateF
       }
 
       const url = new URL(req.url ?? '/', 'http://localhost');
-      const path = url.pathname.startsWith('/api/') || url.pathname === '/api' ? url.pathname.slice(4) || '/' : null;
-      const matches = path === null ? [] : routes.filter((r) => r.regex.test(path));
+      const path =
+        url.pathname.startsWith('/api/') || url.pathname === '/api'
+          ? url.pathname.slice(4) || '/'
+          : null;
+      const matches =
+        path === null ? [] : routes.filter((r) => r.regex.test(path));
 
       if (matches.length === 0) {
         throw new HttpError(404, { path: ['not found'] });
@@ -582,7 +841,9 @@ export function createApiServer({ stateFile = process.env.STATE_FILE }: { stateF
       }
 
       const params = Object.fromEntries(
-        Object.entries(route.regex.exec(path as string)?.groups ?? {}).map(([k, v]) => [k, decodeURIComponent(v)]),
+        Object.entries(route.regex.exec(path as string)?.groups ?? {}).map(
+          ([k, v]) => [k, decodeURIComponent(v)],
+        ),
       );
       const token = tokenFrom(req);
       const claims = token ? verifyToken(db.secret, token) : null;
@@ -592,8 +853,16 @@ export function createApiServer({ stateFile = process.env.STATE_FILE }: { stateF
         throw new HttpError(401, { token: ['is missing or invalid'] });
       }
 
-      const body = req.method === 'POST' || req.method === 'PUT' ? await readJson(req) : undefined;
-      const [status, payload, headers] = route.handler({ params, query: url.searchParams, body, me: me as User });
+      const body =
+        req.method === 'POST' || req.method === 'PUT'
+          ? await readJson(req)
+          : undefined;
+      const [status, payload, headers] = route.handler({
+        params,
+        query: url.searchParams,
+        body,
+        me: me as User,
+      });
 
       if (stateFile && req.method !== 'GET') {
         saveDb(stateFile, db);
@@ -615,6 +884,8 @@ if (import.meta.main) {
   const port = Number(process.env.PORT ?? 3100);
 
   createApiServer().listen(port, () => {
-    console.log(`RealWorld API double listening on http://localhost:${port}/api`);
+    console.log(
+      `RealWorld API double listening on http://localhost:${port}/api`,
+    );
   });
 }
