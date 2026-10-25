@@ -27,7 +27,8 @@ export const strykerValidationSchema = {
             'Playwright projects to run. Defaults to every project in the config.',
         },
         workers: {
-          type: 'number',
+          type: 'integer',
+          minimum: 1,
           default: 1,
           description: 'Playwright workers per Stryker test runner process.',
         },

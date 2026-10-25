@@ -10,7 +10,12 @@ import type {
 } from '@playwright/test/reporter';
 import { DryRunStatus, TestStatus } from '@stryker-mutator/api/test-runner';
 
-import { CollectingReporter, toRunResult } from '../src/run-result.ts';
+import {
+  CollectingReporter,
+  serialGroups,
+  toRunResult,
+  withSerialGroups,
+} from '../src/run-result.ts';
 
 type Outcome = ReturnType<TestCase['outcome']>;
 
@@ -180,4 +185,26 @@ test('tests that ran without the hook are an error', () => {
     classify(reporter, { status: 'passed', hookInstalled: false }).status,
     DryRunStatus.Error,
   );
+});
+
+test('a mutant run selects every test of a describe.serial group, not one test alone', () => {
+  const file = { parent: undefined };
+  const serial = { _parallelMode: 'serial', parent: file };
+  const nestedSerial = { _parallelMode: 'serial', parent: serial };
+  const plain = { _parallelMode: 'default', parent: file };
+  const testCase = (id: string, parent: object) =>
+    ({ id, parent }) as unknown as TestCase;
+  const groups = serialGroups([
+    testCase('create', serial),
+    testCase('edit', nestedSerial),
+    testCase('alone', plain),
+  ]);
+
+  assert.deepEqual(withSerialGroups(['edit'], groups), ['create', 'edit']);
+  assert.deepEqual(withSerialGroups(['alone', 'create'], groups), [
+    'alone',
+    'create',
+    'edit',
+  ]);
+  assert.equal(withSerialGroups(undefined, groups), undefined);
 });

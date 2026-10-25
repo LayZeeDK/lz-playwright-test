@@ -1,5 +1,6 @@
 import type {
   FullResult,
+  Suite,
   TestCase,
   TestError,
 } from '@playwright/test/reporter';
@@ -11,6 +12,7 @@ import {
   TestStatus,
 } from '@stryker-mutator/api/test-runner';
 
+import type { SuiteInternals } from './playwright-internals.ts';
 import type { Snapshot } from './protocol.ts';
 
 type CoverageAnalysis = DryRunOptions['coverageAnalysis'];
@@ -84,6 +86,51 @@ export class CollectingReporter {
   }
 }
 
+/**
+ * The tests of each `describe.serial` group, keyed by every test in it. A later test in a serial
+ * group depends on the ones before it, so it cannot run alone.
+ */
+export function serialGroups(
+  testCases: Iterable<TestCase>,
+): Map<string, string[]> {
+  const bySuite = new Map<object, string[]>();
+  const byTest = new Map<string, string[]>();
+
+  for (const test of testCases) {
+    let group: object | undefined;
+
+    for (
+      let suite: Suite | undefined = test.parent;
+      suite;
+      suite = suite.parent
+    ) {
+      if ((suite as SuiteInternals)._parallelMode === 'serial') {
+        group = suite;
+      }
+    }
+
+    if (group) {
+      const ids = bySuite.get(group) ?? [];
+      ids.push(test.id);
+      bySuite.set(group, ids);
+      byTest.set(test.id, ids);
+    }
+  }
+
+  return byTest;
+}
+
+export function withSerialGroups(
+  testFilter: string[] | undefined,
+  groups: Map<string, string[]>,
+): string[] | undefined {
+  return (
+    testFilter && [
+      ...new Set(testFilter.flatMap((id) => groups.get(id) ?? [id])),
+    ]
+  );
+}
+
 export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
   const { status, reporter, snapshots, hookInstalled } = output;
   const isMutantRun = request.activeMutant !== undefined;
@@ -97,10 +144,6 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
     };
   }
 
-  if (tests.length === 0) {
-    return emptyRunResult(reporter, request);
-  }
-
   const failed = tests.some((test) => test.status === TestStatus.Failed);
 
   if (reporter.errors.length && !failed) {
@@ -108,6 +151,10 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
       status: DryRunStatus.Error,
       errorMessage: reporter.errors.join('\n'),
     };
+  }
+
+  if (tests.length === 0) {
+    return emptyRunResult(request);
   }
 
   if (
@@ -144,17 +191,7 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
   return { status: DryRunStatus.Complete, tests, snapshots };
 }
 
-function emptyRunResult(
-  reporter: CollectingReporter,
-  request: RunRequest,
-): RunResult {
-  if (reporter.errors.length) {
-    return {
-      status: DryRunStatus.Error,
-      errorMessage: reporter.errors.join('\n'),
-    };
-  }
-
+function emptyRunResult(request: RunRequest): RunResult {
   if (request.testFilter?.length) {
     return {
       status: DryRunStatus.Error,

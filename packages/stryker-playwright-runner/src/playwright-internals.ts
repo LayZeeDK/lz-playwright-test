@@ -18,7 +18,10 @@ export interface RunTestsParams {
 export interface TestRunner {
   initialize(params: Record<string, never>): Promise<void>;
   loadConfig(): Promise<{
-    projects: { expect?: { timeout?: number } }[];
+    projects: {
+      expect?: { timeout?: number };
+      project: { name: string; timeout: number };
+    }[];
     webServers: { url?: string; port?: number; ignoreHTTPSErrors?: boolean }[];
   }>;
   runGlobalSetup(reporters: Reporter[]): Promise<{ status: Status }>;
@@ -43,6 +46,11 @@ export interface CoreBundleModule {
   utils: {
     isURLAvailable(url: URL, ignoreHTTPSErrors: boolean): Promise<boolean>;
   };
+}
+
+// The reporter's Suite objects are Playwright's internal ones, which carry the describe mode.
+export interface SuiteInternals {
+  _parallelMode?: 'none' | 'default' | 'serial' | 'parallel';
 }
 
 export interface CommonModule {

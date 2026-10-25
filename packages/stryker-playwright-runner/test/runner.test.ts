@@ -127,8 +127,12 @@ before(async () => {
   tests = dryRun.tests;
 });
 
+let disposed = false;
+
 after(async () => {
-  await runner?.dispose();
+  if (!disposed) {
+    await runner?.dispose();
+  }
 });
 
 test('dry run completes with every test passing', () => {
@@ -309,4 +313,17 @@ test('a webServer that dies between runs is restarted instead of failing every t
 
 test('no Playwright artifacts are written next to the config', () => {
   assert.equal(existsSync(fixture('test-results')), false);
+});
+
+test('dispose removes the temp directory the runner kept its output and runs in', async () => {
+  const { rootDir } = runner as unknown as { rootDir: string };
+  assert.ok(
+    existsSync(rootDir),
+    'the temp directory exists while the runner is up',
+  );
+
+  await runner.dispose();
+  disposed = true;
+
+  assert.equal(existsSync(rootDir), false);
 });

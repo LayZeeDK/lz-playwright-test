@@ -41,7 +41,9 @@ import {
   type RunOutput,
   type RunRequest,
   type RunResult,
+  serialGroups,
   toRunResult,
+  withSerialGroups,
 } from './run-result.ts';
 
 export interface PlaywrightRunnerOptions {
@@ -83,6 +85,9 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   private outputDir?: string;
   private runsDir?: string;
   private servers: ServerCheck[] = [];
+  private serialGroups = new Map<string, string[]>();
+  // The largest test timeout the config sets, 0 for none. The runner's own timeout never exceeds it.
+  private configTestTimeout = 0;
   private runCounter = 0;
 
   constructor(options: StrykerOptions, log: Logger) {
@@ -171,6 +176,16 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
       serverCheck(server, isURLAvailable),
     );
     this.warnAboutAssertionTimeouts(config);
+    const timeouts = config.projects
+      .filter(
+        ({ project }) =>
+          !this.options.projects ||
+          this.options.projects.includes(project.name),
+      )
+      .map(({ project }) => project.timeout);
+    this.configTestTimeout = timeouts.includes(0)
+      ? 0
+      : Math.max(0, ...timeouts);
     await this.runGlobalSetup(this.playwright);
   }
 
@@ -216,7 +231,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     const failed = tests.some((test) => test.status === TestStatus.Failed);
 
     if (
-      tests.length > 0 &&
+      tests.some((test) => test.status !== TestStatus.Skipped) &&
       !failed &&
       !snapshots.some((snapshot) => snapshot.mutantCoverage)
     ) {
@@ -262,18 +277,23 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     disableBail,
     timeout,
   }: MutantRunOptions): Promise<MutantRunResult> {
+    const testTimeout = Math.max(
+      timeout - TIMEOUT_HEADROOM_MS,
+      MIN_TEST_TIMEOUT_MS,
+    );
     const run = await this.run({
       activeMutant: activeMutant.id,
-      testFilter,
+      testFilter: withSerialGroups(testFilter, this.serialGroups),
       hitLimit,
       disableBail,
-      testTimeout: Math.max(timeout - TIMEOUT_HEADROOM_MS, MIN_TEST_TIMEOUT_MS),
+      testTimeout: this.configTestTimeout
+        ? Math.min(testTimeout, this.configTestTimeout)
+        : testTimeout,
     });
     const hitCount =
       run.status === DryRunStatus.Complete
         ? run.snapshots.reduce(
-            (sum, { hitCount = 0 }) =>
-              sum + (isHitCount(hitCount) ? hitCount : 0),
+            (sum, { hitCount }) => sum + (isHitCount(hitCount) ? hitCount : 0),
             0,
           )
         : undefined;
@@ -297,6 +317,10 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
       (await this.restartDeadServers(playwright))
     ) {
       output = await this.runOnce(playwright, request);
+    }
+
+    if (request.activeMutant === undefined) {
+      this.serialGroups = serialGroups(output.reporter.testCases.values());
     }
 
     return toRunResult(output, request);
@@ -473,7 +497,7 @@ function mergeCoverage(snapshots: Snapshot[]): MutantCoverage {
   };
   const add = (
     target: Record<string, number>,
-    hits: Record<string, number> | null = {},
+    hits: Record<string, number> | null | undefined,
   ) => {
     for (const [mutantId, count] of Object.entries(hits ?? {})) {
       if (isHitCount(count)) {
