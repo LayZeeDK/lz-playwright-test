@@ -58,27 +58,31 @@ component-specific branch.
 
 ## Evidence
 
-All numbers are from one Windows 11 arm64 machine shared with other sessions, so treat timings as
-indicative. Commands to rerun them are at the end.
+All numbers are from one Windows 11 arm64 machine shared with other sessions, and each row is a single
+run, so treat timings as indicative. Commands to rerun them are at the end.
 
 | Case | Runner | Score | Wall time |
 |---|---|---|---|
-| Demo e2e, 32 mutants in `cart.ts` | this runner, `timeoutMS` 5000 | 26 killed, 1 timeout, 5 survived | 5m51s |
-| Same | this runner, `timeoutMS` 10000 | 26 killed, 1 timeout, 5 survived | 4m39s |
+| Demo e2e, 32 mutants in `cart.ts` | this runner, `timeoutMS` 10000 | 27 killed, 5 survived | 4m05s |
+| Same | this runner before the per-test timeout fix, `timeoutMS` 10000 | 26 killed, 1 timeout, 5 survived | 4m39s |
+| Same | this runner before the per-test timeout fix, `timeoutMS` 5000 | 26 killed, 1 timeout, 5 survived | 5m51s |
 | Same | `command` runner + Vite `define`, server restart per mutant | 27 killed, 5 survived | 12m35s |
 | Same | `command` runner, no activation (negative control) | 0 killed, 32 survived | 14m59s |
-| Demo CT, 27 mutants in `price-tag.tsx` via `mount()` | this runner | 21 killed, 6 survived | 3m14s |
+| Demo CT, 27 mutants in `price-tag.tsx` via `mount()` | this runner, `timeoutMS` 10000 | 21 killed, 6 survived | 2m29s |
 | `stryker-playwright-hello-world`, 7 mutants | this runner (repo's `define` removed) | 6 killed, 1 survived | 52s |
 | Same | the repo's own `command` runner setup | 6 killed, 1 survived | 1m31s |
 
 `packages/stryker-playwright-runner/test/runner.test.ts` checks the runner against a fixture
 instrumented by Stryker's own instrumenter. It checks that per-test coverage separates a test that
 reaches a function from one that does not, coverage across a navigation to a page without the app,
-static coverage for a shared `beforeAll` page and for a page the worker closes, per-test coverage under
-`reuseContext`, a runtime kill, a static (module-level) kill, a survivor followed by a clean kill, the hit
-limit on an infinite loop, a `webServer` restarted after it dies between runs, and no artifacts on disk.
-With activation disabled in the hook, the kill and hit-limit checks fail. It does not cover Stryker's own
-timeout restart, `coverageAnalysis` `'all'` or `'off'`, `workers` above 1, or the dry-run guard.
+static coverage for a shared `beforeAll` page and for a page the worker closes, per-test coverage for a
+page the test closes, per-test coverage under `reuseContext`, a runtime kill, a static (module-level)
+kill, a survivor followed by a clean kill, an Error when the selected tests no longer exist, an infinite
+loop that times out inside its budget through the per-test timeout, the hit limit on an infinite loop,
+that no run settings stay in the environment, a `webServer` restarted after it dies between runs, and no
+artifacts on disk. Each of the three newest checks fails with its fix removed, and with activation
+disabled in the hook 6 of the 16 checks fail. It does not cover Stryker's own timeout restart,
+`coverageAnalysis` `'all'` or `'off'`, `workers` above 1, or the dry-run guard.
 
 ## What a mutant costs, and why
 
