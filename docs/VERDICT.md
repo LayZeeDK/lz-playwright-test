@@ -84,6 +84,7 @@ indicative. Each row is a single run unless it says otherwise. Commands to rerun
 | `angular-ngrx-nx-realworld-example-app` (Angular 21.2, Nx 22.7), 48 mutants in `auth.store.ts`, against the local API double | this runner, `timeoutMS` 10000 | 11 killed, 15 timeouts, 10 survived, 12 no coverage | 7m41s |
 | Same, with `use.actionTimeout: 5000` added to the copy's Playwright config | this runner, `timeoutMS` 10000 | 26 killed, 10 survived, 12 no coverage | 6m00s |
 | ngx-yeti (Angular, Nx, Playwright 1.63.0, static Storybook), 2 mutants in `cluster.ts`, 234 e2e tests | this runner, `playwright.workers` 2, `dryRunTimeoutMinutes` 20 | 2 killed | 3m51s (dry run 2m57s) |
+| Analog 2.8.0 `beta` (Angular 22.2, Nx 23.2, SSR), 8 mutants in `(home).page.ts`, 11 e2e tests against the built SSR server | this runner, `disableTypeChecking: true` in the copy's Vite config | 4 killed, 4 survived | 1m45s |
 
 `packages/stryker-playwright-runner/test/runner.test.ts` checks the runner against a fixture
 instrumented by Stryker's own instrumenter. It checks that per-test coverage separates a test that
@@ -125,6 +126,14 @@ stopped at the first kill, after 7 tests and after 1. On one worker the dry run 
 5-minute `dryRunTimeoutMinutes`; with 2 workers it took 2m57s. The clone needed one step before Stryker
 could start its Storybook: building the workspace package `yeti-css` in the original
 (`nx run yeti-css:yeti-build`), for the reason in the npm-workspaces entry under Limits.
+
+Analog serves its pages from a production SSR build that the `webServer` starts once, and the page
+component also runs in the browser after hydration. The four kills are the `share()` and `onNotify()`
+click handlers, which run only in the browser. Two survivors empty the route's page title, which no test
+checks; the other two change `requireSync: true` on `toSignal`, which looks equivalent because the
+loaded data arrives synchronously either way. Nothing in this file runs only on the server, so the run
+does not exercise the SSR entry under Limits. Analog's production build type-checks by default, and it
+rejected Stryker's instrumented file until type checking was turned off for the run (see Limits).
 
 ## What a mutant costs, and why
 
@@ -177,6 +186,15 @@ tests, so with the default `timeoutMS` kills turned into timeouts (8 of 11 in th
   workspace package that the app imports through `node_modules` is never served, so its mutants survive
   or show as NoCoverage. ngx-yeti hit the first part (its Storybook reads `node_modules/yeti-css/dist`).
   This comes from Stryker's sandbox, not from this runner.
+- A build that type-checks Angular templates rejects Stryker's instrumented code when a mutant switch
+  widens a type a template uses: `// @ts-nocheck`, which Stryker adds to every instrumented file, does
+  not reach Angular's template type-check. Analog's `{ requireSync: true }` on `toSignal` became
+  "possibly undefined" in `data().products`. Turn off the build's type checking for the mutation run
+  (Analog: `disableTypeChecking: true`); it does not change the built code.
+- An Nx task that the `webServer` starts in Stryker's sandbox starts an Nx daemon rooted in the sandbox.
+  The daemon outlives the run, holds the sandbox open, and Stryker fails to delete it ("Failed to delete
+  stryker temp directory"); seen in the Analog run. `nx daemon --stop` from the sandbox ended it.
+  `NX_DAEMON=false` in the `webServer` environment should prevent it; that is not measured.
 - In an Nx workspace, `.stryker-tmp` must be in `.gitignore` (which `stryker init` adds) or `.nxignore`.
   A Stryker run that fails keeps its sandbox there, a full copy of the workspace, and Nx then finds every
   project twice and refuses to run any task, outside Stryker too.
