@@ -11,6 +11,8 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 const AVATAR =
   'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 8 8%22%3E%3Crect width=%228%22 height=%228%22 fill=%22%23ccc%22/%3E%3C/svg%3E';
 const COOKIE = 'jwt';
+// The CORS headers reflect any Origin with credentials, which is safe only on a loopback-only listener.
+const HOST = 'localhost';
 
 type Errors = Record<string, string[]>;
 
@@ -361,8 +363,8 @@ export function createApiServer({
     query: URLSearchParams,
     me?: User,
   ): Result => {
-    const limit = Number(query.get('limit') ?? 20);
-    const offset = Number(query.get('offset') ?? 0);
+    const limit = Number(query.get('limit')) || 20;
+    const offset = Number(query.get('offset')) || 0;
     const sorted = [...articles].sort((a, b) =>
       b.createdAt.localeCompare(a.createdAt),
     );
@@ -842,7 +844,7 @@ export function createApiServer({
 
       const params = Object.fromEntries(
         Object.entries(route.regex.exec(path as string)?.groups ?? {}).map(
-          ([k, v]) => [k, decodeURIComponent(v)],
+          ([k, v]) => [k, decodeParam(v)],
         ),
       );
       const token = tokenFrom(req);
@@ -880,12 +882,18 @@ export function createApiServer({
   });
 }
 
+function decodeParam(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    throw new HttpError(404, { path: ['not found'] });
+  }
+}
+
 if (import.meta.main) {
   const port = Number(process.env.PORT ?? 3100);
 
-  createApiServer().listen(port, () => {
-    console.log(
-      `RealWorld API double listening on http://localhost:${port}/api`,
-    );
+  createApiServer().listen(port, HOST, () => {
+    console.log(`RealWorld API double listening on http://${HOST}:${port}/api`);
   });
 }

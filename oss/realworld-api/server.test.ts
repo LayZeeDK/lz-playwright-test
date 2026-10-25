@@ -140,6 +140,8 @@ describe('realworld api double', async () => {
     assert.equal((await api('/articles?tag=testing')).json.articlesCount, 2);
     assert.equal((await api('/articles?author=jake')).json.articlesCount, 2);
     assert.equal((await api('/articles?favorited=anne')).json.articlesCount, 1);
+    assert.equal((await api('/articles?limit=abc&offset=x')).json.articles.length, 5);
+    assert.equal((await api('/articles/%E0%A4%A')).status, 404);
 
     const tags = await api('/tags');
 
