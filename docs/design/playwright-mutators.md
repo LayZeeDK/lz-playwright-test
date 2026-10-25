@@ -88,6 +88,13 @@ and stryker4s (`modules/core/src/main/scala/stryker4s/mutation/`), both at their
 | `StateAttribute` | `StateNegation` | `AriaState` |
 | `ListExpression` (later) | `ListTruncation` | `ListTruncate` |
 
+Every name is letters only, because a `// Stryker disable` comment accepts only letters in mutator names,
+and StrykerJS matches those names against every registered mutator ignoring case
+(`directive-bookkeeper.ts:63` and `:73`). The names carry no namespace prefix, like the built-ins they
+sit next to, and like the upstream route would need. The install therefore refuses an operator whose
+name equals, ignoring case, a mutator that is already registered, so a future built-in with the same
+name fails the run loudly instead of sharing a filter key.
+
 Two names do not fit the pattern exactly, the way StrykerJS's `ConditionalExpression` also mutates `if`
 tests and loops. `DisabledAttribute` also covers `readOnly`, and `ElementRole` changes either the `role`
 attribute or the tag that gives an element its implicit role.
