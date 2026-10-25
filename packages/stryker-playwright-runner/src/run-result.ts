@@ -151,6 +151,16 @@ export function serialGroups(
   for (const test of testCases) {
     let group: object | undefined;
 
+    // Without the field every test would run alone, and serial chains would give false kills.
+    if (
+      typeof (test.parent as SuiteInternals | undefined)?._parallelMode !==
+      'string'
+    ) {
+      throw new Error(
+        'Playwright suites no longer carry Suite._parallelMode, which this runner reads to keep describe.serial groups together.',
+      );
+    }
+
     for (
       let suite: Suite | undefined = test.parent;
       suite;

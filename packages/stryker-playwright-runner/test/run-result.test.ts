@@ -215,6 +215,15 @@ test('a mutant run selects every test of a describe.serial group, not one test a
   assert.equal(withSerialGroups(undefined, groups), undefined);
 });
 
+test('serial grouping fails loudly when Playwright suites lose _parallelMode', () => {
+  const renamed = { parent: undefined } as unknown as Suite;
+
+  assert.throws(
+    () => serialGroups([{ id: 'a', parent: renamed } as unknown as TestCase]),
+    { message: /Suite\._parallelMode/ },
+  );
+});
+
 // Stands in for Playwright's TestRunner: reports the given errors and tests, then resolves to result.
 function listing(
   result: { status: FullResult['status'] } | undefined,
