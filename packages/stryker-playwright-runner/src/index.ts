@@ -24,7 +24,7 @@ export const strykerValidationSchema = {
           type: 'array',
           items: { type: 'string' },
           description:
-            'Playwright projects to run. Defaults to every project in the config.',
+            'Playwright projects to run. Defaults to the projects Playwright runs without --project, so not those with default: false.',
         },
         workers: {
           type: 'integer',

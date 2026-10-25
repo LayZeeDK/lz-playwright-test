@@ -17,6 +17,30 @@ The answer to whether this works, the evidence, and the limits are in `docs/VERD
   run. `oss/README.md` describes each copy.
 - `docs/research/`: the research behind the design.
 
+## Options
+
+Set these under `playwright` in the Stryker config. `packages/stryker-playwright-runner/src/index.ts` holds
+the schema Stryker checks them against.
+
+- `configFile`: the Playwright config file, relative to the project root. Without it, Playwright looks
+  for `playwright.config.*` in the working directory.
+- `projects`: the Playwright projects to run. Without it, the runner runs the projects Playwright runs
+  without `--project`, so not those with `default: false`.
+- `workers`: the Playwright workers per Stryker test runner process. The default is 1. The `workers`
+  value in the Playwright config has no effect.
+
+On every run, these settings replace the ones in the Playwright config, except where a line says otherwise:
+
+- `screenshot`, `trace`, and `video` are off.
+- The reporters in the Playwright config do not run.
+- `outputDir` is a folder in a private temp directory, which `dispose` removes.
+- `maxFailures` is 1, unless Stryker's `disableBail` is on. `disableBail` cannot clear a `maxFailures` that
+  the Playwright config sets.
+- In a mutant run, the per-test timeout is Stryker's timeout for the mutant less 5 s, capped at the largest
+  test timeout in the Playwright config. The dry run keeps the config's timeouts.
+- `retries` is 0 and `repeatEach` is 1. Playwright's `TestRunner.runTests` sets these two, not the runner.
+  Retries set with `describe.configure({ retries })` still apply.
+
 ## Type-check and test the runner
 
 Run these from the repo root. The tests start a browser, so install Chromium first.
