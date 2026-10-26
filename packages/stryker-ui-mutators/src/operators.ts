@@ -20,8 +20,15 @@ const COMPARISON: ReadonlySet<string> = new Set([
   '>=',
 ]);
 const LIST_METHODS: ReadonlySet<string> = new Set(['map', 'filter', 'flatMap']);
-const UNRENDERED_TEXT: ReadonlySet<string> = new Set(['style', 'script']);
-const DECORATIVE: ReadonlySet<string> = new Set(['svg', 'img', 'i']);
+const UNRENDERED_TEXT: ReadonlySet<string | undefined> = new Set([
+  'style',
+  'script',
+]);
+const DECORATIVE: ReadonlySet<string | undefined> = new Set([
+  'svg',
+  'img',
+  'i',
+]);
 const LABELABLE: ReadonlySet<string> = new Set(['input', 'select', 'textarea']);
 /** A span cannot take these under @types/react 19.3.0 (TS2322); a span ignores them at run time. */
 const NOT_ON_SPAN: ReadonlySet<string> = new Set(['href', 'type', 'disabled']);
@@ -32,7 +39,7 @@ const NOT_ON_SPAN: ReadonlySet<string> = new Set(['href', 'type', 'disabled']);
  * attributes or context, so they are left out. `dd`, `dt`, `li`, `tbody`, `tfoot`, `thead` and `tr` lose their role
  * under a parent with `role="none"` or `role="presentation"`; that shape is rare, so they stay in.
  */
-export const IMPLICIT_ROLE: ReadonlyMap<string, string> = new Map([
+export const IMPLICIT_ROLE: ReadonlyMap<string | undefined, string> = new Map([
   ['article', 'article'],
   ['aside', 'complementary'],
   ['blockquote', 'blockquote'],
@@ -97,8 +104,7 @@ export const operators = operatorTable([
           if (
             path.isJSXText() &&
             HAS_WORD.test(path.node.value) &&
-            // Stryker disable next-line StringLiteral: equivalent, as UNRENDERED_TEXT has no key '' and no key 'Stryker was here!'
-            !UNRENDERED_TEXT.has(elementName(path.parentPath, t) ?? '')
+            !UNRENDERED_TEXT.has(elementName(path.parentPath, t))
           ) {
             yield t.jsxText('');
           }
@@ -202,9 +208,7 @@ export const operators = operatorTable([
         attributes: ['hidden', 'aria-hidden'],
         on: { bare: 'remove', string: 'remove', expression: 'false' },
         skip: (site) =>
-          site.name === 'aria-hidden' &&
-          // Stryker disable next-line StringLiteral: equivalent, as DECORATIVE has no key '' and no key 'Stryker was here!'
-          DECORATIVE.has(site.element.name ?? ''),
+          site.name === 'aria-hidden' && DECORATIVE.has(site.element.name),
       },
     ],
   },
@@ -335,8 +339,7 @@ function implicitRole(element: ElementSite): string | undefined {
     return element.attributes.has('href') ? 'link' : undefined;
   }
 
-  // Stryker disable next-line StringLiteral: equivalent, as IMPLICIT_ROLE has no key '' and no key 'Stryker was here!'
-  return IMPLICIT_ROLE.get(element.name ?? '');
+  return IMPLICIT_ROLE.get(element.name);
 }
 
 /** A `label` whose subtree holds an `input`, `select` or `textarea`: nesting keeps the association without `htmlFor`. */
