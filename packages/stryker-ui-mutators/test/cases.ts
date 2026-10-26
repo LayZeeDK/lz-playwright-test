@@ -312,13 +312,10 @@ export const cases: readonly Case[] = [
   },
   {
     id: 'ngx-yeti-9',
-    title: 'an img role and its aria-label are removed',
+    title: 'an svg keeps its img role, as Playwright gives svg that role, and loses its aria-label',
     origin: `${YETI}icon-fixture.ts:36`,
     jsx: '<svg role="img" aria-label="Warning" viewBox="0 0 24 24"></svg>',
-    expect: [
-      ['ElementRole', 'role={undefined}'],
-      ['LabelAttribute', 'aria-label=""'],
-    ],
+    expect: [['LabelAttribute', 'aria-label=""']],
   },
   {
     id: 'ngx-yeti-10',
@@ -1019,5 +1016,12 @@ export const cases: readonly Case[] = [
     setup: 'let save = () => {};',
     jsx: '<form onSubmit={save}></form>',
     expect: [['EventHandler', 'onSubmit={undefined}']],
+  },
+  {
+    id: 'design-14',
+    title: 'implicit roles of status, separator, paragraph, group, option, progressbar and textbox are skipped',
+    origin: RULES,
+    jsx: '<div><output role="status" /><hr role="separator" /><p role="paragraph" /><fieldset role="group" /><option role="option" /><progress role="progressbar" /><textarea role="textbox" /></div>',
+    expect: [],
   },
 ];

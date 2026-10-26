@@ -155,12 +155,18 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
   `label` that also wraps its control, because nesting keeps the association. `TextLiteral` skips text
   inside `style` and `script`, which is CSS or code, not rendered text. `ElementRole` skips a `role` equal
   to the element's implicit role, such as `<button role="button">`, because removing it changes nothing.
-  The implicit roles are the ones Playwright's `getByRole` computes for a tag without context
-  (`getImplicitAriaRole` in `playwright-core/lib/coreBundle.js`): `button`, `nav`, `main`, `aside`,
-  `article`, `dialog`, `ul`, `ol` and `menu` (`list`), `li`, `table`, `h1` to `h6` (`heading`), and `a`
-  with `href` (`link`). `header`, `footer`, `form`, and `section` get their role only in some contexts, so
-  removing an explicit one can change what `getByRole` finds, and the skip leaves them out.
-  No synthetic case covers these three yet.
+  The implicit roles are the ones Playwright 1.64.1's `getByRole` computes for a tag from its name alone
+  (`getImplicitAriaRole` in `playwright-core/lib/coreBundle.js`), plus `a` with `href` (`link`). That is
+  every tag in Playwright's table with a fixed role: `article`, `aside`, `blockquote`, `button`, `caption`,
+  `code`, `datalist`, `dd`, `del`, `details`, `dfn`, `dialog`, `dt`, `em`, `fieldset`, `figure`, `h1` to
+  `h6`, `hr`, `html`, `ins`, `li`, `main`, `mark`, `math`, `menu`, `meter`, `nav`, `ol`, `optgroup`,
+  `option`, `output`, `p`, `progress`, `search`, `strong`, `sub`, `sup`, `svg`, `table`, `tbody`,
+  `textarea`, `tfoot`, `thead`, `time`, `tr`, and `ul`. So `<output role="status">` and
+  `<svg role="img">` get no `RoleRemoval`. `area`, `footer`, `form`, `header`, `img`, `input`, `section`,
+  `select`, `td`, and `th` get their role from attributes or context, so removing an explicit one can
+  change what `getByRole` finds, and the skip leaves them out. `dd`, `dt`, `li`, `tbody`, `tfoot`,
+  `thead`, and `tr` lose their implicit role under a parent with `role="none"` or `role="presentation"`;
+  that shape is rare, and the skip keeps them. Cases design-7 and design-14 cover the role skip.
 
 The prototype also matches `formAction`, `inert`, `aria-current`, `aria-invalid` and `checked`, which this
 design does not list; they stay out of the first release.

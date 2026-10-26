@@ -17,28 +17,64 @@ const LABELABLE: ReadonlySet<string> = new Set(['input', 'select', 'textarea']);
 /** A span cannot take these under @types/react 19.3.0 (TS2322); a span ignores them at run time. */
 const NOT_ON_SPAN: ReadonlySet<string> = new Set(['href', 'type', 'disabled']);
 /**
- * The roles Playwright's `getByRole` gives a tag in any context (`getImplicitAriaRole` in
+ * The roles Playwright 1.64.1's `getByRole` gives a tag in any context (`getImplicitAriaRole` in
  * playwright-core/lib/coreBundle.js); an explicit equal `role` restates them. `a` is `link` only with `href`.
- * `header`, `footer`, `form` and `section` get a role only in some contexts, so they are left out.
+ * `area`, `footer`, `form`, `header`, `img`, `input`, `section`, `select`, `td` and `th` get their role from
+ * attributes or context, so they are left out. `dd`, `dt`, `li`, `tbody`, `tfoot`, `thead` and `tr` lose their role
+ * under a parent with `role="none"` or `role="presentation"`; that shape is rare, so they stay in.
  */
 const IMPLICIT_ROLE: ReadonlyMap<string, string> = new Map([
-  ['button', 'button'],
-  ['nav', 'navigation'],
-  ['main', 'main'],
-  ['aside', 'complementary'],
   ['article', 'article'],
+  ['aside', 'complementary'],
+  ['blockquote', 'blockquote'],
+  ['button', 'button'],
+  ['caption', 'caption'],
+  ['code', 'code'],
+  ['datalist', 'listbox'],
+  ['dd', 'definition'],
+  ['del', 'deletion'],
+  ['details', 'group'],
+  ['dfn', 'term'],
   ['dialog', 'dialog'],
-  ['ul', 'list'],
-  ['ol', 'list'],
-  ['menu', 'list'],
-  ['li', 'listitem'],
-  ['table', 'table'],
+  ['dt', 'term'],
+  ['em', 'emphasis'],
+  ['fieldset', 'group'],
+  ['figure', 'figure'],
   ['h1', 'heading'],
   ['h2', 'heading'],
   ['h3', 'heading'],
   ['h4', 'heading'],
   ['h5', 'heading'],
   ['h6', 'heading'],
+  ['hr', 'separator'],
+  ['html', 'document'],
+  ['ins', 'insertion'],
+  ['li', 'listitem'],
+  ['main', 'main'],
+  ['mark', 'mark'],
+  ['math', 'math'],
+  ['menu', 'list'],
+  ['meter', 'meter'],
+  ['nav', 'navigation'],
+  ['ol', 'list'],
+  ['optgroup', 'group'],
+  ['option', 'option'],
+  ['output', 'status'],
+  ['p', 'paragraph'],
+  ['progress', 'progressbar'],
+  ['search', 'search'],
+  ['strong', 'strong'],
+  ['sub', 'subscript'],
+  ['sup', 'superscript'],
+  ['svg', 'img'],
+  ['table', 'table'],
+  ['tbody', 'rowgroup'],
+  ['textarea', 'textbox'],
+  ['tfoot', 'rowgroup'],
+  ['thead', 'rowgroup'],
+  ['time', 'time'],
+  ['tr', 'row'],
+  ['ul', 'list'],
 ]);
 
 export const operators = [
