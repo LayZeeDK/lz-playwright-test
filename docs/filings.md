@@ -37,7 +37,9 @@ order across several red tests. Evidence: `lz-red` step 2 and `references/three-
 **O3. Coach-only defaults conflict with an implementation brief.** `lz-tpp` step 7 says "Never edit the developer's
 code or run the tests" unless asked, and `lz-red` step 5 says "do not run the suite unprompted". An agent whose
 brief tells it to implement and verify was not asked in the skill's invocation arguments, so by the skills' own
-rules it should only coach. The workers followed their briefs. Evidence: `lz-tpp` step 7; `lz-red` step 5.
+rules it should only coach. The workers followed their briefs. `lz-refactor` step 5's "commit only when asked" has
+the same gap: a brief that requires one commit per fix is that ask (round 2 fix worker). Evidence: `lz-tpp` step 7;
+`lz-red` step 5; `lz-refactor` step 5.
 
 **O4. Unit-test scope.** `lz-red` is about "the next FAILING (red) unit test"; two of the three feature tests unit A
 sharpened are browser integration tests (real Playwright and Chromium), and the skill has nothing on them. Its
@@ -48,7 +50,10 @@ red-bar mechanics reference is Vitest-only (`references/vitest-typescript-mechan
 hooks, and declaration annotations that replace `as` expressions so Stryker mutates the code inside (StrykerJS
 10.1.1 mutates nothing inside `expr as Type`), without wrong advice. Neither has a catalogue entry: no test-fixture
 setup, no "fails at load versus fails in a test", no refactoring around a tool's blind spot. On a plain Extract
-Class its APPLY/DECLINE count, defined for patterns, had to be improvised.
+Class its APPLY/DECLINE count, defined for patterns, had to be improvised. In the review round the same count did
+fit a test-file split (removes 7 duplicated double builders > adds 3 support files) and a Replace Derived Variable
+with Query (removes 2 derivations > adds 1 local), so the gap is in the catalogue, not the count. Moving a harness
+to a shared module while each test keeps its own `before()` dynamic import had no entry either.
 
 **O6. A mutation-driven batch routes around the skills.** The worker that took the runner's source mutation run
 from 92.56% to 100% loaded no lz-tdd skill: 49 surviving or uncovered mutants, one test each, checked by the next
@@ -65,14 +70,32 @@ worker fixed three bugs test-first and made eight refactors, and loaded no lz-td
 hand, and the unchanged case tables guarded the refactors. Unit C of the runner (test-code mutation at 100% on the
 first run) had nothing to write, so it is no evidence either way. The descriptions trigger on a developer's coaching
 questions ("what test should I write next?", "anything you'd refactor?"); a worker that holds a list of fixes asks
-none of them. Evidence: `.audit/prod/review/fix-brief.md`, `fix-U-progress.md` (local, gitignored); the three
-skills' `description` fields.
+none of them. After Claude told the runner's two fix workers to load the skills with the Skill tool, naming the
+skill per row, both did: `lz-red` before the reds of two bug fixes, `lz-refactor` as a command for seven
+refactors. Naming the tool call was enough. Evidence: `.audit/prod/review/fix-brief.md`, `fix-U-progress.md`,
+`fix-R-progress.md`, `fix-R2-progress.md` (local, gitignored); the three skills' `description` fields.
 
 **O8. What worked.** `lz-refactor` step 1 caught a behaviour change inside a refactor commit (a lock release on a
 failed init). `lz-red` step 5's "a not-implemented throw ... is a valid but blunter red" let 13 new tests go red
 without a module-load failure, and its "the failure must originate in the code under test" kept a child-process
 test's red on the hook's own TypeError rather than on a spawn failure. Step 3's message-matrix route fitted a shell
-whose outgoing calls are what to assert. Step 4's "assert observable behaviour" fitted the cases-table style.
+whose outgoing calls are what to assert. Step 4's "assert observable behaviour" fitted the cases-table style. On a
+fail-loud fix, step 5 had the red run first and got `AssertionError: Missing expected exception` from the code under
+test, and step 3's house idiom picked `assert.throws` with a message pattern.
+
+**O9. No route for growing a test double.** A Node-coverage bug's red needed a state the fake `test.info()` could
+not express (which hook or fixture is running). `lz-red` step 3 (house idiom) and "listen to the tests" both apply,
+but neither says whether adding a field to the double is the normal move or design feedback. Here it was the normal
+move. Evidence: `fix-R-progress.md`, R1.
+
+**O10. `lz-refactor` has no smell for a type assertion.** Three of the five refactor rows in round 2 removed casts
+(`as`, `as unknown as`, `{} as never` in test doubles and a module's private state). Each went through a
+neighbouring smell with an improvised step-4 count. Evidence: `fix-R2-progress.md`, A1, A3, A7.
+
+**O11. Primitive Obsession's candidates are class-shaped.** For a string slot type matched against string sets,
+the candidates were Replace Primitive with Object and Replace Type Code with Subclasses; step 4 declined both, and
+the fallback "a discriminated union" (here a string-literal union parsed at the boundary) was the right answer.
+The decision came from the fallback, not from a listed candidate. Evidence: `fix-R2-progress.md`, A1.
 
 ### Suggestions
 
@@ -100,6 +123,16 @@ no test can kill.
 **S7 (from O7).** Add trigger phrases for an agent's own work, not only a developer's questions: "fix this
 finding test-first", "write the regression test for this bug", "refactor this without changing behaviour". Or
 state in each description that an implementation brief naming the skill is an invocation.
+
+**S8 (from O9).** In `lz-red` step 3, say that a test double gaining the one field a bug's input needs is the
+ordinary move, and when it is instead a sign that the seam is wrong.
+
+**S9 (from O10).** Add a "Type assertion" smell with candidates and a step-4 count for each: narrow at the boundary
+with a type guard, `implements` on a fake, a typed test double, `satisfies`, a narrower parameter type
+(`Pick<T, 'used'>`).
+
+**S10 (from O11).** For TypeScript, list a string-literal or discriminated union as the first candidate for
+Primitive Obsession, before the class-shaped ones.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
