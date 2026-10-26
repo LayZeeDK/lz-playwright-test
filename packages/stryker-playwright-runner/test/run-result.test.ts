@@ -3,44 +3,20 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import type {
-  FullResult,
-  Suite,
-  TestCase,
-  TestResult,
-} from '@playwright/test/reporter';
-import {
-  INSTRUMENTER_CONSTANTS,
-  type MutantCoverage,
-  type StrykerOptions,
-} from '@stryker-mutator/api/core';
-import type { Logger } from '@stryker-mutator/api/logging';
+import type { TestCase, TestResult } from '@playwright/test/reporter';
+import type { MutantCoverage } from '@stryker-mutator/api/core';
 import {
   DryRunStatus,
-  type MutantRunOptions,
   MutantRunStatus,
   TestStatus,
 } from '@stryker-mutator/api/test-runner';
 
 import {
-  PlaywrightTestRunner,
-  withEnv,
-} from '../src/playwright-test-runner.ts';
-import {
   parseSnapshotLine,
-  RUN_SETTINGS,
-  serializeSnapshot,
   type Snapshot,
   type SnapshotLine,
 } from '../src/protocol.ts';
 import { CollectingReporter } from '../src/reporter.ts';
-import {
-  type DryRunRequest,
-  dryRunRequest,
-  type MutantRunRequest,
-  mutantRunRequest,
-  runPlan,
-} from '../src/run-request.ts';
 import {
   attemptSummary,
   coverageGaps,
@@ -54,16 +30,12 @@ import {
   toRunResult,
 } from '../src/run-result.ts';
 import {
-  listSerialGroups,
-  projectsThatRun,
-  serialGroups,
-  withSerialGroups,
-} from '../src/serial-groups.ts';
-import { DRY_RUN_BUDGET } from '../src/timeouts.ts';
-
-type Outcome = ReturnType<TestCase['outcome']>;
-
-const ACTIVE_MUTANT = INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
+  addAttempt,
+  dryRequest,
+  fakeTestCase,
+  mutantRequest,
+  type Outcome,
+} from './support/doubles.ts';
 
 // A snapshot as the runner reads it from a line the hook wrote.
 function parsed(line: Partial<SnapshotLine>): Snapshot {
@@ -86,20 +58,8 @@ function attempt(
   expectedStatus: TestCase['expectedStatus'] = 'passed',
 ) {
   const testCase =
-    reporter.testCases.get(id) ??
-    ({
-      id,
-      expectedStatus,
-      results: [],
-      titlePath: () => ['', 'e2e', 'app.spec.ts', id],
-      location: { file: 'app.spec.ts', line: 1, column: 1 },
-    } as unknown as TestCase);
-  testCase.results.push({
-    status,
-    duration: 10,
-    error: status === 'passed' ? undefined : { message: `${id} ${status}` },
-  } as unknown as TestResult);
-  Object.assign(testCase, { outcome: () => outcome });
+    reporter.testCases.get(id) ?? fakeTestCase(id, { expectedStatus });
+  addAttempt(testCase, outcome, status);
   reporter.onTestEnd(testCase);
 }
 
@@ -121,30 +81,6 @@ function classify(
     { status, reporter, snapshots: [], hookInstalled },
     mutant ? mutantRequest({ testFilter }) : dryRequest(),
   );
-}
-
-function dryRequest(request: Partial<DryRunRequest> = {}): DryRunRequest {
-  return {
-    kind: 'dry',
-    disableBail: true,
-    coverageAnalysis: 'perTest',
-    budget: DRY_RUN_BUDGET,
-    ...request,
-  };
-}
-
-function mutantRequest(
-  request: Partial<MutantRunRequest> = {},
-): MutantRunRequest {
-  return {
-    kind: 'mutant',
-    disableBail: true,
-    activeMutant: '1',
-    testFilter: undefined,
-    hitLimit: undefined,
-    budget: DRY_RUN_BUDGET,
-    ...request,
-  };
 }
 
 // The output of a run whose tests all passed, with the given snapshot lines.
@@ -480,119 +416,6 @@ test('a mutant run under its hit limit reports the kill', () => {
   );
 });
 
-test('a mutant run request widens its filter to serial groups and gets its budget', () => {
-  const request = mutantRunRequest(
-    {
-      activeMutant: { id: '7' },
-      testFilter: ['edit'],
-      hitLimit: 50,
-      disableBail: false,
-      timeout: 8000,
-    } as unknown as MutantRunOptions,
-    {
-      serialGroups: new Map([['edit', ['create', 'edit']]]),
-      timeouts: { testTimeoutCap: Infinity, expectTimeout: 1000 },
-    },
-  );
-
-  assert.deepEqual(request, {
-    kind: 'mutant',
-    disableBail: false,
-    activeMutant: '7',
-    testFilter: ['create', 'edit'],
-    hitLimit: 50,
-    budget: { testTimeout: 2400, deadlineMs: 5400 },
-  });
-});
-
-test('a dry run request keeps the config timeouts', () => {
-  assert.deepEqual(
-    dryRunRequest({
-      timeout: 60_000,
-      disableBail: false,
-      coverageAnalysis: 'all',
-    }),
-    {
-      kind: 'dry',
-      disableBail: false,
-      coverageAnalysis: 'all',
-      budget: { testTimeout: undefined, deadlineMs: undefined },
-    },
-  );
-});
-
-test('a dry run plan runs every test with no active mutant, and collects per-test coverage only for perTest', () => {
-  assert.deepEqual(runPlan(dryRequest(), 'out'), {
-    env: {
-      [RUN_SETTINGS]: '{"outDir":"out","perTest":true}',
-      [ACTIVE_MUTANT]: undefined,
-    },
-    params: { testIds: undefined, maxFailures: undefined, timeout: undefined },
-  });
-  assert.equal(
-    runPlan(dryRequest({ coverageAnalysis: 'all' }), 'out').env[RUN_SETTINGS],
-    '{"outDir":"out","perTest":false}',
-  );
-});
-
-test('a mutant run plan activates the mutant and runs its filter in its budget, with its hit limit', () => {
-  assert.deepEqual(
-    runPlan(
-      mutantRequest({
-        activeMutant: '7',
-        testFilter: ['a', 'b'],
-        hitLimit: 5,
-        budget: { testTimeout: 900, deadlineMs: 1000 },
-      }),
-      'out',
-    ),
-    {
-      env: {
-        [RUN_SETTINGS]: '{"outDir":"out","perTest":false,"hitLimit":5}',
-        [ACTIVE_MUTANT]: '7',
-      },
-      params: { testIds: ['a', 'b'], maxFailures: undefined, timeout: 900 },
-    },
-  );
-});
-
-test('a run plan stops at the first failure unless bail is disabled', () => {
-  assert.equal(
-    runPlan(dryRequest({ disableBail: false }), 'out').params.maxFailures,
-    1,
-  );
-  assert.equal(
-    runPlan(mutantRequest({ disableBail: false }), 'out').params.maxFailures,
-    1,
-  );
-});
-
-test('a run leaves no run settings behind in the environment, also when it throws', async () => {
-  process.env.WITH_ENV_KEPT = 'before';
-  delete process.env.WITH_ENV_ADDED;
-
-  try {
-    const seen = await withEnv(
-      { WITH_ENV_KEPT: undefined, WITH_ENV_ADDED: 'during' },
-      async () => [process.env.WITH_ENV_KEPT, process.env.WITH_ENV_ADDED],
-    );
-
-    assert.deepEqual(seen, [undefined, 'during']);
-    assert.equal(process.env.WITH_ENV_KEPT, 'before');
-    assert.equal('WITH_ENV_ADDED' in process.env, false);
-
-    await assert.rejects(
-      withEnv({ WITH_ENV_KEPT: 'during' }, async () => {
-        throw new Error('run failed');
-      }),
-      { message: 'run failed' },
-    );
-    assert.equal(process.env.WITH_ENV_KEPT, 'before');
-  } finally {
-    delete process.env.WITH_ENV_KEPT;
-  }
-});
-
 test('a run with a failed attempt may have lost its server', () => {
   const failed = passedRun([]);
   attempt(failed.reporter, 'b', 'unexpected', 'failed');
@@ -678,28 +501,6 @@ test('the missing-coverage error names lost frames when every frame was lost', (
   );
 });
 
-test('a snapshot with a BigInt hit count is written as a lost frame', () => {
-  const line = serializeSnapshot({ hitCount: 1n, outlivedItsTest: true });
-
-  assert.deepEqual(JSON.parse(line), { lost: true, outlivedItsTest: true });
-  assert.equal(parseSnapshotLine(line)?.lost, true);
-});
-
-test('a snapshot with cyclic coverage is written as a lost frame', () => {
-  const cyclic: Record<string, unknown> = {};
-  cyclic.self = cyclic;
-
-  assert.deepEqual(
-    JSON.parse(
-      serializeSnapshot({ mutantCoverage: cyclic, outlivedItsTest: true }),
-    ),
-    {
-      lost: true,
-      outlivedItsTest: true,
-    },
-  );
-});
-
 test('the missing-coverage error says no instrumented code ran instead of blaming the webServer', () => {
   const passed = {
     id: 'a',
@@ -729,16 +530,6 @@ test('the missing-coverage error blames the webServer when pages answered withou
     missingCoverageError([passed], [parsed({ lost: true }), parsed({})]),
     blame,
   );
-});
-
-test('the reporter keeps the last 4000 characters of stdout and stderr, and prints nothing itself', () => {
-  const reporter = new CollectingReporter();
-
-  reporter.onStdOut('a'.repeat(3998));
-  reporter.onStdErr(Buffer.from('bcd'));
-
-  assert.equal(reporter.printsToStdio(), false);
-  assert.equal(reporter.outputTail, `${'a'.repeat(3997)}bcd`);
 });
 
 test('a run with errors and no failed test is an error, with every error', () => {
@@ -818,133 +609,6 @@ test('tests that ran without the hook are an error', () => {
   );
 });
 
-test('a mutant run selects every test of a describe.serial group, not one test alone', () => {
-  const file = { _parallelMode: 'none', parent: undefined };
-  const serial = { _parallelMode: 'serial', parent: file };
-  const nestedSerial = { _parallelMode: 'serial', parent: serial };
-  const plain = { _parallelMode: 'default', parent: file };
-  const testCase = (id: string, parent: object) =>
-    ({ id, parent }) as unknown as TestCase;
-  const groups = serialGroups([
-    testCase('create', serial),
-    testCase('edit', nestedSerial),
-    testCase('alone', plain),
-  ]);
-
-  assert.deepEqual(withSerialGroups(['edit'], groups), ['create', 'edit']);
-  assert.deepEqual(withSerialGroups(['alone', 'create'], groups), [
-    'alone',
-    'create',
-    'edit',
-  ]);
-  assert.equal(withSerialGroups(undefined, groups), undefined);
-});
-
-test('serial grouping fails loudly when Playwright suites lose _parallelMode', () => {
-  const renamed = { parent: undefined } as unknown as Suite;
-
-  assert.throws(
-    () => serialGroups([{ id: 'a', parent: renamed } as unknown as TestCase]),
-    { message: /Suite\._parallelMode/ },
-  );
-});
-
-// Stands in for Playwright's TestRunner: reports the given errors and tests, then resolves to result.
-function listing(
-  result: { status: FullResult['status'] } | undefined,
-  errors: string[] = [],
-  tests: TestCase[] = [],
-) {
-  const calls: string[][] = [];
-  const playwright = {
-    async listTests(
-      reporter: CollectingReporter,
-      params: { projects?: string[] },
-    ) {
-      calls.push(params.projects ?? []);
-      errors.forEach((message) => reporter.onError({ message }));
-      reporter.onBegin(undefined, {
-        allTests: () => tests,
-      } as unknown as Suite);
-
-      return result;
-    },
-  };
-
-  return { playwright, calls };
-}
-
-test('without a projects option, listing covers the default projects, which are what a run runs', () => {
-  const projects = [
-    { default: true, project: { name: 'chromium' } },
-    { default: false, project: { name: 'smoke' } },
-    { default: true, project: { name: 'setup' } },
-  ];
-
-  assert.deepEqual(projectsThatRun(undefined, projects), ['chromium', 'setup']);
-  assert.deepEqual(projectsThatRun([], projects), ['chromium', 'setup']);
-  assert.deepEqual(projectsThatRun(['smoke'], projects), ['smoke']);
-});
-
-test('listing passes the projects to Playwright and groups the describe.serial tests it lists', async () => {
-  const serial = { _parallelMode: 'serial', parent: undefined };
-  const tests = ['create', 'edit'].map(
-    (id) => ({ id, parent: serial }) as unknown as TestCase,
-  );
-  const { playwright, calls } = listing({ status: 'passed' }, [], tests);
-
-  const groups = await listSerialGroups(playwright, ['chromium']);
-
-  assert.deepEqual(groups.get('edit'), ['create', 'edit']);
-  assert.deepEqual(calls, [['chromium']]);
-});
-
-test('listing fails when a test file does not load, though the status says passed', async () => {
-  const { playwright } = listing({ status: 'passed' }, [
-    'SyntaxError in a.spec.ts',
-    'SyntaxError in b.spec.ts',
-  ]);
-
-  await assert.rejects(listSerialGroups(playwright, []), {
-    message:
-      'Playwright could not load every test file:\nSyntaxError in a.spec.ts\nSyntaxError in b.spec.ts',
-  });
-});
-
-test('listing fails with the status Playwright reports', async () => {
-  const { playwright } = listing({ status: 'failed' }, [
-    'config error',
-    'second error',
-  ]);
-
-  await assert.rejects(listSerialGroups(playwright, []), {
-    message:
-      'Playwright could not list the tests (failed):\nconfig error\nsecond error',
-  });
-});
-
-test('listing fails and points at the trace log when Playwright throws', async () => {
-  const { playwright } = listing(undefined);
-
-  await assert.rejects(listSerialGroups(playwright, []), {
-    message: /--logLevel trace/,
-  });
-});
-
-test('init refuses --testFiles before it loads the Playwright config', async () => {
-  const options = {
-    testFiles: ['a.spec.ts'],
-    timeoutMS: 10_000,
-    playwright: { configFile: 'missing.playwright.config.ts' },
-  };
-  const runner = new PlaywrightTestRunner(
-    options as unknown as StrykerOptions,
-    {} as Logger,
-  );
-
-  await assert.rejects(runner.init(), { message: /--testFiles/ });
-});
-
 test('a page cannot reach Object.prototype through a __proto__ test id in its coverage', () => {
   const perTest = JSON.parse('{ "__proto__": { "1": 1 } }') as Record<
     string,
@@ -974,44 +638,9 @@ test('a parsed line drops counts that are not hit counts, and merging sums the r
 });
 
 // mergeCoverage builds null-prototype maps, which deepEqual tells apart from object literals.
-function plain(coverage: MutantCoverage | undefined): MutantCoverage {
-  return JSON.parse(JSON.stringify(coverage)) as MutantCoverage;
+function plain(coverage: MutantCoverage | undefined): unknown {
+  return JSON.parse(JSON.stringify(coverage));
 }
-
-test('a line that is cut off or not an object is skipped', () => {
-  assert.equal(parseSnapshotLine('{"mutantCoverage":{"sta'), undefined);
-  assert.equal(parseSnapshotLine('3'), undefined);
-  assert.equal(parseSnapshotLine('null'), undefined);
-});
-
-test('a parsed line sets every flag and a valid hit count', () => {
-  assert.deepEqual(parseSnapshotLine('{}'), {
-    coverage: undefined,
-    hitCount: 0,
-    outlivedItsTest: false,
-    lost: false,
-  });
-  assert.equal(parseSnapshotLine('{"hitCount":-1}')?.hitCount, 0);
-  assert.equal(parseSnapshotLine('{"hitCount":"3"}')?.hitCount, 0);
-  assert.equal(parseSnapshotLine('{"hitCount":7}')?.hitCount, 7);
-  assert.deepEqual(parseSnapshotLine('{"lost":true,"outlivedItsTest":true}'), {
-    coverage: undefined,
-    hitCount: 0,
-    outlivedItsTest: true,
-    lost: true,
-  });
-});
-
-test('a parsed line keeps no coverage that is not a map', () => {
-  assert.equal(parseSnapshotLine('{"mutantCoverage":3}')?.coverage, undefined);
-  assert.deepEqual(
-    plain(
-      parseSnapshotLine('{"mutantCoverage":{"static":3,"perTest":{"a":3}}}')
-        ?.coverage,
-    ),
-    { static: {}, perTest: { a: {} } },
-  );
-});
 
 test('a page frame puts its per-test coverage under its test and its static coverage in static', () => {
   const coverage = merge([

@@ -3,8 +3,6 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import type { StrykerOptions } from '@stryker-mutator/api/core';
-
 import { Ajv } from 'ajv';
 
 import {
@@ -17,6 +15,7 @@ import {
   STOP_HEADROOM_MS,
   TEST_TIMEOUT_HEADROOM_MS,
 } from '../src/timeouts.ts';
+import { strykerOptions } from './support/doubles.ts';
 
 const readmeOptions = readFileSync(
   new URL('../../../README.md', import.meta.url),
@@ -24,10 +23,6 @@ const readmeOptions = readFileSync(
 )
   .split(/^## /m)
   .find((section) => section.startsWith('Options\n'));
-
-function strykerOptions(options: object): StrykerOptions {
-  return { timeoutMS: 10_000, ...options } as unknown as StrykerOptions;
-}
 
 test('the runner options resolve the config file and take the schema default for workers', () => {
   assert.deepEqual(

@@ -43,6 +43,6 @@
   },
   "scripts": {
     "test": "node --conditions=@layzee/source --test \"test/*.test.ts\"",
-    "test-unit": "node --conditions=@layzee/source --test test/options.test.ts test/playwright-internals.test.ts test/playwright-test-runner.test.ts test/run-result.test.ts test/temp-root.test.ts test/timeouts.test.ts test/worker-hook.test.ts"
+    "test-unit": "node --conditions=@layzee/source --test test/init-page.test.ts test/options.test.ts test/playwright-internals.test.ts test/playwright-test-runner.test.ts test/protocol.test.ts test/reporter.test.ts test/run-request.test.ts test/run-result.test.ts test/serial-groups.test.ts test/temp-root.test.ts test/timeouts.test.ts test/worker-hook.test.ts"
   }
 }
