@@ -8,6 +8,7 @@ import type { StrykerOptions } from '@stryker-mutator/api/core';
 import { OPTION_PROPERTIES, readRunnerOptions } from '../src/options.ts';
 import {
   MIN_TEST_TIMEOUT_MS,
+  STOP_HEADROOM_MS,
   TEST_TIMEOUT_HEADROOM_MS,
 } from '../src/timeouts.ts';
 
@@ -70,4 +71,11 @@ test('the README states the per-test timeout the runner sets', () => {
 
   assert.equal(Number(headroom) * 1000, TEST_TIMEOUT_HEADROOM_MS);
   assert.equal(Number(floor) * 1000, MIN_TEST_TIMEOUT_MS);
+});
+
+test('the README states when the runner stops a mutant run', () => {
+  const [, headroom] =
+    /still going ([\d.]+) s before/.exec(readmeOptions ?? '') ?? [];
+
+  assert.equal(Number(headroom) * 1000, STOP_HEADROOM_MS);
 });
