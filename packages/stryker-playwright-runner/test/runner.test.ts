@@ -25,11 +25,13 @@ import {
   TestStatus,
 } from '@stryker-mutator/api/test-runner';
 import { Instrumenter } from '@stryker-mutator/instrumenter';
+import ts from 'typescript';
 
 import {
   acceptsConnections,
   PlaywrightTestRunner,
 } from '../src/playwright-test-runner.ts';
+import { STOP_HEADROOM_MS } from '../src/timeouts.ts';
 
 // The runner's private state, which one test checks directly.
 function session() {
@@ -50,11 +52,15 @@ const fixture = (file: string) =>
 // RUNNER_TEST_LOG=1 prints the runner's log, with seconds since start.
 const verbose = process.env.RUNNER_TEST_LOG !== undefined;
 const start = Date.now();
+// Every line the runner logged, at any level.
+const logged: string[] = [];
 const log = {
   ...Object.fromEntries(
     ['trace', 'debug', 'info', 'warn', 'error', 'fatal'].map((level) => [
       level,
       (...args: unknown[]) => {
+        logged.push(args.join(' '));
+
         if (verbose) {
           console.log(((Date.now() - start) / 1000).toFixed(1), level, ...args);
         }
@@ -69,9 +75,16 @@ let mutants: readonly Mutant[];
 let dryRun: CompleteDryRunResult;
 let tests: TestResult[];
 
-function mutant(mutatorName: string, replacement: string): Mutant {
+function mutant(
+  mutatorName: string,
+  replacement: string,
+  file?: string,
+): Mutant {
   const found = mutants.find(
-    (m) => m.mutatorName === mutatorName && m.replacement === replacement,
+    (m) =>
+      m.mutatorName === mutatorName &&
+      m.replacement === replacement &&
+      (file === undefined || m.fileName === fixture(file)),
   );
   assert.ok(found, `mutant ${mutatorName} ${replacement} exists`);
 
@@ -85,11 +98,11 @@ function testId(title: string): string {
   return found.id;
 }
 
-// The ids of the fixture's mutants in the bodies of the lib.js functions `called`, plus, with
-// `pageLoad`, those in app.js, all of which runs when a page loads the app. Lines are 0-based, as in
+// The ids of the fixture's mutants in the bodies of the lib.ts functions `called`, plus, with
+// `pageLoad`, those in app.ts, all of which runs when a page loads the app. Lines are 0-based, as in
 // Stryker's mutant locations.
 function mutantsReached(called: string[], pageLoad = true): string[] {
-  const lib = readFileSync(fixture('src/lib.js'), 'utf8').split('\n');
+  const lib = readFileSync(fixture('src/lib.ts'), 'utf8').split('\n');
   const lines = (name: string) => {
     const first = lib.findIndex((line) =>
       line.startsWith(`export function ${name}(`),
@@ -101,9 +114,10 @@ function mutantsReached(called: string[], pageLoad = true): string[] {
 
   return mutants
     .filter(({ fileName, location: { start } }) =>
-      fileName === fixture('src/app.js')
+      fileName === fixture('src/app.ts')
         ? pageLoad
-        : reached.some(
+        : fileName === fixture('src/lib.ts') &&
+          reached.some(
             ({ first, last }) => start.line >= first && start.line <= last,
           ),
     )
@@ -124,14 +138,24 @@ function mutantRun(
     disableBail: false,
     mutantActivation: 'runtime',
     reloadEnvironment: false,
-    sandboxFileName: fixture('src/app.js'),
+    sandboxFileName: fixture('src/app.ts'),
   });
+}
+
+// The browser and the Playwright worker load the instrumented fixture as JavaScript.
+function transpile(code: string): string {
+  return ts.transpileModule(code, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+    },
+  }).outputText;
 }
 
 before(async () => {
   const instrumenter = new Instrumenter(log);
   const result = await instrumenter.instrument(
-    ['app.js', 'lib.js'].map((file) => ({
+    ['app.ts', 'lib.ts', 'node-only.ts'].map((file) => ({
       name: fixture(`src/${file}`),
       content: readFileSync(fixture(`src/${file}`), 'utf8'),
       mutate: true,
@@ -141,7 +165,10 @@ before(async () => {
   mutants = result.mutants;
 
   for (const { name, content } of result.files) {
-    writeFileSync(fixture(`public/${path.basename(name)}`), content);
+    writeFileSync(
+      fixture(`public/${path.basename(name, '.ts')}.js`),
+      transpile(content),
+    );
   }
 
   rmSync(fixture('test-results'), { recursive: true, force: true });
@@ -300,12 +327,27 @@ test('app code a test runs in the Playwright worker gets per-test coverage', () 
   );
 });
 
-test('a mutant in app code that only the worker runs is killed by its test', async () => {
-  const result = await mutantRun(mutant('ArithmeticOperator', 'a - b'), {
-    testFilter: [testId('adds in the worker')],
-  });
+test('app code imported into the Playwright worker, outside any test, is static coverage', () => {
+  const { perTest, static: atImport } = dryRun.mutantCoverage!;
+  const importMutant = mutant('StringLiteral', '""', 'src/node-only.ts').id;
+
+  assert.ok(atImport[importMutant], 'the import counts as static');
+  assert.deepEqual(
+    Object.keys(perTest).filter((id) => perTest[id]?.[importMutant]),
+    [],
+  );
+});
+
+test('a mutant in app code that only the worker runs is killed by the test the dry run says covers it', async () => {
+  const workerMutant = mutant('ArithmeticOperator', 'a - b');
+  const worker = testId('adds in the worker');
+
+  assert.ok(dryRun.mutantCoverage!.perTest[worker]?.[workerMutant.id]);
+
+  const result = await mutantRun(workerMutant, { testFilter: [worker] });
 
   assert.equal(result.status, MutantRunStatus.Killed, JSON.stringify(result));
+  assert.deepEqual(result.killedBy, [worker]);
 });
 
 test('an infinite loop in app code that the worker runs trips the hit limit', async () => {
@@ -367,7 +409,7 @@ test('an infinite loop without a hit limit times out within its budget, and the 
     disableBail: false,
     mutantActivation: 'runtime',
     reloadEnvironment: false,
-    sandboxFileName: fixture('src/app.js'),
+    sandboxFileName: fixture('src/app.ts'),
   });
   // Past its budget, Stryker would kill and restart the worker, webServer and all.
   const elapsed = performance.now() - started;
@@ -397,10 +439,11 @@ test('an infinite loop trips the hit limit and reports a timeout', async () => {
   );
 });
 
-test('a loop in a test that raised its own timeout stops at the deadline, without a new init', async () => {
+test('a loop in a test that raised its own timeout stops at the deadline, without a new init', async (t) => {
   const serverPid = () =>
     fetch('http://localhost:4321/__pid').then((response) => response.text());
   const before = await serverPid();
+  const loggedBefore = logged.length;
   const started = performance.now();
   const timedOut = await runner.mutantRun({
     activeMutant: mutant('UpdateOperator', 'i--'),
@@ -409,7 +452,7 @@ test('a loop in a test that raised its own timeout stops at the deadline, withou
     disableBail: false,
     mutantActivation: 'runtime',
     reloadEnvironment: false,
-    sandboxFileName: fixture('src/app.js'),
+    sandboxFileName: fixture('src/app.ts'),
   });
   const elapsed = performance.now() - started;
   const killed = await mutantRun(mutant('ArithmeticOperator', 'a - b'), {
@@ -425,7 +468,23 @@ test('a loop in a test that raised its own timeout stops at the deadline, withou
     timedOut.status === MutantRunStatus.Timeout ? (timedOut.reason ?? '') : '',
     /deadline/,
   );
-  assert.ok(elapsed < 8000, `stopped run took ${Math.round(elapsed)} ms`);
+  // The runner decides when the stop starts; how long Playwright's teardown then takes is not its
+  // to decide (2.1 s in 8 of 9 measured runs, 6.5 s once), so that part is reported, not asserted.
+  const [, stopTook] =
+    logged
+      .slice(loggedBefore)
+      .map((line) => /^deadline stop took (\d+) ms$/.exec(line))
+      .find((match) => match !== null) ?? [];
+  const stoppedAfter = elapsed - Number(stopTook);
+  const deadlineMs = 8000 - STOP_HEADROOM_MS;
+  t.diagnostic(
+    `stop started after ${Math.round(stoppedAfter)} ms, took ${stopTook} ms`,
+  );
+  assert.ok(stopTook !== undefined, 'the runner logged the stop');
+  assert.ok(
+    stoppedAfter >= deadlineMs - 1 && stoppedAfter < deadlineMs + 1000,
+    `stop started after ${Math.round(stoppedAfter)} ms, deadline ${deadlineMs} ms`,
+  );
   assert.equal(killed.status, MutantRunStatus.Killed, JSON.stringify(killed));
   assert.equal(await serverPid(), before, 'the same webServer still serves');
 });
