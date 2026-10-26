@@ -8,6 +8,12 @@
     },
     {
       "path": "./apps/demo-app"
+    },
+    {
+      "path": "./packages/stryker-playwright-runner"
+    },
+    {
+      "path": "./packages/stryker-ui-mutators"
     }
   ]
 }

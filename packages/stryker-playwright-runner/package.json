@@ -4,9 +4,25 @@
   "private": true,
   "description": "Prototype StrykerJS test runner plugin for Playwright Test (e2e and component tests)",
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "@layzee/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "sideEffects": [
+    "./dist/worker-hook.js"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
   },
   "peerDependencies": {
     "@playwright/test": ">=1.63.0",
@@ -15,8 +31,10 @@
   "dependencies": {
     "@stryker-mutator/api": "10.1.1"
   },
+  "devDependencies": {
+    "@layzee/stryker-ui-mutators": "*"
+  },
   "scripts": {
-    "test": "node --test test/runner.test.ts test/run-result.test.ts test/ui-mutators.test.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "test": "node --conditions=@layzee/source --test test/runner.test.ts test/run-result.test.ts test/ui-mutators.test.ts"
   }
 }

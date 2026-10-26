@@ -4,9 +4,25 @@
   "private": true,
   "description": "StrykerJS mutation operators for JSX that Playwright tests can kill",
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "@layzee/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "sideEffects": [
+    "./dist/index.js"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
   },
   "peerDependencies": {
     "@stryker-mutator/core": "~10.1.0"
@@ -14,8 +30,10 @@
   "dependencies": {
     "@stryker-mutator/api": "10.1.1"
   },
+  "devDependencies": {
+    "@babel/core": "8.0.9"
+  },
   "scripts": {
-    "test": "node --test test/*.test.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "test": "node --conditions=@layzee/source --test test/*.test.ts"
   }
 }
