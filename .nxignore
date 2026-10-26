@@ -1,2 +1,3 @@
 .stryker-tmp*
 reports
+tools/packed-demo

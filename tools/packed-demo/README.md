@@ -1,0 +1,28 @@
+# Packed demo: the demo app on the packed tarballs
+
+This folder holds what a scratch project outside the workspace needs to run the demo's e2e Stryker run with
+the UI operators on the two packed packages, with no workspace links. `docs/VERDICT.md` (Evidence) has the
+result. The configs are plain JavaScript versions of the demo's Vite, Playwright and `stryker.e2e.ui.config.ts`
+settings, without Nx.
+
+From the repo root, with `<scratch>` a new folder outside the repo:
+
+```sh
+npx nx run-many -t build
+mkdir -p <scratch>/app <scratch>/e2e <scratch>/tarballs
+cp tools/packed-demo/*.json tools/packed-demo/*.mjs <scratch>/
+cp -r apps/demo-app/index.html apps/demo-app/src apps/demo-app/public <scratch>/app/
+rm <scratch>/app/src/app/price-tag.story.tsx
+cp apps/demo-app-e2e/src/*.spec.ts <scratch>/e2e/
+(cd packages/lz-stryker-playwright-runner && npm pack --pack-destination <scratch>/tarballs)
+(cd packages/lz-stryker-ui-mutators && npm pack --pack-destination <scratch>/tarballs)
+cd <scratch>
+npm install
+node --no-experimental-strip-types --input-type=module -e "await import('@layzee/lz-stryker-playwright-runner'); await import('@layzee/lz-stryker-ui-mutators')"
+npx playwright test
+npx stryker run stryker.config.mjs
+```
+
+The `node` line imports both packages with type stripping turned off, so it fails if anything in them is
+TypeScript. The dev server listens on 127.0.0.1, on port 4500 outside Stryker and 4600 plus the worker number
+under it.
