@@ -26,7 +26,7 @@ export interface AttributeRule {
     readonly string?: 'empty' | 'remove' | 'flip';
     readonly expression?: 'empty' | 'remove' | 'false' | 'negate';
   };
-  skip?(site: AttributeSite): boolean;
+  skip?(site: AttributeSite, t: BabelTypes): boolean;
 }
 
 export interface NodeRule {
@@ -80,7 +80,7 @@ export function toNodeMutator(
         if (
           site === undefined ||
           !matches(rule.attributes, site.name) ||
-          rule.skip?.(site) === true
+          rule.skip?.(site, t) === true
         ) {
           continue;
         }
@@ -113,19 +113,17 @@ function attributeSite(
   }
 
   const value = readValue(path.node.value, t);
-  const element = elementSite(path, t);
+  const element = elementSiteOf(path.parentPath.parentPath?.node, t);
 
   return value === undefined || element === undefined
     ? undefined
     : { name: path.node.name.name, value, element, path };
 }
 
-function elementSite(
-  attribute: NodePath<types.JSXAttribute>,
+export function elementSiteOf(
+  node: types.Node | null | undefined,
   t: BabelTypes,
 ): ElementSite | undefined {
-  const node = attribute.parentPath.parentPath?.node;
-
   if (!t.isJSXElement(node)) {
     return undefined;
   }

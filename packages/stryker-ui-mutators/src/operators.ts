@@ -1,6 +1,7 @@
-import type { NodePath, types } from '@babel/core';
+import type { types } from '@babel/core';
 
 import {
+  elementSiteOf,
   isJsxChild,
   operatorTable,
   type AttributeSite,
@@ -29,7 +30,11 @@ const DECORATIVE: ReadonlySet<string | undefined> = new Set([
   'img',
   'i',
 ]);
-const LABELABLE: ReadonlySet<string> = new Set(['input', 'select', 'textarea']);
+const LABELABLE: ReadonlySet<string | undefined> = new Set([
+  'input',
+  'select',
+  'textarea',
+]);
 /** A span cannot take these under @types/react 19.3.0 (TS2322); a span ignores them at run time. */
 const NOT_ON_SPAN: ReadonlySet<string> = new Set(['href', 'type', 'disabled']);
 /**
@@ -104,7 +109,7 @@ export const operators = operatorTable([
           if (
             path.isJSXText() &&
             HAS_WORD.test(path.node.value) &&
-            !UNRENDERED_TEXT.has(elementName(path.parentPath, t))
+            !UNRENDERED_TEXT.has(elementSiteOf(path.parentPath?.node, t)?.name)
           ) {
             yield t.jsxText('');
           }
@@ -127,10 +132,10 @@ export const operators = operatorTable([
           'htmlFor',
         ],
         on: { string: 'empty', expression: 'empty' },
-        skip: (site) =>
+        skip: (site, t) =>
           site.name === 'htmlFor' &&
           site.element.name === 'label' &&
-          wrapsControl(site.element),
+          wrapsControl(site.element, t),
       },
     ],
   },
@@ -227,11 +232,13 @@ export const operators = operatorTable([
       {
         kind: 'node',
         *mutate(path, t) {
-          if (!path.isJSXElement() || !swapsToSpan(path.node, t)) {
+          const element = elementSiteOf(path.node, t);
+
+          if (element === undefined || !swapsToSpan(element)) {
             return;
           }
 
-          const span = t.cloneNode(path.node, true);
+          const span = t.cloneNode(element.node, true);
           span.openingElement.name = t.jsxIdentifier('span');
           span.openingElement.attributes =
             span.openingElement.attributes.filter(
@@ -297,13 +304,6 @@ export const operatorNames: readonly OperatorName[] = operators.map(
   ({ name }) => name,
 );
 
-function elementName(path: NodePath | null, t: BabelTypes): string | undefined {
-  return path?.isJSXElement() &&
-    t.isJSXIdentifier(path.node.openingElement.name)
-    ? path.node.openingElement.name.name
-    : undefined;
-}
-
 function isJsxBranch(node: types.Node, t: BabelTypes): boolean {
   return t.isJSXElement(node) || t.isJSXFragment(node) || t.isNullLiteral(node);
 }
@@ -316,21 +316,10 @@ function builtInForces(test: types.Node, t: BabelTypes): boolean {
   );
 }
 
-function swapsToSpan(element: types.JSXElement, t: BabelTypes): boolean {
-  const { name, attributes } = element.openingElement;
-
-  if (!t.isJSXIdentifier(name)) {
-    return false;
-  }
-
+function swapsToSpan(element: ElementSite): boolean {
   return (
-    name.name === 'button' ||
-    (name.name === 'a' &&
-      attributes.some(
-        (attribute) =>
-          t.isJSXAttribute(attribute) &&
-          t.isJSXIdentifier(attribute.name, { name: 'href' }),
-      ))
+    element.name === 'button' ||
+    (element.name === 'a' && element.attributes.has('href'))
   );
 }
 
@@ -343,15 +332,14 @@ function implicitRole(element: ElementSite): string | undefined {
 }
 
 /** A `label` whose subtree holds an `input`, `select` or `textarea`: nesting keeps the association without `htmlFor`. */
-function wrapsControl(label: ElementSite): boolean {
+function wrapsControl(label: ElementSite, t: BabelTypes): boolean {
   const holds = (children: types.JSXElement['children']): boolean =>
     children.some(
       (child) =>
-        (child.type === 'JSXElement' &&
-          ((child.openingElement.name.type === 'JSXIdentifier' &&
-            LABELABLE.has(child.openingElement.name.name)) ||
+        (t.isJSXElement(child) &&
+          (LABELABLE.has(elementSiteOf(child, t)?.name) ||
             holds(child.children))) ||
-        (child.type === 'JSXFragment' && holds(child.children)),
+        (t.isJSXFragment(child) && holds(child.children)),
     );
 
   return holds(label.node.children);
