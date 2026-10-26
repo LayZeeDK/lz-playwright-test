@@ -151,8 +151,11 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
   and flips each branch: a string branch as a string value flips, a boolean branch to the other boolean,
   any other expression to `!(expr)`, and an `undefined` or other literal branch stays. So
   `isSelected === undefined ? undefined : isSelected ? 'true' : 'false'` keeps its `undefined` branch and
-  swaps the strings. A `String()` or `.toString()` call gets no mutant; a template literal never reaches
-  the operator. Cases tldraw-1, tldraw-2, design-15 and design-16 cover this.
+  swaps the strings. A `String()` or `.toString()` call, optional (`s?.toString()`) or not, gets no
+  mutant; a template literal never reaches the operator. These rules look through an `as`, `satisfies` or
+  `!` wrapper, and a flipped value drops it: `(s ? 'true' : 'false') as 'true' | 'false'` becomes
+  `s ? "false" : "true"`, while a negated one keeps it (`!(flag as boolean)`). Cases tldraw-1, tldraw-2,
+  design-15, design-16 and design-43 to design-45 cover this.
 - `ElementToSpan` drops `href`, `type`, and `disabled` from the `span`. React's types do not allow them
   on a `span` (`HTMLAttributes` in `@types/react` 19.3.0), so a swap that kept them fails to compile under
   Stryker's TypeScript checker and reports CompileError, not a test result. A `span` ignores them at run

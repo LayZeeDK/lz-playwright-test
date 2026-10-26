@@ -1104,6 +1104,38 @@ export const cases: readonly Case[] = [
     expect: [['StateAttribute', 'aria-expanded={c ? "false" : undefined}']],
   },
   {
+    id: 'design-43',
+    title:
+      'a string ternary state inside as, satisfies or ! flips each branch and drops the type wrapper',
+    origin: 'design:Operators in the first release, StateAttribute',
+    jsx:
+      "<div><div aria-pressed={(s ? 'true' : 'false') as 'true' | 'false'} />" +
+      "<div aria-expanded={(s ? 'true' : 'false') satisfies string} />" +
+      "<div aria-checked={(s ? 'true' : 'false')!} />" +
+      "<div aria-selected={((s ? 'true' : 'false') as string)!} /></div>",
+    expect: [
+      ['StateAttribute', 'aria-pressed={s ? "false" : "true"}'],
+      ['StateAttribute', 'aria-expanded={s ? "false" : "true"}'],
+      ['StateAttribute', 'aria-checked={s ? "false" : "true"}'],
+      ['StateAttribute', 'aria-selected={s ? "false" : "true"}'],
+    ],
+  },
+  {
+    id: 'design-44',
+    title: 'a boolean state inside as is negated with its type wrapper',
+    origin: 'design:Operators in the first release, StateAttribute',
+    jsx: '<div aria-pressed={flag as boolean} />',
+    expect: [['StateAttribute', 'aria-pressed={!(flag as boolean)}']],
+  },
+  {
+    id: 'design-45',
+    title:
+      'an optional .toString() state gets no negation, which would be a constant false',
+    origin: 'design:Operators in the first release, StateAttribute',
+    jsx: '<div><div aria-expanded={s?.toString()} /><div aria-checked={s.toString?.()} /></div>',
+    expect: [],
+  },
+  {
     id: 'design-20',
     title: 'a rendered value among the children of a fragment is removed',
     origin: 'design:Operators in the first release, ChildExpression',

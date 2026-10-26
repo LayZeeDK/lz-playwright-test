@@ -226,31 +226,33 @@ function negation(
   expression: types.Expression,
   t: BabelTypes,
 ): types.Expression | undefined {
-  if (t.isConditionalExpression(expression)) {
-    const consequent = negation(expression.consequent, t);
-    const alternate = negation(expression.alternate, t);
+  const value = withoutTypeWrapper(expression, t);
+
+  if (t.isConditionalExpression(value)) {
+    const consequent = negation(value.consequent, t);
+    const alternate = negation(value.alternate, t);
 
     return consequent === undefined && alternate === undefined
       ? undefined
       : t.conditionalExpression(
-          t.cloneNode(expression.test, true),
-          consequent ?? t.cloneNode(expression.consequent, true),
-          alternate ?? t.cloneNode(expression.alternate, true),
+          t.cloneNode(value.test, true),
+          consequent ?? t.cloneNode(value.consequent, true),
+          alternate ?? t.cloneNode(value.alternate, true),
         );
   }
 
-  if (t.isStringLiteral(expression)) {
-    return t.stringLiteral(expression.value === 'true' ? 'false' : 'true');
+  if (t.isStringLiteral(value)) {
+    return t.stringLiteral(value.value === 'true' ? 'false' : 'true');
   }
 
-  if (t.isBooleanLiteral(expression)) {
-    return t.booleanLiteral(!expression.value);
+  if (t.isBooleanLiteral(value)) {
+    return t.booleanLiteral(!value.value);
   }
 
   if (
-    t.isLiteral(expression) ||
-    t.isIdentifier(expression, { name: 'undefined' }) ||
-    isStringCall(expression, t)
+    t.isLiteral(value) ||
+    t.isIdentifier(value, { name: 'undefined' }) ||
+    isStringCall(value, t)
   ) {
     return undefined;
   }
@@ -258,8 +260,22 @@ function negation(
   return t.unaryExpression('!', t.cloneNode(expression, true));
 }
 
+function withoutTypeWrapper(
+  expression: types.Expression,
+  t: BabelTypes,
+): types.Expression {
+  return t.isTSAsExpression(expression) ||
+    t.isTSSatisfiesExpression(expression) ||
+    t.isTSNonNullExpression(expression)
+    ? withoutTypeWrapper(expression.expression, t)
+    : expression;
+}
+
 function isStringCall(expression: types.Expression, t: BabelTypes): boolean {
-  if (!t.isCallExpression(expression)) {
+  if (
+    !t.isCallExpression(expression) &&
+    !t.isOptionalCallExpression(expression)
+  ) {
     return false;
   }
 
@@ -267,7 +283,7 @@ function isStringCall(expression: types.Expression, t: BabelTypes): boolean {
 
   return (
     t.isIdentifier(callee, { name: 'String' }) ||
-    (t.isMemberExpression(callee) &&
+    ((t.isMemberExpression(callee) || t.isOptionalMemberExpression(callee)) &&
       t.isIdentifier(callee.property, { name: 'toString' }))
   );
 }
