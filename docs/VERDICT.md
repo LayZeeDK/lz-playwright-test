@@ -28,6 +28,14 @@ needed changes before its suite passed (an upstream test bug, a build switch, an
 Analog file has no server-only code, so it does not exercise server-side rendering. The Evidence section
 lists the changes, and Limits lists the general ones.
 
+A second plugin, `@layzee/stryker-ui-mutators`, adds ten mutation operators for the JSX that Playwright
+tests look at, such as text, labels, links, and disabled or hidden state. StrykerJS 10.1.1 leaves those
+parts of a component unmutated (`docs/design/playwright-mutators.md`). On the demo app's e2e suite they
+add 17 mutants to 48 built-in ones: 11 killed, 4 survived because of gaps in the tests, and 2 in a
+component no e2e page renders. That is one small app with sites for three of the ten operators. Tests
+cover the other seven, and no open-source repo has been run with the operators yet. The plugin patches
+StrykerJS internals, so it supports StrykerJS 10.1 only.
+
 ## How it works
 
 - Stryker compiles every mutant into one instrumented build (mutant schemata). The instrumented code
@@ -127,6 +135,8 @@ the shell's elapsed time for the whole command.
 | Same, lines 11 to 17 | this runner | 53a5aa6 | 7 timeouts | 1m28s |
 | Demo CT, 27 mutants in `price-tag.tsx` via `mount()` | this runner, `timeoutMS` 10000 | before fca053d | 21 killed, 6 survived | 2m30s |
 | Same | this runner, `--concurrency 2` | before fca053d | 21 killed, 6 survived | 1m26s |
+| Demo e2e with the UI operators (`stryker.e2e.ui.config.ts`), 65 mutants in `app.tsx` and `price-tag.tsx`, 17 of them from UI operators | this runner and `@layzee/stryker-ui-mutators`, `timeoutMS` 10000 | 107505c | UI: 8 killed, 3 timeouts, 4 survived, 2 no coverage. Built-in: 12 killed, 8 timeouts, 1 survived, 27 no coverage | 5m15s |
+| Same, with `use.actionTimeout: 5000` added to the demo's Playwright config | same | 107505c | UI: 11 killed, 4 survived, 2 no coverage. Built-in: 20 killed, 1 survived, 27 no coverage | 4m26s |
 | `stryker-playwright-hello-world`, 7 mutants | this runner (repo's `define` removed) | before fca053d | 6 killed, 1 survived | median 44s (43 to 46s), 5 runs |
 | Same | the repo's own `command` runner setup | - | 6 killed, 1 survived | median 64s (57 to 66s), 5 runs |
 | Same, `timeoutMS` 1 and `timeoutFactor` 0 so Stryker's own timer fires first | this runner | before fca053d | 7 timeouts | 36s, 36s, and 32s, 3 runs |
@@ -134,6 +144,29 @@ the shell's elapsed time for the whole command.
 | Same, with `use.actionTimeout: 5000` added to the copy's Playwright config | this runner, `timeoutMS` 10000 | fca053d | 26 killed, 10 survived, 12 no coverage | 6m00s |
 | ngx-yeti (Angular, Nx, Playwright 1.63.0, static Storybook), 2 mutants in `cluster.ts`, 234 e2e tests | this runner, `playwright.workers` 2, `dryRunTimeoutMinutes` 20 | fca053d | 2 killed | 3m51s (dry run 2m57s) |
 | Analog 2.8.0 `beta` (Angular 22.2, Nx 23.2, SSR), 8 mutants in `(home).page.ts`, 11 e2e tests against the built SSR server | this runner, `disableTypeChecking: true` in the copy's Vite config | fca053d | 4 killed, 4 survived | 1m45s |
+
+The UI operator rows match the statuses Claude wrote down before the first run, except that the
+three UI timeouts were predicted as kills. Each is a test that clicks or fills an element the mutant
+emptied the text or label of, and waits for it until the test timeout (see Limits). With
+`actionTimeout` set, those three and the eight built-in timeouts end as kills by the named tests. The
+four survivors are gaps in the demo's tests, not equivalent mutants: the tests read the three totals
+by test id, not by their labels, and read each line's name from its input's `aria-label`, not from the
+label text. The two uncovered mutants are in `price-tag.tsx`, which no e2e page renders. No UI mutant
+was equivalent, and none was a compile or runtime error. The demo app has sites for only three of the
+ten operators (`TextLiteral`, `ChildExpression`, `UrlAttribute`). The other seven have evidence from
+tests only, below.
+
+The UI operators have three more layers of evidence, all at or after 107505c.
+`packages/stryker-ui-mutators/test/` runs without a browser: 107 synthetic cases from the open-source
+repos and the design, each with the exact UI mutants it must give (0 todo); install checks for the
+name refusal, a second install, the self-check, and core resolution; an in-process check that the
+JSX placement leaves the built-in mutants of five files unchanged, with a negative control; and a
+render check that every mutant of the design spike's sample renders like the same edit made by hand.
+`packages/stryker-playwright-runner/test/ui-mutators.test.ts` runs the runner on a page instrumented
+with the UI operators: for each of the ten operators a Playwright test kills one of its mutants, and a
+test that does not observe that mutant lets it survive. `spikes/fail-loud/` runs `stryker run` with
+the plugin listed in `plugins` and with the plugin imported from the config. Both report UI mutants,
+and with one operator's sample broken on purpose both exit 1 and name that operator.
 
 `packages/stryker-playwright-runner/test/runner.test.ts` checks the runner against a fixture
 instrumented by Stryker's own instrumenter. It checks that per-test coverage separates a test that
@@ -357,8 +390,11 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
 npm install
 npx playwright install chromium
 npx tsc -p packages/stryker-playwright-runner/tsconfig.json
-node --test packages/stryker-playwright-runner/test/runner.test.ts packages/stryker-playwright-runner/test/run-result.test.ts
+node --test packages/stryker-playwright-runner/test/runner.test.ts packages/stryker-playwright-runner/test/run-result.test.ts packages/stryker-playwright-runner/test/ui-mutators.test.ts
+npx tsc -p packages/stryker-ui-mutators/tsconfig.json
+node --test packages/stryker-ui-mutators/test/*.test.ts
 npx stryker run stryker.e2e.config.ts
+npx stryker run stryker.e2e.ui.config.ts
 npx stryker run stryker.ct.config.ts
 npx stryker run stryker.e2e.config.ts --concurrency 2
 npx stryker run stryker.ct.config.ts --concurrency 2
@@ -376,7 +412,9 @@ The demo forced-timeout run used a config file in the gitignored `.audit/` folde
 `mutate`, `timeoutMS`, and `timeoutFactor` as that command line. Its reporters and temp folder name
 differ. The command line itself was not run.
 
-For the RealWorld row with `use.actionTimeout: 5000`, add `actionTimeout: 5000` to the top-level `use` block of
+For the second UI operator row, add `actionTimeout: 5000` to the top-level `use` block of
+`apps/demo-app-e2e/playwright.config.mts` for that run only. `spikes/fail-loud/README.md` gives the
+fail-loud commands. For the RealWorld row with `use.actionTimeout: 5000`, add `actionTimeout: 5000` to the top-level `use` block of
 the copy's `apps/conduit-e2e/playwright.config.ts` after `prepare.ts` has run. `prepare.ts` does not
 add it. `oss/README.md` gives the steps for the hello-world forced-timeout row, ngx-yeti, and Analog.
 
