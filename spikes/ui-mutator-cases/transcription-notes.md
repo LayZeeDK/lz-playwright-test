@@ -1,8 +1,8 @@
 # Transcription notes: mined rows to `cases.ts`
 
 The 95 rows in `mined-*.md` became 93 cases in `cases.ts`. The other 2 are skipped (see Skipped rows). A later
-review added ngx-yeti-21 (see Gaps). Run `node --test spikes/ui-mutator-cases/cases.test.ts`: 94 tests, 62 pass,
-32 todo, 0 fail, exit 0. Each todo
+review added ngx-yeti-21 (see Gaps). Run `node --test spikes/ui-mutator-cases/cases.test.ts`: 94 tests, 61 pass,
+33 todo, 0 fail, exit 0. Each todo
 case fails only on the mutant that its `gap` names. Every expectation was taken from a run of the design
 spike's prototype (`spikes/design-opus/ui-mutators.ts`) on StrykerJS 10.1.1. Claude then changed it by hand
 only where the design's written rules disagree with the prototype (Gaps).
@@ -40,6 +40,7 @@ already todo for a rule above, and their `gap` names both rules.
 |---|---|---|
 | An attribute whose value is already empty gets no mutant | ngx-yeti-21 (`alt=""`) | `alt=""` |
 | `ElementToSpan` drops `href`, `type` and `disabled`, which a `span` cannot take | realworld-10, -11, -12, -13, -20; ngx-yeti-1, -3, -5, -6, -7, -15, -16, -18, -20; analog-1, -2, -3, -5, -6, -8, -9, -15, -19, -24 | the `span` with those attributes kept |
+| `HiddenAttribute` skips `aria-hidden` on `svg`, `img` and `i` (added 2026-10-26) | ngx-yeti-14 | `aria-hidden={undefined}` |
 
 ## Design clarifications for Claude to settle
 

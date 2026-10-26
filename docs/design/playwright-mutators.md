@@ -45,7 +45,7 @@ are in the Opus draft, section 2. Where this list differs from the draft, this l
 4. `ConditionalElement`: forces `x && <A/>` to render, and forces each branch of a JSX ternary. It skips a shape when the `&&` left operand, or the ternary test, is a `BinaryExpression` with `==`, `!=`, `===`, `!==`, `<`, `<=`, `>`, or `>=`, or a `LogicalExpression` with `&&` or `||`. For those shapes the built-in `ConditionalExpression` already makes the same mutants: `true` for the left operand of `&&`, which renders the element, and `true` and `false` for a ternary test, which force each branch. So `{open && <p/>}` and `{busy ? <A/> : <B/>}` get operator mutants, and `{off > 0 && <s/>}` and `{n > 1 ? <A/> : <B/>}` get none. Killed by `toBeVisible`, `toHaveCount(0)`.
 5. `UrlAttribute`: `href`, `to`, and `action` become `""`, from a string or a bound expression; a template literal is left to `StringLiteral`, as for `LabelAttribute`. Killed by `toHaveURL`.
 6. `DisabledAttribute`: forces `disabled`, `readOnly`, and `aria-disabled` off, and skips boolean-literal values (`disabled={true}`), which `BooleanLiteral` already flips. Killed by `toBeDisabled`, `toBeEditable`.
-7. `HiddenAttribute`: forces `hidden` and `aria-hidden` off. It never forces an element hidden. Killed by `toBeVisible`, `getByRole` (hidden elements leave the tree).
+7. `HiddenAttribute`: forces `hidden` and `aria-hidden` off. It never forces an element hidden. It skips `aria-hidden` on `svg`, `img`, and `i`, as the Opus draft did (2.7): those are decorative icons, and exposing one changes nothing a role, label, or text query sees. Killed by `toBeVisible`, `getByRole` (hidden elements leave the tree).
 8. `ElementRole`: removes `role`, or swaps a semantic tag for `span`: `button` always, and `a` only when it has an `href`. An `<a>` without `href` has no `link` role, so swapping it would be an equivalent mutant. The `span` drops `href`, `type`, and `disabled`, which a `span` cannot take (see "Rules the synthetic cases settled"). Killed by `getByRole`.
 9. `ChildExpression`: a `{value}` child becomes `null`. Killed by `toHaveText`.
 10. `StateAttribute`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, `aria-selected`. Killed by `toHaveAttribute` and role queries with state options.
@@ -159,9 +159,10 @@ The prototype also matches `formAction`, `inert`, `aria-current`, `aria-invalid`
 design does not list; they stay out of the first release.
 
 The Opus prototype (`spikes/design-opus/ui-mutators.ts`) and both drafts use the earlier names. The
-prototype also predates six of the rules above: the `ConditionalElement` comparison and logical skip, the
+prototype also predates seven of the rules in this design: the `ConditionalElement` comparison and logical skip, the
 `ConditionalElement` limit to JSX children, the `EventHandler` single-reference skip, the `href`
-condition on the `a` swap, the skip of an empty value, and the attributes that `ElementToSpan` drops. The
+condition on the `a` swap, the skip of an empty value, the attributes that `ElementToSpan` drops, and the
+`HiddenAttribute` skip of `aria-hidden` on `svg`, `img`, and `i`. The
 synthetic cases that test them run as `todo`. Two more prototype behaviours differ from this design, and
 no case tests them. The prototype skips, without a word, an operator whose name is already registered
 (a case-sensitive `Set.has`), and wraps the placer only when it added every operator, where the design

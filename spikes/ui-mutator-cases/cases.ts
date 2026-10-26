@@ -377,10 +377,11 @@ export const cases: readonly Case[] = [
   },
   {
     id: 'ngx-yeti-14',
-    title: 'a string aria-hidden is forced off',
+    title: 'aria-hidden on a decorative svg is skipped',
     origin: `${YETI}button-fixture.ts:82`,
     jsx: '<svg aria-hidden="true" viewBox="0 0 24 24"></svg>',
-    expect: [['HiddenAttribute', 'aria-hidden={undefined}']],
+    expect: [],
+    gap: 'HiddenAttribute skips aria-hidden on svg, img and i; the prototype forces it off',
   },
   {
     id: 'ngx-yeti-15',
