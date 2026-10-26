@@ -18,7 +18,8 @@
         "dependsOn": [
           "^build"
         ],
-        "cache": false
+        "cache": false,
+        "parallelism": false
       }
     }
   }

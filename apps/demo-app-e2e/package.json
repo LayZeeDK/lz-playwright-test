@@ -22,7 +22,8 @@
         "dependsOn": [
           "^build"
         ],
-        "cache": false
+        "cache": false,
+        "parallelism": false
       },
       "mutate-e2e-ui": {
         "command": "stryker run stryker.e2e.ui.config.ts",
@@ -32,7 +33,8 @@
         "dependsOn": [
           "^build"
         ],
-        "cache": false
+        "cache": false,
+        "parallelism": false
       }
     }
   }
