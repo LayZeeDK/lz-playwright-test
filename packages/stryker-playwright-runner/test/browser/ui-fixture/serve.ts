@@ -21,4 +21,4 @@ createServer(async (request, response) => {
   } catch {
     response.writeHead(404).end();
   }
-}).listen(4322, 'localhost');
+}).listen(4322, '127.0.0.1');

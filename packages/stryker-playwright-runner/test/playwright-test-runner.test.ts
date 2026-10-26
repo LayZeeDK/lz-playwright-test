@@ -710,9 +710,9 @@ test('a port check that neither connects nor fails gives up at its timeout, and 
       this.destroyed = true;
     },
   });
-  let asked: unknown;
+  const asked: unknown[] = [];
   const answer = acceptsConnections(4321, (options) => {
-    asked = options;
+    asked.push(options);
 
     return socket as unknown as net.Socket;
   });
@@ -720,12 +720,39 @@ test('a port check that neither connects nor fails gives up at its timeout, and 
   socket.emit('timeout');
 
   assert.equal(await answer, false);
-  assert.deepEqual(asked, { host: 'localhost', port: 4321, timeout: 5000 });
+  assert.deepEqual(asked, [
+    { host: '127.0.0.1', port: 4321, timeout: 5000 },
+    { host: '::1', port: 4321, timeout: 5000 },
+  ]);
   assert.equal(socket.destroyed, true);
 });
 
-test('a port accepts connections while a server listens on it, and not after', async () => {
+for (const loopback of ['::1', '127.0.0.1']) {
+  test(`a port answers when only ${loopback} accepts connections on it`, async () => {
+    const answer = acceptsConnections(4321, (options) => {
+      const socket = new net.Socket();
+      setImmediate(() => {
+        if (options.host === loopback) {
+          socket.emit('connect');
+        } else {
+          socket.emit('error', new Error('ECONNREFUSED'));
+        }
+      });
+
+      return socket;
+    });
+
+    assert.equal(await answer, true);
+  });
+}
+
+test('a port accepts connections while a server listens on it, and not after', async (t) => {
   const server = net.createServer();
+  t.after(() => {
+    if (server.listening) {
+      server.close();
+    }
+  });
   await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
   const { port } = server.address() as net.AddressInfo;
 

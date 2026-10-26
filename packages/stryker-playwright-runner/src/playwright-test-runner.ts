@@ -327,19 +327,30 @@ function setEnv(values: Readonly<Record<string, string | undefined>>) {
   }
 }
 
+// Playwright's own webServer port check tries both loopback addresses: localhost can resolve to only one of them.
+const LOOPBACK_HOSTS = ['127.0.0.1', '::1'];
+
 export function acceptsConnections(
   port: number,
   connect: (options: net.TcpNetConnectOpts) => net.Socket = net.connect,
 ): Promise<boolean> {
   return new Promise((resolve) => {
-    const socket = connect({ host: 'localhost', port, timeout: 5000 });
-    const done = (ok: boolean) => {
-      socket.destroy();
-      resolve(ok);
-    };
-    socket.once('connect', () => done(true));
-    socket.once('error', () => done(false));
-    socket.once('timeout', () => done(false));
+    let answered = 0;
+
+    for (const host of LOOPBACK_HOSTS) {
+      const socket = connect({ host, port, timeout: 5000 });
+      const done = (ok: boolean) => {
+        socket.destroy();
+        answered += 1;
+
+        if (ok || answered === LOOPBACK_HOSTS.length) {
+          resolve(ok);
+        }
+      };
+      socket.once('connect', () => done(true));
+      socket.once('error', () => done(false));
+      socket.once('timeout', () => done(false));
+    }
   });
 }
 

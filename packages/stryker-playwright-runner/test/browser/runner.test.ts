@@ -486,7 +486,7 @@ test('an infinite loop trips the hit limit and reports a timeout', async () => {
 
 test('a loop in a test that raised its own timeout stops at the deadline, without a new init', async (t) => {
   const serverPid = () =>
-    fetch('http://localhost:4321/__pid').then((response) => response.text());
+    fetch('http://127.0.0.1:4321/__pid').then((response) => response.text());
   const before = await serverPid();
   const loggedBefore = logged.length;
   const started = performance.now();
@@ -531,7 +531,7 @@ test('a loop in a test that raised its own timeout stops at the deadline, withou
 });
 
 test('a webServer that dies between runs is restarted instead of failing every test', async () => {
-  await fetch('http://localhost:4321/__exit').catch(() => undefined);
+  await fetch('http://127.0.0.1:4321/__exit').catch(() => undefined);
   assert.equal(
     await acceptsConnections(4321),
     false,
