@@ -103,6 +103,7 @@ export const operators = operatorTable([
           if (
             path.isJSXText() &&
             HAS_WORD.test(path.node.value) &&
+            // Stryker disable next-line StringLiteral: equivalent, as UNRENDERED_TEXT has no key '' and no key 'Stryker was here!'
             !UNRENDERED_TEXT.has(elementName(path.parentPath, t) ?? '')
           ) {
             yield t.jsxText('');
@@ -210,6 +211,7 @@ export const operators = operatorTable([
         on: { bare: 'remove', string: 'remove', expression: 'false' },
         skip: (site) =>
           site.name === 'aria-hidden' &&
+          // Stryker disable next-line StringLiteral: equivalent, as DECORATIVE has no key '' and no key 'Stryker was here!'
           DECORATIVE.has(site.element.name ?? ''),
       },
     ],
