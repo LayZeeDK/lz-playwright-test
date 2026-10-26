@@ -21,22 +21,23 @@ function text(value: unknown, what: string): string {
   return value;
 }
 
-function count(value: unknown, what: string): number {
-  if (typeof value !== 'number') {
-    throw new Error(`${what} is not a number`);
+function integer(value: unknown, what: string): number {
+  if (typeof value !== 'number' || !Number.isInteger(value)) {
+    throw new Error(`${what} is not an integer`);
   }
 
   return value;
 }
 
-function mutantKeys(reportPath: string, withStatus: boolean): string[] {
+function mutantKeys(reportPath: string, withStatus: boolean): Set<string> {
   const report: unknown = JSON.parse(readFileSync(reportPath, 'utf8'));
 
   if (!isRecord(report) || !isRecord(report['files'])) {
     throw new Error(`${reportPath} has no files object`);
   }
 
-  const keys: string[] = [];
+  const keys = new Set<string>();
+  const ids = new Set<string>();
 
   for (const [file, entry] of Object.entries(report['files'])) {
     const mutants = isRecord(entry) ? entry['mutants'] : undefined;
@@ -53,10 +54,17 @@ function mutantKeys(reportPath: string, withStatus: boolean): string[] {
         throw new Error(`${reportPath}: ${file} has a mutant without a start`);
       }
 
+      const id = text(mutant['id'], 'a mutant id');
+
+      if (ids.has(id)) {
+        throw new Error(`${reportPath} lists mutant ${id} twice`);
+      }
+
+      ids.add(id);
       const fields = [
-        text(mutant['id'], 'a mutant id'),
+        id,
         path.basename(file),
-        `${count(start['line'], 'a start line')}:${count(start['column'], 'a start column')}`,
+        `${integer(start['line'], 'a start line')}:${integer(start['column'], 'a start column')}`,
         text(mutant['mutatorName'], 'a mutator name').replace(/^Lz/, ''),
         mutant['replacement'] === undefined
           ? ''
@@ -67,22 +75,11 @@ function mutantKeys(reportPath: string, withStatus: boolean): string[] {
         fields.push(text(mutant['status'], 'a status'));
       }
 
-      keys.push(fields.join(' | '));
+      keys.add(fields.join(' | '));
     }
   }
 
   return keys;
-}
-
-function uniqueKeys(reportPath: string, withStatus: boolean): Set<string> {
-  const keys = mutantKeys(reportPath, withStatus);
-  const unique = new Set(keys);
-
-  if (unique.size !== keys.length) {
-    throw new Error(`${reportPath} lists a mutant twice`);
-  }
-
-  return unique;
 }
 
 function compare(args: string[]): number {
@@ -101,8 +98,8 @@ function compare(args: string[]): number {
     );
   }
 
-  const a = uniqueKeys(first, withStatus);
-  const b = uniqueKeys(second, withStatus);
+  const a = mutantKeys(first, withStatus);
+  const b = mutantKeys(second, withStatus);
   const onlyA = [...a].filter((key) => !b.has(key));
   const onlyB = [...b].filter((key) => !a.has(key));
 
