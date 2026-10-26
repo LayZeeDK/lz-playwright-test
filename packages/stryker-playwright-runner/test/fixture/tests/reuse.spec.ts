@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('reused context, first test', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.locator('#out')).toHaveText('Hello 3', { timeout: 1000 });
+  await expect(page.getByRole('status')).toHaveText('Hello 3');
 });
 
 test('reused context, second test', async ({ page }) => {

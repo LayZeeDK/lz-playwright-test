@@ -7,7 +7,7 @@ import { expect, type Page, test } from '@playwright/test';
 test('shows the greeting', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.locator('#out')).toHaveText('Hello 3', { timeout: 1000 });
+  await expect(page.getByRole('status')).toHaveText('Hello 3');
 });
 
 test('counts to three', async ({ page }) => {
@@ -41,7 +41,7 @@ test('keeps coverage across a navigation to a page without the app', async ({
   page,
 }) => {
   await page.goto('/');
-  await expect(page.locator('#out')).toHaveText('Hello 3', { timeout: 1000 });
+  await expect(page.getByRole('status')).toHaveText('Hello 3');
   await page.goto('/blank.html');
 
   await expect(page).toHaveTitle('blank');

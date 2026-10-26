@@ -4,6 +4,7 @@ const baseURL = 'http://localhost:4321';
 
 export default defineConfig({
   testDir: './tests',
+  expect: { timeout: 1_000 },
   use: { ...devices['Desktop Chrome'], baseURL },
   projects: [
     { name: 'e2e', testIgnore: /reuse/ },
