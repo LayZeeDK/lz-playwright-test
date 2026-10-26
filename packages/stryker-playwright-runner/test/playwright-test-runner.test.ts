@@ -2,6 +2,7 @@
 // folder, as it resolves a real one, and the fake TestRunner plays what Playwright and the worker hook do.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import {
   existsSync,
   mkdirSync,
@@ -923,6 +924,27 @@ test('a webServer port is checked by connecting to it, and one without url or po
 
   assert.deepEqual(lines, []);
   assert.equal(fake.runs.length, 1);
+});
+
+test('a port check that neither connects nor fails gives up at its timeout, and closes the socket', async () => {
+  const socket = Object.assign(new EventEmitter(), {
+    destroyed: false,
+    destroy() {
+      this.destroyed = true;
+    },
+  });
+  let asked: unknown;
+  const answer = acceptsConnections(4321, (options) => {
+    asked = options;
+
+    return socket as unknown as net.Socket;
+  });
+
+  socket.emit('timeout');
+
+  assert.equal(await answer, false);
+  assert.deepEqual(asked, { host: 'localhost', port: 4321, timeout: 5000 });
+  assert.equal(socket.destroyed, true);
 });
 
 test('a port accepts connections while a server listens on it, and not after', async () => {
