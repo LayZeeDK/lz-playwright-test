@@ -88,7 +88,8 @@ test('a Playwright worker outside a Stryker run loads the hook and installs noth
   }
 });
 
-test('during a run the hook installs in the main thread of a Playwright worker, not in its threads', (t) => {
+// Starts a fake Playwright worker during a run with the given `--import`s; it prints one line per install.
+function runWorker(t: TestContext, imports: string[]) {
   const dir = mkdtempSync(path.join(tmpdir(), 'worker-hook-gate-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const files: Record<string, string> = {
@@ -118,8 +119,7 @@ test('during a run the hook installs in the main thread of a Playwright worker, 
   const child = spawnSync(
     process.execPath,
     [
-      '--import',
-      new URL('../src/worker-hook.ts', import.meta.url).href,
+      ...imports.flatMap((url) => ['--import', url]),
       path.join(dir, 'playwright/lib/worker/workerProcessEntry.js'),
     ],
     {
@@ -131,9 +131,38 @@ test('during a run the hook installs in the main thread of a Playwright worker, 
     },
   );
 
+  return { child, outDir };
+}
+
+const HOOK_URL = new URL('../src/worker-hook.ts', import.meta.url).href;
+
+test('during a run the hook installs in the main thread of a Playwright worker, not in its threads', (t) => {
+  const { child, outDir } = runWorker(t, [HOOK_URL]);
+
   assert.equal(child.status, 0, child.stderr);
   assert.equal(child.stdout.trim(), 'main');
   assert.equal(readdirSync(outDir).length, 1);
+});
+
+test('a second copy of the hook in the same worker installs nothing', (t) => {
+  // Another URL loads the module again, as a second install of this package would.
+  const { child, outDir } = runWorker(t, [HOOK_URL, `${HOOK_URL}?copy=2`]);
+
+  assert.equal(child.status, 0, child.stderr);
+  assert.equal(child.stdout.trim(), 'main');
+  assert.equal(readdirSync(outDir).length, 1);
+});
+
+test('the hook installs nothing in a worker where another version of it installed first', (t) => {
+  const mark = `globalThis[Symbol.for('@layzee/stryker-playwright-runner/worker-hook')]=1`;
+  const { child, outDir } = runWorker(t, [
+    `data:text/javascript,${mark}`,
+    HOOK_URL,
+  ]);
+
+  assert.equal(child.status, 0, child.stderr);
+  assert.equal(child.stdout.trim(), '');
+  assert.deepEqual(readdirSync(outDir), []);
 });
 
 test('a worker that ran no instrumented code writes nothing at exit', () => {

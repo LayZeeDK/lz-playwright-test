@@ -50,8 +50,19 @@ type Test = TestType<object, object>;
 // Undefined under `node -e`, which a worker's NODE_OPTIONS can reach; RegExp.test reads it as "undefined".
 const entry = process.argv[1];
 const settings = readRunSettings(process.env);
+// `Symbol.for`, so a second copy of this package in the worker, from another install, sees the mark
+// of the first and leaves the worker's coverage to it.
+const INSTALLED: unique symbol = Symbol.for(
+  '@layzee/stryker-playwright-runner/worker-hook',
+);
 
-if (settings && isMainThread && WORKER_ENTRY.test(entry)) {
+if (
+  settings &&
+  isMainThread &&
+  WORKER_ENTRY.test(entry) &&
+  !(INSTALLED in globalThis)
+) {
+  Reflect.set(globalThis, INSTALLED, INSTALLED);
   install(createRequire(entry), settings);
 }
 
