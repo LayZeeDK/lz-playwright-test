@@ -9,15 +9,12 @@ import {
 } from '@stryker-mutator/api/core';
 import type { Logger } from '@stryker-mutator/api/logging';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
-import {
-  determineHitLimitReached,
-  type DryRunOptions,
-  type DryRunResult,
-  DryRunStatus,
-  type MutantRunOptions,
-  type MutantRunResult,
-  type TestRunner as StrykerTestRunner,
-  toMutantRunResult,
+import type {
+  DryRunOptions,
+  DryRunResult,
+  MutantRunOptions,
+  MutantRunResult,
+  TestRunner as StrykerTestRunner,
 } from '@stryker-mutator/api/test-runner';
 
 import { readRunnerOptions, type RunnerOptions } from './options.ts';
@@ -27,29 +24,25 @@ import {
   type Playwright,
   type TestRunner,
 } from './playwright-internals.ts';
-import {
-  readSnapshotDir,
-  RUN_SETTINGS,
-  type RunSettings,
-  type Snapshot,
-} from './protocol.ts';
+import { readSnapshotDir, RUN_SETTINGS } from './protocol.ts';
 import {
   CollectingReporter,
+  type CoverageGaps,
+  dryRunRequest,
+  dryRunResult,
   listSerialGroups,
-  mergeCoverage,
-  missingCoverageError,
+  mayHaveLostItsServer,
+  mutantRunRequest,
+  mutantRunResult,
   projectsThatRun,
   type RunOutput,
   type RunRequest,
-  type RunResult,
-  toRunResult,
-  withSerialGroups,
+  runSettings,
 } from './run-result.ts';
 import {
   assertionTimeoutWarning,
   type ConfigTimeouts,
   configTimeouts,
-  mutantRunBudget,
 } from './timeouts.ts';
 
 interface ServerCheck {
@@ -146,96 +139,47 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     removeDirs([this.rootDir]);
   }
 
-  async dryRun({
-    disableBail,
-    coverageAnalysis,
-  }: DryRunOptions): Promise<DryRunResult> {
-    const run = await this.run({ disableBail, coverageAnalysis });
+  async dryRun(options: DryRunOptions): Promise<DryRunResult> {
+    const request = dryRunRequest(options);
+    const { result, gaps } = dryRunResult(await this.run(request), request);
 
-    if (run.status !== DryRunStatus.Complete) {
-      return run;
+    if (gaps) {
+      logCoverageGaps(this.log, gaps);
     }
 
-    const { tests, snapshots } = run;
-    const errorMessage = missingCoverageError(tests, snapshots);
-
-    if (errorMessage) {
-      return { status: DryRunStatus.Error, errorMessage };
-    }
-
-    if (coverageAnalysis === 'off') {
-      return { status: run.status, tests };
-    }
-
-    this.reportCoverageGaps(snapshots);
-
-    return {
-      status: run.status,
-      tests,
-      mutantCoverage: mergeCoverage(snapshots),
-    };
+    return result;
   }
 
-  private reportCoverageGaps(snapshots: Snapshot[]) {
-    const lost = snapshots.filter((snapshot) => snapshot.lost).length;
-    const shared = snapshots.filter(
-      (snapshot) => snapshot.outlivedItsTest && snapshot.coverage,
-    ).length;
-
-    if (lost > 0) {
-      this.log.warn(
-        `${lost} frame(s) did not answer before their context closed; their coverage is missing, so mutants only they reached show as NoCoverage.`,
-      );
-    }
-
-    if (shared > 0) {
-      this.log.info(
-        `${shared} frame(s) belonged to contexts that outlived their test (beforeAll or worker fixtures); their coverage counts as static, so every test runs for those mutants.`,
-      );
-    }
-  }
-
-  async mutantRun({
-    activeMutant,
-    testFilter,
-    hitLimit,
-    disableBail,
-    timeout,
-  }: MutantRunOptions): Promise<MutantRunResult> {
-    const run = await this.run({
-      activeMutant: activeMutant.id,
-      testFilter: withSerialGroups(testFilter, this.serialGroups),
-      hitLimit,
-      disableBail,
-      testTimeout: mutantRunBudget(timeout, this.timeouts!).testTimeout,
+  async mutantRun(options: MutantRunOptions): Promise<MutantRunResult> {
+    const request = mutantRunRequest(options, {
+      serialGroups: this.serialGroups,
+      timeouts: this.timeouts!,
     });
-    const hitCount =
-      run.status === DryRunStatus.Complete
-        ? run.snapshots.reduce((sum, { hitCount }) => sum + hitCount, 0)
-        : undefined;
+    const { result, hitCount } = mutantRunResult(
+      await this.run(request),
+      request,
+    );
     this.log.debug(
-      `Mutant ${activeMutant.id}: ${run.status}, hitCount ${hitCount}/${hitLimit}`,
+      `Mutant ${request.activeMutant}: ${result.status}, hitCount ${hitCount}/${request.hitLimit}`,
     );
 
-    return toMutantRunResult(
-      determineHitLimitReached(hitCount, hitLimit) ?? run,
-    );
+    return result;
   }
 
-  private async run(request: RunRequest): Promise<RunResult> {
+  private async run(request: RunRequest): Promise<RunOutput> {
     const playwright = this.playwright!;
     await this.restartDeadServers(playwright);
     let output = await this.runOnce(playwright, request);
 
     // A server that died during this run fails its tests for a reason the mutant did not cause.
     if (
-      output.reporter.anyAttemptFailed() &&
+      mayHaveLostItsServer(output) &&
       (await this.restartDeadServers(playwright))
     ) {
       output = await this.runOnce(playwright, request);
     }
 
-    return toRunResult(output, request);
+    return output;
   }
 
   private async runOnce(
@@ -244,16 +188,12 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   ): Promise<RunOutput> {
     const outDir = path.join(this.runsDir!, String(this.runCounter++));
     fs.mkdirSync(outDir);
-    const settings: RunSettings = {
-      outDir,
-      perTest: request.coverageAnalysis === 'perTest',
-      hitLimit: request.hitLimit,
-    };
     // Only the workers this run forks see these; the webServer started earlier never does.
     const restoreEnv = overrideEnv({
       NODE_OPTIONS: `${this.baseNodeOptions ?? ''} --import "${HOOK}"`.trim(),
-      [RUN_SETTINGS]: JSON.stringify(settings),
-      [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: request.activeMutant,
+      [RUN_SETTINGS]: JSON.stringify(runSettings(request, outDir)),
+      [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]:
+        request.kind === 'mutant' ? request.activeMutant : undefined,
       [NO_COPY_PROMPT_ENV]: '1',
     });
     const reporter = new CollectingReporter();
@@ -261,13 +201,14 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     try {
       const { status } = await playwright.runTests(reporter, {
         locations: [],
-        testIds: request.testFilter,
+        testIds: request.kind === 'mutant' ? request.testFilter : undefined,
         projects: this.options!.projects,
         workers: this.options!.workers,
         maxFailures: request.disableBail ? undefined : 1,
-        timeout: request.testTimeout,
+        timeout: request.budget.testTimeout,
         disableConfigReporters: true,
       });
+
       return { status, reporter, ...readSnapshotDir(outDir) };
     } finally {
       restoreEnv();
@@ -341,6 +282,23 @@ function acceptsConnections(port: number): Promise<boolean> {
     socket.once('error', () => done(false));
     socket.once('timeout', () => done(false));
   });
+}
+
+function logCoverageGaps(
+  log: Logger,
+  { lostFrames, sharedFrames }: CoverageGaps,
+) {
+  if (lostFrames > 0) {
+    log.warn(
+      `${lostFrames} frame(s) did not answer before their context closed; their coverage is missing, so mutants only they reached show as NoCoverage.`,
+    );
+  }
+
+  if (sharedFrames > 0) {
+    log.info(
+      `${sharedFrames} frame(s) belonged to contexts that outlived their test (beforeAll or worker fixtures); their coverage counts as static, so every test runs for those mutants.`,
+    );
+  }
 }
 
 function removeDirs(dirs: (string | undefined)[]) {

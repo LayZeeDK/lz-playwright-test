@@ -6,19 +6,28 @@ import type {
 } from '@playwright/test/reporter';
 import type { MutantCoverage } from '@stryker-mutator/api/core';
 import {
+  determineHitLimitReached,
   type DryRunOptions,
   type DryRunResult,
   DryRunStatus,
+  type MutantRunOptions,
+  type MutantRunResult,
   type TestResult,
   TestStatus,
+  toMutantRunResult,
 } from '@stryker-mutator/api/test-runner';
 
 import { parallelModeOf, type TestRunner } from './playwright-internals.ts';
-import type { Snapshot } from './protocol.ts';
-import { timeoutReason } from './timeouts.ts';
+import type { RunSettings, Snapshot } from './protocol.ts';
+import {
+  type ConfigTimeouts,
+  DRY_RUN_BUDGET,
+  mutantRunBudget,
+  type RunBudget,
+  timeoutReason,
+} from './timeouts.ts';
 
-type CoverageAnalysis = DryRunOptions['coverageAnalysis'];
-
+/** A Complete result that still carries the snapshots for the dry-run and mutant-run folds. */
 export type RunResult =
   | {
       status: DryRunStatus.Complete;
@@ -27,20 +36,36 @@ export type RunResult =
     }
   | Exclude<DryRunResult, { status: DryRunStatus.Complete }>;
 
-export interface RunRequest {
-  disableBail: boolean;
-  coverageAnalysis?: CoverageAnalysis;
-  activeMutant?: string;
-  testFilter?: string[];
-  hitLimit?: number;
-  testTimeout?: number;
+export type RunRequest = DryRunRequest | MutantRunRequest;
+
+export interface DryRunRequest {
+  readonly kind: 'dry';
+  readonly disableBail: boolean;
+  readonly coverageAnalysis: DryRunOptions['coverageAnalysis'];
+  readonly budget: RunBudget;
+}
+
+export interface MutantRunRequest {
+  readonly kind: 'mutant';
+  readonly disableBail: boolean;
+  readonly activeMutant: string;
+  /** Already widened to whole describe.serial groups. */
+  readonly testFilter: string[] | undefined;
+  readonly hitLimit: number | undefined;
+  readonly budget: RunBudget;
 }
 
 export interface RunOutput {
-  status: FullResult['status'];
-  reporter: CollectingReporter;
-  snapshots: Snapshot[];
-  hookInstalled: boolean;
+  readonly status: FullResult['status'];
+  readonly reporter: CollectingReporter;
+  readonly snapshots: Snapshot[];
+  readonly hookInstalled: boolean;
+}
+
+/** The counts the dry run logs. */
+export interface CoverageGaps {
+  readonly lostFrames: number;
+  readonly sharedFrames: number;
 }
 
 const OUTCOME = {
@@ -185,9 +210,51 @@ export function withSerialGroups(
   );
 }
 
+export function dryRunRequest({
+  disableBail,
+  coverageAnalysis,
+}: DryRunOptions): DryRunRequest {
+  return { kind: 'dry', disableBail, coverageAnalysis, budget: DRY_RUN_BUDGET };
+}
+
+export function mutantRunRequest(
+  {
+    activeMutant,
+    testFilter,
+    hitLimit,
+    disableBail,
+    timeout,
+  }: MutantRunOptions,
+  session: {
+    readonly serialGroups: Map<string, string[]>;
+    readonly timeouts: ConfigTimeouts;
+  },
+): MutantRunRequest {
+  return {
+    kind: 'mutant',
+    disableBail,
+    activeMutant: activeMutant.id,
+    testFilter: withSerialGroups(testFilter, session.serialGroups),
+    hitLimit,
+    budget: mutantRunBudget(timeout, session.timeouts),
+  };
+}
+
+/** What the hook needs to know about this run. */
+export function runSettings(request: RunRequest, outDir: string): RunSettings {
+  return request.kind === 'dry'
+    ? { outDir, perTest: request.coverageAnalysis === 'perTest' }
+    : { outDir, perTest: false, hitLimit: request.hitLimit };
+}
+
+/** A failed attempt may come from a server that died during the run. */
+export function mayHaveLostItsServer(output: RunOutput): boolean {
+  return output.reporter.anyAttemptFailed();
+}
+
 export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
   const { status, reporter, snapshots, hookInstalled } = output;
-  const isMutantRun = request.activeMutant !== undefined;
+  const isMutantRun = request.kind === 'mutant';
   const testCases = [...reporter.testCases.values()];
   const tests = testCases.map((test) => toTestResult(test, isMutantRun));
 
@@ -255,8 +322,8 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
 }
 
 export function missingCoverageError(
-  tests: TestResult[],
-  snapshots: Snapshot[],
+  tests: readonly TestResult[],
+  snapshots: readonly Snapshot[],
 ): string | undefined {
   const ran = tests.some((test) => test.status !== TestStatus.Skipped);
   const failed = tests.some((test) => test.status === TestStatus.Failed);
@@ -313,17 +380,83 @@ export function mergeCoverage(snapshots: readonly Snapshot[]): MutantCoverage {
   return merged;
 }
 
+export function coverageGaps(snapshots: readonly Snapshot[]): CoverageGaps {
+  return {
+    lostFrames: snapshots.filter((snapshot) => snapshot.lost).length,
+    sharedFrames: snapshots.filter(
+      (snapshot) => snapshot.outlivedItsTest && snapshot.coverage,
+    ).length,
+  };
+}
+
+export function sumHitCounts(snapshots: readonly Snapshot[]): number {
+  return snapshots.reduce((sum, { hitCount }) => sum + hitCount, 0);
+}
+
+/**
+ * The missing-coverage check runs with coverage off too. `gaps` is set only when coverage was merged,
+ * for the shell to log.
+ */
+export function dryRunResult(
+  output: RunOutput,
+  request: DryRunRequest,
+): { result: DryRunResult; gaps: CoverageGaps | undefined } {
+  const run = toRunResult(output, request);
+
+  if (run.status !== DryRunStatus.Complete) {
+    return { result: run, gaps: undefined };
+  }
+
+  const { status, tests, snapshots } = run;
+  const errorMessage = missingCoverageError(tests, snapshots);
+
+  if (errorMessage) {
+    return {
+      result: { status: DryRunStatus.Error, errorMessage },
+      gaps: undefined,
+    };
+  }
+
+  if (request.coverageAnalysis === 'off') {
+    return { result: { status, tests }, gaps: undefined };
+  }
+
+  return {
+    result: { status, tests, mutantCoverage: mergeCoverage(snapshots) },
+    gaps: coverageGaps(snapshots),
+  };
+}
+
+/**
+ * The hit limit outranks every other result, and the count is summed on every status: a limit that a
+ * test file trips while it loads leaves a run without tests, which would otherwise be an Error.
+ */
+export function mutantRunResult(
+  output: RunOutput,
+  request: MutantRunRequest,
+): { result: MutantRunResult; hitCount: number } {
+  const hitCount = sumHitCounts(output.snapshots);
+
+  return {
+    result: toMutantRunResult(
+      determineHitLimitReached(hitCount, request.hitLimit) ??
+        toRunResult(output, request),
+    ),
+    hitCount,
+  };
+}
+
 function emptyRunResult(request: RunRequest): RunResult {
+  // Stryker fails an empty dry run itself unless allowEmpty is set.
+  if (request.kind === 'dry') {
+    return { status: DryRunStatus.Complete, tests: [], snapshots: [] };
+  }
+
   if (request.testFilter?.length) {
     return {
       status: DryRunStatus.Error,
       errorMessage: `None of the ${request.testFilter.length} selected tests ran; their Playwright test ids no longer match.`,
     };
-  }
-
-  // Stryker fails an empty dry run itself unless allowEmpty is set.
-  if (request.activeMutant === undefined) {
-    return { status: DryRunStatus.Complete, tests: [], snapshots: [] };
   }
 
   return {

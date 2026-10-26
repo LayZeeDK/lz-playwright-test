@@ -11,7 +11,12 @@ import type {
 } from '@playwright/test/reporter';
 import type { MutantCoverage, StrykerOptions } from '@stryker-mutator/api/core';
 import type { Logger } from '@stryker-mutator/api/logging';
-import { DryRunStatus, TestStatus } from '@stryker-mutator/api/test-runner';
+import {
+  DryRunStatus,
+  type MutantRunOptions,
+  MutantRunStatus,
+  TestStatus,
+} from '@stryker-mutator/api/test-runner';
 
 import { PlaywrightTestRunner } from '../src/playwright-test-runner.ts';
 import {
@@ -22,14 +27,25 @@ import {
 } from '../src/protocol.ts';
 import {
   CollectingReporter,
+  coverageGaps,
+  type DryRunRequest,
+  dryRunRequest,
+  dryRunResult,
   listSerialGroups,
+  mayHaveLostItsServer,
   mergeCoverage,
   missingCoverageError,
+  type MutantRunRequest,
+  mutantRunRequest,
+  mutantRunResult,
   projectsThatRun,
+  type RunOutput,
+  runSettings,
   serialGroups,
   toRunResult,
   withSerialGroups,
 } from '../src/run-result.ts';
+import { DRY_RUN_BUDGET } from '../src/timeouts.ts';
 
 type Outcome = ReturnType<TestCase['outcome']>;
 
@@ -87,12 +103,45 @@ function classify(
 ) {
   return toRunResult(
     { status, reporter, snapshots: [], hookInstalled },
-    {
-      disableBail: true,
-      activeMutant: mutant ? '1' : undefined,
-      testFilter,
-    },
+    mutant ? mutantRequest({ testFilter }) : dryRequest(),
   );
+}
+
+function dryRequest(request: Partial<DryRunRequest> = {}): DryRunRequest {
+  return {
+    kind: 'dry',
+    disableBail: true,
+    coverageAnalysis: 'perTest',
+    budget: DRY_RUN_BUDGET,
+    ...request,
+  };
+}
+
+function mutantRequest(
+  request: Partial<MutantRunRequest> = {},
+): MutantRunRequest {
+  return {
+    kind: 'mutant',
+    disableBail: true,
+    activeMutant: '1',
+    testFilter: undefined,
+    hitLimit: undefined,
+    budget: DRY_RUN_BUDGET,
+    ...request,
+  };
+}
+
+// The output of a run whose tests all passed, with the given snapshot lines.
+function passedRun(lines: Partial<SnapshotLine>[]): RunOutput {
+  const reporter = new CollectingReporter();
+  attempt(reporter, 'a', 'expected', 'passed');
+
+  return {
+    status: 'passed',
+    reporter,
+    snapshots: lines.map(parsed),
+    hookInstalled: true,
+  };
 }
 
 test('a mutant run fails a test that passes only on a retry', () => {
@@ -212,24 +261,199 @@ test('a run that Playwright failed without a test or an error is an error, not a
   });
 });
 
-test('a dry run with coverage off still fails when no page loaded instrumented code', async () => {
-  const runner = new PlaywrightTestRunner(
-    { timeoutMS: 10_000 } as unknown as StrykerOptions,
-    {} as Logger,
+test('a dry run with coverage off still fails when no page loaded instrumented code', () => {
+  const { result, gaps } = dryRunResult(
+    passedRun([]),
+    dryRequest({ coverageAnalysis: 'off' }),
   );
-  const reporter = new CollectingReporter();
-  attempt(reporter, 'a', 'expected', 'passed');
-  Object.assign(runner, {
-    run: async () => classify(reporter, { status: 'passed', mutant: false }),
-  });
-
-  const result = await runner.dryRun({
-    timeout: 60_000,
-    disableBail: false,
-    coverageAnalysis: 'off',
-  });
 
   assert.equal(result.status, DryRunStatus.Error);
+  assert.equal(gaps, undefined);
+});
+
+test('a dry run with coverage off reports the tests and no coverage', () => {
+  const { result, gaps } = dryRunResult(
+    passedRun([{ mutantCoverage: { static: { '1': 1 }, perTest: {} } }]),
+    dryRequest({ coverageAnalysis: 'off' }),
+  );
+
+  assert.deepEqual(
+    result.status === DryRunStatus.Complete && {
+      tests: result.tests.map((t) => t.id),
+      mutantCoverage: result.mutantCoverage,
+    },
+    { tests: ['a'], mutantCoverage: undefined },
+  );
+  assert.equal(gaps, undefined);
+});
+
+test('a dry run merges the coverage of every snapshot exactly and reports the gaps', () => {
+  const { result, gaps } = dryRunResult(
+    passedRun([
+      {
+        outlivedItsTest: false,
+        mutantCoverage: { static: {}, perTest: { a: { '1': 1 } } },
+      },
+      {
+        outlivedItsTest: true,
+        mutantCoverage: { static: {}, perTest: { b: { '2': 1 } } },
+      },
+      {
+        outlivedItsTest: false,
+        mutantCoverage: { static: {}, perTest: { a: { '1': 1 } } },
+      },
+      { mutantCoverage: { static: {}, perTest: { a: { '1': 1 } } } },
+      { lost: true, outlivedItsTest: false },
+    ]),
+    dryRequest(),
+  );
+
+  assert.deepEqual(
+    result.status === DryRunStatus.Complete && plain(result.mutantCoverage),
+    { static: { '2': 1 }, perTest: { a: { '1': 3 } } },
+  );
+  assert.deepEqual(gaps, { lostFrames: 1, sharedFrames: 1 });
+});
+
+test('a dry run that fails before the merge reports no gaps', () => {
+  const output = passedRun([{ lost: true, outlivedItsTest: false }]);
+
+  assert.deepEqual(
+    dryRunResult({ ...output, status: 'interrupted' }, dryRequest()),
+    {
+      result: {
+        status: DryRunStatus.Error,
+        errorMessage: 'The Playwright run was interrupted',
+      },
+      gaps: undefined,
+    },
+  );
+});
+
+test('the coverage gaps count lost frames and shared frames with coverage', () => {
+  assert.deepEqual(
+    coverageGaps(
+      [
+        { lost: true, outlivedItsTest: true },
+        { outlivedItsTest: true },
+        { outlivedItsTest: true, mutantCoverage: { static: {}, perTest: {} } },
+        { mutantCoverage: { static: {}, perTest: {} } },
+      ].map(parsed),
+    ),
+    { lostFrames: 1, sharedFrames: 1 },
+  );
+});
+
+test('the hit limit outranks a kill, summed over every snapshot', () => {
+  const output = passedRun([{ hitCount: 600 }, { hitCount: 500 }]);
+  attempt(output.reporter, 'b', 'unexpected', 'failed');
+
+  const { result, hitCount } = mutantRunResult(
+    output,
+    mutantRequest({ hitLimit: 1000 }),
+  );
+
+  assert.equal(hitCount, 1100);
+  assert.equal(result.status, MutantRunStatus.Timeout);
+  assert.match(
+    result.status === MutantRunStatus.Timeout ? (result.reason ?? '') : '',
+    /Hit limit reached/,
+  );
+});
+
+test('the hit limit counts on a run that is otherwise an error', () => {
+  const output: RunOutput = {
+    status: 'failed',
+    reporter: new CollectingReporter(),
+    snapshots: [parsed({ hitCount: 1001 })],
+    hookInstalled: true,
+  };
+
+  assert.equal(
+    mutantRunResult(output, mutantRequest({ hitLimit: 1000 })).result.status,
+    MutantRunStatus.Timeout,
+  );
+  assert.equal(
+    mutantRunResult(output, mutantRequest()).result.status,
+    MutantRunStatus.Error,
+  );
+});
+
+test('a mutant run under its hit limit reports the kill', () => {
+  const output = passedRun([{ hitCount: 10 }]);
+  attempt(output.reporter, 'b', 'unexpected', 'failed');
+
+  const { result } = mutantRunResult(output, mutantRequest({ hitLimit: 1000 }));
+
+  assert.deepEqual(
+    result.status === MutantRunStatus.Killed && result.killedBy,
+    ['b'],
+  );
+});
+
+test('a mutant run request widens its filter to serial groups and gets its budget', () => {
+  const request = mutantRunRequest(
+    {
+      activeMutant: { id: '7' },
+      testFilter: ['edit'],
+      hitLimit: 50,
+      disableBail: false,
+      timeout: 8000,
+    } as unknown as MutantRunOptions,
+    {
+      serialGroups: new Map([['edit', ['create', 'edit']]]),
+      timeouts: { testTimeoutCap: Infinity, expectTimeout: 1000 },
+    },
+  );
+
+  assert.deepEqual(request, {
+    kind: 'mutant',
+    disableBail: false,
+    activeMutant: '7',
+    testFilter: ['create', 'edit'],
+    hitLimit: 50,
+    budget: { testTimeout: 3000, deadlineMs: 6000 },
+  });
+});
+
+test('a dry run request keeps the config timeouts', () => {
+  assert.deepEqual(
+    dryRunRequest({
+      timeout: 60_000,
+      disableBail: false,
+      coverageAnalysis: 'all',
+    }),
+    {
+      kind: 'dry',
+      disableBail: false,
+      coverageAnalysis: 'all',
+      budget: { testTimeout: undefined, deadlineMs: undefined },
+    },
+  );
+});
+
+test('the hook collects per-test coverage only in a perTest dry run', () => {
+  assert.deepEqual(runSettings(dryRequest(), 'out'), {
+    outDir: 'out',
+    perTest: true,
+  });
+  assert.equal(
+    runSettings(dryRequest({ coverageAnalysis: 'all' }), 'out').perTest,
+    false,
+  );
+  assert.deepEqual(runSettings(mutantRequest({ hitLimit: 5 }), 'out'), {
+    outDir: 'out',
+    perTest: false,
+    hitLimit: 5,
+  });
+});
+
+test('a run with a failed attempt may have lost its server', () => {
+  const failed = passedRun([]);
+  attempt(failed.reporter, 'b', 'unexpected', 'failed');
+
+  assert.equal(mayHaveLostItsServer(failed), true);
+  assert.equal(mayHaveLostItsServer(passedRun([])), false);
 });
 
 test('the missing-coverage error names lost frames when every frame was lost', () => {
