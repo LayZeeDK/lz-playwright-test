@@ -436,16 +436,17 @@ test('without a config file, Playwright is found from the working directory', as
   assert.deepEqual(fake.calls[0][1], { resolved: undefined });
 });
 
-test('init refuses a Playwright older than the runner supports', async (t) => {
-  const fake = fakePlaywright(t, {}, '1.62.9');
-  const { runner: shell } = runner(fake.configFile);
+for (const version of ['1.62.9', '2.0.0']) {
+  test(`init refuses Playwright ${version}`, async (t) => {
+    const fake = fakePlaywright(t, {}, version);
+    const { runner: shell } = runner(fake.configFile);
 
-  await assert.rejects(shell.init(), {
-    message:
-      'The Playwright test runner needs Playwright 1.63 or later, found 1.62.9.',
+    await assert.rejects(shell.init(), {
+      message: `The Playwright test runner needs Playwright 1.63 or a later 1.x release, found ${version}.`,
+    });
+    assert.deepEqual(fake.calls, []);
   });
-  assert.deepEqual(fake.calls, []);
-});
+}
 
 test('init warns when timeoutMS is below twice the expect timeout, and only then', async (t) => {
   const fake = fakePlaywright(t);

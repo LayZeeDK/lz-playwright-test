@@ -108,10 +108,7 @@ export interface Playwright {
 export function supportsPlaywright(version: string): boolean {
   const [major, minor] = version.split('.').map(Number);
 
-  return (
-    major > MIN_PLAYWRIGHT.major ||
-    (major === MIN_PLAYWRIGHT.major && minor >= MIN_PLAYWRIGHT.minor)
-  );
+  return major === MIN_PLAYWRIGHT.major && minor >= MIN_PLAYWRIGHT.minor;
 }
 
 export function probeInternals(
@@ -172,7 +169,7 @@ export function loadPlaywright(configFile: string | undefined): Playwright {
 
   if (!supportsPlaywright(version)) {
     throw new Error(
-      `The Playwright test runner needs Playwright ${MIN_PLAYWRIGHT.major}.${MIN_PLAYWRIGHT.minor} or later, found ${version}.`,
+      `The Playwright test runner needs Playwright ${MIN_PLAYWRIGHT.major}.${MIN_PLAYWRIGHT.minor} or a later ${MIN_PLAYWRIGHT.major}.x release, found ${version}.`,
     );
   }
 

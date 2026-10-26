@@ -34,10 +34,11 @@ function fakeModules(methods = TEST_RUNNER_METHODS) {
   };
 }
 
-test('the runner supports Playwright 1.63 and later', () => {
+test('the runner supports Playwright 1.63 and later 1.x releases', () => {
   assert.equal(supportsPlaywright('1.62.9'), false);
   assert.equal(supportsPlaywright('1.63.0'), true);
-  assert.equal(supportsPlaywright('2.0.0'), true);
+  assert.equal(supportsPlaywright('1.99.0'), true);
+  assert.equal(supportsPlaywright('2.0.0'), false);
   assert.equal(supportsPlaywright('0.70.0'), false);
 });
 

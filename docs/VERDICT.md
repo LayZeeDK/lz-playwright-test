@@ -305,7 +305,8 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
 
 ## Limits
 
-- Requires Playwright 1.63 or later. The runner refuses older versions with a clear error.
+- Requires Playwright 1.63 or a later 1.x release. The runner refuses older versions and Playwright 2
+  with a clear error, and its peer range is `>=1.63.0 <2`.
 - The runner is tested only with Chromium. Firefox and WebKit are untested.
 - The runner depends on six Playwright internals, any of which a Playwright release can change:
   `TestRunner` from `playwright/lib/runner`, `configLoader` from `playwright/lib/common`, `isURLAvailable`

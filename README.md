@@ -10,7 +10,7 @@ The answer to whether this works, the evidence, and the limits are in `docs/VERD
 
 ## Requirements
 
-- Playwright 1.63 or later, tested on 1.63.0 and 1.64.1. The runner calls Playwright internals that a
+- Playwright 1.63 or a later 1.x release, tested on 1.63.0 and 1.64.1. The runner calls Playwright internals that a
   release can change. The Limits section of `docs/VERDICT.md` lists them.
 - StrykerJS 10, tested on 10.1.1.
 - A Node.js version that strips TypeScript types by default, tested on 24.22.0. The package ships its

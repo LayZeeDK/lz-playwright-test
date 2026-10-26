@@ -11,7 +11,7 @@ Every Stryker config here loads the runner by its package name, `@layzee/stryker
 npm install -D @stryker-mutator/core@^10.1.1 file:<this repo>/packages/stryker-playwright-runner
 ```
 
-The runner needs `@playwright/test` 1.63 or later. If the copy has an older one or none, also install
+The runner needs `@playwright/test` 1.63 or a later 1.x release. If the copy has an older one or none, also install
 `@playwright/test@^1.64.1`. ngx-yeti ran on its own `@playwright/test` 1.63.0.
 
 ## realworld: stefanoslig/angular-ngrx-nx-realworld-example-app at bc7158d
