@@ -1,4 +1,3 @@
-// Test doubles more than one test file builds.
 import type { TestCase, TestResult } from '@playwright/test/reporter';
 import type { StrykerOptions } from '@stryker-mutator/api/core';
 import type { Logger } from '@stryker-mutator/api/logging';
@@ -50,7 +49,6 @@ export function addAttempt(
   testCase.outcome = () => outcome;
 }
 
-/** A test that ran once with `status`. */
 export function finishedTest(
   id: string,
   status: TestResult['status'],
@@ -62,7 +60,6 @@ export function finishedTest(
   return testCase;
 }
 
-/** A logger that records each line with its level. */
 export function logger() {
   const lines: [string, string][] = [];
   const record = (level: string) => (message: string) => {

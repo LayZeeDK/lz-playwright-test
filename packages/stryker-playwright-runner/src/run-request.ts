@@ -63,7 +63,6 @@ export function mutantRunRequest(
   };
 }
 
-/** What a run sets in the environment of the workers it forks, and passes to runTests. */
 export interface RunPlan {
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly params: Pick<RunTestsParams, 'testIds' | 'maxFailures' | 'timeout'>;
