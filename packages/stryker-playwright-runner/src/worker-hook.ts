@@ -43,7 +43,9 @@ export interface PageSettings {
 
 type Test = TestType<object, object>;
 
-const entry = process.argv[1] ?? '';
+// Undefined under `node -e`, which a Playwright worker's NODE_OPTIONS can reach; test() reads it as
+// "undefined", which is no worker entry.
+const entry = process.argv[1];
 const settings = readRunSettings(process.env);
 
 if (settings && isMainThread && WORKER_ENTRY.test(entry)) {
@@ -221,17 +223,11 @@ export function recordNodeCoverage(
           writeOnce();
         }
       },
-      configurable: true,
-      enumerable: true,
     });
   }
 
   if (perTest) {
-    Object.defineProperty(ns, 'currentTestId', {
-      get: currentTestId,
-      configurable: true,
-      enumerable: true,
-    });
+    Object.defineProperty(ns, 'currentTestId', { get: currentTestId });
   }
 
   onExit(() => {

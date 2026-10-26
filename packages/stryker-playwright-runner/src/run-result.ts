@@ -352,7 +352,7 @@ export function missingCoverageError(
 
   const lost = snapshots.filter((snapshot) => snapshot.lost).length;
 
-  if (lost === snapshots.length && lost > 0) {
+  if (lost === snapshots.length) {
     return `No page reported coverage: all ${lost} frame(s) did not answer before their context closed.`;
   }
 
@@ -480,7 +480,8 @@ function emptyRunResult(request: RunRequest): RunResult {
 }
 
 function toTestResult(test: TestCase, isMutantRun: boolean): TestResult {
-  const titles = test.titlePath().slice(1).filter(Boolean);
+  // The root suite's title is the empty first one.
+  const titles = test.titlePath().filter(Boolean);
   const last = test.results.at(-1);
   const outcome = test.outcome();
   // A test that passes only on a retry still failed against the mutant. Retries reach mutant runs

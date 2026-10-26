@@ -111,7 +111,7 @@ export function parseSnapshotLine(line: string): Snapshot | undefined {
   try {
     raw = JSON.parse(line);
   } catch {
-    return undefined;
+    // raw stays undefined, which is no object.
   }
 
   if (!isObject(raw)) {
@@ -134,7 +134,6 @@ export function readSnapshotDir(dir: string): SnapshotDir {
     .flatMap((file) =>
       fs.readFileSync(path.join(dir, file), 'utf8').split('\n'),
     )
-    .filter(Boolean)
     .map(parseSnapshotLine)
     .filter((snapshot) => snapshot !== undefined);
 
