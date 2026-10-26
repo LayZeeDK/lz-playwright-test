@@ -319,7 +319,7 @@ test('a dry run runs every test with the hook and the run settings in the worker
   });
 });
 
-test('the hook is preloaded after the NODE_OPTIONS the runner started with', async (t) => {
+test('the hook is preloaded before the NODE_OPTIONS the runner started with, so its own copy installs first', async (t) => {
   const fake = fakePlaywright(t);
   const original = process.env.NODE_OPTIONS;
   t.after(() => {
@@ -342,7 +342,7 @@ test('the hook is preloaded after the NODE_OPTIONS the runner started with', asy
 
   assert.deepEqual(
     fake.runs.map((run) => run.env.NODE_OPTIONS),
-    [`--import "${HOOK}"`, `--max-old-space-size=100 --import "${HOOK}"`],
+    [`--import "${HOOK}"`, `--import "${HOOK}" --max-old-space-size=100`],
   );
   assert.equal(existsSync(fileURLToPath(HOOK)), true);
 });

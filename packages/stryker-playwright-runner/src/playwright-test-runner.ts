@@ -244,7 +244,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
       const { status } = await withEnv(
         {
           NODE_OPTIONS:
-            `${this.baseNodeOptions ?? ''} --import "${HOOK}"`.trim(),
+            `--import "${HOOK}" ${this.baseNodeOptions ?? ''}`.trim(),
           ...env,
           [NO_COPY_PROMPT_ENV]: '1',
         },
