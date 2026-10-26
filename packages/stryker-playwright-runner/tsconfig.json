@@ -12,7 +12,10 @@
     "types": ["node"],
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "@babel/core": ["../../node_modules/@stryker-mutator/instrumenter/node_modules/@babel/core/lib/index.d.ts"]
+    }
   },
   "include": ["src/**/*.ts", "test/**/*.ts"]
 }
