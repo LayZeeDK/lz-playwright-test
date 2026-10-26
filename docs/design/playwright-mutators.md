@@ -218,7 +218,8 @@ remain:
   Core creates every ignorer listed in `ignorers` right before `instrument()`
   (`2-mutant-instrumenter-executor.ts:67-69`), with no catch, so an error thrown from that factory stops
   the run. The factory throws the kept error, or an "install did not run" error when the install was
-  skipped. Otherwise it returns an ignorer that ignores nothing. This route is not spiked yet.
+  skipped. Otherwise it returns an ignorer that ignores nothing. `spikes/ignorer-route/` measured this
+  route on StrykerJS 10.1.1: a factory that throws makes `stryker run` exit 1 with the error's message.
 - **The `ignorers` entry is required.** `ignorers` defaults to `[]`
   (`packages/api/schema/stryker-core.json:509-516`), and core creates only the listed names. A
   documented config that lists the plugin in `plugins` therefore always has `ignorers: ['ui-mutators']`
@@ -232,8 +233,9 @@ remain:
   can `import '@layzee/stryker-ui-mutators'` on its first line instead. The module installs with a
   top-level `await`, so an install or self-check error rejects the config import, and the run stops
   before it starts, with no `ignorers` entry. The thermos plugin's Node operators use this route
-  (`stryker.config.mjs:1`). A JSON config cannot import, so it keeps `plugins` and `ignorers`. This route
-  is not spiked for the UI operators yet.
+  (`stryker.config.mjs:1`). A JSON config cannot import, so it keeps `plugins` and `ignorers`. The same
+  spike measured this route: a config that imports a module whose top-level `await` rejects makes
+  `stryker run` exit 1 with `Invalid config file` and the error's message.
 - **A second install adds nothing.** A config that both imports the module and lists it in `plugins`
   installs twice in one process. The second install skips the operators that the first one registered,
   the name check does not count them as collisions, and the placer is wrapped once.
