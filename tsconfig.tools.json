@@ -1,19 +1,12 @@
 {
-  "extends": "./tsconfig.base.json",
+  "extends": "./tsconfig.node.json",
   "compilerOptions": {
     "composite": false,
     "declarationMap": false,
     "emitDeclarationOnly": false,
     "noEmit": true,
     "rootDir": ".",
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "lib": ["es2024", "dom"],
-    "target": "es2024",
-    "types": ["node"],
-    "allowImportingTsExtensions": true,
-    "erasableSyntaxOnly": true,
-    "verbatimModuleSyntax": true
+    "allowImportingTsExtensions": true
   },
   "include": ["tools/**/*.ts", "stryker.*.config.ts", "oss/**/*.ts"]
 }
