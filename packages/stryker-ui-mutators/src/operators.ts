@@ -166,7 +166,11 @@ export const operators = operatorTable([
           ) {
             yield t.cloneNode(path.node.right, true);
           }
-
+        },
+      },
+      {
+        kind: 'node',
+        *mutate(path, t) {
           if (
             path.isConditionalExpression() &&
             path.parentPath.isJSXExpressionContainer() &&
