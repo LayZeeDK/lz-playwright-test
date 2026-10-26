@@ -17,10 +17,8 @@ import {
 } from '../src/timeouts.ts';
 import { strykerOptions } from './support/doubles.ts';
 
-const readmeOptions = readFileSync(
-  new URL('../../../README.md', import.meta.url),
-  'utf8',
-)
+const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+const readmeOptions = readme
   .split(/^## /m)
   .find((section) => section.startsWith('Options\n'));
 
@@ -143,15 +141,20 @@ test('the README lists exactly the options the schema has', () => {
 
 test('the README states the per-test timeout the runner sets', () => {
   const [, headroom, floor] =
-    /less ([\d.]+) s but at least ([\d.]+) s/.exec(readmeOptions ?? '') ?? [];
+    /less ([\d.]+) s but\s+at\s+least\s+([\d.]+) s/.exec(readme) ?? [];
 
   assert.equal(Number(headroom) * 1000, RUN_START_MS + STOP_HEADROOM_MS);
   assert.equal(Number(floor) * 1000, MIN_TEST_TIMEOUT_MS);
 });
 
-test('the README states when the runner stops a mutant run', () => {
-  const [, headroom] =
-    /still going ([\d.]+) s before/.exec(readmeOptions ?? '') ?? [];
+test('the README states when the runner stops a mutant run, and below which timeout it does not', () => {
+  const [, headroom] = /still\s+going\s+([\d.]+) s before/.exec(readme) ?? [];
+  const [, noStopBelow] =
+    /timeout\s+is\s+under\s+([\d.]+) s/.exec(readme) ?? [];
 
   assert.equal(Number(headroom) * 1000, STOP_HEADROOM_MS);
+  assert.equal(
+    Number(noStopBelow) * 1000,
+    RUN_START_MS + MIN_TEST_TIMEOUT_MS + STOP_HEADROOM_MS,
+  );
 });
