@@ -775,6 +775,27 @@ test('a run that someone else interrupted is no deadline stop', async (t) => {
   assert.deepEqual(lines, [['debug', 'Mutant 7: error, hitCount 0/undefined']]);
 });
 
+test('a run whose workers wrote no snapshot file reports that the hook never installed', async (t) => {
+  const fake = fakePlaywright(t, {
+    runTests: async (run) => {
+      run.reporter.onTestEnd?.(fakeTest('a', 'passed'), {} as never);
+      writeFileSync(path.join(run.settings.outDir, 'worker-1.log'), '{}\n');
+
+      return 'passed';
+    },
+  });
+  const { runner: shell } = runner(fake.configFile);
+  await shell.init();
+
+  const result = await shell.dryRun(dryRunOptions());
+
+  assert.deepEqual(result, {
+    status: DryRunStatus.Error,
+    errorMessage:
+      'Tests ran but the Stryker worker hook did not install in any Playwright worker; this Playwright version may have changed its worker entry point.',
+  });
+});
+
 test('each run gets its own run folder, removed after the run', async (t) => {
   const fake = fakePlaywright(t);
   const { runner: shell } = runner(fake.configFile);
