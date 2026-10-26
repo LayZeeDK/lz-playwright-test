@@ -6,7 +6,8 @@ result. The configs are plain JavaScript versions of the demo's Vite, Playwright
 settings, without Nx.
 
 From the repo root, with `<scratch>` the absolute path of a new folder outside the repo (the two `npm pack`
-lines run from a package folder):
+lines run from a package folder). The `rm` line drops the story file, which belongs to the component tests
+that this project does not run.
 
 ```sh
 npx nx run-many -t build
@@ -25,9 +26,9 @@ npx playwright test
 npx stryker run stryker.config.mjs
 ```
 
-The story file belongs to the component tests, which this project does not run. The `node` line imports both
-packages with type stripping turned off, so it fails if anything in them is TypeScript. The dev server listens
-on 127.0.0.1, on port 4500 outside Stryker and 4600 plus the worker number under it.
+The `node` line imports both packages with type stripping turned off, so it fails if anything in them is
+TypeScript. The dev server listens on 127.0.0.1, on port 4500 outside Stryker and 4600 plus the worker number
+under it.
 
 To compare the result with the workspace's own run of `stryker.e2e.ui.config.ts`, from the repo root:
 
