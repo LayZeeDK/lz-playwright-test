@@ -26,7 +26,7 @@ function uiMutatorsIgnorer(): Ignorer {
 
   return { shouldIgnore: () => undefined };
 }
-uiMutatorsIgnorer.inject = [] as const;
+uiMutatorsIgnorer.inject = [] satisfies [];
 
 export const strykerPlugins = [
   declareFactoryPlugin(PluginKind.Ignore, 'ui-mutators', uiMutatorsIgnorer),

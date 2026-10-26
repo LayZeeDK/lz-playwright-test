@@ -4,10 +4,10 @@ import type { NodePath, types } from '@babel/core';
 
 import {
   isJsxChild,
+  operatorTable,
   type AttributeSite,
   type BabelTypes,
   type ElementSite,
-  type Operator,
 } from './mutator.ts';
 
 const HAS_WORD = /[\p{L}\p{N}]/u;
@@ -92,7 +92,7 @@ const IMPLICIT_ROLE: ReadonlyMap<string, string> = new Map([
   ['ul', 'list'],
 ]);
 
-export const operators = [
+export const operators = operatorTable([
   {
     name: 'TextLiteral',
     sample: 'export const a = <p>Hello</p>;\n',
@@ -293,7 +293,7 @@ export const operators = [
       },
     ],
   },
-] as const satisfies readonly Operator[];
+]);
 
 /** Derived from the table; the cases harness types its expectations with it, so no second list of names exists. */
 export type OperatorName = (typeof operators)[number]['name'];

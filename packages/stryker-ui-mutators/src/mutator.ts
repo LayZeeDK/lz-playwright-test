@@ -13,6 +13,16 @@ export interface Operator {
   readonly rules: readonly Rule[];
 }
 
+/**
+ * The table as written, its names kept as literal types. In place of `as const`: Stryker mutates nothing inside an
+ * `as` expression, which would leave every rule of the table out of a mutation run.
+ */
+export function operatorTable<const T extends readonly Operator[]>(
+  table: T,
+): T {
+  return table;
+}
+
 export type Rule = AttributeRule | NodeRule;
 
 /**

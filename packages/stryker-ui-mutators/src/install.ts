@@ -262,7 +262,10 @@ export async function resolveFromCore(
     expressionPlacer,
     async instrument(files, excludedMutations = []) {
       return new Instrumenter(SILENT).instrument(
-        files.map((file) => ({ ...file, mutate: true as const })),
+        files.map((file): SourceFile & { mutate: true } => ({
+          ...file,
+          mutate: true,
+        })),
         { plugins: null, excludedMutations, ignorers: [] },
       );
     },
