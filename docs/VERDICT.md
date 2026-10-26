@@ -116,8 +116,10 @@ The Code column names the runner commit a row ran on. `git log -- packages/stryk
 lists every runner change after it, and a row is not rerun when the runner changes. fca053d rewrote how
 a run's test results become a mutant result. A row marked "before fca053d" ran on earlier code, and its
 log times do not pin it to one commit. A `command` runner row does not use this runner, so it has no
-commit. The scripts, configs, and API double in `oss/` also changed after the open-source rows ran
-(`git log -- oss/`), and those rows were not rerun either.
+commit. The open-source rows marked ff95b44 were rerun on that commit with the `oss/` files of that
+commit, after both the runner and `oss/` had changed. Each rerun gave the same status counts as its
+earlier run, which the rows replace; the wall times differ by up to 1m14s, which one run per row on a
+shared machine cannot explain. One `oss/README.md` step needed a fix for the ngx-yeti rerun (3ff6277).
 
 Wall time is Stryker's own "Done in" from the run's log. The define row has no kept log, so its time is
 the shell's elapsed time for the whole command.
@@ -140,10 +142,11 @@ the shell's elapsed time for the whole command.
 | `stryker-playwright-hello-world`, 7 mutants | this runner (repo's `define` removed) | before fca053d | 6 killed, 1 survived | median 44s (43 to 46s), 5 runs |
 | Same | the repo's own `command` runner setup | - | 6 killed, 1 survived | median 64s (57 to 66s), 5 runs |
 | Same, `timeoutMS` 1 and `timeoutFactor` 0 so Stryker's own timer fires first | this runner | before fca053d | 7 timeouts | 36s, 36s, and 32s, 3 runs |
-| `angular-ngrx-nx-realworld-example-app` (Angular 21.2, Nx 22.7), 48 mutants in `auth.store.ts`, against the local API double | this runner, `timeoutMS` 10000 | fca053d | 11 killed, 15 timeouts, 10 survived, 12 no coverage | 7m41s |
-| Same, with `use.actionTimeout: 5000` added to the copy's Playwright config | this runner, `timeoutMS` 10000 | fca053d | 26 killed, 10 survived, 12 no coverage | 6m00s |
-| ngx-yeti (Angular, Nx, Playwright 1.63.0, static Storybook), 2 mutants in `cluster.ts`, 234 e2e tests | this runner, `playwright.workers` 2, `dryRunTimeoutMinutes` 20 | fca053d | 2 killed | 3m51s (dry run 2m57s) |
-| Analog 2.8.0 `beta` (Angular 22.2, Nx 23.2, SSR), 8 mutants in `(home).page.ts`, 11 e2e tests against the built SSR server | this runner, `disableTypeChecking: true` in the copy's Vite config | fca053d | 4 killed, 4 survived | 1m45s |
+| Same as the first hello-world row, rerun with `oss/hello-world/stryker.playwright.config.ts` | this runner (repo's `define` removed) | ff95b44 | 6 killed, 1 survived | 44s |
+| `angular-ngrx-nx-realworld-example-app` (Angular 21.2, Nx 22.7), 48 mutants in `auth.store.ts`, against the local API double | this runner, `timeoutMS` 10000 | ff95b44 | 11 killed, 15 timeouts, 10 survived, 12 no coverage | 8m48s and 7m18s, 2 runs |
+| Same, with `use.actionTimeout: 5000` added to the copy's Playwright config | this runner, `timeoutMS` 10000 | ff95b44 | 26 killed, 10 survived, 12 no coverage | 4m46s |
+| ngx-yeti (Angular, Nx, Playwright 1.63.0, static Storybook), 2 mutants in `cluster.ts`, 234 e2e tests | this runner, `playwright.workers` 2, `dryRunTimeoutMinutes` 20 | ff95b44 | 2 killed | 3m03s (dry run 2m20s) |
+| Analog 2.8.0 `beta` (Angular 22.2, Nx 23.2, SSR), 8 mutants in `(home).page.ts`, 11 e2e tests against the built SSR server | this runner, `disableTypeChecking: true` in the copy's Vite config | ff95b44 | 4 killed, 4 survived | 2m01s |
 
 The UI operator rows match the statuses Claude wrote down before the first run, except that the
 three UI timeouts were predicted as kills. Each is a test that clicks or fills an element the mutant
@@ -205,8 +208,9 @@ inferred, not profiled. The `command` side kept the repo's own Stryker settings:
 timeout does not change the numbers.
 
 The hello-world rows ran on an earlier shell script with `.mjs` versions of the Stryker configs.
-`tools/bench-hello-world.ts` and the `.ts` configs in `oss/hello-world/` replaced them later, and the
-rows were not rerun on them. The table shows each log's "Done in". `tools/bench-hello-world.ts` prints
+`tools/bench-hello-world.ts` and the `.ts` configs in `oss/hello-world/` replaced them later. The
+rerun row used the `.ts` config once, not the benchmark script; the two benchmark rows and the
+forced-timeout row were not rerun. The table shows each log's "Done in". `tools/bench-hello-world.ts` prints
 the shell's elapsed time for the whole command instead, which ran 1 to 3 s above "Done in" in the kept
 logs.
 
@@ -244,7 +248,8 @@ The ngx-yeti run is the only one with `playwright.workers` above 1, which `runne
 cover. Coverage still came back per test. Each mutant was covered by 20 of the 234 tests, and Stryker
 stopped at the first kill, after 7 tests for one mutant and after 1 for the other. On one worker the dry
 run ran longer than Stryker's default 5-minute `dryRunTimeoutMinutes` (decision log, not rerun). With 2
-workers it took 2m57s, and its log reports 344 s of net test time, which agrees with that.
+workers it took 2m57s in the first run, whose log reports 344 s of net test time, which agrees with
+that, and 2m20s in the rerun at ff95b44. The rerun stopped after 7 tests and after 1 as well.
 The clone needed one step before Stryker could start its Storybook: building the workspace package
 `yeti-css` in the clone itself, outside Stryker's sandbox (`nx run yeti-css:yeti-build`), for the
 reason in the npm-workspaces entry under Limits.
@@ -332,8 +337,9 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   In the RealWorld run, 15 of the 26 detected mutants were timeouts. With `use.actionTimeout: 5000` in
   the Playwright config all 15 were Killed, and the survivors and uncovered mutants did not change. Set
   `actionTimeout` below the per-test timeout, so that the failing test of a killed mutant says what
-  broke. The wall time dropped from 7m41s to 6m00s. That is one run each, not interleaved, and
-  indicative only.
+  broke. The wall time dropped from 7m41s to 6m00s in the first runs, and from 8m48s and 7m18s to
+  4m46s in the reruns at ff95b44; on the demo app with the UI operators it dropped from 5m15s to 4m26s.
+  Those are one or two runs per side, not interleaved, and indicative only.
 - Stryker links the sandbox's `node_modules` to the original project's, and npm links each workspace
   package in `node_modules` to its folder in the original. So a workspace package's build output must
   already exist in the original. A build that runs in the sandbox writes its output in the sandbox,
