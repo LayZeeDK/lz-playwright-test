@@ -226,17 +226,78 @@ test('the dry run reports a timed-out test as a failed test', () => {
 });
 
 test('a mutant run without test results is an error, filtered or not', () => {
-  assert.equal(
+  assert.deepEqual(
     classify(new CollectingReporter(), {
       status: 'passed',
-      testFilter: ['gone'],
-    }).status,
-    DryRunStatus.Error,
+      testFilter: ['gone', 'also gone'],
+    }),
+    {
+      status: DryRunStatus.Error,
+      errorMessage:
+        'None of the 2 selected tests ran; their Playwright test ids no longer match.',
+    },
   );
+  assert.deepEqual(classify(new CollectingReporter(), { status: 'passed' }), {
+    status: DryRunStatus.Error,
+    errorMessage: 'Playwright ran no tests.',
+  });
+});
+
+test('a test result is named by its title path without the empty titles', () => {
+  const reporter = new CollectingReporter();
+  attempt(reporter, 'a', 'expected', 'passed');
+  Object.assign(reporter.testCases.get('a') ?? {}, {
+    titlePath: () => ['', '', 'app.spec.ts', 'a'],
+  });
+
+  const result = classify(reporter, { status: 'passed' });
+
+  assert.deepEqual(
+    result.status === DryRunStatus.Complete && result.tests.map((t) => t.name),
+    ['[app.spec.ts] › a'],
+  );
+});
+
+test('a test.fail() test that passed kills the mutant, though another test timed out', () => {
+  const reporter = new CollectingReporter();
+  attempt(reporter, 'a', 'unexpected', 'timedOut');
+  attempt(reporter, 'b', 'unexpected', 'passed', 'failed');
+
+  assert.equal(classify(reporter).status, DryRunStatus.Complete);
+});
+
+test('a test that timed out and then passed on a retry makes a mutant run a Timeout', () => {
+  const reporter = new CollectingReporter();
+  attempt(reporter, 'a', 'unexpected', 'timedOut');
+  attempt(reporter, 'a', 'flaky', 'passed');
+
   assert.equal(
-    classify(new CollectingReporter(), { status: 'passed' }).status,
+    classify(reporter, { status: 'passed' }).status,
+    DryRunStatus.Timeout,
+  );
+});
+
+test('a timed-out test that ran without the hook is a hook error, not a Timeout', () => {
+  const reporter = new CollectingReporter();
+  attempt(reporter, 'a', 'unexpected', 'timedOut');
+
+  assert.equal(
+    classify(reporter, { hookInstalled: false }).status,
     DryRunStatus.Error,
   );
+});
+
+test('a failed or retried-then-failed attempt counts as failed, a skipped one does not', () => {
+  const reporter = new CollectingReporter();
+  attempt(reporter, 'a', 'expected', 'passed');
+  attempt(reporter, 'b', 'skipped', 'skipped');
+
+  assert.equal(reporter.anyAttemptFailed(), false);
+
+  attempt(reporter, 'c', 'unexpected', 'failed');
+  attempt(reporter, 'c', 'flaky', 'passed');
+
+  assert.equal(reporter.anyAttemptFailed(), true);
 });
 
 test('an unfiltered dry run without tests completes empty, so Stryker applies allowEmpty', () => {
@@ -642,6 +703,7 @@ test('a run with errors and no failed test is an error, with every error', () =>
 test('a failed test outranks the errors of its run', () => {
   const reporter = new CollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'failed');
+  attempt(reporter, 'b', 'expected', 'passed');
   reporter.onError({ message: 'worker teardown' });
 
   assert.equal(classify(reporter).status, DryRunStatus.Complete);
@@ -664,6 +726,23 @@ test('coverage from a Playwright worker alone satisfies the dry run', () => {
   );
 });
 
+test('the missing-coverage error needs a test that ran, and none that failed', () => {
+  const result = (id: string, status: TestStatus) =>
+    ({ id, name: id, status, timeSpentMs: 10 }) as Parameters<
+      typeof missingCoverageError
+    >[0][number];
+  const skipped = result('a', TestStatus.Skipped);
+  const passed = result('b', TestStatus.Success);
+  const failed = result('c', TestStatus.Failed);
+
+  assert.equal(missingCoverageError([skipped], []), undefined);
+  assert.match(
+    missingCoverageError([skipped, passed], []) ?? '',
+    /no instrumented code ran/,
+  );
+  assert.equal(missingCoverageError([passed, failed], []), undefined);
+});
+
 test('a run of skipped tests needs no hook', () => {
   const reporter = new CollectingReporter();
   attempt(reporter, 'a', 'skipped', 'skipped');
@@ -676,7 +755,8 @@ test('a run of skipped tests needs no hook', () => {
 
 test('tests that ran without the hook are an error', () => {
   const reporter = new CollectingReporter();
-  attempt(reporter, 'a', 'expected', 'passed');
+  attempt(reporter, 'a', 'skipped', 'skipped');
+  attempt(reporter, 'b', 'expected', 'passed');
 
   assert.equal(
     classify(reporter, { status: 'passed', hookInstalled: false }).status,
@@ -768,18 +848,24 @@ test('listing passes the projects to Playwright and groups the describe.serial t
 test('listing fails when a test file does not load, though the status says passed', async () => {
   const { playwright } = listing({ status: 'passed' }, [
     'SyntaxError in a.spec.ts',
+    'SyntaxError in b.spec.ts',
   ]);
 
   await assert.rejects(listSerialGroups(playwright, []), {
-    message: /could not load every test file:\nSyntaxError in a\.spec\.ts/,
+    message:
+      'Playwright could not load every test file:\nSyntaxError in a.spec.ts\nSyntaxError in b.spec.ts',
   });
 });
 
 test('listing fails with the status Playwright reports', async () => {
-  const { playwright } = listing({ status: 'failed' }, ['config error']);
+  const { playwright } = listing({ status: 'failed' }, [
+    'config error',
+    'second error',
+  ]);
 
   await assert.rejects(listSerialGroups(playwright, []), {
-    message: /could not list the tests \(failed\):\nconfig error/,
+    message:
+      'Playwright could not list the tests (failed):\nconfig error\nsecond error',
   });
 });
 
@@ -822,15 +908,15 @@ test('a page cannot reach Object.prototype through a __proto__ test id in its co
 });
 
 test('a parsed line drops counts that are not hit counts, and merging sums the rest', () => {
-  const hits = { '1': 2, '2': NaN, '3': -1, '4': '3', '5': null };
+  const hits = { '1': 2, '2': NaN, '3': -1, '4': '3', '5': null, '6': 0 };
 
   const coverage = merge([
     { mutantCoverage: { static: hits, perTest: { a: hits } } },
     { mutantCoverage: { static: { '1': 1 }, perTest: {} } },
   ]);
 
-  assert.deepEqual({ ...coverage.static }, { '1': 3 });
-  assert.deepEqual({ ...coverage.perTest['a'] }, { '1': 2 });
+  assert.deepEqual({ ...coverage.static }, { '1': 3, '6': 0 });
+  assert.deepEqual({ ...coverage.perTest['a'] }, { '1': 2, '6': 0 });
 });
 
 // mergeCoverage builds null-prototype maps, which deepEqual tells apart from object literals.

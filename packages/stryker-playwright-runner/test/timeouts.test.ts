@@ -81,13 +81,16 @@ test('the test timeout keeps its floor and the config cap', () => {
 });
 
 test('no deadline when it would leave too little time for a test to finish', () => {
+  const shortest = RUN_START_MS + MIN_TEST_TIMEOUT_MS;
+
   assert.equal(mutantRunBudget(4500, uncapped).deadlineMs, undefined);
   assert.equal(
-    mutantRunBudget(
-      RUN_START_MS + MIN_TEST_TIMEOUT_MS + STOP_HEADROOM_MS - 1,
-      uncapped,
-    ).deadlineMs,
+    mutantRunBudget(shortest + STOP_HEADROOM_MS - 1, uncapped).deadlineMs,
     undefined,
+  );
+  assert.equal(
+    mutantRunBudget(shortest + STOP_HEADROOM_MS, uncapped).deadlineMs,
+    shortest,
   );
 });
 
@@ -192,7 +195,11 @@ test('a deadline repeats stop until it is disarmed, since Playwright ignores it 
   const { deadline, calls, tick } = armed(t, 1000);
 
   tick(1000);
-  tick(STOP_RETRY_MS);
+  tick(STOP_RETRY_MS - 1);
+
+  assert.deepEqual(calls, [1000]);
+
+  tick(1);
   tick(STOP_RETRY_MS);
   deadline.disarm();
   tick(STOP_RETRY_MS * 10);

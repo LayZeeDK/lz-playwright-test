@@ -35,6 +35,7 @@ test('a root name gives the pid of the runner that made it', () => {
 test('names of the old scheme and other folders give no pid', () => {
   assert.equal(rootPid('stryker-pw-0-a1B2c3'), undefined);
   assert.equal(rootPid('stryker-playwright-abc-a1B2c3'), undefined);
+  assert.equal(rootPid('stryker-playwright-x12-a1B2c3'), undefined);
   assert.equal(rootPid('stryker-playwright-'), undefined);
   assert.equal(rootPid('other-4242-a1B2c3'), undefined);
 });
@@ -151,7 +152,10 @@ test('a new root is named after the pid of the runner that owns it', () => {
 
     assert.equal(rootPid(path.basename(root.dir)), 4242);
     assert.deepEqual(readdirSync(root.dir), ['runs']);
-    assert.notEqual(root.nextRunDir(), root.nextRunDir());
+    assert.deepEqual(
+      [root.nextRunDir(), root.nextRunDir()],
+      [path.join(root.dir, 'runs', '0'), path.join(root.dir, 'runs', '1')],
+    );
 
     root.remove();
 

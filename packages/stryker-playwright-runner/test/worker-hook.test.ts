@@ -671,7 +671,11 @@ test('a closing browser first collects every context it holds, and is patched on
   hooked.scope[hooked.ns].hitCount = 1;
   const owner = hooked.browser();
   const first = await hooked.context(owner);
+  const patched = owner.browser.close;
   const second = await hooked.context(owner);
+
+  assert.equal(owner.browser.close, patched);
+
   first.open(hooked.page().page);
   second.open(hooked.page().page);
 
@@ -722,6 +726,20 @@ test('a frame that does not answer in time is lost', async (t) => {
   assert.deepEqual(parsedLines(hooked.read()), [
     { lost: true, outlivedItsTest: false },
   ]);
+});
+
+test('a frame that answers leaves no read timer to hold the worker open', async (t) => {
+  const hooked = installed(t, { perTest: false });
+  const created = await hooked.context();
+  created.open(hooked.page().page);
+  const timers = () =>
+    process.getActiveResourcesInfo().filter((type) => type === 'Timeout')
+      .length;
+  const before = timers();
+
+  await created.close();
+
+  assert.equal(timers(), before);
 });
 
 // --- initPage, in a fake page ---

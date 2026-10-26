@@ -10,6 +10,7 @@ import {
   type RunnerModule,
   supportsPlaywright,
   TEST_RUNNER_METHODS,
+  WORKER_ENTRY,
 } from '../src/playwright-internals.ts';
 
 const src = new URL('../src/', import.meta.url);
@@ -36,6 +37,28 @@ test('the runner supports Playwright 1.63 and later', () => {
   assert.equal(supportsPlaywright('1.62.9'), false);
   assert.equal(supportsPlaywright('1.63.0'), true);
   assert.equal(supportsPlaywright('2.0.0'), true);
+  assert.equal(supportsPlaywright('0.70.0'), false);
+});
+
+test("the worker entry is Playwright's workerProcessEntry.js, by either path separator", () => {
+  assert.equal(
+    WORKER_ENTRY.test(
+      '/app/node_modules/playwright/lib/worker/workerProcessEntry.js',
+    ),
+    true,
+  );
+  assert.equal(
+    WORKER_ENTRY.test(
+      'C:\\app\\node_modules\\playwright\\lib\\worker\\workerProcessEntry.js',
+    ),
+    true,
+  );
+  assert.equal(
+    WORKER_ENTRY.test(
+      '/app/node_modules/playwright/lib/worker/workerProcessEntry.js.map',
+    ),
+    false,
+  );
 });
 
 test('the probe accepts the internals the runner calls', () => {

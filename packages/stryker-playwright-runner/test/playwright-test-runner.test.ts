@@ -470,19 +470,23 @@ test('init warns when timeoutMS is below twice the expect timeout, and only then
 test('init removes the temp roots of runners that no longer run, and says so', async (t) => {
   const fake = fakePlaywright(t);
   const dead = spawnSync(process.execPath, ['-e', '']).pid;
-  const left = `${ROOT_PREFIX}${dead}-abc123`;
-  mkdirSync(path.join(fake.tmp, left));
+  const left = [`${ROOT_PREFIX}${dead}-abc123`, `${ROOT_PREFIX}${dead}-def456`];
+  left.forEach((name) => mkdirSync(path.join(fake.tmp, name)));
   const { runner: shell, lines } = runner(fake.configFile);
+  const prefix = 'Removed the temp directories of runners that no longer run: ';
 
   await shell.init();
 
-  assert.equal(existsSync(path.join(fake.tmp, left)), false);
-  assert.deepEqual(lines, [
-    [
-      'debug',
-      `Removed the temp directories of runners that no longer run: ${left}`,
-    ],
-  ]);
+  assert.deepEqual(
+    left.map((name) => existsSync(path.join(fake.tmp, name))),
+    [false, false],
+  );
+  assert.equal(lines.length, 1);
+  const [[level, message]] = lines;
+  assert.equal(level, 'debug');
+  assert.ok(message.startsWith(prefix), message);
+  // In the order the directory lists them, which depends on the file system.
+  assert.deepEqual(message.slice(prefix.length).split(', ').sort(), left);
 });
 
 test('a failed global setup fails init with its errors and output, and cleans up', async (t) => {
@@ -739,9 +743,14 @@ test('a mutant run activates the mutant and runs its tests with their serial gro
 });
 
 test('a mutant run that the deadline stops is a Timeout, and the stop is logged', async (t) => {
+  let stoppedEarly = true;
   const fake = fakePlaywright(t, {
     runTests: async () => {
-      t.mock.timers.tick(5_400);
+      // The deadline is 5400 ms after the run started, less the real time init and the server
+      // probe took since then.
+      t.mock.timers.tick(5_000);
+      stoppedEarly = fake.names().includes('stopTests');
+      t.mock.timers.tick(400);
       await fake.stopped();
 
       return 'interrupted';
@@ -751,14 +760,40 @@ test('a mutant run that the deadline stops is a Timeout, and the stop is logged'
   await shell.init();
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
 
+  const started = performance.now();
   const result = await shell.mutantRun(mutantRunOptions({ timeout: 8_000 }));
+  const took = performance.now() - started;
   t.mock.timers.reset();
 
+  assert.equal(stoppedEarly, false);
   assert.deepEqual(result, {
     status: MutantRunStatus.Timeout,
     reason: "The run reached the runner's deadline before Stryker's timeout",
   });
-  assert.match(lines[0][1], /^deadline stop took \d+ ms$/);
+  const [, stopTook] = /^deadline stop took (\d+) ms$/.exec(lines[0][1]) ?? [];
+  assert.ok(
+    Number(stopTook) <= Math.ceil(took),
+    `stop took ${stopTook} ms of a ${took} ms run`,
+  );
+});
+
+test('a run that ends on its own after the deadline fired is no deadline stop', async (t) => {
+  const fake = fakePlaywright(t, {
+    runTests: async (run) => {
+      t.mock.timers.tick(5_400);
+      await fake.stopped();
+
+      return passAll(run);
+    },
+  });
+  const { runner: shell } = runner(fake.configFile);
+  await shell.init();
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+
+  const result = await shell.mutantRun(mutantRunOptions({ timeout: 8_000 }));
+  t.mock.timers.reset();
+
+  assert.equal(result.status, MutantRunStatus.Survived);
 });
 
 test('a run that someone else interrupted is no deadline stop', async (t) => {
@@ -840,6 +875,7 @@ test('a webServer that died is restarted through global setup before the run, an
     webServers: [
       { url: 'http://localhost:1/' },
       { url: 'http://localhost:2/' },
+      { url: 'http://localhost:3/' },
     ],
     urlUp: async (url) => url.port === '2' || up,
     globalSetup: () => {
@@ -862,7 +898,7 @@ test('a webServer that died is restarted through global setup before the run, an
   assert.deepEqual(lines, [
     [
       'warn',
-      'webServer at http://localhost:1/ stopped answering; rerunning Playwright global setup (global teardown runs first).',
+      'webServer at http://localhost:1/, http://localhost:3/ stopped answering; rerunning Playwright global setup (global teardown runs first).',
     ],
   ]);
 });
@@ -945,6 +981,25 @@ test('a webServer port is checked by connecting to it, and one without url or po
 
   assert.deepEqual(lines, []);
   assert.equal(fake.runs.length, 1);
+});
+
+test('a webServer port that stopped answering is restarted and named by its port', async (t) => {
+  const server = net.createServer();
+  await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
+  const { port } = server.address() as net.AddressInfo;
+  await new Promise((resolve) => server.close(resolve));
+  const fake = fakePlaywright(t, { webServers: [{ port }] });
+  const { runner: shell, lines } = runner(fake.configFile);
+  await shell.init();
+
+  await shell.dryRun(dryRunOptions());
+
+  assert.deepEqual(lines, [
+    [
+      'warn',
+      `webServer at port ${port} stopped answering; rerunning Playwright global setup (global teardown runs first).`,
+    ],
+  ]);
 });
 
 test('a port check that neither connects nor fails gives up at its timeout, and closes the socket', async () => {
