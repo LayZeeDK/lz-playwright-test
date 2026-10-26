@@ -109,7 +109,7 @@ export const operators = operatorTable([
           if (
             path.isJSXText() &&
             HAS_WORD.test(path.node.value) &&
-            !UNRENDERED_TEXT.has(elementSiteOf(path.parentPath?.node, t)?.name)
+            !UNRENDERED_TEXT.has(elementSiteOf(path.parentPath.node, t)?.name)
           ) {
             yield t.jsxText('');
           }
