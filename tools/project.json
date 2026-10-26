@@ -1,0 +1,21 @@
+{
+  "name": "tools",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "targets": {
+    "typecheck": {
+      "command": "tsc -p tsconfig.tools.json",
+      "options": { "cwd": "{workspaceRoot}" },
+      "cache": true,
+      "inputs": [
+        "{workspaceRoot}/tools/**/*.ts",
+        "{workspaceRoot}/oss/**/*.ts",
+        "{workspaceRoot}/stryker.*.ts",
+        "{workspaceRoot}/packages/stryker-playwright-runner/src/**/*.ts",
+        "{workspaceRoot}/tsconfig.tools.json",
+        "{workspaceRoot}/tsconfig.node.json",
+        "{workspaceRoot}/tsconfig.base.json"
+      ],
+      "outputs": []
+    }
+  }
+}
