@@ -129,8 +129,7 @@ function attributeSite(
       ? rule.attributes.test(name)
       : rule.attributes.includes(name);
   const value = matches ? readValue(path.node.value, t) : undefined;
-  // Stryker disable next-line ConditionalExpression: equivalent, as elementSite is pure and the return drops its result when value is undefined
-  const element = value === undefined ? undefined : elementSite(path, t);
+  const element = elementSite(path, t);
 
   return value === undefined || element === undefined
     ? undefined
