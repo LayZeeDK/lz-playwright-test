@@ -188,7 +188,6 @@ export function fakeInstall(
 
   return {
     ns,
-    /** The worker's namespace, which install made or kept. */
     namespace: (): StrykerNamespace => {
       const found = scope[ns];
       assert.ok(typeof found === 'object' && found !== null, 'a namespace');
