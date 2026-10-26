@@ -1,16 +1,18 @@
 // Each case must give exactly the UI mutants it lists, through the real instrumenter with the real install. Calls
 // install() itself rather than importing index.ts, so the cases also run inside a Stryker worker, where
-// STRYKER_MUTATOR_WORKER makes index.ts skip the install (a mutation run of this package).
+// STRYKER_MUTATOR_WORKER makes index.ts skip the install (a mutation run of this package). The install and the
+// instrumentation run in a before hook, so that an error there fails every case instead of the file.
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
-import { test } from 'node:test';
+import { before, test } from 'node:test';
 
-import { install, resolveFromCore } from '../src/install.ts';
+import {
+  install,
+  resolveFromCore,
+  type InstrumentResult,
+} from '../src/install.ts';
 import { operatorNames, operators } from '../src/operators.ts';
 import { cases, type Case } from './cases.ts';
-
-const instrumenter = await resolveFromCore();
-await install(operators, async () => instrumenter);
 
 function source(testCase: Case): string {
   return `${testCase.setup ?? ''}\nexport function Case(props: any) {\n  return (${testCase.jsx});\n}\n`;
@@ -25,7 +27,13 @@ const files = cases.map((testCase) => ({
   name: join(import.meta.dirname, 'out', `${testCase.id}.tsx`),
   content: source(testCase),
 }));
-const result = await instrumenter.instrument(files);
+let result: InstrumentResult;
+
+before(async () => {
+  const instrumenter = await resolveFromCore();
+  await install(operators, async () => instrumenter);
+  result = await instrumenter.instrument(files);
+});
 
 for (const [index, testCase] of cases.entries()) {
   test(`${testCase.id}: ${testCase.title}`, () => {

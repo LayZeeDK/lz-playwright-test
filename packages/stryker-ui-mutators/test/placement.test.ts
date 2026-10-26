@@ -1,19 +1,22 @@
 // The placer wrap is neutral for built-in mutants, and places UI mutants as valid TSX. One process, ordered: the
 // corpus is instrumented stock first, then install() runs, then the corpus is instrumented with every UI operator
-// excluded. node --test runs each test file in its own process, so no other file has wrapped the placer before.
+// excluded. node --test runs each test file in its own process, so no other file has wrapped the placer before. That
+// sequence runs in a before hook, so that an error in it fails every test instead of the file.
 // Corpus: the design spike's sample, the demo app's components, and StrykerJS v10.1.1's
 // packages/instrumenter/testResources/parser/App.tsx and testResources/instrumenter/vue-tsx-sample.vue (copied).
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { describe, it } from 'node:test';
+import { before, describe, it } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
 import {
   install,
   resolveFromCore,
   type InstrumentedMutant,
+  type InstrumentResult,
+  type Instrumenter,
   type SourceFile,
 } from '../src/install.ts';
 import { operatorNames, operators } from '../src/operators.ts';
@@ -27,15 +30,12 @@ const corpus: readonly SourceFile[] = [
   join(import.meta.dirname, 'corpus', 'vue-tsx-sample.vue'),
 ].map((name) => ({ name, content: readFileSync(name, 'utf8') }));
 
-const instrumenter = await resolveFromCore();
-const { parse }: { parse: (code: string, options: object) => unknown } =
-  await import(
-    pathToFileURL(
-      createRequire(join(instrumenter.dir, 'package.json')).resolve(
-        '@babel/parser',
-      ),
-    ).href
-  );
+let instrumenter: Instrumenter;
+let parse: (code: string, options: object) => unknown;
+let stock: InstrumentResult[];
+let excluded: InstrumentResult[];
+let oneLeftOn: InstrumentResult[];
+let on: InstrumentResult[];
 
 const ours: ReadonlySet<string> = new Set(operatorNames);
 const masked = (code: string): string =>
@@ -57,13 +57,23 @@ async function instrumentEach(excludedMutations: readonly string[]) {
   );
 }
 
-const stock = await instrumentEach([]);
-await install(operators, async () => instrumenter);
-const excluded = await instrumentEach(operatorNames);
-const oneLeftOn = await instrumentEach(
-  operatorNames.filter((name) => name !== 'TextLiteral'),
-);
-const on = await instrumentEach([]);
+before(async () => {
+  instrumenter = await resolveFromCore();
+  ({ parse } = await import(
+    pathToFileURL(
+      createRequire(join(instrumenter.dir, 'package.json')).resolve(
+        '@babel/parser',
+      ),
+    ).href
+  ));
+  stock = await instrumentEach([]);
+  await install(operators, async () => instrumenter);
+  excluded = await instrumentEach(operatorNames);
+  oneLeftOn = await instrumentEach(
+    operatorNames.filter((name) => name !== 'TextLiteral'),
+  );
+  on = await instrumentEach([]);
+});
 
 describe('the JSX placement, with every UI operator excluded', () => {
   for (const [index, { name }] of corpus.entries()) {
