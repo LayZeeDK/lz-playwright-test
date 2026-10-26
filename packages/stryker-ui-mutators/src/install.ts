@@ -17,6 +17,7 @@ import { withJsxPlacement, type MutantPlacerLike } from './placer.ts';
 export const TESTED_VERSION = '10.1.1';
 const CORE_BIN = /[\\/]@stryker-mutator[\\/]core[\\/]bin[\\/]stryker\.js$/;
 const NAME = /^[A-Za-z]+$/;
+// `Symbol.for`, so a second copy of this package in the process sees the marks of the first.
 const OWN: unique symbol = Symbol.for('@layzee/stryker-ui-mutators');
 const nothing = (): undefined => undefined;
 const SILENT = {

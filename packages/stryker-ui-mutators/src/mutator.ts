@@ -158,6 +158,7 @@ function readValue(
 
   const { expression } = value;
 
+  // The built-in StringLiteral, BooleanLiteral, ArrowFunction and BlockStatement mutators own these.
   return t.isLiteral(expression) || t.isFunction(expression)
     ? undefined
     : { kind: 'expression', expression };
@@ -222,6 +223,7 @@ function* replaced(
   }
 }
 
+// `!(expr)` is always false for a string value, as in `!(c ? 'true' : 'false')` and `!String(open)`.
 function negation(
   expression: types.Expression,
   t: BabelTypes,
