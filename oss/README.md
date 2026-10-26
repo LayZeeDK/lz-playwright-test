@@ -31,7 +31,10 @@ it uses is `oss/realworld-api`. Then run `npx stryker run stryker.playwright.con
 1. Apply `ngx-yeti/copy.patch` (`.stryker-tmp` in `.gitignore`) and copy
    `ngx-yeti/stryker.playwright.config.ts` into the copy.
 2. Run `npx nx run yeti-css:yeti-build` once. Storybook reads `node_modules/yeti-css/dist`, which
-   resolves to the copy itself, not to Stryker's sandbox.
+   resolves to the copy itself, not to Stryker's sandbox. Then run `npx nx daemon --stop`. Stryker
+   copies `.nx/workspace-data` into its sandbox, and while the daemon that the build started is
+   running, the sandbox's Nx connects to it, the daemon refuses a different workspace, and the
+   `webServer` fails to start.
 3. Run `npx stryker run stryker.playwright.config.ts`. The config sets `playwright.workers` to 2 and
    `dryRunTimeoutMinutes` to 20, because the 234-test dry run takes longer than Stryker's default
    5 minutes on one worker.
