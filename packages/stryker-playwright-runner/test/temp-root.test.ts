@@ -4,7 +4,10 @@ import {
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   rmSync,
+  statSync,
+  writeFileSync,
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,6 +17,8 @@ import {
   createTempRoot,
   isOwnDir,
   isRunning,
+  namespaceToken,
+  OWNER_FILE,
   removeLeftRoots,
   rootPid,
 } from '../src/temp-root.ts';
@@ -65,6 +70,36 @@ test('a pid too large to be a safe integer is no pid', () => {
   );
 });
 
+test('on Linux the namespace token is the inode of the pid namespace and the host name', () => {
+  const files: string[] = [];
+  const token = namespaceToken((file) => {
+    files.push(file);
+
+    return 4026531836;
+  }, 'ci-host');
+
+  assert.equal(token, '4026531836@ci-host');
+  assert.deepEqual(files, ['/proc/self/ns/pid']);
+});
+
+test('where there is no /proc the namespace token is the host name', () => {
+  assert.equal(
+    namespaceToken(() => {
+      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+    }, 'dev-box'),
+    'dev-box',
+  );
+});
+
+test('the namespace token of this process names its pid namespace where there is one, and this host', () => {
+  const ns = '/proc/self/ns/pid';
+
+  assert.equal(
+    namespaceToken(),
+    existsSync(ns) ? `${statSync(ns).ino}@${os.hostname()}` : os.hostname(),
+  );
+});
+
 test('a process that answers signal 0 runs', () => {
   assert.equal(
     isRunning(1, () => undefined),
@@ -108,17 +143,51 @@ test('a folder that vanished is not ours', () => {
   );
 });
 
-// A temp directory holding the given entries, each a folder.
+const TOKEN = 'ns-of-this-runner';
+
+// A temp directory holding the given entries, each a folder with an owner marker that holds `TOKEN`.
 function tmpWith(names: string[]) {
   const tmp = mkdtempSync(path.join(os.tmpdir(), 'temp-root-test-'));
   const removed: string[] = [];
 
   for (const name of names) {
     mkdirSync(path.join(tmp, name));
+    writeFileSync(path.join(tmp, name, OWNER_FILE), TOKEN);
   }
 
   return { tmp, removed, cleanup: () => rmSync(tmp, { recursive: true }) };
 }
+
+test('a dead root is removed only when its owner marker holds the token of this runner', () => {
+  const { tmp, removed, cleanup } = tmpWith([
+    'stryker-playwright-100-ours00',
+    'stryker-playwright-101-theirs',
+    'stryker-playwright-102-nomark',
+    'stryker-playwright-103-notxt0',
+  ]);
+  writeFileSync(
+    path.join(tmp, 'stryker-playwright-101-theirs', OWNER_FILE),
+    'ns-of-another-runner',
+  );
+  rmSync(path.join(tmp, 'stryker-playwright-102-nomark', OWNER_FILE));
+  rmSync(path.join(tmp, 'stryker-playwright-103-notxt0', OWNER_FILE));
+  mkdirSync(path.join(tmp, 'stryker-playwright-103-notxt0', OWNER_FILE));
+
+  try {
+    const result = removeLeftRoots(tmp, {
+      running: () => false,
+      owned: () => true,
+      remove: (dir) => removed.push(path.basename(dir)),
+      ownPid: 1,
+      token: TOKEN,
+    });
+
+    assert.deepEqual(result, ['stryker-playwright-100-ours00']);
+    assert.deepEqual(removed, ['stryker-playwright-100-ours00']);
+  } finally {
+    cleanup();
+  }
+});
 
 test('only the roots of dead runners of this user are removed, and named', () => {
   const { tmp, removed, cleanup } = tmpWith([
@@ -136,6 +205,7 @@ test('only the roots of dead runners of this user are removed, and named', () =>
       owned: (dir) => !dir.includes('-400-'),
       remove: (dir) => removed.push(path.basename(dir)),
       ownPid: 300,
+      token: TOKEN,
     });
 
     assert.deepEqual(result, ['stryker-playwright-100-dead00']);
@@ -161,6 +231,7 @@ test('a root that cannot be removed now is skipped without an error', () => {
         }
       },
       ownPid: 1,
+      token: TOKEN,
     });
 
     assert.deepEqual(result, ['stryker-playwright-101-bbbbbb']);
@@ -173,10 +244,11 @@ test('a new root is named after the pid of the runner that owns it', () => {
   const { tmp, cleanup } = tmpWith([]);
 
   try {
-    const root = createTempRoot(tmp, 4242);
+    const root = createTempRoot(tmp, 4242, TOKEN);
 
     assert.equal(rootPid(path.basename(root.dir)), 4242);
-    assert.deepEqual(readdirSync(root.dir), ['runs']);
+    assert.deepEqual(readdirSync(root.dir).sort(), [OWNER_FILE, 'runs']);
+    assert.equal(readFileSync(path.join(root.dir, OWNER_FILE), 'utf8'), TOKEN);
     assert.deepEqual(
       [root.nextRunDir(), root.nextRunDir()],
       [path.join(root.dir, 'runs', '0'), path.join(root.dir, 'runs', '1')],

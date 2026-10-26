@@ -15,6 +15,7 @@ export interface TempRoot {
 }
 
 export const ROOT_PREFIX = 'stryker-playwright-';
+export const OWNER_FILE = 'owner';
 
 // mkdtemp appends six letters or digits.
 export function rootPid(name: string): number | undefined {
@@ -23,6 +24,23 @@ export function rootPid(name: string): number | undefined {
     : undefined;
 
   return Number.isSafeInteger(pid) ? pid : undefined;
+}
+
+/**
+ * Names the PID namespace this process sees pids in. Containers that share /tmp, or hosts that share
+ * an NFS temp directory, see one another's roots but not one another's processes. The host name
+ * alone is not enough: a container started with `--network host` has the host's name. On Linux each
+ * PID namespace is a file under /proc with its own inode.
+ */
+export function namespaceToken(
+  inode: (file: string) => number = (file) => fs.statSync(file).ino,
+  host: string = os.hostname(),
+): string {
+  try {
+    return `${inode('/proc/self/ns/pid')}@${host}`;
+  } catch {
+    return host;
+  }
 }
 
 /** EPERM means the process exists but belongs to someone else, so it counts as running. */
@@ -72,11 +90,13 @@ export function removeLeftRoots(
     owned = isOwnDir,
     remove = removeDir,
     ownPid = process.pid,
+    token = namespaceToken(),
   }: {
     running?: (pid: number) => boolean;
     owned?: (dir: string) => boolean;
     remove?: (dir: string) => void;
     ownPid?: number;
+    token?: string;
   } = {},
 ): string[] {
   const removed: string[] = [];
@@ -90,10 +110,13 @@ export function removeLeftRoots(
     }
 
     try {
-      remove(dir);
-      removed.push(name);
+      if (fs.readFileSync(path.join(dir, OWNER_FILE), 'utf8') === token) {
+        remove(dir);
+        removed.push(name);
+      }
     } catch {
-      // The next runner that starts tries again.
+      // A root whose owner file cannot be read is kept; one that cannot be removed now, the next
+      // runner that starts tries again.
     }
   }
 
@@ -107,11 +130,13 @@ export function removeDir(dir: string): void {
 export function createTempRoot(
   tmp: string = os.tmpdir(),
   pid: number = process.pid,
+  token: string = namespaceToken(),
 ): TempRoot {
   const dir = fs.mkdtempSync(path.join(tmp, `${ROOT_PREFIX}${pid}-`));
   const outputDir = path.join(dir, 'output');
   const runsDir = path.join(dir, 'runs');
   let runs = 0;
+  fs.writeFileSync(path.join(dir, OWNER_FILE), token);
   fs.mkdirSync(runsDir);
 
   return {

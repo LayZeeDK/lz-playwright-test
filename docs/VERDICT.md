@@ -354,6 +354,13 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   `stryker-playwright-<pid>-*` and removes, at `init`, those of runners of the same user that no longer
   run. It never removes `stryker-pw-*` directories, because their number is no pid and a live one of an
   older runner would look dead; remove those from the system temp folder once by hand.
+- A pid names a process only in the PID namespace and on the host that gave it out. Each temp
+  directory therefore holds an `owner` file with a token for the host, and on Linux for the PID
+  namespace (the inode of `/proc/self/ns/pid`), and a runner removes only directories whose token is
+  its own. Runners in containers that share `/tmp`, or on hosts that share an NFS temp directory, keep
+  one another's directories. A directory without a readable `owner` file is kept, including the
+  `stryker-playwright-<pid>-*` directories of runners from before the `owner` file; remove those by
+  hand.
 - Stryker gives a runner's `dispose` 2 s and then kills its process tree. The runner's `dispose` stops
   the tests and then runs global teardown, so a `globalTeardown` that needs more than what is left of
   the 2 s is cut off (inferred from the code, not run).

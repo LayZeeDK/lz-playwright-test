@@ -22,7 +22,7 @@ import {
   PlaywrightTestRunner,
   withEnv,
 } from '../src/playwright-test-runner.ts';
-import { ROOT_PREFIX } from '../src/temp-root.ts';
+import { namespaceToken, OWNER_FILE, ROOT_PREFIX } from '../src/temp-root.ts';
 import {
   dryRunOptions,
   finishedTest,
@@ -154,7 +154,10 @@ test('init removes the temp roots of runners that no longer run, and says so', a
   const fake = fakePlaywright(t);
   const dead = spawnSync(process.execPath, ['-e', '']).pid;
   const left = [`${ROOT_PREFIX}${dead}-abc123`, `${ROOT_PREFIX}${dead}-def456`];
-  left.forEach((name) => mkdirSync(path.join(fake.tmp, name)));
+  left.forEach((name) => {
+    mkdirSync(path.join(fake.tmp, name));
+    writeFileSync(path.join(fake.tmp, name, OWNER_FILE), namespaceToken());
+  });
   const { runner: shell, lines } = runner(fake.configFile);
   const prefix = 'Removed the temp directories of runners that no longer run: ';
 
@@ -264,11 +267,11 @@ test('dispose removes the run folders and output before it waits for the workers
   root = path.join(fake.tmp, readdirSync(fake.tmp)[0]);
   // Playwright creates the output folder; the runner creates the runs folder.
   mkdirSync(path.join(root, 'output'));
-  assert.deepEqual(readdirSync(root).sort(), ['output', 'runs']);
+  assert.deepEqual(readdirSync(root).sort(), ['output', OWNER_FILE, 'runs']);
 
   await shell.dispose();
 
-  assert.deepEqual(seen, []);
+  assert.deepEqual(seen, [OWNER_FILE]);
 });
 
 test('a dry run runs every test with the hook and the run settings in the workers environment', async (t) => {

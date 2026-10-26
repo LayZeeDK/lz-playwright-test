@@ -31,6 +31,7 @@ import {
   PlaywrightTestRunner,
 } from '../../src/playwright-test-runner.ts';
 import type { SerialGroups } from '../../src/serial-groups.ts';
+import { namespaceToken, OWNER_FILE } from '../../src/temp-root.ts';
 import { STOP_HEADROOM_MS } from '../../src/timeouts.ts';
 import { logger } from '../support/doubles.ts';
 
@@ -176,6 +177,7 @@ before(async () => {
 
   rmSync(fixture('test-results'), { recursive: true, force: true });
   mkdirSync(deadRoot, { recursive: true });
+  writeFileSync(path.join(deadRoot, OWNER_FILE), namespaceToken());
   mkdirSync(oldSchemeRoot, { recursive: true });
 
   const options = {
