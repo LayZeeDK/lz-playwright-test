@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { before, type TestContext, test } from 'node:test';
 
 import type * as Hook from '../src/worker-hook.ts';
-import type { PageSettings } from '../src/worker-hook.ts';
+import type { PageSettings, StrykerNamespace } from '../src/worker-hook.ts';
 
 let hook: typeof Hook;
 
@@ -53,10 +53,7 @@ function pageRun(
     (name) =>
       [name, Object.getOwnPropertyDescriptor(globalThis, name)] as const,
   );
-  const scope = globalThis as unknown as Record<
-    string,
-    Record<string, unknown>
-  >;
+  const scope: Record<string, unknown> = globalThis;
   t.after(() => {
     delete scope[ns];
   });
@@ -78,17 +75,20 @@ function pageRun(
         if (descriptor) {
           Object.defineProperty(globalThis, name, descriptor);
         } else {
-          delete (globalThis as Record<string, unknown>)[name];
+          delete scope[name];
         }
       }
     }
   }
 
   inPage(() => hook.initPage({ ns, ...settings }));
+  const found = scope[ns];
+  assert.ok(typeof found === 'object' && found !== null, 'a page namespace');
+  const s: StrykerNamespace = found;
 
   return {
     ns,
-    s: scope[ns],
+    s,
     stored,
     listeners,
     fire: (event: string) =>
@@ -123,7 +123,7 @@ test('the init script sets nothing it was not given', (t) => {
 test('the init script keeps a namespace the page already has', (t) => {
   const ns = '__pageTestExisting__';
   const existing = { kept: true };
-  const scope = globalThis as unknown as Record<string, unknown>;
+  const scope: Record<string, unknown> = globalThis;
   scope[ns] = existing;
   t.after(() => {
     delete scope[ns];
@@ -139,7 +139,7 @@ test('the init script keeps a namespace the page already has', (t) => {
   try {
     hook.initPage({ ns, testId: 't1' });
   } finally {
-    delete (globalThis as Record<string, unknown>).window;
+    delete scope.window;
   }
 
   assert.equal(scope[ns], existing);

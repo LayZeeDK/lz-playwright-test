@@ -358,7 +358,7 @@ test('a dry run stops at the first failure unless bail is disabled, and asks for
 test('a dry run logs the frames that lost or shared their coverage', async (t) => {
   const fake = fakePlaywright(t, {
     runTests: async (run) => {
-      run.reporter.onTestEnd?.(finishedTest('a', 'passed'), {} as never);
+      run.reporter.onTestEnd(finishedTest('a', 'passed'));
       writeSnapshots(run, [
         { lost: true, outlivedItsTest: false },
         { lost: true, outlivedItsTest: false },
@@ -407,7 +407,7 @@ test('a mutant run activates the mutant and runs its tests with their serial gro
   const fake = fakePlaywright(t, {
     listed,
     runTests: async (run) => {
-      run.reporter.onTestEnd?.(finishedTest('s1', 'failed'), {} as never);
+      run.reporter.onTestEnd(finishedTest('s1', 'failed'));
       writeSnapshots(run, [{ hitCount: 3, outlivedItsTest: false }]);
 
       return 'failed';
@@ -511,7 +511,7 @@ test('a run that someone else interrupted is no deadline stop', async (t) => {
 test('a run whose workers wrote no snapshot file reports that the hook never installed', async (t) => {
   const fake = fakePlaywright(t, {
     runTests: async (run) => {
-      run.reporter.onTestEnd?.(finishedTest('a', 'passed'), {} as never);
+      run.reporter.onTestEnd(finishedTest('a', 'passed'));
       writeFileSync(path.join(run.settings.outDir, 'worker-1.log'), '{}\n');
 
       return 'passed';
@@ -614,7 +614,7 @@ test('a run that failed while its server died is rerun once after the restart', 
     runTests: async (run) => {
       if (fake.runs.length === 1) {
         up = false;
-        run.reporter.onTestEnd?.(finishedTest('a', 'failed'), {} as never);
+        run.reporter.onTestEnd(finishedTest('a', 'failed'));
 
         return 'failed';
       }
@@ -635,7 +635,7 @@ test('a failed run whose server still answers is not rerun', async (t) => {
   const fake = fakePlaywright(t, {
     webServers: [{ url: 'http://localhost:1/' }],
     runTests: async (run) => {
-      run.reporter.onTestEnd?.(finishedTest('a', 'failed'), {} as never);
+      run.reporter.onTestEnd(finishedTest('a', 'failed'));
       writeSnapshots(run, []);
 
       return 'failed';

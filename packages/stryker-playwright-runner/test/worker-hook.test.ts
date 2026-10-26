@@ -278,7 +278,7 @@ test('each install names its snapshot file by the worker pid and a random part',
 test("install counts the worker's own hits in its namespace and writes them past the limit", (t) => {
   const hooked = installed(t, { perTest: false, hitLimit: 2 });
 
-  hooked.scope[hooked.ns].hitCount = 3;
+  hooked.namespace().hitCount = 3;
 
   assert.equal(hooked.read(), '{"hitCount":3,"outlivedItsTest":false}\n');
 });
@@ -292,13 +292,14 @@ test("install keeps a namespace the worker's instrumented code made first", (t) 
     { perTest: true },
     {
       prepare: (_, ns) => {
-        (globalThis as unknown as Record<string, unknown>)[ns] = first;
+        const scope: Record<string, unknown> = globalThis;
+        scope[ns] = first;
       },
     },
   );
   hooked.setTest('t1');
 
-  assert.equal(hooked.scope[hooked.ns], first);
+  assert.equal(hooked.namespace(), first);
   assert.equal(first.currentTestId, 't1');
 });
 
@@ -315,7 +316,7 @@ test('install replaces a namespace that is null with its own', (t) => {
   );
   hooked.setTest('t1');
 
-  assert.equal(hooked.scope[hooked.ns].currentTestId, 't1');
+  assert.equal(hooked.namespace().currentTestId, 't1');
 });
 
 test('a frame whose namespace is null holds nothing to read', async (t) => {
@@ -340,11 +341,11 @@ test("the worker's namespace names the running Playwright test, and none between
 
   hooked.setTest('t1');
 
-  assert.equal(hooked.scope[hooked.ns].currentTestId, 't1');
+  assert.equal(hooked.namespace().currentTestId, 't1');
 
   hooked.setTest(undefined);
 
-  assert.equal(hooked.scope[hooked.ns].currentTestId, undefined);
+  assert.equal(hooked.namespace().currentTestId, undefined);
 });
 
 test("the worker's namespace names the test in its beforeEach and afterEach hooks", (t) => {
@@ -352,11 +353,11 @@ test("the worker's namespace names the test in its beforeEach and afterEach hook
 
   hooked.setTest('t1', { type: 'beforeEach' });
 
-  assert.equal(hooked.scope[hooked.ns].currentTestId, 't1');
+  assert.equal(hooked.namespace().currentTestId, 't1');
 
   hooked.setTest('t1', { type: 'afterEach' });
 
-  assert.equal(hooked.scope[hooked.ns].currentTestId, 't1');
+  assert.equal(hooked.namespace().currentTestId, 't1');
 });
 
 test("the worker's namespace names no test in a beforeAll or afterAll hook, a fixture, or an unknown slot", (t) => {
@@ -373,7 +374,7 @@ test("the worker's namespace names no test in a beforeAll or afterAll hook, a fi
     hooked.setTest('t1', runs);
 
     assert.equal(
-      hooked.scope[hooked.ns].currentTestId,
+      hooked.namespace().currentTestId,
       undefined,
       JSON.stringify(runs),
     );
@@ -382,7 +383,7 @@ test("the worker's namespace names no test in a beforeAll or afterAll hook, a fi
 
 test('at exit the worker writes its Node coverage to its snapshot file', (t) => {
   const hooked = installed(t, { perTest: false });
-  hooked.scope[hooked.ns].mutantCoverage = { static: { '1': 1 }, perTest: {} };
+  hooked.namespace().mutantCoverage = { static: { '1': 1 }, perTest: {} };
 
   hooked.exitListeners.forEach((exit) => exit(0));
 
@@ -429,11 +430,11 @@ test('without per-test coverage the init script names no test, and no mutant out
 test('a closing context writes what each frame of each page holds, as one line per frame', async (t) => {
   const hooked = installed(t, { perTest: true });
   hooked.setTest('t1');
-  hooked.scope[hooked.ns].mutantCoverage = {
+  hooked.namespace().mutantCoverage = {
     static: {},
     perTest: { t1: { '1': 1 } },
   };
-  hooked.scope[hooked.ns].hitCount = 5;
+  hooked.namespace().hitCount = 5;
   const created = await hooked.context();
   created.open(hooked.page([hooked.frame(), hooked.frame()]).page);
   created.open(
@@ -457,7 +458,7 @@ test('a closing context writes what each frame of each page holds, as one line p
 
 test('a context closes into the snapshot file once', async (t) => {
   const hooked = installed(t, { perTest: false });
-  hooked.scope[hooked.ns].hitCount = 1;
+  hooked.namespace().hitCount = 1;
   const created = await hooked.context();
   const { page } = hooked.page();
   created.open(page);
@@ -471,7 +472,7 @@ test('a context closes into the snapshot file once', async (t) => {
 
 test('a context the hook never saw created writes nothing', async (t) => {
   const hooked = installed(t, { perTest: false });
-  hooked.scope[hooked.ns].hitCount = 1;
+  hooked.namespace().hitCount = 1;
   const unseen = {
     pages: () => [hooked.page().page],
   } as unknown as BrowserContext;
@@ -495,7 +496,7 @@ test('a context with no instrumented frame writes nothing', async (t) => {
 
 test('per-test coverage of a context that outlived its test, or began outside one, counts as shared', async (t) => {
   const hooked = installed(t, { perTest: true });
-  hooked.scope[hooked.ns].hitCount = 1;
+  hooked.namespace().hitCount = 1;
   hooked.setTest('t1');
   const sameTest = await hooked.context();
   const laterTest = await hooked.context();
@@ -521,7 +522,7 @@ test('per-test coverage of a context that outlived its test, or began outside on
 
 test('a context a beforeAll or afterAll hook opens and closes counts as shared, and its pages name no test', async (t) => {
   const hooked = installed(t, { perTest: true });
-  hooked.scope[hooked.ns].hitCount = 1;
+  hooked.namespace().hitCount = 1;
   const created: Awaited<ReturnType<typeof hooked.context>>[] = [];
 
   for (const type of ['beforeAll', 'afterAll'] as const) {
@@ -544,7 +545,7 @@ test('a context a beforeAll or afterAll hook opens and closes counts as shared, 
 
 test("a context a test's own fixture opens belongs to that test", async (t) => {
   const hooked = installed(t, { perTest: true });
-  hooked.scope[hooked.ns].hitCount = 1;
+  hooked.namespace().hitCount = 1;
   hooked.setTest('t1', { type: 'test', fixture: { title: 'context' } });
   const opened = await hooked.context();
   opened.open(hooked.page().page);
@@ -559,7 +560,7 @@ test("a context a test's own fixture opens belongs to that test", async (t) => {
 
 test('a context that began outside a test and closes inside one counts as shared', async (t) => {
   const hooked = installed(t, { perTest: true });
-  hooked.scope[hooked.ns].hitCount = 1;
+  hooked.namespace().hitCount = 1;
   const created = await hooked.context();
   created.open(hooked.page().page);
   hooked.setTest('t1');
@@ -571,7 +572,7 @@ test('a context that began outside a test and closes inside one counts as shared
 
 test('without per-test coverage no context counts as shared', async (t) => {
   const hooked = installed(t, { perTest: false });
-  hooked.scope[hooked.ns].hitCount = 1;
+  hooked.namespace().hitCount = 1;
   hooked.setTest('t1');
   const created = await hooked.context();
   created.open(hooked.page().page);
@@ -584,13 +585,13 @@ test('without per-test coverage no context counts as shared', async (t) => {
 
 test('a page closed before its context is read first, once, and closes with its options', async (t) => {
   const hooked = installed(t, { perTest: false });
-  hooked.scope[hooked.ns].hitCount = 1;
+  hooked.namespace().hitCount = 1;
   const created = await hooked.context();
   const { page, closed } = hooked.page();
   created.open(page);
 
   await page.close({ reason: 'done' });
-  hooked.scope[hooked.ns].hitCount = 2;
+  hooked.namespace().hitCount = 2;
   await created.close();
 
   assert.deepEqual(closed, [{ reason: 'done' }]);
@@ -602,7 +603,7 @@ test('a page closed before its context is read first, once, and closes with its 
 
 test('a closing browser first collects every context it holds, and is patched once', async (t) => {
   const hooked = installed(t, { perTest: false });
-  hooked.scope[hooked.ns].hitCount = 1;
+  hooked.namespace().hitCount = 1;
   const owner = hooked.browser();
   const first = await hooked.context(owner);
   const patched = owner.browser.close;

@@ -1,5 +1,6 @@
 // A fake Playwright install that loadPlaywright resolves from the config's folder, as it resolves a real
 // one, with a fake TestRunner that plays what Playwright and the worker hook do.
+import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -8,7 +9,10 @@ import type { TestContext } from 'node:test';
 import type { FullResult, Reporter, TestCase } from '@playwright/test/reporter';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
-import type { RunTestsParams } from '../../src/playwright-internals.ts';
+import type {
+  RunTestsParams,
+  TestRunner,
+} from '../../src/playwright-internals.ts';
 import { PlaywrightTestRunner } from '../../src/playwright-test-runner.ts';
 import {
   RUN_SETTINGS,
@@ -16,6 +20,7 @@ import {
   serializeSnapshot,
   type SnapshotLine,
 } from '../../src/protocol.ts';
+import { CollectingReporter } from '../../src/reporter.ts';
 import { finishedTest, logger, strykerOptions } from './doubles.ts';
 
 export type Status = FullResult['status'];
@@ -40,7 +45,7 @@ interface WebServer {
 
 /** What one runTests call saw: its params, the run settings and the environment the workers get. */
 export interface Run {
-  reporter: Reporter;
+  reporter: CollectingReporter;
   params: RunTestsParams;
   settings: RunSettings;
   env: Record<string, string | undefined>;
@@ -102,12 +107,12 @@ export function fakePlaywright(
   const runs: Run[] = [];
   let stopRequested = Promise.withResolvers<void>();
 
-  class FakeTestRunner {
+  class FakeTestRunner implements TestRunner {
     constructor(configLocation: unknown, overrides: Record<string, unknown>) {
       calls.push(['new', configLocation, overrides]);
     }
 
-    async initialize(params: unknown) {
+    async initialize(params: Record<string, never>) {
       calls.push(['initialize', params]);
       await behaviour.initialize?.();
     }
@@ -123,15 +128,18 @@ export function fakePlaywright(
       };
     }
 
-    async listTests(reporter: Reporter, params: { projects?: string[] }) {
+    async listTests(
+      reporter: Reporter,
+      params: { projects?: string[] },
+    ): Promise<{ status: Status }> {
       calls.push(['listTests', params]);
       const listed = behaviour.listed ?? [];
-      reporter.onBegin?.({} as never, { allTests: () => listed } as never);
+      collecting(reporter).onBegin({}, { allTests: () => listed });
 
       return { status: 'passed' };
     }
 
-    async runGlobalSetup(reporters: Reporter[]) {
+    async runGlobalSetup(reporters: Reporter[]): Promise<{ status: Status }> {
       calls.push(['runGlobalSetup']);
 
       return {
@@ -154,7 +162,7 @@ export function fakePlaywright(
         ].map((name) => [name, process.env[name]]),
       );
       const run: Run = {
-        reporter,
+        reporter: collecting(reporter),
         params,
         env,
         settings: JSON.parse(env[RUN_SETTINGS] ?? 'null'),
@@ -234,8 +242,15 @@ export function fakePlaywright(
   };
 }
 
+/** The runner always hands Playwright a CollectingReporter. */
+function collecting(reporter: Reporter): CollectingReporter {
+  assert.ok(reporter instanceof CollectingReporter, 'a CollectingReporter');
+
+  return reporter;
+}
+
 export async function passAll(run: Run): Promise<Status> {
-  run.reporter.onTestEnd?.(finishedTest('a', 'passed'), {} as never);
+  run.reporter.onTestEnd(finishedTest('a', 'passed'));
   writeSnapshots(run, [
     {
       mutantCoverage: { static: {}, perTest: { a: { '1': 1 } } },

@@ -5,13 +5,13 @@ export class CollectingReporter {
   outputTail = '';
   // Playwright reports each attempt of a retried test with the same TestCase, which holds them all.
   readonly testCases = new Map<string, TestCase>();
-  private suite?: Suite;
+  private suite?: Pick<Suite, 'allTests'>;
 
   printsToStdio() {
     return false;
   }
 
-  onBegin(_config: unknown, suite: Suite) {
+  onBegin(_config: unknown, suite: Pick<Suite, 'allTests'>) {
     this.suite = suite;
   }
 

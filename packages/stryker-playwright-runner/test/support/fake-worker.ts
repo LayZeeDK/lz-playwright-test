@@ -55,10 +55,7 @@ export function fakeInstall(
 ) {
   const ns = `__hookTest${Math.random().toString(36).slice(2)}__`;
   const outDir = mkdtempSync(path.join(tmpdir(), 'worker-hook-install-'));
-  const scope = globalThis as unknown as Record<
-    string,
-    StrykerNamespace & Record<string, unknown>
-  >;
+  const scope: Record<string, unknown> = globalThis;
   prepare?.(outDir, ns);
   const exitListeners = process.listeners('exit');
   const previousMutant = process.env[ACTIVE_MUTANT];
@@ -191,7 +188,13 @@ export function fakeInstall(
 
   return {
     ns,
-    scope,
+    /** The worker's namespace, which install made or kept. */
+    namespace: (): StrykerNamespace => {
+      const found = scope[ns];
+      assert.ok(typeof found === 'object' && found !== null, 'a namespace');
+
+      return found;
+    },
     hooks,
     files: () => readdirSync(outDir),
     read: () => {
