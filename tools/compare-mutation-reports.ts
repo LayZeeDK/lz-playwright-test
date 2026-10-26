@@ -3,7 +3,8 @@
 // same files elsewhere (tools/packed-demo) compares with the workspace. Mutator names match with or without
 // the Lz prefix of the UI operators, so a report from before the lz- rename compares with one after it.
 // The report schema makes replacement optional; a missing one compares as empty.
-// Exits 0 when both list the same mutants, 1 when they differ, and 2 when a report cannot be read.
+// Exits 0 when both list the same mutants, 1 when they differ, and 2 on a usage error, a report it cannot
+// read, or a report that lists a mutant twice.
 // Run: node tools/compare-mutation-reports.ts <a/mutation.json> <b/mutation.json> [--status]
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -73,18 +74,35 @@ function mutantKeys(reportPath: string, withStatus: boolean): string[] {
   return keys;
 }
 
+function uniqueKeys(reportPath: string, withStatus: boolean): Set<string> {
+  const keys = mutantKeys(reportPath, withStatus);
+  const unique = new Set(keys);
+
+  if (unique.size !== keys.length) {
+    throw new Error(`${reportPath} lists a mutant twice`);
+  }
+
+  return unique;
+}
+
 function compare(args: string[]): number {
   const withStatus = args.includes('--status');
-  const [first, second] = args.filter((arg) => arg !== '--status');
+  const paths = args.filter((arg) => arg !== '--status');
+  const [first, second] = paths;
 
-  if (!first || !second) {
+  if (
+    !first ||
+    !second ||
+    paths.length !== 2 ||
+    paths.some((arg) => arg.startsWith('--'))
+  ) {
     throw new Error(
       'Usage: node tools/compare-mutation-reports.ts <a/mutation.json> <b/mutation.json> [--status]',
     );
   }
 
-  const a = new Set(mutantKeys(first, withStatus));
-  const b = new Set(mutantKeys(second, withStatus));
+  const a = uniqueKeys(first, withStatus);
+  const b = uniqueKeys(second, withStatus);
   const onlyA = [...a].filter((key) => !b.has(key));
   const onlyB = [...b].filter((key) => !a.has(key));
 
