@@ -11,6 +11,7 @@
     "lib": ["es2024", "dom"],
     "target": "es2024",
     "types": ["node"],
+    "importHelpers": false,
     "rewriteRelativeImportExtensions": true,
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true

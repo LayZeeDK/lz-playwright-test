@@ -35,6 +35,11 @@
   "devDependencies": {
     "@layzee/stryker-ui-mutators": "*"
   },
+  "nx": {
+    "tags": [
+      "type:lib"
+    ]
+  },
   "scripts": {
     "test": "node --conditions=@layzee/source --test test/runner.test.ts test/run-result.test.ts test/ui-mutators.test.ts"
   }

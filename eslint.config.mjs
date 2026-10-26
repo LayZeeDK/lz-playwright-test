@@ -1,5 +1,6 @@
 import nx from '@nx/eslint-plugin';
 import playwright from 'eslint-plugin-playwright';
+import jsoncParser from 'jsonc-eslint-parser';
 
 const playwrightRecommended = playwright.configs['flat/recommended'];
 
@@ -27,8 +28,16 @@ export default [
           allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$'],
           depConstraints: [
             {
-              sourceTag: '*',
-              onlyDependOnLibsWithTags: ['*'],
+              sourceTag: 'type:lib',
+              onlyDependOnLibsWithTags: ['type:lib'],
+            },
+            {
+              sourceTag: 'type:app',
+              onlyDependOnLibsWithTags: ['type:lib'],
+            },
+            {
+              sourceTag: 'type:e2e',
+              onlyDependOnLibsWithTags: ['type:app', 'type:lib'],
             },
           ],
         },
@@ -91,6 +100,23 @@ export default [
       'playwright/missing-playwright-await': [
         'error',
         { includePageLocatorMethods: true },
+      ],
+    },
+  },
+  {
+    files: ['packages/*/package.json'],
+    languageOptions: { parser: jsoncParser },
+    rules: {
+      '@nx/dependency-checks': [
+        'error',
+        {
+          // Core is the plugin host, resolved at run time rather than imported; Babel is imported for types only.
+          ignoredDependencies: ['@stryker-mutator/core', '@babel/core'],
+          ignoredFiles: [
+            '{projectRoot}/test/**',
+            '{projectRoot}/eslint.config.{js,cjs,mjs,ts,cts,mts}',
+          ],
+        },
       ],
     },
   },
