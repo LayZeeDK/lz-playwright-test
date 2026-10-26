@@ -105,11 +105,13 @@ function valueExpression(
 }
 
 function cleanedText(node: types.JSXText, t: BabelTypes): types.Expression {
+  // Stryker disable StringLiteral: equivalent, as t.react.buildChildren reads only the element's children
   const element = t.jsxElement(
     t.jsxOpeningElement(t.jsxIdentifier('x'), []),
     t.jsxClosingElement(t.jsxIdentifier('x')),
     [node],
   );
+  // Stryker restore StringLiteral
   const [child] = t.react.buildChildren(element);
 
   return t.isStringLiteral(child)

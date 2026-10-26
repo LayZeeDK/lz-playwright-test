@@ -132,17 +132,21 @@ function register(
 ): void {
   const { allMutators, expressionPlacer, types } = instrumenter;
   const registered = new Set(
+    // Stryker disable next-line MethodExpression: equivalent, as checkNames has thrown for any operator whose name an unmarked mutator has
     allMutators.filter((mutator) => OWN in mutator).map(({ name }) => name),
   );
 
+  // Stryker disable BooleanLiteral: equivalent, as every reader of the mark tests `OWN in`, not its value
   allMutators.push(
     ...operators
       .filter(({ name }) => !registered.has(name))
       .map((operator) => ({ ...toNodeMutator(operator, types), [OWN]: true })),
   );
+  // Stryker restore BooleanLiteral
 
   if (!(OWN in expressionPlacer)) {
     Object.assign(expressionPlacer, withJsxPlacement(expressionPlacer, types), {
+      // Stryker disable next-line BooleanLiteral: equivalent, as every reader of the mark tests `OWN in`, not its value
       [OWN]: true,
     });
   }

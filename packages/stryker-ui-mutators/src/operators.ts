@@ -344,6 +344,7 @@ function implicitRole(element: ElementSite): string | undefined {
     return element.attributes.has('href') ? 'link' : undefined;
   }
 
+  // Stryker disable next-line StringLiteral: equivalent, as IMPLICIT_ROLE has no key '' and no key 'Stryker was here!'
   return IMPLICIT_ROLE.get(element.name ?? '');
 }
 
