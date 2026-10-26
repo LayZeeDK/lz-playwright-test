@@ -72,23 +72,53 @@ test('a pid too large to be a safe integer is no pid', () => {
 
 test('on Linux the namespace token is the inode of the pid namespace and the host name', () => {
   const files: string[] = [];
-  const token = namespaceToken((file) => {
-    files.push(file);
+  const token = namespaceToken(
+    (file) => {
+      files.push(file);
 
-    return 4026531836;
-  }, 'ci-host');
+      return 4026531836;
+    },
+    'ci-host',
+    'linux',
+  );
 
   assert.equal(token, '4026531836@ci-host');
   assert.deepEqual(files, ['/proc/self/ns/pid']);
 });
 
-test('where there is no /proc the namespace token is the host name', () => {
+test("on Linux without /proc the namespace token is this runner's own, so no other runner matches it", () => {
   assert.equal(
-    namespaceToken(() => {
-      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
-    }, 'dev-box'),
-    'dev-box',
+    namespaceToken(
+      () => {
+        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      },
+      'ci-host',
+      'linux',
+      () => 'b7e4',
+    ),
+    'b7e4@ci-host',
   );
+});
+
+test('outside Linux the namespace token is the host name, and /proc is not looked up', () => {
+  const files: string[] = [];
+
+  for (const platform of ['win32', 'darwin'] as const) {
+    assert.equal(
+      namespaceToken(
+        (file) => {
+          files.push(file);
+
+          return 1;
+        },
+        'dev-box',
+        platform,
+      ),
+      'dev-box',
+    );
+  }
+
+  assert.deepEqual(files, []);
 });
 
 test('the namespace token of this process names its pid namespace where there is one, and this host', () => {
@@ -96,7 +126,9 @@ test('the namespace token of this process names its pid namespace where there is
 
   assert.equal(
     namespaceToken(),
-    existsSync(ns) ? `${statSync(ns).ino}@${os.hostname()}` : os.hostname(),
+    process.platform === 'linux'
+      ? `${statSync(ns).ino}@${os.hostname()}`
+      : os.hostname(),
   );
 });
 
@@ -257,6 +289,24 @@ test('a new root is named after the pid of the runner that owns it', () => {
     root.remove();
 
     assert.equal(existsSync(root.dir), false);
+  } finally {
+    cleanup();
+  }
+});
+
+test('a root whose owner file cannot be written is removed, and the write error is thrown', () => {
+  const { tmp, cleanup } = tmpWith([]);
+  const full = Object.assign(new Error('ENOSPC'), { code: 'ENOSPC' });
+
+  try {
+    assert.throws(
+      () =>
+        createTempRoot(tmp, 4242, TOKEN, () => {
+          throw full;
+        }),
+      (error) => error === full,
+    );
+    assert.deepEqual(readdirSync(tmp), []);
   } finally {
     cleanup();
   }

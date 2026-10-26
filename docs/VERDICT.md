@@ -358,9 +358,14 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   directory therefore holds an `owner` file with a token for the host, and on Linux for the PID
   namespace (the inode of `/proc/self/ns/pid`), and a runner removes only directories whose token is
   its own. Runners in containers that share `/tmp`, or on hosts that share an NFS temp directory, keep
-  one another's directories. A directory without a readable `owner` file is kept, including the
-  `stryker-playwright-<pid>-*` directories of runners from before the `owner` file; remove those by
-  hand.
+  one another's directories, provided those hosts have different host names: every Linux host's first
+  PID namespace has the same inode. On Linux without `/proc` the token is unique to the runner, so no
+  later runner removes its directory. A directory without a readable `owner` file is kept, including
+  the `stryker-playwright-<pid>-*` directories of runners from before the `owner` file; remove those
+  by hand. The root is removed again at once if its `owner` file cannot be written.
+- In a Stryker run started inside a Playwright worker, the worker hook of the inner runner installs
+  and an outer copy of the same hook stays out; a copy from before that rule installs too and counts
+  coverage twice.
 - Stryker gives a runner's `dispose` 2 s and then kills its process tree. The runner's `dispose` stops
   the tests and then runs global teardown, so a `globalTeardown` that needs more than what is left of
   the 2 s is cut off (inferred from the code, not run).

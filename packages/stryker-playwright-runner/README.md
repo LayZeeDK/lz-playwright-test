@@ -64,8 +64,9 @@ otherwise:
   directory, which `dispose` removes. A runner that Stryker killed first leaves that directory behind.
   The next runner to start removes it if the process that owned it no longer runs and the directory's
   `owner` file shows it was made on the same host (and, on Linux, in the same PID namespace). Runners
-  in containers that share `/tmp`, or on hosts that share a temp directory, never remove one another's
-  directories. A directory without a readable `owner` file is kept; remove it by hand.
+  in containers that share `/tmp`, or on hosts with different host names that share a temp directory,
+  never remove one another's directories. A directory without a readable `owner` file is kept, and so
+  is one a runner on Linux without `/proc` made; remove those by hand.
 - `maxFailures` is 1, unless Stryker's `disableBail` is on. `disableBail` cannot clear a `maxFailures`
   that the Playwright config sets.
 - In a mutant run, the per-test timeout is Stryker's timeout for the mutant less 5.6 s but at least

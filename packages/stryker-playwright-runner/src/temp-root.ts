@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -35,11 +36,18 @@ export function rootPid(name: string): number | undefined {
 export function namespaceToken(
   inode: (file: string) => number = (file) => fs.statSync(file).ino,
   host: string = os.hostname(),
+  platform: NodeJS.Platform = process.platform,
+  unique: () => string = randomUUID,
 ): string {
+  if (platform !== 'linux') {
+    return host;
+  }
+
   try {
     return `${inode('/proc/self/ns/pid')}@${host}`;
   } catch {
-    return host;
+    // Without /proc another runner here may sit in another PID namespace, so no other runner may match.
+    return `${unique()}@${host}`;
   }
 }
 
@@ -131,13 +139,20 @@ export function createTempRoot(
   tmp: string = os.tmpdir(),
   pid: number = process.pid,
   token: string = namespaceToken(),
+  writeFile: (file: string, data: string) => void = fs.writeFileSync,
 ): TempRoot {
   const dir = fs.mkdtempSync(path.join(tmp, `${ROOT_PREFIX}${pid}-`));
   const outputDir = path.join(dir, 'output');
   const runsDir = path.join(dir, 'runs');
   let runs = 0;
-  fs.writeFileSync(path.join(dir, OWNER_FILE), token);
-  fs.mkdirSync(runsDir);
+
+  try {
+    writeFile(path.join(dir, OWNER_FILE), token);
+    fs.mkdirSync(runsDir);
+  } catch (error) {
+    removeDir(dir);
+    throw error;
+  }
 
   return {
     dir,
