@@ -2,12 +2,38 @@
   "name": "@layzee/demo-app-e2e",
   "version": "0.0.1",
   "private": true,
+  "devDependencies": {
+    "@layzee/stryker-playwright-runner": "*",
+    "@layzee/stryker-ui-mutators": "*"
+  },
   "nx": {
     "tags": [
       "type:e2e"
     ],
     "implicitDependencies": [
       "@layzee/demo-app"
-    ]
+    ],
+    "targets": {
+      "mutate-e2e": {
+        "command": "stryker run stryker.e2e.config.ts",
+        "options": {
+          "cwd": "{workspaceRoot}"
+        },
+        "dependsOn": [
+          "^build"
+        ],
+        "cache": false
+      },
+      "mutate-e2e-ui": {
+        "command": "stryker run stryker.e2e.ui.config.ts",
+        "options": {
+          "cwd": "{workspaceRoot}"
+        },
+        "dependsOn": [
+          "^build"
+        ],
+        "cache": false
+      }
+    }
   }
 }

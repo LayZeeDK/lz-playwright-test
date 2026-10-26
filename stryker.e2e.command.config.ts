@@ -18,4 +18,6 @@ export default {
     fileName: `reports/e2e-command-${define ? 'define' : 'off'}/mutation.json`,
   },
   tempDirName: '.stryker-tmp',
+  // A copied .nx/workspace-data sends the sandbox's Nx to this workspace's daemon, which refuses it.
+  ignorePatterns: ['/.nx', '/.claude', '/.stryker-tmp-*'],
 } satisfies PartialStrykerOptions;

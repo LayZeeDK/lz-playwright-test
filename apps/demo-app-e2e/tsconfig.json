@@ -22,5 +22,13 @@
     "eslint.config.js",
     "eslint.config.mjs",
     "eslint.config.cjs"
+  ],
+  "references": [
+    {
+      "path": "../../packages/stryker-ui-mutators"
+    },
+    {
+      "path": "../../packages/stryker-playwright-runner"
+    }
   ]
 }
