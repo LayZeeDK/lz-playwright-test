@@ -5,7 +5,8 @@ the UI operators on the two packed packages, with no workspace links. `docs/VERD
 result. The configs are plain JavaScript versions of the demo's Vite, Playwright and `stryker.e2e.ui.config.ts`
 settings, without Nx.
 
-From the repo root, with `<scratch>` a new folder outside the repo:
+From the repo root, with `<scratch>` the absolute path of a new folder outside the repo (the two `npm pack`
+lines run from a package folder):
 
 ```sh
 npx nx run-many -t build
@@ -18,11 +19,20 @@ cp apps/demo-app-e2e/src/*.spec.ts <scratch>/e2e/
 (cd packages/lz-stryker-ui-mutators && npm pack --pack-destination <scratch>/tarballs)
 cd <scratch>
 npm install
+npx playwright install chromium
 node --no-experimental-strip-types --input-type=module -e "await import('@layzee/lz-stryker-playwright-runner'); await import('@layzee/lz-stryker-ui-mutators')"
 npx playwright test
 npx stryker run stryker.config.mjs
 ```
 
-The `node` line imports both packages with type stripping turned off, so it fails if anything in them is
-TypeScript. The dev server listens on 127.0.0.1, on port 4500 outside Stryker and 4600 plus the worker number
-under it.
+The story file belongs to the component tests, which this project does not run. The `node` line imports both
+packages with type stripping turned off, so it fails if anything in them is TypeScript. The dev server listens
+on 127.0.0.1, on port 4500 outside Stryker and 4600 plus the worker number under it.
+
+To compare the result with the workspace's own run of `stryker.e2e.ui.config.ts`, from the repo root:
+
+```sh
+node tools/compare-mutation-reports.ts reports/e2e-ui/mutation.json <scratch>/reports/mutation.json --status
+```
+
+It exits 0 when both reports list the same mutants with the same statuses.

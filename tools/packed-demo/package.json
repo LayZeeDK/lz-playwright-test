@@ -1,5 +1,5 @@
 {
-  "name": "demo-pack",
+  "name": "packed-demo",
   "private": true,
   "type": "module",
   "dependencies": {
