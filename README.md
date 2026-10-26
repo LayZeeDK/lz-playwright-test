@@ -116,6 +116,8 @@ npx nx run @layzee/stryker-ui-mutators:test
 
 To run Stryker on the demo app, use `npx nx run @layzee/demo-app-e2e:mutate-e2e`,
 `npx nx run @layzee/demo-app-e2e:mutate-e2e-ui`, or `npx nx run @layzee/demo-app:mutate-ct`. Each target builds
-both packages first, because Stryker loads them from their `dist` folders. The Rerun section of
+both packages first, because Stryker loads them from their `dist` folders. `stryker.e2e.command.config.ts`
+has no target: it loads neither package, so it needs no build, and it runs once per `STRYKER_BASELINE`
+value. The Rerun section of
 `docs/VERDICT.md` lists the commands for the measured rows, and `oss/README.md` gives the steps for the
 open-source copies.
