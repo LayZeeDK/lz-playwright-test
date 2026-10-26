@@ -63,11 +63,9 @@ test('a Playwright worker outside a Stryker run loads the hook and installs noth
     // A path that ends like Playwright's worker entry, so only the run-settings check keeps the hook out.
     const entry = path.join(dir, 'playwright/lib/worker/workerProcessEntry.js');
     mkdirSync(path.dirname(entry), { recursive: true });
-    writeFileSync(
-      entry,
-      `console.log(JSON.stringify(globalThis[${JSON.stringify(INSTRUMENTER_CONSTANTS.NAMESPACE)}] ?? null));`,
-    );
+    writeFileSync(entry, `console.log('entry ran');`);
 
+    // An install without run settings throws at import, before the entry runs.
     const child = spawnSync(
       process.execPath,
       [
@@ -77,12 +75,14 @@ test('a Playwright worker outside a Stryker run loads the hook and installs noth
       ],
       {
         encoding: 'utf8',
+        // The child keeps NODE_OPTIONS: under Stryker, the test runner's preload there reports the
+        // coverage the gate makes in the child.
         env: { ...process.env, [RUN_SETTINGS]: undefined },
       },
     );
 
     assert.equal(child.status, 0, child.stderr);
-    assert.equal(child.stdout.trim(), 'null');
+    assert.equal(child.stdout.trim(), 'entry ran');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -91,17 +91,18 @@ test('a Playwright worker outside a Stryker run loads the hook and installs noth
 test('during a run the hook installs in the main thread of a Playwright worker, not in its threads', (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), 'worker-hook-gate-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const ns = JSON.stringify(INSTRUMENTER_CONSTANTS.NAMESPACE);
   const files: Record<string, string> = {
     'node_modules/playwright/test.js':
       'exports.test = { info() { throw new Error("no test"); } };',
     'node_modules/playwright-core/package.json': '{"main":"index.js"}',
-    'node_modules/playwright-core/index.js':
-      'exports._instrumentation = { addListener() {} };',
+    // Every install adds one listener, so each line is one install.
+    'node_modules/playwright-core/index.js': [
+      `const { isMainThread } = require('node:worker_threads');`,
+      `exports._instrumentation = { addListener() { console.log(isMainThread ? 'main' : 'thread'); } };`,
+    ].join('\n'),
     // The thread runs this same file, so its argv[1] is the worker entry too.
     'playwright/lib/worker/workerProcessEntry.js': [
       `const { isMainThread, Worker } = require('node:worker_threads');`,
-      `console.log(typeof globalThis[${ns}]);`,
       `if (isMainThread) new Worker(__filename);`,
     ].join('\n'),
   };
@@ -131,7 +132,7 @@ test('during a run the hook installs in the main thread of a Playwright worker, 
   );
 
   assert.equal(child.status, 0, child.stderr);
-  assert.deepEqual(child.stdout.trim().split(/\r?\n/), ['object', 'undefined']);
+  assert.equal(child.stdout.trim(), 'main');
   assert.equal(readdirSync(outDir).length, 1);
 });
 
