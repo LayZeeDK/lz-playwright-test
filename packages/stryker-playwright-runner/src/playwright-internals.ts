@@ -211,11 +211,26 @@ export interface RunningSlot {
 
 /**
  * What the timeout manager of a TestInfo runs now (TestInfo._timeoutManager._running.runnable).
- * Undefined when it runs nothing, or when Playwright no longer has that shape.
+ * Undefined when there is no TestInfo or its timeout manager runs nothing known; throws when a
+ * TestInfo has no timeout manager.
  */
-export function runningSlotOf(testInfo: unknown): RunningSlot | undefined {
-  const manager = isRecord(testInfo) ? testInfo._timeoutManager : undefined;
-  const running = isRecord(manager) ? manager._running : undefined;
+export function runningSlotOf(
+  testInfo: unknown,
+  version: string,
+): RunningSlot | undefined {
+  if (!isRecord(testInfo)) {
+    return undefined;
+  }
+
+  const manager = testInfo._timeoutManager;
+
+  if (!isRecord(manager)) {
+    throw new Error(
+      `Playwright ${version} changed the internals this runner calls (TestInfo._timeoutManager, which tells a test from the hooks and fixtures that serve a group).`,
+    );
+  }
+
+  const running = manager._running;
   const runnable = isRecord(running) ? running.runnable : undefined;
 
   if (!isRecord(runnable) || !isSlotType(runnable.type)) {

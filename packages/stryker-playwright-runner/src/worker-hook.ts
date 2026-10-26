@@ -254,7 +254,7 @@ const GROUP_HOOKS: ReadonlySet<SlotType> = new Set(['beforeAll', 'afterAll']);
 /** The test that Node code running now belongs to: none in a beforeAll or afterAll hook or a fixture. */
 function nodeTestId(test: Test): string | undefined {
   const info = testInfoOf(test);
-  const slot = runningSlotOf(info);
+  const slot = info && runningSlotOf(info, info.config.version);
 
   return slot && !slot.inFixture && PER_TEST_SLOTS.has(slot.type)
     ? info?.testId
@@ -264,7 +264,7 @@ function nodeTestId(test: Test): string | undefined {
 /** The test a context opened or closed now belongs to: a test's own fixtures open its context. */
 function contextTestId(test: Test): string | undefined {
   const info = testInfoOf(test);
-  const type = runningSlotOf(info)?.type;
+  const type = info && runningSlotOf(info, info.config.version)?.type;
 
   return type !== undefined && GROUP_HOOKS.has(type) ? undefined : info?.testId;
 }

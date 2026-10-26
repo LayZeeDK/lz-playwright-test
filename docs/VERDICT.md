@@ -317,7 +317,9 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   undocumented. The runner checks the first three at startup and fails with an error that lists them.
   A moved worker entry leaves the hook uninstalled, and a missing `_instrumentation` makes the hook throw
   in the worker. Either one fails the dry run. A missing `_parallelMode` stops the runner with an error
-  that names it. A missing `_timeoutManager` fails nothing: all Node coverage then counts as static.
+  that names it. A missing `_timeoutManager` makes the hook throw an error that names it and the
+  Playwright version when instrumented code or a new browser context asks for the current test. That
+  happens only in a `perTest` dry run, and fails it.
 - The runner also sets `PLAYWRIGHT_NO_COPY_PROMPT`, an environment variable that Playwright reads but
   does not document, to turn off the page snapshot for its error prompt. If a release renames or drops
   that variable, nothing fails. A timed-out mutant run then takes about 12.5 s on an 8 s budget again,
@@ -407,9 +409,10 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
 - Node coverage in a test worker counts for a test only while Playwright runs that test's body or its
   `beforeEach` and `afterEach` hooks. Coverage from `beforeAll` and `afterAll` hooks and from fixture
   setup and teardown, test-scoped fixtures included, counts as static, so Stryker runs every test for
-  those mutants. The runner reads that from Playwright's internal `TestInfo._timeoutManager`; if a
-  Playwright release drops it, all Node coverage counts as static. Node coverage from a worker that Playwright force-kills (no heartbeat for 5 min) is
-  lost, and code in Playwright's loader process or the `webServer` gets none.
+  those mutants. The runner reads that from Playwright's internal `TestInfo._timeoutManager` and fails
+  the dry run if a Playwright release drops it. Node coverage from a worker that Playwright force-kills
+  (no heartbeat for 5 min) is lost, and code in Playwright's loader process or the `webServer` gets
+  none.
 - An infinite loop in a test worker's own Node code, outside a page, blocks that worker. Neither the
   per-test timeout nor the runner's stop ends it; `stopTests()` waits until Playwright force-kills the
   worker after 5 minutes without a heartbeat (measured once, before the worker counted hits: 357 s

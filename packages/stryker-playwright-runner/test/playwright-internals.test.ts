@@ -110,12 +110,15 @@ test("the running slot is read from the TestInfo's timeout manager", () => {
     _timeoutManager: { _running: { runnable } },
   });
 
-  assert.deepEqual(runningSlotOf(info({ type: 'beforeAll' })), {
+  assert.deepEqual(runningSlotOf(info({ type: 'beforeAll' }), '1.64.1'), {
     type: 'beforeAll',
     inFixture: false,
   });
   assert.deepEqual(
-    runningSlotOf(info({ type: 'test', fixture: { title: 'server' } })),
+    runningSlotOf(
+      info({ type: 'test', fixture: { title: 'server' } }),
+      '1.64.1',
+    ),
     { type: 'test', inFixture: true },
   );
 });
@@ -134,18 +137,19 @@ test("every runnable type of Playwright's timeout manager is a slot", () => {
     'fixme',
   ]) {
     assert.deepEqual(
-      runningSlotOf({ _timeoutManager: { _running: { runnable: { type } } } }),
+      runningSlotOf(
+        { _timeoutManager: { _running: { runnable: { type } } } },
+        '1.64.1',
+      ),
       { type, inFixture: false },
     );
   }
 });
 
-test('a TestInfo without that shape, or with nothing running, has no running slot', () => {
+test('no TestInfo, or a timeout manager that runs nothing known, has no running slot', () => {
   for (const testInfo of [
     undefined,
     null,
-    {},
-    { _timeoutManager: null },
     { _timeoutManager: {} },
     { _timeoutManager: { _running: null } },
     { _timeoutManager: { _running: {} } },
@@ -153,7 +157,28 @@ test('a TestInfo without that shape, or with nothing running, has no running slo
     { _timeoutManager: { _running: { runnable: { type: 1 } } } },
     { _timeoutManager: { _running: { runnable: { type: 'beforeSome' } } } },
   ]) {
-    assert.equal(runningSlotOf(testInfo), undefined, JSON.stringify(testInfo));
+    assert.equal(
+      runningSlotOf(testInfo, '1.64.1'),
+      undefined,
+      JSON.stringify(testInfo),
+    );
+  }
+});
+
+test('a TestInfo without an object timeout manager fails loudly, naming the internal and the version', () => {
+  for (const testInfo of [
+    {},
+    { _timeoutManager: null },
+    { _timeoutManager: 'manager' },
+  ]) {
+    assert.throws(
+      () => runningSlotOf(testInfo, '1.99.0'),
+      {
+        message:
+          /^Playwright 1\.99\.0 changed the internals this runner calls \(TestInfo\._timeoutManager, /,
+      },
+      JSON.stringify(testInfo),
+    );
   }
 });
 

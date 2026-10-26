@@ -73,7 +73,11 @@ export function fakeInstall(
         );
       }
 
-      return { testId: running, _timeoutManager: { _running: { runnable } } };
+      return {
+        testId: running,
+        config: { version: '1.64.1' },
+        _timeoutManager: { _running: { runnable } },
+      };
     },
   };
   const modules: Record<string, unknown> = {
