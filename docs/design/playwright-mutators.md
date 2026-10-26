@@ -342,9 +342,9 @@ level is a new concept in the StrykerJS schema that every built-in would need a 
 The built package has gone through `stryker run` with a browser on the demo app and on a copy of
 epic-stack, and a Playwright test kills a mutant of every operator in
 `packages/stryker-playwright-runner/test/browser/ui-mutators.test.ts`. `docs/VERDICT.md` (Evidence)
-has the counts. Two risks remain from those runs. On a server-rendered app the runner activates the mutant in
-the browser only, so a text or element mutant breaks hydration and is killed by an unrelated step,
-and an attribute mutant never reaches the DOM (VERDICT, Limits). And three operators,
+has the counts. Two risks remain from those runs. On a server-rendered app the runner activates the
+mutant in the browser only, so a text or element mutant breaks hydration and is killed by an
+unrelated step, and an attribute mutant never reaches the DOM (VERDICT, Limits). And three operators,
 `EventHandler`, `HiddenAttribute`, and `StateAttribute`, have had no site in a real app yet, only in
 the test fixture.
 
@@ -388,9 +388,9 @@ decides each operator.
    is the placement test in `packages/stryker-ui-mutators/test/`. On the demo app, with
    `actionTimeout` set, none of the 17 UI mutants is equivalent or an error, and without it 3 kills
    show as Timeout. In `packages/stryker-playwright-runner/test/browser/ui-mutators.test.ts` a
-   written test kills a mutant of each operator. A copy of epic-stack, outside the bar's scope, adds the first real
-   ratios: 1 equivalent and 0 errors among 45 UI mutants, the equivalent one a `ConditionalElement`
-   (1 of 8 for that operator). Three operators have had no site in a real app yet, so the limit stays
+   written test kills a mutant of each operator. A copy of epic-stack, outside the bar's scope, adds
+   the first real ratios: 1 equivalent and 0 errors among 45 UI mutants, the equivalent one a
+   `ConditionalElement` (1 of 8 for that operator). Three operators have had no site in a real app yet, so the limit stays
    a starting value.
 
 ## Rerun the evidence
