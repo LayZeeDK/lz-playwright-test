@@ -1,6 +1,6 @@
 // Route 2: the config imports the package and lists nothing.
 import './break.ts';
-import '@layzee/stryker-ui-mutators';
+import '@layzee/lz-stryker-ui-mutators';
 
 export default {
   mutate: ['src.tsx'],

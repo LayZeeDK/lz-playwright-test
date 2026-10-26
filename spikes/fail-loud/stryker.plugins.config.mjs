@@ -3,8 +3,8 @@ import './break.ts';
 
 export default {
   mutate: ['src.tsx'],
-  plugins: ['@layzee/stryker-ui-mutators'],
-  ignorers: ['ui-mutators'],
+  plugins: ['@layzee/lz-stryker-ui-mutators'],
+  ignorers: ['lz-stryker-ui-mutators'],
   testRunner: 'command',
   commandRunner: { command: 'node -e "process.exit(0)"' },
   concurrency: 1,

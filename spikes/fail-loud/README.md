@@ -2,8 +2,8 @@
 
 The design (`docs/design/playwright-mutators.md`, "What the verification plan adds", step 2) asks for a run
 that breaks one operator's sample on purpose and shows that `stryker run` stops with that operator's name,
-once per route. `break.ts` gives `TextLiteral` a sample it cannot mutate when `SPIKE_BROKEN=1`. A config's own
-imports run before core loads `plugins`, so the real `@layzee/stryker-ui-mutators` specifier installs the
+once per route. `break.ts` gives `LzTextLiteral` a sample it cannot mutate when `SPIKE_BROKEN=1`. A config's own
+imports run before core loads `plugins`, so the real `@layzee/lz-stryker-ui-mutators` specifier installs the
 broken table on both routes. With `SPIKE_BROKEN=0` the same runs are the control, and their JSON reports show
 whether the UI operators reach a real run (the gate under "Risks that remain").
 
