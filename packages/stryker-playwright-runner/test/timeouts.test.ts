@@ -1,13 +1,16 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { type TestContext, test } from 'node:test';
 
 import {
+  armDeadline,
   assertionTimeoutWarning,
   configTimeouts,
   DEFAULT_EXPECT_TIMEOUT_MS,
   MIN_TEST_TIMEOUT_MS,
   mutantRunBudget,
   RUN_START_MS,
+  STOP_HEADROOM_MS,
+  STOP_RETRY_MS,
   timeoutReason,
 } from '../src/timeouts.ts';
 
@@ -60,8 +63,8 @@ test('the assertion warning fires below twice the expect timeout', () => {
 
 test('a mutant run gets the timeout less the headroom as its test timeout, and a deadline', () => {
   assert.deepEqual(mutantRunBudget(8000, uncapped), {
-    testTimeout: 3000,
-    deadlineMs: 6000,
+    testTimeout: 2400,
+    deadlineMs: 5400,
   });
 });
 
@@ -79,6 +82,13 @@ test('the test timeout keeps its floor and the config cap', () => {
 
 test('no deadline when it would leave too little time for a test to finish', () => {
   assert.equal(mutantRunBudget(4500, uncapped).deadlineMs, undefined);
+  assert.equal(
+    mutantRunBudget(
+      RUN_START_MS + MIN_TEST_TIMEOUT_MS + STOP_HEADROOM_MS - 1,
+      uncapped,
+    ).deadlineMs,
+    undefined,
+  );
 });
 
 test('the deadline never comes before a test that starts on time hits its own timeout', () => {
@@ -94,21 +104,131 @@ test('the deadline never comes before a test that starts on time hits its own ti
   }
 });
 
+const noTimeout = {
+  mutantRun: true,
+  killed: false,
+  testTimedOut: false,
+  stoppedAtDeadline: false,
+};
+
 test('a kill outranks a per-test timeout, which counts only in a mutant run', () => {
   assert.equal(
-    timeoutReason({ mutantRun: true, killed: true, testTimedOut: true }),
+    timeoutReason({ ...noTimeout, killed: true, testTimedOut: true }),
     undefined,
   );
   assert.equal(
-    timeoutReason({ mutantRun: true, killed: false, testTimedOut: true }),
+    timeoutReason({ ...noTimeout, testTimedOut: true }),
     'A test hit its timeout',
   );
   assert.equal(
-    timeoutReason({ mutantRun: false, killed: false, testTimedOut: true }),
+    timeoutReason({ ...noTimeout, mutantRun: false, testTimedOut: true }),
     undefined,
+  );
+  assert.equal(timeoutReason(noTimeout), undefined);
+});
+
+test('a deadline stop is a Timeout in either run kind, unless a test killed the mutant', () => {
+  const reason =
+    "The run reached the runner's deadline before Stryker's timeout";
+
+  assert.equal(
+    timeoutReason({ ...noTimeout, stoppedAtDeadline: true }),
+    reason,
   );
   assert.equal(
-    timeoutReason({ mutantRun: true, killed: false, testTimedOut: false }),
+    timeoutReason({ ...noTimeout, mutantRun: false, stoppedAtDeadline: true }),
+    reason,
+  );
+  assert.equal(
+    timeoutReason({
+      ...noTimeout,
+      stoppedAtDeadline: true,
+      testTimedOut: true,
+    }),
+    reason,
+  );
+  assert.equal(
+    timeoutReason({ ...noTimeout, stoppedAtDeadline: true, killed: true }),
     undefined,
   );
+});
+
+// A deadline over a fake clock that the mocked timers move.
+function armed(t: TestContext, at: number | undefined) {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  let clock = 0;
+  const calls: number[] = [];
+  const deadline = armDeadline(
+    at,
+    async () => {
+      calls.push(clock);
+    },
+    () => clock,
+  );
+  const tick = (ms: number) => {
+    clock += ms;
+    t.mock.timers.tick(ms);
+  };
+
+  return { deadline, calls, tick };
+}
+
+test('a deadline calls stop when it passes, and not before', (t) => {
+  const { deadline, calls, tick } = armed(t, 6000);
+
+  tick(5999);
+
+  assert.deepEqual(calls, []);
+  assert.equal(deadline.firedAt, undefined);
+
+  tick(1);
+
+  assert.deepEqual(calls, [6000]);
+  assert.equal(deadline.firedAt, 6000);
+  deadline.disarm();
+});
+
+test('a deadline repeats stop until it is disarmed, since Playwright ignores it during config load', (t) => {
+  const { deadline, calls, tick } = armed(t, 1000);
+
+  tick(1000);
+  tick(STOP_RETRY_MS);
+  tick(STOP_RETRY_MS);
+  deadline.disarm();
+  tick(STOP_RETRY_MS * 10);
+
+  assert.deepEqual(calls, [1000, 1100, 1200]);
+});
+
+test('a deadline disarmed before it passes never calls stop', (t) => {
+  const { deadline, calls, tick } = armed(t, 1000);
+
+  deadline.disarm();
+  tick(5000);
+
+  assert.deepEqual(calls, []);
+  assert.equal(deadline.firedAt, undefined);
+});
+
+test('no deadline never calls stop', (t) => {
+  const { deadline, calls, tick } = armed(t, undefined);
+
+  tick(2 ** 31);
+
+  assert.deepEqual(calls, []);
+  assert.equal(deadline.firedAt, undefined);
+  deadline.disarm();
+});
+
+test('a deadline further off than setTimeout can wait is clamped, not fired at once', (t) => {
+  const { deadline, calls, tick } = armed(t, 2 ** 33);
+
+  tick(1);
+
+  assert.deepEqual(calls, []);
+
+  tick(2 ** 31 - 2);
+
+  assert.equal(calls.length, 1);
+  deadline.disarm();
 });

@@ -16,6 +16,13 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  // Lets a test tell a restarted server from the one it saw before.
+  if (request.url === '/__pid') {
+    response.end(String(process.pid));
+
+    return;
+  }
+
   const file = new URL(
     request.url === '/' ? '/index.html' : (request.url ?? '/'),
     'http://x',

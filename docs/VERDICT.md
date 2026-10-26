@@ -57,14 +57,18 @@ tests cover all ten. The plugin patches StrykerJS internals, so it supports Stry
   whose context stays open, skip the before-close hook for what they close, so the hook reads those
   pages first. The dry run warns about frames that did not answer in time and logs how much coverage
   came from shared contexts.
-- Each mutant run passes Stryker's timeout, less 5 s but at least 2 s, to Playwright as the per-test
-  timeout. A test that hits that timeout makes the mutant a Timeout. If the looping test starts within
-  about the first 3 s of the run and does not raise its own timeout, an infinite loop with no hit limit
-  ends inside Playwright, and the worker and `webServer` stay up. The 5 s is a 3 s budget for the run
-  to start plus 2 s for reading coverage from the hung page, so a test that starts later runs past
-  Stryker's timer (inferred from the constants in `timeouts.ts`). Stryker's own timer
-  still applies. When it fires, the runner stops the Playwright run, Stryker kills the worker's process
-  tree, and a fresh worker starts.
+- Each mutant run passes Stryker's timeout, less 5.6 s but at least 2 s, to Playwright as the per-test
+  timeout. A test that hits that timeout makes the mutant a Timeout. The 5.6 s is a 3 s budget for the
+  run to start plus 2.6 s to stop: the hook's 2 s read of the hung page, the context close and the
+  worker exit.
+- The runner also stops a mutant run itself (`stopTests()`) 2.6 s before Stryker's timeout, and reports
+  a Timeout unless a test already killed the mutant. That covers a looping test that starts late or
+  raises its own timeout with `test.slow()`, `test.setTimeout()` or `describe.configure({ timeout })`.
+  In both cases the infinite loop ends inside Playwright, and the worker and `webServer` stay up. The
+  browser test for it stopped an 8 s run in 8.1 s or less: the stop after the deadline took 2078 to
+  2096 ms in 8 of 9 runs and 6519 ms once, so the stop takes about 2.1 s but can take longer. A run
+  that outlasts the stop still meets Stryker's own timer: Stryker kills the worker's process tree, and
+  a fresh worker starts.
 - Every run turns off the page snapshot that Playwright takes of a failed test for its error prompt
   (`PLAYWRIGHT_NO_COPY_PROMPT`). On a page stuck in a loop, that snapshot waits out a 5 s timeout. With
   the snapshot on, a timed-out run took 12.5 s on an 8 s budget, past Stryker's timer. With it off, the
@@ -395,13 +399,9 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   runs against them. Even with `'off'`, the dry run needs at least one test that loads instrumented code
   in a page. A suite in which no page loads instrumented code fails the dry run.
 - A timeout that reaches Stryker's own timer costs a full init: config load, global setup, and a
-  `webServer` start, including any build that start runs. That happens when the looping test starts
-  late in the run, or raises its own timeout with `test.slow()`, `test.setTimeout()`, or
-  `describe.configure({ timeout })`, which outrank the per-test timeout the runner sets. A run-level
-  timer that calls `stopTests()` could close this gap. `stopTests()` ends the Playwright run at once
-  with the status `interrupted`, which the runner reports as an Error, so such a timer also needs its
-  own Timeout result (read from Playwright's source, not run). How long Playwright's workers then take
-  to shut down on a page stuck in a loop is not measured.
+  `webServer` start, including any build that start runs. With the runner's own stop that happens only
+  when the stop takes longer than 2.6 s (once in 9 measured runs), in a dry run, or when a loop runs at
+  module load in Playwright's loader process, which `stopTests()` waits for (inferred, not run).
 - A project that already bakes the active mutant into its build (a Vite `define` of
   `globalThis.__stryker__.activeMutant`) overwrites the runner's value: remove that workaround first.
   The hello-world repo scored 0 of 7 until it was removed.

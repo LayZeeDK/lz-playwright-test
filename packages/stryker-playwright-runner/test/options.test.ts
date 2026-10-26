@@ -66,7 +66,7 @@ test('the README lists exactly the options the schema has', () => {
 
 test('the README states the per-test timeout the runner sets', () => {
   const [, headroom, floor] =
-    /less (\d+) s but at least (\d+) s/.exec(readmeOptions ?? '') ?? [];
+    /less ([\d.]+) s but at least ([\d.]+) s/.exec(readmeOptions ?? '') ?? [];
 
   assert.equal(Number(headroom) * 1000, TEST_TIMEOUT_HEADROOM_MS);
   assert.equal(Number(floor) * 1000, MIN_TEST_TIMEOUT_MS);

@@ -181,7 +181,7 @@ test('init removes the temp roots of dead runners and leaves those of the old sc
 });
 
 test('dry run completes with every test passing', () => {
-  assert.equal(tests.length, 10);
+  assert.equal(tests.length, 11);
   assert.ok(
     tests.every((t) => t.status === TestStatus.Success),
     JSON.stringify(tests),
@@ -364,6 +364,39 @@ test('an infinite loop trips the hit limit and reports a timeout', async () => {
     result.status === MutantRunStatus.Timeout ? (result.reason ?? '') : '',
     /Hit limit reached/,
   );
+});
+
+test('a loop in a test that raised its own timeout stops at the deadline, without a new init', async () => {
+  const serverPid = () =>
+    fetch('http://localhost:4321/__pid').then((response) => response.text());
+  const before = await serverPid();
+  const started = performance.now();
+  const timedOut = await runner.mutantRun({
+    activeMutant: mutant('UpdateOperator', 'i--'),
+    testFilter: [testId('counts to three under a raised timeout')],
+    timeout: 8000,
+    disableBail: false,
+    mutantActivation: 'runtime',
+    reloadEnvironment: false,
+    sandboxFileName: fixture('src/app.js'),
+  });
+  const elapsed = performance.now() - started;
+  const killed = await mutantRun(mutant('ArithmeticOperator', 'a - b'), {
+    testFilter: [testId('shows the greeting')],
+  });
+
+  assert.equal(
+    timedOut.status,
+    MutantRunStatus.Timeout,
+    JSON.stringify(timedOut),
+  );
+  assert.match(
+    timedOut.status === MutantRunStatus.Timeout ? (timedOut.reason ?? '') : '',
+    /deadline/,
+  );
+  assert.ok(elapsed < 8000, `stopped run took ${Math.round(elapsed)} ms`);
+  assert.equal(killed.status, MutantRunStatus.Killed, JSON.stringify(killed));
+  assert.equal(await serverPid(), before, 'the same webServer still serves');
 });
 
 test('a webServer that dies between runs is restarted instead of failing every test', async () => {

@@ -57,8 +57,11 @@ On every run, these settings replace the ones in the Playwright config, except w
   killed first leaves that directory behind; the next runner to start removes it.
 - `maxFailures` is 1, unless Stryker's `disableBail` is on. `disableBail` cannot clear a `maxFailures` that
   the Playwright config sets.
-- In a mutant run, the per-test timeout is Stryker's timeout for the mutant less 5 s but at least 2 s,
+- In a mutant run, the per-test timeout is Stryker's timeout for the mutant less 5.6 s but at least 2 s,
   capped at the largest test timeout in the Playwright config. The dry run keeps the config's timeouts.
+- A mutant run that is still going 2.6 s before Stryker's timeout is stopped, and the mutant is a Timeout
+  unless a test already killed it. This catches a looping test that raised its own timeout, which
+  outranks the per-test timeout. The dry run has no such stop.
 - `retries` is 0 and `repeatEach` is 1. Playwright's `TestRunner.runTests` sets these two, not the runner.
   Retries set with `describe.configure({ retries })` still apply.
 

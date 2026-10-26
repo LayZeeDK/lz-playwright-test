@@ -45,6 +45,7 @@ import {
   type TempRoot,
 } from './temp-root.ts';
 import {
+  armDeadline,
   assertionTimeoutWarning,
   type ConfigTimeouts,
   configTimeouts,
@@ -208,16 +209,22 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     return this.session;
   }
 
+  // The deadline starts here: the server probe, a restart and a second runOnce all count against
+  // Stryker's one timer.
   private async run(session: Session, request: RunRequest): Promise<RunOutput> {
+    const deadlineAt =
+      request.budget.deadlineMs === undefined
+        ? undefined
+        : performance.now() + request.budget.deadlineMs;
     await this.restartDeadServers(session);
-    let output = await this.runOnce(session, request);
+    let output = await this.runOnce(session, request, deadlineAt);
 
     // A server that died during this run fails its tests for a reason the mutant did not cause.
     if (
       mayHaveLostItsServer(output) &&
       (await this.restartDeadServers(session))
     ) {
-      output = await this.runOnce(session, request);
+      output = await this.runOnce(session, request, deadlineAt);
     }
 
     return output;
@@ -226,9 +233,13 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   private async runOnce(
     session: Session,
     request: RunRequest,
+    deadlineAt: number | undefined,
   ): Promise<RunOutput> {
     const outDir = session.root.nextRunDir();
     const reporter = new CollectingReporter();
+    const deadline = armDeadline(deadlineAt, () =>
+      session.playwright.stopTests(),
+    );
 
     try {
       // Only the workers this run forks see these; the webServer started earlier never does.
@@ -252,9 +263,24 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
             disableConfigReporters: true,
           }),
       );
+      const { firedAt } = deadline;
 
-      return { status, reporter, ...readSnapshotDir(outDir) };
+      if (firedAt !== undefined) {
+        this.log.debug(
+          `deadline stop took ${Math.round(performance.now() - firedAt)} ms`,
+        );
+      }
+
+      return {
+        status:
+          firedAt !== undefined && status === 'interrupted'
+            ? 'deadline'
+            : status,
+        reporter,
+        ...readSnapshotDir(outDir),
+      };
     } finally {
+      deadline.disarm();
       removeDir(outDir);
     }
   }

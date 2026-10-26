@@ -55,8 +55,14 @@ export interface MutantRunRequest {
   readonly budget: RunBudget;
 }
 
+/**
+ * Playwright's status, plus 'deadline': the runner's own timer stopped the run. An 'interrupted' that
+ * reaches the folds is never the runner's doing.
+ */
+export type RunStatus = FullResult['status'] | 'deadline';
+
 export interface RunOutput {
-  readonly status: FullResult['status'];
+  readonly status: RunStatus;
   readonly reporter: CollectingReporter;
   readonly snapshots: Snapshot[];
   readonly hookInstalled: boolean;
@@ -247,9 +253,12 @@ export function runSettings(request: RunRequest, outDir: string): RunSettings {
     : { outDir, perTest: false, hitLimit: request.hitLimit };
 }
 
-/** A failed attempt may come from a server that died during the run. */
+/**
+ * A failed attempt may come from a server that died during the run. Never after the deadline: the
+ * stopped test counts as failed, and the budget is spent.
+ */
 export function mayHaveLostItsServer(output: RunOutput): boolean {
-  return output.reporter.anyAttemptFailed();
+  return output.status !== 'deadline' && output.reporter.anyAttemptFailed();
 }
 
 export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
@@ -257,12 +266,33 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
   const isMutantRun = request.kind === 'mutant';
   const testCases = [...reporter.testCases.values()];
   const tests = testCases.map((test) => toTestResult(test, isMutantRun));
+  // An attempt that failed on its own kills the mutant even when another attempt, or another test,
+  // timed out. The test a deadline stop interrupts ends as skipped, so it is no kill.
+  const reason = timeoutReason({
+    mutantRun: isMutantRun,
+    killed: testCases.some((test) =>
+      test.results.some(
+        (result) =>
+          result.status !== test.expectedStatus &&
+          (result.status === 'failed' || result.status === 'passed'),
+      ),
+    ),
+    testTimedOut: testCases.some((test) =>
+      test.results.some((result) => result.status === 'timedOut'),
+    ),
+    stoppedAtDeadline: status === 'deadline',
+  });
 
   if (status === 'interrupted') {
     return {
       status: DryRunStatus.Error,
       errorMessage: 'The Playwright run was interrupted',
     };
+  }
+
+  // Before the empty-run rules: a stop during the config load leaves no tests at all.
+  if (status === 'deadline' && reason) {
+    return { status: DryRunStatus.Timeout, reason };
   }
 
   const failed = tests.some((test) => test.status === TestStatus.Failed);
@@ -297,22 +327,6 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
         'Tests ran but the Stryker worker hook did not install in any Playwright worker; this Playwright version may have changed its worker entry point.',
     };
   }
-
-  // An attempt that failed on its own kills the mutant even when another attempt, or another test,
-  // timed out.
-  const reason = timeoutReason({
-    mutantRun: isMutantRun,
-    killed: testCases.some((test) =>
-      test.results.some(
-        (result) =>
-          result.status !== test.expectedStatus &&
-          (result.status === 'failed' || result.status === 'passed'),
-      ),
-    ),
-    testTimedOut: testCases.some((test) =>
-      test.results.some((result) => result.status === 'timedOut'),
-    ),
-  });
 
   if (reason) {
     return { status: DryRunStatus.Timeout, reason };

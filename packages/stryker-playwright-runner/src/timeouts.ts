@@ -6,13 +6,17 @@ export const RUN_START_MS = 3000;
 /**
  * What the runner needs after the last test ends and before Stryker's timer fires: the hook's read of a
  * hung frame plus the context close and the worker exit. The same teardown follows a per-test timeout
- * and a deadline stop, so one value serves both.
+ * and a deadline stop, so one value serves both. runner.test.ts's deadline test logs the stop
+ * ("deadline stop took N ms"); it measured 2078-2096 ms in 8 of 9 runs, so this is the frame read
+ * plus 600 ms.
  */
-export const STOP_HEADROOM_MS = FRAME_READ_TIMEOUT_MS;
+export const STOP_HEADROOM_MS = FRAME_READ_TIMEOUT_MS + 600;
 /** Room for a timed-out test to end before Stryker's timer fires. */
 export const TEST_TIMEOUT_HEADROOM_MS = RUN_START_MS + STOP_HEADROOM_MS;
 /** Below this, real tests cannot finish, so Stryker's own timer ends the run instead. */
 export const MIN_TEST_TIMEOUT_MS = 2000;
+/** stopTests() does nothing until runTests has loaded the config (~1.4 s), so the deadline repeats it. */
+export const STOP_RETRY_MS = 100;
 /** Playwright's default expect.timeout. */
 export const DEFAULT_EXPECT_TIMEOUT_MS = 5000;
 
@@ -105,6 +109,8 @@ export interface TimeoutFacts {
   readonly killed: boolean;
   /** Some attempt hit its per-test timeout. */
   readonly testTimedOut: boolean;
+  /** The runner's deadline stopped the run. */
+  readonly stoppedAtDeadline: boolean;
 }
 
 /**
@@ -116,7 +122,58 @@ export function timeoutReason(facts: TimeoutFacts): string | undefined {
     return undefined;
   }
 
+  if (facts.stoppedAtDeadline) {
+    return "The run reached the runner's deadline before Stryker's timeout";
+  }
+
   return facts.mutantRun && facts.testTimedOut
     ? 'A test hit its timeout'
     : undefined;
+}
+
+export interface ArmedDeadline {
+  /** The `now()` at which stop() was first called, or undefined while it was not. */
+  readonly firedAt: number | undefined;
+  /** Clears the timer and the retry interval. */
+  disarm(): void;
+}
+
+// setTimeout fires at once for a longer delay.
+const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
+
+/**
+ * Calls `stop` when `at` (a `now()` value) passes, then again every STOP_RETRY_MS until disarmed:
+ * Playwright's stopTests() does nothing while runTests is still loading the config, and a second call
+ * is harmless. `at` undefined never fires.
+ */
+export function armDeadline(
+  at: number | undefined,
+  stop: () => Promise<void>,
+  now: () => number = () => performance.now(),
+): ArmedDeadline {
+  if (at === undefined) {
+    return { firedAt: undefined, disarm: () => undefined };
+  }
+
+  let firedAt: number | undefined;
+  let retry: NodeJS.Timeout | undefined;
+  const call = () => void stop().catch(() => undefined);
+  const timer = setTimeout(
+    () => {
+      firedAt = now();
+      call();
+      retry = setInterval(call, STOP_RETRY_MS);
+    },
+    Math.min(Math.max(0, at - now()), MAX_TIMER_DELAY_MS),
+  );
+
+  return {
+    get firedAt() {
+      return firedAt;
+    },
+    disarm() {
+      clearTimeout(timer);
+      clearInterval(retry);
+    },
+  };
 }

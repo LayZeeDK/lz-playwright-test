@@ -44,6 +44,7 @@ import {
   projectsThatRun,
   type RunOutput,
   runSettings,
+  type RunStatus,
   serialGroups,
   toRunResult,
   withSerialGroups,
@@ -98,7 +99,7 @@ function classify(
     hookInstalled = true,
     testFilter,
   }: {
-    status?: FullResult['status'];
+    status?: RunStatus;
     mutant?: boolean;
     hookInstalled?: boolean;
     testFilter?: string[];
@@ -415,7 +416,7 @@ test('a mutant run request widens its filter to serial groups and gets its budge
     activeMutant: '7',
     testFilter: ['create', 'edit'],
     hitLimit: 50,
-    budget: { testTimeout: 3000, deadlineMs: 6000 },
+    budget: { testTimeout: 2400, deadlineMs: 5400 },
   });
 });
 
@@ -483,6 +484,66 @@ test('a run with a failed attempt may have lost its server', () => {
 
   assert.equal(mayHaveLostItsServer(failed), true);
   assert.equal(mayHaveLostItsServer(passedRun([])), false);
+});
+
+test('a run the deadline stopped is never rerun, though its stopped test counts as failed', () => {
+  const stopped = passedRun([]);
+  attempt(stopped.reporter, 'b', 'skipped', 'interrupted');
+
+  assert.equal(mayHaveLostItsServer(stopped), true);
+  assert.equal(mayHaveLostItsServer({ ...stopped, status: 'deadline' }), false);
+});
+
+test('a deadline stop during config load, before any test, is a Timeout', () => {
+  const output: RunOutput = {
+    status: 'deadline',
+    reporter: new CollectingReporter(),
+    snapshots: [],
+    hookInstalled: false,
+  };
+
+  assert.equal(
+    toRunResult(output, mutantRequest({ testFilter: ['a'] })).status,
+    DryRunStatus.Timeout,
+  );
+  assert.equal(toRunResult(output, dryRequest()).status, DryRunStatus.Timeout);
+});
+
+test('a deadline stop that interrupted the looping test is a Timeout', () => {
+  const reporter = new CollectingReporter();
+  attempt(reporter, 'a', 'expected', 'passed');
+  attempt(reporter, 'b', 'skipped', 'interrupted');
+
+  assert.deepEqual(classify(reporter, { status: 'deadline' }), {
+    status: DryRunStatus.Timeout,
+    reason: "The run reached the runner's deadline before Stryker's timeout",
+  });
+});
+
+test('a deadline stop after a test killed the mutant reports the kill', () => {
+  const output = passedRun([]);
+  attempt(output.reporter, 'b', 'unexpected', 'failed');
+  attempt(output.reporter, 'c', 'skipped', 'interrupted');
+
+  const { result } = mutantRunResult(
+    { ...output, status: 'deadline' },
+    mutantRequest({ testFilter: ['a', 'b', 'c'] }),
+  );
+
+  assert.deepEqual(
+    result.status === MutantRunStatus.Killed && result.killedBy,
+    ['b'],
+  );
+});
+
+test('a run someone else interrupted stays an error', () => {
+  const reporter = new CollectingReporter();
+  attempt(reporter, 'a', 'skipped', 'interrupted');
+
+  assert.equal(
+    classify(reporter, { status: 'interrupted' }).status,
+    DryRunStatus.Error,
+  );
 });
 
 test('the missing-coverage error names lost frames when every frame was lost', () => {
