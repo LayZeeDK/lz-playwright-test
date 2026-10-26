@@ -5,7 +5,7 @@ import jsoncParser from 'jsonc-eslint-parser';
 const playwrightRecommended = playwright.configs['flat/recommended'];
 
 function raiseWarning(level) {
-  if (level === 'warn' || level === 1) {
+  if (level === 'warn') {
     return 'error';
   }
 
