@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
+import { TESTED_VERSION } from '../src/install.ts';
 import { operatorNames } from '../src/operators.ts';
 
 const ENTRY = join(import.meta.dirname, 'fixture', 'entry.ts');
@@ -51,7 +52,10 @@ describe('index.ts', () => {
     assert.equal(stdout, '');
     assert.match(
       stderr,
-      /stryker-ui-mutators: the instrumenter 10\.1\.1 in .+ made no mutants of TextLiteral from their samples/,
+      new RegExp(
+        `stryker-ui-mutators: the instrumenter ${TESTED_VERSION.replaceAll('.', '\\.')} in .+ made no mutants ` +
+          'of TextLiteral from their samples',
+      ),
     );
   });
 });

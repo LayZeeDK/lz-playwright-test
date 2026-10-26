@@ -18,6 +18,7 @@ import {
   corePackageJson,
   install,
   resolveFromCore,
+  TESTED_VERSION,
   type InstrumentedMutant,
   type Instrumenter,
   type SourceFile,
@@ -40,7 +41,7 @@ function operator(name: string): Operator {
 function setup({
   builtIns = ['StringLiteral', 'BooleanLiteral'],
   silent = [] as string[],
-  version = '10.1.1',
+  version = TESTED_VERSION,
 } = {}) {
   const allMutators: NodeMutatorLike[] = builtIns.map((name) => ({
     name,
@@ -246,7 +247,7 @@ describe('install', () => {
       run([operator('Alpha'), operator('Beta'), operator('Gamma')]),
       {
         message:
-          'stryker-ui-mutators: the instrumenter 10.1.1 in /stryker/instrumenter made no mutants of Alpha, Gamma from ' +
+          `stryker-ui-mutators: the instrumenter ${TESTED_VERSION} in /stryker/instrumenter made no mutants of Alpha, Gamma from ` +
           'their samples, so it does not run the mutators this module added. A bundled or second copy of the ' +
           'instrumenter does that.',
       },
@@ -284,7 +285,7 @@ describe('install', () => {
 
       assert.deepEqual(names(), ['StringLiteral', 'BooleanLiteral', 'Alpha']);
       assert.deepEqual(warnings, [
-        `stryker-ui-mutators was tested with @stryker-mutator/instrumenter 10.1.1, not ${version} in ` +
+        `stryker-ui-mutators was tested with @stryker-mutator/instrumenter ${TESTED_VERSION}, not ${version} in ` +
           '/stryker/instrumenter; its self-check passed.',
       ]);
     });
@@ -394,7 +395,7 @@ describe('resolveFromCore', () => {
   it("returns the installed instrumenter, with Stryker's mutators, the expression placer and Babel 8 types", async () => {
     const instrumenter = await resolveFromCore();
 
-    assert.equal(instrumenter.version, '10.1.1');
+    assert.equal(instrumenter.version, TESTED_VERSION);
     assert.ok(
       instrumenter.allMutators.some(({ name }) => name === 'StringLiteral'),
     );

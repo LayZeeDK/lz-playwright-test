@@ -14,7 +14,7 @@ import {
 } from './mutator.ts';
 import { withJsxPlacement, type MutantPlacerLike } from './placer.ts';
 
-const TESTED_VERSION = '10.1.1';
+export const TESTED_VERSION = '10.1.1';
 const CORE_BIN = /[\\/]@stryker-mutator[\\/]core[\\/]bin[\\/]stryker\.js$/;
 const NAME = /^[A-Za-z]+$/;
 const OWN: unique symbol = Symbol.for('@layzee/stryker-ui-mutators');
