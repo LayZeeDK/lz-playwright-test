@@ -22,7 +22,7 @@ import {
   type RunSettings,
 } from '../src/protocol.ts';
 import type * as Hook from '../src/worker-hook.ts';
-import type { NodeNamespace, PageSettings } from '../src/worker-hook.ts';
+import type { StrykerNamespace, PageSettings } from '../src/worker-hook.ts';
 
 const ACTIVE_MUTANT = INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
 
@@ -38,7 +38,7 @@ function worker(
   settings: { perTest: boolean; hitLimit?: number },
   testId?: () => string | undefined,
 ) {
-  const ns: NodeNamespace = {};
+  const ns: StrykerNamespace = {};
   const lines: string[] = [];
   const listeners: (() => void)[] = [];
   hook.recordNodeCoverage(
@@ -221,7 +221,7 @@ test('a worker past its hit limit writes its count at once, and not again at exi
 });
 
 test('a write that fails at exit does not throw out of the exit listener', () => {
-  const ns: NodeNamespace = {};
+  const ns: StrykerNamespace = {};
   const listeners: (() => void)[] = [];
   hook.recordNodeCoverage(
     ns,
@@ -281,7 +281,7 @@ function installed(
   const outDir = mkdtempSync(path.join(tmpdir(), 'worker-hook-install-'));
   const scope = globalThis as unknown as Record<
     string,
-    NodeNamespace & Record<string, unknown>
+    StrykerNamespace & Record<string, unknown>
   >;
   prepare?.(outDir, ns);
   const exitListeners = process.listeners('exit');
@@ -470,7 +470,9 @@ test("install counts the worker's own hits in its namespace and writes them past
 });
 
 test("install keeps a namespace the worker's instrumented code made first", (t) => {
-  const first: NodeNamespace = { mutantCoverage: { static: {}, perTest: {} } };
+  const first: StrykerNamespace = {
+    mutantCoverage: { static: {}, perTest: {} },
+  };
   const hooked = installed(
     t,
     { perTest: true },
@@ -484,6 +486,39 @@ test("install keeps a namespace the worker's instrumented code made first", (t) 
 
   assert.equal(hooked.scope[hooked.ns], first);
   assert.equal(first.currentTestId, 't1');
+});
+
+test('install replaces a namespace that is null with its own', (t) => {
+  const hooked = installed(
+    t,
+    { perTest: true },
+    {
+      prepare: (_, ns) => {
+        const scope: Record<string, unknown> = globalThis;
+        scope[ns] = null;
+      },
+    },
+  );
+  hooked.setTest('t1');
+
+  assert.equal(hooked.scope[hooked.ns].currentTestId, 't1');
+});
+
+test('a frame whose namespace is null holds nothing to read', async (t) => {
+  const hooked = installed(t, { perTest: false });
+  const created = await hooked.context();
+  created.open(
+    hooked.page([hooked.frame({ name: '__nullNamespaceHere__' })]).page,
+  );
+  const scope: Record<string, unknown> = globalThis;
+  scope.__nullNamespaceHere__ = null;
+  t.after(() => {
+    delete scope.__nullNamespaceHere__;
+  });
+
+  await created.close();
+
+  assert.equal(hooked.read(), '');
 });
 
 test("the worker's namespace names the running Playwright test, and none between tests", (t) => {
@@ -961,6 +996,42 @@ test('the init script keeps a namespace the page already has', (t) => {
 
   assert.equal(scope[ns], existing);
   assert.deepEqual(existing, { kept: true, currentTestId: 't1' });
+});
+
+test('the init script replaces a namespace that is null with its own', (t) => {
+  const ns = '__pageTestNull__';
+  const scope: Record<string, unknown> = globalThis;
+  scope[ns] = null;
+  t.after(() => {
+    delete scope[ns];
+  });
+  const win: { top?: unknown } = {};
+  win.top = {};
+  Object.defineProperty(globalThis, 'window', {
+    value: win,
+    configurable: true,
+    writable: true,
+  });
+
+  try {
+    hook.initPage({ ns, testId: 't1' });
+  } finally {
+    delete scope.window;
+  }
+
+  assert.deepEqual(scope[ns], { currentTestId: 't1' });
+});
+
+test('a carried value that is not an object carries nothing in, and the page still stores its own', (t) => {
+  for (const carried of ['5', '"text"', 'null']) {
+    const { s, listeners } = pageRun(t, { hitLimit: 7 }, { carried });
+
+    assert.deepEqual({ ...s }, { hitLimit: 7, hitCount: 0 }, carried);
+    assert.deepEqual(
+      listeners.map(([event]) => event),
+      ['pagehide'],
+    );
+  }
 });
 
 test('a child frame carries nothing across navigations', (t) => {

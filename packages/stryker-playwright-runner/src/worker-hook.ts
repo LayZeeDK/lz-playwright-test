@@ -71,12 +71,8 @@ export function install(
   const patchedBrowsers = new WeakSet<Browser>();
 
   fs.writeFileSync(outFile, '');
-  const scope = globalThis as unknown as Record<
-    string,
-    NodeNamespace | undefined
-  >;
   recordNodeCoverage(
-    (scope[ns] ??= {}),
+    workerNamespace(ns),
     { perTest, hitLimit },
     () => nodeTestId(test),
     (line) => fs.appendFileSync(outFile, line + '\n'),
@@ -160,16 +156,34 @@ export function install(
   });
 }
 
-export interface NodeNamespace {
-  activeMutant?: string;
-  currentTestId?: string;
+/**
+ * The global that Stryker's instrumented code and this hook share, in the worker and in every page.
+ * Instrumented code may create it first, so each field claims nothing.
+ */
+export interface StrykerNamespace {
+  activeMutant?: unknown;
+  currentTestId?: unknown;
   mutantCoverage?: unknown;
-  hitCount?: number;
-  hitLimit?: number;
+  hitCount?: unknown;
+  hitLimit?: unknown;
+}
+
+function workerNamespace(name: string): StrykerNamespace {
+  const scope: Record<string, unknown> = globalThis;
+  const found = scope[name];
+
+  if (typeof found === 'object' && found !== null) {
+    return found;
+  }
+
+  const created: StrykerNamespace = {};
+  scope[name] = created;
+
+  return created;
 }
 
 export function recordNodeCoverage(
-  ns: NodeNamespace,
+  ns: StrykerNamespace,
   { perTest, hitLimit }: { perTest: boolean; hitLimit?: number },
   currentTestId: () => string | undefined,
   write: (line: string) => void,
@@ -281,13 +295,16 @@ async function readNamespace(
   );
   const read = frame
     .evaluate((name) => {
-      const s = (
-        globalThis as unknown as Record<string, FrameRead | undefined>
-      )[name];
+      const scope: Record<string, unknown> = globalThis;
+      const found = scope[name];
 
-      return s
-        ? { mutantCoverage: s.mutantCoverage, hitCount: s.hitCount }
-        : undefined;
+      if (typeof found !== 'object' || found === null) {
+        return undefined;
+      }
+
+      const { mutantCoverage, hitCount }: StrykerNamespace = found;
+
+      return { mutantCoverage, hitCount };
     }, ns)
     .catch(() =>
       frame.isDetached() ? undefined : ({ lost: true } satisfies FrameRead),
@@ -306,11 +323,10 @@ export function initPage({
   testId,
   hitLimit,
 }: PageSettings): void {
-  const scope = globalThis as unknown as Record<
-    string,
-    Record<string, unknown> | undefined
-  >;
-  const s = (scope[ns] ??= {});
+  const scope: Record<string, unknown> = globalThis;
+  const found = scope[ns];
+  const s: StrykerNamespace =
+    typeof found === 'object' && found !== null ? found : (scope[ns] = {});
   const key = `${ns}:carry`;
 
   if (activeMutant !== undefined) {
@@ -331,15 +347,14 @@ export function initPage({
   }
 
   try {
-    const carried: FrameRead | null = JSON.parse(
-      sessionStorage.getItem(key) ?? 'null',
-    );
+    const carried: unknown = JSON.parse(sessionStorage.getItem(key) ?? 'null');
 
-    if (carried) {
-      s.mutantCoverage = carried.mutantCoverage;
+    if (typeof carried === 'object' && carried !== null) {
+      const { mutantCoverage, hitCount }: StrykerNamespace = carried;
+      s.mutantCoverage = mutantCoverage;
 
       if (hitLimit !== undefined) {
-        s.hitCount = carried.hitCount ?? 0;
+        s.hitCount = hitCount ?? 0;
       }
     }
 
