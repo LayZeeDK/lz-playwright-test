@@ -337,9 +337,12 @@ function setEnv(values: Readonly<Record<string, string | undefined>>) {
   }
 }
 
-export function acceptsConnections(port: number): Promise<boolean> {
+export function acceptsConnections(
+  port: number,
+  connect: (options: net.TcpNetConnectOpts) => net.Socket = net.connect,
+): Promise<boolean> {
   return new Promise((resolve) => {
-    const socket = net.connect({ host: 'localhost', port, timeout: 5000 });
+    const socket = connect({ host: 'localhost', port, timeout: 5000 });
     const done = (ok: boolean) => {
       socket.destroy();
       resolve(ok);
