@@ -1,7 +1,8 @@
 # Design: UI mutation operators that Playwright tests can kill
 
-Status: chosen design, 2026-10-25, by Claude during an AFK run. Not built yet. Lars approved the
-operator and mutation names in Names, without a namespace prefix, on 2026-10-25 ("2-3: Approve").
+Status: chosen design, 2026-10-25, by Claude during an AFK run. Built on 2026-10-26 as
+`packages/stryker-ui-mutators`. Lars approved the operator and mutation names in Names, without a
+namespace prefix, on 2026-10-25 ("2-3: Approve").
 
 ## Why
 
