@@ -16,12 +16,11 @@ import { after, before, describe, it } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
 import {
-  install,
   resolveFromCore,
   type InstrumentedMutant,
   type InstrumentResult,
 } from '../src/install.ts';
-import { operatorNames, operators } from '../src/operators.ts';
+import { installInto, ours } from './support/installed.ts';
 
 type Component = (props: unknown) => unknown;
 
@@ -57,8 +56,7 @@ function isolated(code: string): string {
 before(async () => {
   mkdirSync(tmpDir, { recursive: true });
   outDir = mkdtempSync(join(tmpDir, 'render-oracle-'));
-  const instrumenter = await resolveFromCore();
-  await install(operators, async () => instrumenter);
+  const instrumenter = await installInto(await resolveFromCore());
   result = await instrumenter.instrument([
     { name: samplePath, content: source },
   ]);
@@ -199,7 +197,6 @@ async function renders(mutant: InstrumentedMutant) {
   return { actual, expected };
 }
 
-const ours: ReadonlySet<string> = new Set(operatorNames);
 const label = ({
   id,
   mutatorName,

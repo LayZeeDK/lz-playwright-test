@@ -1,7 +1,7 @@
 // The placer wrap is neutral for built-in mutants, and places UI mutants as valid TSX. One process, ordered: the
-// corpus is instrumented stock first, then install() runs, then the corpus is instrumented with every UI operator
-// excluded. node --test runs each test file in its own process, so no other file has wrapped the placer before. That
-// sequence runs in a before hook, so that an error in it fails every test instead of the file.
+// corpus is instrumented stock first, then the install runs (support/installed.ts), then the corpus is instrumented
+// with every UI operator excluded. node --test runs each test file in its own process, so no other file has wrapped
+// the placer before. That sequence runs in a before hook, so that an error in it fails every test instead of the file.
 // Corpus: the design spike's sample, the demo app's components, and StrykerJS v10.1.1's
 // packages/instrumenter/testResources/parser/App.tsx and testResources/instrumenter/vue-tsx-sample.vue (copied).
 import assert from 'node:assert/strict';
@@ -12,14 +12,14 @@ import { before, describe, it } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
 import {
-  install,
   resolveFromCore,
   type InstrumentedMutant,
   type InstrumentResult,
   type Instrumenter,
   type SourceFile,
 } from '../src/install.ts';
-import { operatorNames, operators } from '../src/operators.ts';
+import { operatorNames } from '../src/operators.ts';
+import { installInto, ours } from './support/installed.ts';
 
 const root = join(import.meta.dirname, '..', '..', '..');
 const corpus: readonly SourceFile[] = [
@@ -37,7 +37,6 @@ let excluded: InstrumentResult[];
 let oneLeftOn: InstrumentResult[];
 let on: InstrumentResult[];
 
-const ours: ReadonlySet<string> = new Set(operatorNames);
 const masked = (code: string): string =>
   code.replace(/(stryMutAct_9fa48|stryCov_9fa48)\([^)]*\)/g, '$1(#)');
 const builtIns = (mutants: readonly InstrumentedMutant[]): string[] =>
@@ -67,7 +66,7 @@ before(async () => {
     ).href
   ));
   stock = await instrumentEach([]);
-  await install(operators, async () => instrumenter);
+  await installInto(instrumenter);
   excluded = await instrumentEach(operatorNames);
   oneLeftOn = await instrumentEach(
     operatorNames.filter((name) => name !== 'TextLiteral'),
