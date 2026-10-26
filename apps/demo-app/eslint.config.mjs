@@ -1,4 +1,5 @@
 import nx from '@nx/eslint-plugin';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
 import baseConfig from '../../eslint.config.mjs';
 
 export default [
@@ -6,7 +7,6 @@ export default [
   ...baseConfig,
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
-    // Override or add rules here
-    rules: {},
+    rules: jsxA11y.flatConfigs.strict.rules,
   },
 ];
