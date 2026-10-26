@@ -58,7 +58,17 @@ an outcome, was then reviewed with `lz-refactor` after the fact: it routed the c
 whose "Use when" is "code is no longer executed or referenced", which does not cover executed-but-redundant code.
 Evidence: runner progress file, unit B continuation; `references/fowler-catalog/remove-dead-code.md`.
 
-**O7. What worked.** `lz-refactor` step 1 caught a behaviour change inside a refactor commit (a lock release on a
+**O7. A review-fix list does not trigger the skills, even when the brief names them.** In the review round on
+2026-10-26, the brief for the fix workers quoted "Use the lz-tdd plugin where applicable" and said "A bug fix
+starts with its failing test (lz-red); a behaviour-preserving change is a refactor (lz-refactor)". The ui-mutators
+worker fixed three bugs test-first and made eight refactors, and loaded no lz-tdd skill: it showed each red by
+hand, and the unchanged case tables guarded the refactors. Unit C of the runner (test-code mutation at 100% on the
+first run) had nothing to write, so it is no evidence either way. The descriptions trigger on a developer's coaching
+questions ("what test should I write next?", "anything you'd refactor?"); a worker that holds a list of fixes asks
+none of them. Evidence: `.audit/prod/review/fix-brief.md`, `fix-U-progress.md` (local, gitignored); the three
+skills' `description` fields.
+
+**O8. What worked.** `lz-refactor` step 1 caught a behaviour change inside a refactor commit (a lock release on a
 failed init). `lz-red` step 5's "a not-implemented throw ... is a valid but blunter red" let 13 new tests go red
 without a module-load failure, and its "the failure must originate in the code under test" kept a child-process
 test's red on the hook's own TypeError rather than on a spawn failure. Step 3's message-matrix route fitted a shell
@@ -86,6 +96,10 @@ tester, a coverage tool) can see the code.
 observe, which a surviving mutant often exposes: what proof it needs (why no input tells the two versions apart),
 and that deleting it beats a `// Stryker disable` comment. S1's guard-test kind could point there for a survivor
 no test can kill.
+
+**S7 (from O7).** Add trigger phrases for an agent's own work, not only a developer's questions: "fix this
+finding test-first", "write the regression test for this bug", "refactor this without changing behaviour". Or
+state in each description that an implementation brief naming the skill is an invocation.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
