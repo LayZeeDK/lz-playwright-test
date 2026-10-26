@@ -41,9 +41,9 @@ it uses is `oss/realworld-api`. Then run `npx stryker run stryker.playwright.con
 
 ## analog: analogjs/analog `beta` at a377078ec
 
-1. Install with pnpm, not the npm line above: `pnpm add -D @stryker-mutator/core@10.1.1
-@playwright/test@^1.64.1`. The copy's own `@playwright/test` is `^1.58.2`, below the runner's 1.63
-   floor; the copy's `package.json` diff after the run showed both versions. Then link the runner as a
+1. Install with pnpm, not the npm line above:
+   `pnpm add -D @stryker-mutator/core@10.1.1 @playwright/test@^1.64.1`. The copy's own
+   `@playwright/test` is `^1.58.2`, below the runner's 1.63 floor; the copy's `package.json` diff after the run showed both versions. Then link the runner as a
    junction at `node_modules/@layzee/stryker-playwright-runner`, the name that
    `analog/stryker.playwright.config.ts` loads.
 2. Apply `analog/copy.patch` and copy `analog/stryker.playwright.config.ts` into the copy. The patch:
@@ -63,8 +63,8 @@ dev server (`npm run dev`), which compiles Stryker's sandbox on the fly.
 
 1. Copy `.env.example` to `.env`, the repo's own setup step.
 2. Install the runner, StrykerJS, and Playwright as above, plus the operators and the checker:
-   `npm install -D @stryker-mutator/typescript-checker@10.1.1
-file:<this repo>/packages/stryker-ui-mutators`. The copy pins `@playwright/test` to `^1.58.1`.
+   `npm install -D @stryker-mutator/typescript-checker@10.1.1 file:<this repo>/packages/stryker-ui-mutators`.
+   The copy pins `@playwright/test` to `^1.58.1`.
 3. Apply `epic-stack/copy.patch` and copy `epic-stack/stryker.playwright.config.ts` into the copy.
    The patch:
    - sets Prisma's `engineType = "binary"`. Prisma 6.19 ships its query engine for Windows only as
