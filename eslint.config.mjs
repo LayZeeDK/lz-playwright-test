@@ -4,6 +4,25 @@ import jsoncParser from 'jsonc-eslint-parser';
 
 const playwrightRecommended = playwright.configs['flat/recommended'];
 
+function raiseWarning(level) {
+  if (level === 'warn' || level === 1) {
+    return 'error';
+  }
+
+  if (Array.isArray(level)) {
+    return [raiseWarning(level[0]), ...level.slice(1)];
+  }
+
+  return level;
+}
+
+const playwrightRecommendedAsErrors = Object.fromEntries(
+  Object.entries(playwrightRecommended.rules).map(([rule, level]) => [
+    rule,
+    raiseWarning(level),
+  ]),
+);
+
 export default [
   ...nx.configs['flat/base'],
   ...nx.configs['flat/typescript'],
@@ -62,23 +81,7 @@ export default [
     files: ['**/*.spec.ts', '**/playwright*.config.{ts,mts}'],
     ...playwrightRecommended,
     rules: {
-      ...playwrightRecommended.rules,
-      'playwright/expect-expect': 'error',
-      'playwright/no-conditional-expect': 'error',
-      'playwright/no-conditional-in-test': 'error',
-      'playwright/no-element-handle': 'error',
-      'playwright/no-eval': 'error',
-      'playwright/no-force-option': 'error',
-      'playwright/no-identical-title': 'error',
-      'playwright/no-page-pause': 'error',
-      'playwright/no-skipped-test': 'error',
-      'playwright/no-useless-await': 'error',
-      'playwright/no-useless-not': 'error',
-      'playwright/no-wait-for-selector': 'error',
-      'playwright/no-wait-for-timeout': 'error',
-      'playwright/prefer-locator': 'error',
-      'playwright/prefer-to-have-count': 'error',
-      'playwright/prefer-to-have-length': 'error',
+      ...playwrightRecommendedAsErrors,
       'playwright/no-commented-out-tests': 'error',
       'playwright/no-get-by-title': 'error',
       'playwright/no-raw-locators': 'error',
