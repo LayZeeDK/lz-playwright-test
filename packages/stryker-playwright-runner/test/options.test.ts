@@ -5,7 +5,13 @@ import { test } from 'node:test';
 
 import type { StrykerOptions } from '@stryker-mutator/api/core';
 
-import { OPTION_PROPERTIES, readRunnerOptions } from '../src/options.ts';
+import { Ajv } from 'ajv';
+
+import {
+  OPTION_PROPERTIES,
+  readRunnerOptions,
+  strykerValidationSchema,
+} from '../src/options.ts';
 import {
   MIN_TEST_TIMEOUT_MS,
   STOP_HEADROOM_MS,
@@ -53,6 +59,81 @@ test('the runner options refuse --testFiles', () => {
   assert.throws(
     () => readRunnerOptions(strykerOptions({ testFiles: ['a.spec.ts'] })),
     { message: /--testFiles/ },
+  );
+});
+
+test('without playwright options or with an empty --testFiles the runner takes its defaults', () => {
+  const defaults = {
+    configFile: undefined,
+    projects: undefined,
+    workers: 1,
+    strykerTimeoutMS: 10_000,
+  };
+
+  assert.deepEqual(readRunnerOptions(strykerOptions({})), defaults);
+  assert.deepEqual(
+    readRunnerOptions(strykerOptions({ testFiles: [] })),
+    defaults,
+  );
+});
+
+// The Ajv settings of Stryker's OptionsValidator (@stryker-mutator/core, src/config/options-validator.ts),
+// which checks a config against the schema a plugin exports.
+function validate(options: object) {
+  const ajv = new Ajv({
+    useDefaults: true,
+    allErrors: true,
+    jsPropertySyntax: true,
+    verbose: true,
+    logger: false,
+    strict: false,
+  });
+  const check = ajv.compile(strykerValidationSchema);
+  const copy = structuredClone(options);
+
+  return { valid: check(copy), options: copy };
+}
+
+test("Stryker's check of the options fills in the defaults", () => {
+  assert.deepEqual(validate({}), {
+    valid: true,
+    options: { playwright: { workers: 1 } },
+  });
+  assert.deepEqual(
+    validate({
+      playwright: { configFile: 'a.ts', projects: ['chromium'], workers: 2 },
+    }).valid,
+    true,
+  );
+});
+
+test("Stryker's check of the options refuses wrong types, workers below 1 and unknown options", () => {
+  for (const playwright of [
+    { configFile: 1 },
+    { projects: 'chromium' },
+    { projects: [1] },
+    { workers: 1.5 },
+    { workers: 0 },
+    { browser: 'chromium' },
+  ]) {
+    assert.equal(
+      validate({ playwright }).valid,
+      false,
+      JSON.stringify(playwright),
+    );
+  }
+
+  assert.equal(validate({ playwright: [] }).valid, false);
+});
+
+test('every option says what it is for', () => {
+  for (const [name, { description }] of Object.entries(OPTION_PROPERTIES)) {
+    assert.match(description, /^[A-Z].{20,}\.$/, name);
+  }
+
+  assert.equal(
+    strykerValidationSchema.$schema,
+    'http://json-schema.org/draft-07/schema#',
   );
 });
 
