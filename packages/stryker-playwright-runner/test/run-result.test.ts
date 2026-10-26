@@ -599,6 +599,54 @@ test('the missing-coverage error says no instrumented code ran instead of blamin
   );
 });
 
+test('the missing-coverage error blames the webServer when pages answered without instrumented code', () => {
+  const passed = {
+    id: 'a',
+    name: 'a',
+    status: TestStatus.Success,
+    timeSpentMs: 10,
+  } as const;
+  const blame =
+    'No page loaded instrumented code. Is the webServer serving the Stryker sandbox? A server that was already running (reuseExistingServer) serves the original sources.';
+
+  assert.equal(missingCoverageError([passed], [parsed({})]), blame);
+  assert.equal(
+    missingCoverageError([passed], [parsed({ lost: true }), parsed({})]),
+    blame,
+  );
+});
+
+test('the reporter keeps the last 4000 characters of stdout and stderr, and prints nothing itself', () => {
+  const reporter = new CollectingReporter();
+
+  reporter.onStdOut('a'.repeat(3998));
+  reporter.onStdErr(Buffer.from('bcd'));
+
+  assert.equal(reporter.printsToStdio(), false);
+  assert.equal(reporter.output, `${'a'.repeat(3997)}bcd`);
+});
+
+test('a run with errors and no failed test is an error, with every error', () => {
+  const reporter = new CollectingReporter();
+  attempt(reporter, 'a', 'expected', 'passed');
+  reporter.onError({ message: 'first' });
+  reporter.onError({ value: 'second' });
+  reporter.onError({});
+
+  assert.deepEqual(classify(reporter, { status: 'passed' }), {
+    status: DryRunStatus.Error,
+    errorMessage: 'first\nsecond\nTest failed',
+  });
+});
+
+test('a failed test outranks the errors of its run', () => {
+  const reporter = new CollectingReporter();
+  attempt(reporter, 'a', 'unexpected', 'failed');
+  reporter.onError({ message: 'worker teardown' });
+
+  assert.equal(classify(reporter).status, DryRunStatus.Complete);
+});
+
 test('coverage from a Playwright worker alone satisfies the dry run', () => {
   const passed = {
     id: 'a',
