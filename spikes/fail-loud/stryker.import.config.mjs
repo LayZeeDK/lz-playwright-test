@@ -1,6 +1,8 @@
-// Route 2: the config imports the package and lists nothing.
+// Route 2: the config imports the package and lists nothing. break.ts has a top-level await, so a static
+// import of the package beside it could start installing first; awaiting the package after it keeps the order.
 import './break.ts';
-import '@layzee/lz-stryker-ui-mutators';
+
+await import('@layzee/lz-stryker-ui-mutators');
 
 export default {
   mutate: ['src.tsx'],
