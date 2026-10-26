@@ -227,8 +227,8 @@ remain:
   the install error is in the warning above it. After a skipped install (see "Process placement") the
   factory throws "install did not run". Otherwise it returns an ignorer that ignores nothing.
   `spikes/ignorer-route/` measured on StrykerJS 10.1.1 that a factory that throws makes `stryker run` exit
-  1 with the error's message; the exit code after a failed install comes from the same call site and is
-  measured by the negative control under "What the verification plan adds". An earlier version of this
+  1 with the error's message, and `spikes/fail-loud/` measured that a failed install exits 1 on both
+  routes with the failing operator's name. An earlier version of this
   design kept the error and threw it from the factory. That cannot hold together with the config import
   below: a module that keeps its error loads without one, so a config that imports it would not stop.
 - **The `ignorers` entry is required.** `ignorers` defaults to `[]`
@@ -315,7 +315,9 @@ plugin's own module instance, so the check cannot see a mismatch with the instan
 It catches a broken install of the resolved copy, and it names a second copy only through the version
 and path in its message. The gate is a real `stryker run` through core with `testRunner: 'command'` and
 no browser, asserting that `mutation.json` lists the operator names (Opus draft, section 5, risk 3). Run
-it before calling the self-check enough, and on every StrykerJS bump.
+it before calling the self-check enough, and on every StrykerJS bump. `spikes/fail-loud/` is that gate and
+the negative control below: on StrykerJS 10.1.1 both routes report 12 UI mutants from seven operators, and
+with one broken sample both exit 1 with that operator's name.
 
 The `ElementToSpan` rule rests on `tsc` output for three hand-written elements, not on a Stryker run.
 The run for the Opus draft's risk 7 (`@stryker-mutator/typescript-checker` on the demo app) tests it: no `ElementToSpan`
