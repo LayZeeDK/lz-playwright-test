@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "StrykerJS mutation operators for JSX that Playwright tests can kill",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
