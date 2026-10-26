@@ -70,6 +70,17 @@ const log = {
   isDebugEnabled: () => verbose,
 } as unknown as Logger;
 
+/** How long a deadline stop logged since `from` took, or undefined when the deadline never fired. */
+function deadlineStopTook(from: number): number | undefined {
+  const [, took] =
+    logged
+      .slice(from)
+      .map((line) => /^deadline stop took (\d+) ms$/.exec(line))
+      .find((match) => match !== null) ?? [];
+
+  return took === undefined ? undefined : Number(took);
+}
+
 let runner: PlaywrightTestRunner;
 let mutants: readonly Mutant[];
 let dryRun: CompleteDryRunResult;
@@ -400,7 +411,8 @@ test('a run whose selected tests no longer exist is an error, not a survivor', a
   assert.equal(result.status, MutantRunStatus.Error);
 });
 
-test('an infinite loop without a hit limit times out within its budget, and the next run is clean', async () => {
+test('an infinite loop without a hit limit times out within its budget, and the next run is clean', async (t) => {
+  const loggedBefore = logged.length;
   const started = performance.now();
   const timedOut = await runner.mutantRun({
     activeMutant: mutant('UpdateOperator', 'i--'),
@@ -422,7 +434,19 @@ test('an infinite loop without a hit limit times out within its budget, and the 
     MutantRunStatus.Timeout,
     JSON.stringify(timedOut),
   );
-  assert.ok(elapsed < 8000, `timed-out run took ${Math.round(elapsed)} ms`);
+  // The per-test timeout and the deadline fall at about the same moment, so either may end the run.
+  // A deadline stop is timed from when it started, as in the deadline test; without one the whole
+  // run ended before the deadline. Playwright's teardown after either is reported, not asserted.
+  const stopTook = deadlineStopTook(loggedBefore);
+  const endedAt = stopTook === undefined ? elapsed : elapsed - stopTook;
+  const deadlineMs = 8000 - STOP_HEADROOM_MS;
+  t.diagnostic(
+    `run took ${Math.round(elapsed)} ms, deadline stop ${stopTook === undefined ? 'none' : `took ${stopTook} ms`}`,
+  );
+  assert.ok(
+    endedAt < deadlineMs + 1000,
+    `the runner ended the run after ${Math.round(endedAt)} ms, deadline ${deadlineMs} ms`,
+  );
   assert.equal(killed.status, MutantRunStatus.Killed, JSON.stringify(killed));
 });
 
@@ -470,11 +494,7 @@ test('a loop in a test that raised its own timeout stops at the deadline, withou
   );
   // The runner decides when the stop starts; how long Playwright's teardown then takes is not its
   // to decide (2.1 s in 8 of 9 measured runs, 6.5 s once), so that part is reported, not asserted.
-  const [, stopTook] =
-    logged
-      .slice(loggedBefore)
-      .map((line) => /^deadline stop took (\d+) ms$/.exec(line))
-      .find((match) => match !== null) ?? [];
+  const stopTook = deadlineStopTook(loggedBefore);
   const stoppedAfter = elapsed - Number(stopTook);
   const deadlineMs = 8000 - STOP_HEADROOM_MS;
   t.diagnostic(
