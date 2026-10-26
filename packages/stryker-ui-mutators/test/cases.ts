@@ -1024,4 +1024,35 @@ export const cases: readonly Case[] = [
     jsx: '<div><output role="status" /><hr role="separator" /><p role="paragraph" /><fieldset role="group" /><option role="option" /><progress role="progressbar" /><textarea role="textbox" /></div>',
     expect: [],
   },
+  {
+    id: 'tldraw-1',
+    title: "a 'true'/'false' ternary state is flipped in each branch, not negated to a constant",
+    origin: 'tldraw@12921f6d3:packages/tldraw/src/lib/ui/components/primitives/menus/TldrawUiMenuItem.tsx:233',
+    jsx: "<div aria-pressed={isSelected ? 'true' : 'false'} />",
+    expect: [['StateAttribute', 'aria-pressed={isSelected ? "false" : "true"}']],
+  },
+  {
+    id: 'tldraw-2',
+    title: 'a nested ternary state keeps its undefined branch and flips the string branches',
+    origin: 'tldraw@12921f6d3:packages/tldraw/src/lib/ui/components/primitives/menus/TldrawUiMenuItem.tsx:173',
+    jsx: "<div aria-pressed={isSelected === undefined ? undefined : isSelected ? 'true' : 'false'} />",
+    expect: [['StateAttribute', 'aria-pressed={isSelected === undefined ? undefined : isSelected ? "false" : "true"}']],
+  },
+  {
+    id: 'design-15',
+    title: 'a String() or template-literal state gets no negation, which would be a constant false',
+    origin: 'design:Operators in the first release, StateAttribute',
+    jsx: '<div><div aria-expanded={String(open)} /><div aria-checked={`${checked}`} /></div>',
+    expect: [],
+  },
+  {
+    id: 'design-16',
+    title: 'a boolean state expression is negated',
+    origin: 'design:Operators in the first release, StateAttribute',
+    jsx: '<div aria-expanded={open} aria-selected={tab === current} />',
+    expect: [
+      ['StateAttribute', 'aria-expanded={!open}'],
+      ['StateAttribute', 'aria-selected={!(tab === current)}'],
+    ],
+  },
 ];

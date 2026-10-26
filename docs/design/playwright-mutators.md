@@ -49,7 +49,7 @@ are in the Opus draft, section 2. Where this list differs from the draft, this l
 7. `HiddenAttribute`: forces `hidden` and `aria-hidden` off. It never forces an element hidden. It skips `aria-hidden` on `svg`, `img`, and `i`, as the Opus draft did (2.7): those are decorative icons, and exposing one changes nothing a role, label, or text query sees. Killed by `toBeVisible`, `getByRole` (hidden elements leave the tree).
 8. `ElementRole`: removes `role`, or swaps a semantic tag for `span`: `button` always, and `a` only when it has an `href`. An `<a>` without `href` has no `link` role, so swapping it would be an equivalent mutant. The `span` drops `href`, `type`, and `disabled`, which a `span` cannot take (see "Rules the synthetic cases settled"). Killed by `getByRole`.
 9. `ChildExpression`: a `{value}` child becomes `null`. Killed by `toHaveText`.
-10. `StateAttribute`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, `aria-selected`. Killed by `toHaveAttribute` and role queries with state options.
+10. `StateAttribute`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, `aria-selected`. A string value flips between `"true"` and `"false"`, and an expression is negated, except where negating would give a constant: a ternary flips each branch instead, and a `String()` or `.toString()` call gets no mutant (see "Rules the synthetic cases settled"). Killed by `toHaveAttribute` and role queries with state options.
 
 Later: `ListExpression` (`.map` becomes `.slice(0, 1).map`, from the Fable draft), button `type` swap, Angular
 templates, and CSS. Each waits for a reason given in the drafts' "later" sections.
@@ -118,7 +118,7 @@ attribute or the tag that gives an element its implicit role.
 
 ## Rules the synthetic cases settled
 
-`packages/stryker-ui-mutators/test/cases.ts` holds 94 synthetic cases: JSX versions of UI shapes in the repos
+`packages/stryker-ui-mutators/test/cases.ts` holds 112 synthetic cases: JSX versions of UI shapes in the repos
 the runner was exercised on (RealWorld, ngx-yeti, Analog and hello-world at the commits `oss/README.md` names,
 and the demo app), each with the exact UI mutants it must give. `spikes/ui-mutator-cases/` keeps the mined rows
 they came from. The cases first ran against the prototype and now run against the package. The design was silent on
@@ -144,6 +144,15 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
   disables an enabled button, so any test that clicks it kills that mutant. `{false}` changes the element
   only while it is disabled, so only a test that checks the disabled state kills it. The operator
   mutant is the stronger one, and the Fable draft's skip of `!` is not taken.
+- `StateAttribute` negates a value that renders a boolean (`aria-expanded={open}` becomes
+  `{!open}`), but not one that renders a string, because a non-empty string negates to a constant
+  `false`. tldraw (12921f6d3) writes `aria-pressed={isSelected ? 'true' : 'false'}` at five of its six state
+  sites; `!(...)` there is equivalent whenever the item is not selected. A ternary therefore keeps its test
+  and flips each branch: a string branch as a string value flips, a boolean branch to the other boolean,
+  any other expression to `!(expr)`, and an `undefined` or other literal branch stays. So
+  `isSelected === undefined ? undefined : isSelected ? 'true' : 'false'` keeps its `undefined` branch and
+  swaps the strings. A `String()` or `.toString()` call gets no mutant; a template literal never reaches
+  the operator. Cases tldraw-1, tldraw-2, design-15 and design-16 cover this.
 - `ElementToSpan` drops `href`, `type`, and `disabled` from the `span`. React's types do not allow them
   on a `span` (`HTMLAttributes` in `@types/react` 19.3.0), so a swap that kept them fails to compile under
   Stryker's TypeScript checker and reports CompileError, not a test result. A `span` ignores them at run

@@ -152,7 +152,7 @@ function readValue(value: types.JSXAttribute['value'], t: BabelTypes): Attribute
 /**
  * The replacement attribute, or nothing when it would not change the value. The only place that holds the
  * empty-value skip: `empty` on a string whose text is already `""` yields nothing (`alt=""`, `href=""`).
- * empty -> `name=""`; remove -> `name={undefined}`; false -> `name={false}`; negate -> `name={!(expr)}`;
+ * empty -> `name=""`; remove -> `name={undefined}`; false -> `name={false}`; negate -> `name={…}` from `negation`;
  * flip -> `name="false"` from `"true"`, else `name="true"`.
  */
 function* replaced(site: AttributeSite, replacement: Replacement, t: BabelTypes): Iterable<types.JSXAttribute> {
@@ -181,8 +181,10 @@ function* replaced(site: AttributeSite, replacement: Replacement, t: BabelTypes)
     }
 
     case 'negate': {
-      if (value.kind === 'expression') {
-        yield t.jsxAttribute(name, t.jsxExpressionContainer(t.unaryExpression('!', t.cloneNode(value.expression, true))));
+      const negated = value.kind === 'expression' ? negation(value.expression, t) : undefined;
+
+      if (negated !== undefined) {
+        yield t.jsxAttribute(name, t.jsxExpressionContainer(negated));
       }
 
       return;
@@ -196,6 +198,52 @@ function* replaced(site: AttributeSite, replacement: Replacement, t: BabelTypes)
       return;
     }
   }
+}
+
+/**
+ * The expression that renders the opposite state, or undefined when the syntax cannot tell one. `!(expr)` alone
+ * is wrong for a value that is a string: `!(c ? 'true' : 'false')` and `!String(open)` are always `false`. So a
+ * conditional negates each branch and keeps its test; a string branch flips as a string value does; a boolean
+ * branch flips; `undefined`, another literal, or a `String()` or `.toString()` call stays as it is (a conditional)
+ * or gives no mutant (the whole value); anything else becomes `!(expr)`.
+ */
+function negation(expression: types.Expression, t: BabelTypes): types.Expression | undefined {
+  if (t.isConditionalExpression(expression)) {
+    const consequent = negation(expression.consequent, t);
+    const alternate = negation(expression.alternate, t);
+
+    return consequent === undefined && alternate === undefined
+      ? undefined
+      : t.conditionalExpression(
+          t.cloneNode(expression.test, true),
+          consequent ?? t.cloneNode(expression.consequent, true),
+          alternate ?? t.cloneNode(expression.alternate, true),
+        );
+  }
+
+  if (t.isStringLiteral(expression)) {
+    return t.stringLiteral(expression.value === 'true' ? 'false' : 'true');
+  }
+
+  if (t.isBooleanLiteral(expression)) {
+    return t.booleanLiteral(!expression.value);
+  }
+
+  if (t.isLiteral(expression) || t.isIdentifier(expression, { name: 'undefined' }) || isStringCall(expression, t)) {
+    return undefined;
+  }
+
+  return t.unaryExpression('!', t.cloneNode(expression, true));
+}
+
+function isStringCall(expression: types.Expression, t: BabelTypes): boolean {
+  if (!t.isCallExpression(expression)) {
+    return false;
+  }
+
+  const { callee } = expression;
+
+  return t.isIdentifier(callee, { name: 'String' }) || (t.isMemberExpression(callee) && t.isIdentifier(callee.property, { name: 'toString' }));
 }
 
 /** A node whose parent is a `JSXElement` or `JSXFragment`: a JSX child. Shared by the rules and the placer. */
