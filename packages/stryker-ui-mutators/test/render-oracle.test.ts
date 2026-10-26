@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { describe, it } from 'node:test';
+import { after, describe, it } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
 import { install, resolveFromCore, type InstrumentedMutant } from '../src/install.ts';
@@ -22,12 +22,15 @@ interface ElementLike {
 const root = join(import.meta.dirname, '..', '..', '..');
 const samplePath = join(root, 'spikes', 'design-opus', 'sample.tsx');
 const source = readFileSync(samplePath, 'utf8');
-// Under the package, so the transpiled modules resolve react from the workspace; `tmp` is ignored by git.
-const outDir = join(import.meta.dirname, '..', 'tmp', 'render-oracle');
+// Under the package, not os.tmpdir(), so the `react/jsx-runtime` import the transpiler emits resolves from the
+// workspace; `tmp` is ignored by git and removed after the run.
+const tmpDir = join(import.meta.dirname, '..', 'tmp');
+const outDir = join(tmpDir, 'render-oracle');
 const ts: typeof import('typescript') = createRequire(join(root, 'package.json'))('typescript');
 
 rmSync(outDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
+after(() => rmSync(tmpDir, { recursive: true, force: true }));
 
 const instrumenter = await resolveFromCore();
 await install(operators, async () => instrumenter);
