@@ -9,6 +9,7 @@ export default {
   coverageAnalysis: 'off',
   cleanTempDir: false,
   tempDirName: '.stryker-tmp-live',
+  // Stryker copies the project into the sandbox; reports and spikes are outputs the served app never needs.
   ignorePatterns: [...ui.ignorePatterns, '/reports', '/spikes'],
   reporters: ['json'],
   jsonReporter: { fileName: 'spikes/live-mutant/out/mutation.json' },

@@ -22,7 +22,8 @@ SPIKE_BROKEN=0 node ../../node_modules/@stryker-mutator/core/bin/stryker.js run 
 SPIKE_BROKEN=1 node ../../node_modules/@stryker-mutator/core/bin/stryker.js run stryker.import.config.mjs
 ```
 
-Result on StrykerJS 10.1.1, 2026-10-26, on the built package (measured):
+Result on StrykerJS 10.1.1, 2026-10-26, on the built package and the import config that awaits the package
+after `break.ts` (measured):
 
 | Route | Intact | Broken `LzTextLiteral` sample |
 |---|---|---|

@@ -1,6 +1,7 @@
 # Serves Stryker's kept sandbox of the demo app and drives it with playwright-cli, once without a mutant and once
 # per mutant below, each in its own browser session with the mutant set by an init script before the app loads.
-# Exits with the number of failed checks: a case whose page differs from its expectation, or a port left open.
+# Exits with the number of failed checks: a case whose page differs from its expectation, a session that did not
+# close, or a port left open. A setup failure (a held port, Vite not serving) throws, which exits 1.
 param(
   [Parameter(Mandatory)] [string] $Sandbox,
   [int] $Port = 4700
@@ -71,6 +72,11 @@ async page => {
     $raw = (playwright-cli "-s=$session" run-code "--filename=$probe") -join "`n"
     playwright-cli "-s=$session" screenshot "--filename=$out/$name.png" | Out-Null
     playwright-cli "-s=$session" close | Out-Null
+
+    if ($LASTEXITCODE -ne 0) {
+      $failed++
+    }
+
     $session = $null
     Set-Content -Encoding utf8 "$out/$name.txt" $raw
     $json = [regex]::Match($raw, '\{\\?"dts.*?\}').Value -replace '\\"', '"'
@@ -84,11 +90,17 @@ async page => {
     '{0} {1}: {2}; saw dts [{3}] labels [{4}] code [{5}]' -f ($(if ($ok) { 'PASS' } else { 'FAIL' })), $name, $case.what, $seen.dts, $seen.labels, $seen.code
   }
 } finally {
+  Stop-Process -Id $vite.Id -Force -ErrorAction SilentlyContinue
+
   if ($session) {
-    playwright-cli "-s=$session" close | Out-Null
+    try {
+      playwright-cli "-s=$session" close | Out-Null
+    } catch {
+      "could not close session ${session}: $_"
+      $failed++
+    }
   }
 
-  Stop-Process -Id $vite.Id -Force -ErrorAction SilentlyContinue
   Start-Sleep 1
   $left = @(Get-Listener).Count
   "port $Port listening after stop: $left"
