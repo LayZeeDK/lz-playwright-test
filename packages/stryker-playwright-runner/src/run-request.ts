@@ -1,9 +1,11 @@
+import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 import type {
   DryRunOptions,
   MutantRunOptions,
 } from '@stryker-mutator/api/test-runner';
 
-import type { RunSettings } from './protocol.ts';
+import type { RunTestsParams } from './playwright-internals.ts';
+import { RUN_SETTINGS, type RunSettings } from './protocol.ts';
 import { type SerialGroups, withSerialGroups } from './serial-groups.ts';
 import {
   type ConfigTimeouts,
@@ -61,8 +63,42 @@ export function mutantRunRequest(
   };
 }
 
-export function runSettings(request: RunRequest, outDir: string): RunSettings {
-  return request.kind === 'dry'
-    ? { outDir, perTest: request.coverageAnalysis === 'perTest' }
-    : { outDir, perTest: false, hitLimit: request.hitLimit };
+/** What a run sets in the environment of the workers it forks, and passes to runTests. */
+export interface RunPlan {
+  readonly env: Readonly<Record<string, string | undefined>>;
+  readonly params: Pick<RunTestsParams, 'testIds' | 'maxFailures' | 'timeout'>;
+}
+
+export function runPlan(request: RunRequest, outDir: string): RunPlan {
+  const { settings, activeMutant, testIds } =
+    request.kind === 'dry'
+      ? {
+          settings: {
+            outDir,
+            perTest: request.coverageAnalysis === 'perTest',
+          } satisfies RunSettings,
+          activeMutant: undefined,
+          testIds: undefined,
+        }
+      : {
+          settings: {
+            outDir,
+            perTest: false,
+            hitLimit: request.hitLimit,
+          } satisfies RunSettings,
+          activeMutant: request.activeMutant,
+          testIds: request.testFilter,
+        };
+
+  return {
+    env: {
+      [RUN_SETTINGS]: JSON.stringify(settings),
+      [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: activeMutant,
+    },
+    params: {
+      testIds,
+      maxFailures: request.disableBail ? undefined : 1,
+      timeout: request.budget.testTimeout,
+    },
+  };
 }

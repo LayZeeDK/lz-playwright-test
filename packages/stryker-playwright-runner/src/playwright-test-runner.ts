@@ -2,10 +2,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
-import {
-  INSTRUMENTER_CONSTANTS,
-  type StrykerOptions,
-} from '@stryker-mutator/api/core';
+import type { StrykerOptions } from '@stryker-mutator/api/core';
 import type { Logger } from '@stryker-mutator/api/logging';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 import type {
@@ -23,13 +20,13 @@ import {
   type Playwright,
   type TestRunner,
 } from './playwright-internals.ts';
-import { readSnapshotDir, RUN_SETTINGS } from './protocol.ts';
+import { readSnapshotDir } from './protocol.ts';
 import { CollectingReporter } from './reporter.ts';
 import {
   dryRunRequest,
   mutantRunRequest,
+  runPlan,
   type RunRequest,
-  runSettings,
 } from './run-request.ts';
 import {
   type CoverageGaps,
@@ -242,25 +239,22 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     );
 
     try {
+      const { env, params } = runPlan(request, outDir);
       // Only the workers this run forks see these; the webServer started earlier never does.
       const { status } = await withEnv(
         {
           NODE_OPTIONS:
             `${this.baseNodeOptions ?? ''} --import "${HOOK}"`.trim(),
-          [RUN_SETTINGS]: JSON.stringify(runSettings(request, outDir)),
-          [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]:
-            request.kind === 'mutant' ? request.activeMutant : undefined,
+          ...env,
           [NO_COPY_PROMPT_ENV]: '1',
         },
         () =>
           session.playwright.runTests(reporter, {
             locations: [],
-            testIds: request.kind === 'mutant' ? request.testFilter : undefined,
             projects: session.options.projects,
             workers: session.options.workers,
-            maxFailures: request.disableBail ? undefined : 1,
-            timeout: request.budget.testTimeout,
             disableConfigReporters: true,
+            ...params,
           }),
       );
       const { firedAt } = deadline;

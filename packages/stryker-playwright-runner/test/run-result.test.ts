@@ -9,7 +9,11 @@ import type {
   TestCase,
   TestResult,
 } from '@playwright/test/reporter';
-import type { MutantCoverage, StrykerOptions } from '@stryker-mutator/api/core';
+import {
+  INSTRUMENTER_CONSTANTS,
+  type MutantCoverage,
+  type StrykerOptions,
+} from '@stryker-mutator/api/core';
 import type { Logger } from '@stryker-mutator/api/logging';
 import {
   DryRunStatus,
@@ -24,6 +28,7 @@ import {
 } from '../src/playwright-test-runner.ts';
 import {
   parseSnapshotLine,
+  RUN_SETTINGS,
   serializeSnapshot,
   type Snapshot,
   type SnapshotLine,
@@ -34,7 +39,7 @@ import {
   dryRunRequest,
   type MutantRunRequest,
   mutantRunRequest,
-  runSettings,
+  runPlan,
 } from '../src/run-request.ts';
 import {
   coverageGaps,
@@ -56,6 +61,8 @@ import {
 import { DRY_RUN_BUDGET } from '../src/timeouts.ts';
 
 type Outcome = ReturnType<TestCase['outcome']>;
+
+const ACTIVE_MUTANT = INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
 
 // A snapshot as the runner reads it from a line the hook wrote.
 function parsed(line: Partial<SnapshotLine>): Snapshot {
@@ -501,20 +508,50 @@ test('a dry run request keeps the config timeouts', () => {
   );
 });
 
-test('the hook collects per-test coverage only in a perTest dry run', () => {
-  assert.deepEqual(runSettings(dryRequest(), 'out'), {
-    outDir: 'out',
-    perTest: true,
+test('a dry run plan runs every test with no active mutant, and collects per-test coverage only for perTest', () => {
+  assert.deepEqual(runPlan(dryRequest(), 'out'), {
+    env: {
+      [RUN_SETTINGS]: '{"outDir":"out","perTest":true}',
+      [ACTIVE_MUTANT]: undefined,
+    },
+    params: { testIds: undefined, maxFailures: undefined, timeout: undefined },
   });
   assert.equal(
-    runSettings(dryRequest({ coverageAnalysis: 'all' }), 'out').perTest,
-    false,
+    runPlan(dryRequest({ coverageAnalysis: 'all' }), 'out').env[RUN_SETTINGS],
+    '{"outDir":"out","perTest":false}',
   );
-  assert.deepEqual(runSettings(mutantRequest({ hitLimit: 5 }), 'out'), {
-    outDir: 'out',
-    perTest: false,
-    hitLimit: 5,
-  });
+});
+
+test('a mutant run plan activates the mutant and runs its filter in its budget, with its hit limit', () => {
+  assert.deepEqual(
+    runPlan(
+      mutantRequest({
+        activeMutant: '7',
+        testFilter: ['a', 'b'],
+        hitLimit: 5,
+        budget: { testTimeout: 900, deadlineMs: 1000 },
+      }),
+      'out',
+    ),
+    {
+      env: {
+        [RUN_SETTINGS]: '{"outDir":"out","perTest":false,"hitLimit":5}',
+        [ACTIVE_MUTANT]: '7',
+      },
+      params: { testIds: ['a', 'b'], maxFailures: undefined, timeout: 900 },
+    },
+  );
+});
+
+test('a run plan stops at the first failure unless bail is disabled', () => {
+  assert.equal(
+    runPlan(dryRequest({ disableBail: false }), 'out').params.maxFailures,
+    1,
+  );
+  assert.equal(
+    runPlan(mutantRequest({ disableBail: false }), 'out').params.maxFailures,
+    1,
+  );
 });
 
 test('a run leaves no run settings behind in the environment, also when it throws', async () => {
