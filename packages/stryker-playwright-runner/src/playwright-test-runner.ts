@@ -21,6 +21,7 @@ import {
   toMutantRunResult,
 } from '@stryker-mutator/api/test-runner';
 
+import { readRunnerOptions, type RunnerOptions } from './options.ts';
 import {
   type CommonModule,
   type CoreBundleModule,
@@ -48,12 +49,6 @@ import {
   toRunResult,
   withSerialGroups,
 } from './run-result.ts';
-
-export interface PlaywrightRunnerOptions {
-  configFile?: string;
-  projects?: string[];
-  workers?: number;
-}
 
 interface ServerCheck {
   name: string;
@@ -83,11 +78,10 @@ const MIN_TEST_TIMEOUT_MS = 2000;
 export class PlaywrightTestRunner implements StrykerTestRunner {
   static inject = tokens(commonTokens.options, commonTokens.logger);
 
-  private readonly options: PlaywrightRunnerOptions;
-  private readonly testFiles: string[] | undefined;
-  private readonly timeoutMS: number;
+  private readonly strykerOptions: StrykerOptions;
   private readonly log: Logger;
   private readonly baseNodeOptions = process.env.NODE_OPTIONS;
+  private options?: RunnerOptions;
   private playwright?: TestRunner;
   private rootDir?: string;
   private outputDir?: string;
@@ -98,11 +92,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   private runCounter = 0;
 
   constructor(options: StrykerOptions, log: Logger) {
-    this.options =
-      (options as StrykerOptions & { playwright?: PlaywrightRunnerOptions })
-        .playwright ?? {};
-    this.testFiles = options.testFiles;
-    this.timeoutMS = options.timeoutMS;
+    this.strykerOptions = options;
     this.log = log;
   }
 
@@ -111,15 +101,9 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   }
 
   async init(): Promise<void> {
-    if (this.testFiles?.length) {
-      throw new Error(
-        'The Playwright test runner does not support the --testFiles option.',
-      );
-    }
-
-    const configFile = this.options.configFile
-      ? path.resolve(this.options.configFile)
-      : undefined;
+    const options = readRunnerOptions(this.strykerOptions);
+    this.options = options;
+    const { configFile } = options;
     const testRequire = createRequire(
       createRequire(configFile ?? path.resolve('package.json')).resolve(
         '@playwright/test',
@@ -194,7 +178,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     this.servers = config.webServers.flatMap((server) =>
       serverCheck(server, isURLAvailable),
     );
-    this.warnAboutAssertionTimeouts(config);
+    this.warnAboutAssertionTimeouts(config, options.strykerTimeoutMS);
     // Every project, setup dependencies included: the one timeout override applies to all that run.
     const timeouts = config.projects.map(({ project }) => project.timeout);
     this.configTestTimeout =
@@ -206,12 +190,13 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     // after global setup, like Playwright's own CLI, because test files may read what it creates.
     this.serialGroups = await listSerialGroups(
       this.playwright,
-      projectsThatRun(this.options.projects, config.projects),
+      projectsThatRun(options.projects, config.projects),
     );
   }
 
   private warnAboutAssertionTimeouts(
     config: Awaited<ReturnType<TestRunner['loadConfig']>>,
+    timeoutMS: number,
   ) {
     // A killed test fails only after its auto-waiting assertion gives up, but Stryker sizes its timeout
     // from passing tests, so a short timeoutMS turns kills into timeouts.
@@ -219,9 +204,9 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
       ...config.projects.map((project) => project.expect?.timeout ?? 5000),
     );
 
-    if (this.timeoutMS < expectTimeout * 2) {
+    if (timeoutMS < expectTimeout * 2) {
       this.log.warn(
-        `timeoutMS (${this.timeoutMS}) is below twice the Playwright expect timeout (${expectTimeout}); killed mutants may be reported as timeouts. Set timeoutMS to at least ${expectTimeout * 2}.`,
+        `timeoutMS (${timeoutMS}) is below twice the Playwright expect timeout (${expectTimeout}); killed mutants may be reported as timeouts. Set timeoutMS to at least ${expectTimeout * 2}.`,
       );
     }
   }
@@ -361,8 +346,8 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
       const { status } = await playwright.runTests(reporter, {
         locations: [],
         testIds: request.testFilter,
-        projects: this.options.projects,
-        workers: this.options.workers ?? 1,
+        projects: this.options!.projects,
+        workers: this.options!.workers,
         maxFailures: request.disableBail ? undefined : 1,
         timeout: request.testTimeout,
         disableConfigReporters: true,

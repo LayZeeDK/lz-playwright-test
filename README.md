@@ -39,7 +39,7 @@ The answer to whether this works, the evidence, and the limits are in `docs/VERD
 
 ## Options
 
-Set these under `playwright` in the Stryker config. `packages/stryker-playwright-runner/src/index.ts` holds
+Set these under `playwright` in the Stryker config. `packages/stryker-playwright-runner/src/options.ts` holds
 the schema Stryker checks them against.
 
 - `configFile`: the Playwright config file, relative to the project root. Without it, Playwright looks
@@ -98,7 +98,7 @@ Run these from the repo root. The tests start a browser, so install Chromium fir
 npm install
 npx playwright install chromium
 npx tsc -p packages/stryker-playwright-runner/tsconfig.json
-node --test packages/stryker-playwright-runner/test/runner.test.ts packages/stryker-playwright-runner/test/run-result.test.ts packages/stryker-playwright-runner/test/ui-mutators.test.ts
+node --test "packages/stryker-playwright-runner/test/*.test.ts"
 ```
 
 `ui-mutators.test.ts` runs the runner against a page instrumented with the UI operators and checks that a

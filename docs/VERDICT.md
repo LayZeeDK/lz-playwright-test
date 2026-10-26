@@ -421,7 +421,7 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
 npm install
 npx playwright install chromium
 npx tsc -p packages/stryker-playwright-runner/tsconfig.json
-node --test packages/stryker-playwright-runner/test/runner.test.ts packages/stryker-playwright-runner/test/run-result.test.ts packages/stryker-playwright-runner/test/ui-mutators.test.ts
+node --test "packages/stryker-playwright-runner/test/*.test.ts"
 npx tsc -p packages/stryker-ui-mutators/tsconfig.json
 node --test packages/stryker-ui-mutators/test/*.test.ts
 npx stryker run stryker.e2e.config.ts
