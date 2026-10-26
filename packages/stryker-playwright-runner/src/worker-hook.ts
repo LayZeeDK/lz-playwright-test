@@ -34,7 +34,7 @@ interface ContextState {
   collected: boolean;
 }
 
-interface PageSettings {
+export interface PageSettings {
   ns: string;
   activeMutant?: string;
   testId?: string;
@@ -50,13 +50,14 @@ if (settings && isMainThread && WORKER_ENTRY.test(entry)) {
   install(createRequire(entry), settings);
 }
 
-function install(
+/** `ns` is the global the instrumented code keeps its state in, in the worker and in its pages. */
+export function install(
   playwrightRequire: NodeJS.Require,
   { outDir, perTest, hitLimit }: RunSettings,
-) {
+  ns: string = INSTRUMENTER_CONSTANTS.NAMESPACE,
+): void {
   const { test }: { test: Test } = playwrightRequire('playwright/test');
   const instrumentation = instrumentationOf(playwrightRequire);
-  const ns = INSTRUMENTER_CONSTANTS.NAMESPACE;
   const activeMutant =
     process.env[INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE];
   const outFile = path.join(outDir, `worker-${process.pid}${SNAPSHOT_SUFFIX}`);
@@ -292,7 +293,12 @@ async function readNamespace(
 
 // Runs in the browser before any page script. Coverage and the hit count are carried across
 // same-origin navigations of the top frame through sessionStorage, which survives a page load.
-function initPage({ ns, activeMutant, testId, hitLimit }: PageSettings) {
+export function initPage({
+  ns,
+  activeMutant,
+  testId,
+  hitLimit,
+}: PageSettings): void {
   const scope = globalThis as unknown as Record<
     string,
     Record<string, unknown> | undefined
