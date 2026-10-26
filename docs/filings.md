@@ -115,6 +115,17 @@ text still says not to run the suite unprompted. O8 gained one more case: `lz-re
 a prerequisite to clear, not the red" made the worker export a constant before running the red, so the red came
 from the function under test and not from ESM linking.
 
+**O14. `lz-refactor` has no route for a public rename the owner already approved.** Asked to apply Rename across
+both packages after Lars ruled on the new names, `lz-refactor` routed to Fowler's Rename / Change Function
+Declaration, and step 5 says to pause and ask before changing an exported or public-API symbol whose consumers the
+local tests do not cover. The owner's ruling is that ask answered; the skill has no case for it, so the worker went
+ahead on the ruling. Evidence: `lz-refactor` SKILL.md step 5; `.audit/prod/rename/progress.md` (local, gitignored).
+
+O8 gained one more case on a Linux-only bug (a port check that read a live server as down): `lz-red` step 5's
+"a test that passes on its first run while driving new behavior is a false green" ruled out a real-socket test,
+which passes on Windows before the fix, in favour of a test through the injected `connect` seam that fails on every
+OS with an AssertionError on the value.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -159,6 +170,10 @@ the next red.
 **S12 (from O13).** Add a short note to `lz-tpp`: when a project gates on mutation score, prefer the
 transformation that leaves no equivalent mutant, and say which shapes create them (a separate `catch` that returns
 a default, a boolean literal used only as a mark).
+
+**S13 (from O14).** In `lz-refactor` step 5, say that an owner's recorded approval of the public change (a ruling,
+an issue, a brief that quotes it) answers the pause, and that the refactoring then proceeds with the consumers'
+breakage stated in the commit.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
