@@ -401,11 +401,13 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
 - One server serves every mutant run, so state the app writes to its server or backend during one run is
   still there in the next. A suite that passes when run twice in a row against one dev server is fine.
   A suite that depends on a fresh backend can report a mutant as Killed or Survived when it is not.
-- With Stryker's `ignoreStatic`, mutants covered only by a shared `beforeAll` page count as static and
-  are ignored. A mutant that both a shared page and a test's own page reach is not ignored. Stryker
-  runs only the tests that reached it from their own pages, so it can survive when only a test that
-  uses the shared page would have killed it (inferred from Stryker's test planner, not run). Shared
-  pages make such mutants common with this runner.
+- With Stryker's `ignoreStatic`, mutants covered only by static coverage are ignored: those a shared
+  `beforeAll` page reaches, and those Node code reaches only from fixtures (test-scoped ones included)
+  or from `beforeAll` and `afterAll` hooks (see the next item). A mutant that both static coverage and
+  a test reach is not ignored. Stryker runs only the tests whose per-test coverage reached it, so it
+  can survive when only a test that uses the shared page or the fixture would have killed it
+  (inferred from Stryker's test planner, not run). Shared pages and fixtures make such mutants common
+  with this runner.
 - Node coverage in a test worker counts for a test only while Playwright runs that test's body or its
   `beforeEach` and `afterEach` hooks. Coverage from `beforeAll` and `afterAll` hooks and from fixture
   setup and teardown, test-scoped fixtures included, counts as static, so Stryker runs every test for
