@@ -69,15 +69,19 @@ export function toNodeMutator(
   return {
     name: operator.name,
     *mutate(path) {
+      const site = attributeSite(path, t);
+
       for (const rule of operator.rules) {
         if (rule.kind === 'node') {
           yield* rule.mutate(path, t);
           continue;
         }
 
-        const site = attributeSite(path, rule, t);
-
-        if (site === undefined || rule.skip?.(site) === true) {
+        if (
+          site === undefined ||
+          !matches(rule.attributes, site.name) ||
+          rule.skip?.(site) === true
+        ) {
           continue;
         }
 
@@ -91,26 +95,29 @@ export function toNodeMutator(
   };
 }
 
+function matches(
+  attributes: AttributeRule['attributes'],
+  name: string,
+): boolean {
+  return attributes instanceof RegExp
+    ? attributes.test(name)
+    : attributes.includes(name);
+}
+
 function attributeSite(
   path: NodePath,
-  rule: AttributeRule,
   t: BabelTypes,
 ): AttributeSite | undefined {
   if (!path.isJSXAttribute() || !t.isJSXIdentifier(path.node.name)) {
     return undefined;
   }
 
-  const name = path.node.name.name;
-  const matches =
-    rule.attributes instanceof RegExp
-      ? rule.attributes.test(name)
-      : rule.attributes.includes(name);
-  const value = matches ? readValue(path.node.value, t) : undefined;
+  const value = readValue(path.node.value, t);
   const element = elementSite(path, t);
 
   return value === undefined || element === undefined
     ? undefined
-    : { name, value, element, path };
+    : { name: path.node.name.name, value, element, path };
 }
 
 function elementSite(
