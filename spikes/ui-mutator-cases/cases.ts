@@ -439,14 +439,14 @@ export const cases: readonly Case[] = [
   },
   {
     id: 'ngx-yeti-19',
-    title: 'a list role is removed and each item text emptied',
+    title: 'a list role equal to the implicit role is kept; each item text is emptied',
     origin: `${YETI}cluster-fixture.ts:24`,
     jsx: '<ul id="tags-cluster" role="list"><li>layout</li><li>intrinsic</li></ul>',
     expect: [
-      ['ElementRole', 'role={undefined}'],
       ['TextLiteral', ''],
       ['TextLiteral', ''],
     ],
+    gap: 'ElementRole skips a role equal to the implicit role (Playwright maps ul to list); the prototype removes it',
   },
   {
     id: 'ngx-yeti-20',

@@ -153,6 +153,11 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
   `label` that also wraps its control, because nesting keeps the association. `TextLiteral` skips text
   inside `style` and `script`, which is CSS or code, not rendered text. `ElementRole` skips a `role` equal
   to the element's implicit role, such as `<button role="button">`, because removing it changes nothing.
+  The implicit roles are the ones Playwright's `getByRole` computes for a tag without context
+  (`getImplicitAriaRole` in `playwright-core/lib/coreBundle.js`): `button`, `nav`, `main`, `aside`,
+  `article`, `dialog`, `ul`, `ol` and `menu` (`list`), `li`, `table`, `h1` to `h6` (`heading`), and `a`
+  with `href` (`link`). `header`, `footer`, `form`, and `section` get their role only in some contexts, so
+  removing an explicit one can change what `getByRole` finds, and the skip leaves them out.
   No synthetic case covers these three yet.
 
 The prototype also matches `formAction`, `inert`, `aria-current`, `aria-invalid` and `checked`, which this
@@ -213,14 +218,19 @@ remain:
   `JSXText` become placement sites. Details: Opus draft, sections 3.2 and 3.3.
 - **Fail loud.** Still at import, the plugin instruments one JSX sample per operator and checks that
   each sample gives a mutant of its operator. The error names every operator whose sample gave none, so
-  one operator that a StrykerJS change breaks cannot hide behind the others. Core turns a plugin import error into a warning and runs on without the mutators
-  (`packages/core/src/di/plugin-loader.ts:193-209`), so throwing at import is not enough. The plugin
-  therefore keeps any install or self-check error and exports an `Ignore` plugin named `ui-mutators`.
-  Core creates every ignorer listed in `ignorers` right before `instrument()`
-  (`2-mutant-instrumenter-executor.ts:67-69`), with no catch, so an error thrown from that factory stops
-  the run. The factory throws the kept error, or an "install did not run" error when the install was
-  skipped. Otherwise it returns an ignorer that ignores nothing. `spikes/ignorer-route/` measured this
-  route on StrykerJS 10.1.1: a factory that throws makes `stryker run` exit 1 with the error's message.
+  one operator that a StrykerJS change breaks cannot hide behind the others. An install or self-check
+  error rejects the module's import. Core turns a plugin import error into a warning and runs on without
+  the mutators (`packages/core/src/di/plugin-loader.ts:193-209`), so the module also exports an `Ignore`
+  plugin named `ui-mutators`. Core creates every ignorer listed in `ignorers` right before `instrument()`
+  (`2-mutant-instrumenter-executor.ts:67-69`), with no catch. After a failed install the module exported
+  nothing, so core throws `Cannot find Ignore plugin "ui-mutators"` there (`plugin-creator.ts:57-64`), and
+  the install error is in the warning above it. After a skipped install (see "Process placement") the
+  factory throws "install did not run". Otherwise it returns an ignorer that ignores nothing.
+  `spikes/ignorer-route/` measured on StrykerJS 10.1.1 that a factory that throws makes `stryker run` exit
+  1 with the error's message; the exit code after a failed install comes from the same call site and is
+  measured by the negative control under "What the verification plan adds". An earlier version of this
+  design kept the error and threw it from the factory. That cannot hold together with the config import
+  below: a module that keeps its error loads without one, so a config that imports it would not stop.
 - **The `ignorers` entry is required.** `ignorers` defaults to `[]`
   (`packages/api/schema/stryker-core.json:509-516`), and core creates only the listed names. A
   documented config that lists the plugin in `plugins` therefore always has `ignorers: ['ui-mutators']`
@@ -228,8 +238,7 @@ remain:
   Without it, a successful install still registers and runs every operator, because registration
   happens at import. A failed install falls back to core's warning
   `Error during loading "@layzee/stryker-ui-mutators" plugin`, and the run finishes without UI mutants. The
-  plugin cannot detect the missing entry in that case, because the code that would check is the code
-  that failed.
+  plugin cannot detect the missing entry in that case, because its import has already failed.
 - **A config import fails loud with one entry.** A config written as a JavaScript or TypeScript module
   can `import '@layzee/stryker-ui-mutators'` on its first line instead. The module installs with a
   top-level `await`, so an install or self-check error rejects the config import, and the run stops
