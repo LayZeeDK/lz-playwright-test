@@ -38,7 +38,7 @@ const NOT_ON_SPAN: ReadonlySet<string> = new Set(['href', 'type', 'disabled']);
  * attributes or context, so they are left out. `dd`, `dt`, `li`, `tbody`, `tfoot`, `thead` and `tr` lose their role
  * under a parent with `role="none"` or `role="presentation"`; that shape is rare, so they stay in.
  */
-const IMPLICIT_ROLE: ReadonlyMap<string, string> = new Map([
+export const IMPLICIT_ROLE: ReadonlyMap<string, string> = new Map([
   ['article', 'article'],
   ['aside', 'complementary'],
   ['blockquote', 'blockquote'],
