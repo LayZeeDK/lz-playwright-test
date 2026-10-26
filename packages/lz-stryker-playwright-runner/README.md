@@ -1,4 +1,4 @@
-# @layzee/stryker-playwright-runner
+# @layzee/lz-stryker-playwright-runner
 
 A StrykerJS test runner for Playwright Test. It runs Playwright e2e tests and Playwright component
 tests (`mount()`) as Stryker tests, reports per-test coverage, and starts the Playwright `webServer`
@@ -18,7 +18,7 @@ once per Stryker test runner process instead of once per mutant.
 Install the runner next to StrykerJS and Playwright:
 
 ```sh
-npm install -D @layzee/stryker-playwright-runner @stryker-mutator/core @playwright/test
+npm install -D @layzee/lz-stryker-playwright-runner @stryker-mutator/core @playwright/test
 ```
 
 Then select it in the Stryker config:
@@ -27,9 +27,9 @@ Then select it in the Stryker config:
 import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 
 export default {
-  plugins: ['@layzee/stryker-playwright-runner'],
-  testRunner: 'playwright',
-  playwright: { configFile: 'playwright.config.ts' },
+  plugins: ['@layzee/lz-stryker-playwright-runner'],
+  testRunner: 'lz-stryker-playwright',
+  lzStrykerPlaywright: { configFile: 'playwright.config.ts' },
   coverageAnalysis: 'perTest',
   mutate: ['src/**/*.tsx'],
 } satisfies PartialStrykerOptions;
@@ -43,7 +43,7 @@ it.
 
 ## Options
 
-Set these under `playwright` in the Stryker config. Stryker checks them against the schema the package
+Set these under `lzStrykerPlaywright` in the Stryker config. Stryker checks them against the schema the package
 exports as `strykerValidationSchema`.
 
 - `configFile`: the Playwright config file, relative to the project root. Without it, Playwright looks
@@ -60,7 +60,7 @@ otherwise:
 
 - `screenshot`, `trace`, and `video` are off.
 - The reporters in the Playwright config do not run.
-- `outputDir` is a folder in a private temp directory, `stryker-playwright-<pid>-*` in the OS temp
+- `outputDir` is a folder in a private temp directory, `lz-stryker-playwright-<pid>-*` in the OS temp
   directory, which `dispose` removes. A runner that Stryker killed first leaves that directory behind.
   The next runner to start removes it if the process that owned it no longer runs and the directory's
   `owner` file shows it was made on the same host (and, on Linux, in the same PID namespace). Runners

@@ -5,10 +5,10 @@ Never apply these to the upstream clone itself. `docs/VERDICT.md` (Evidence) has
 
 Every copy also needs this runner and StrykerJS installed. Link the runner as a directory junction or
 an absolute link. Node resolves the link and strips the runner's TypeScript outside `node_modules`.
-Every Stryker config here loads the runner by its package name, `@layzee/stryker-playwright-runner`.
+Every Stryker config here loads the runner by its package name, `@layzee/lz-stryker-playwright-runner`.
 
 ```sh
-npm install -D @stryker-mutator/core@^10.1.1 file:<this repo>/packages/stryker-playwright-runner
+npm install -D @stryker-mutator/core@^10.1.1 file:<this repo>/packages/lz-stryker-playwright-runner
 ```
 
 The runner needs `@playwright/test` 1.63 or a later 1.x release. If the copy has an older one or none,
@@ -35,7 +35,7 @@ it uses is `oss/realworld-api`. Then run `npx stryker run stryker.playwright.con
    copies `.nx/workspace-data` into its sandbox, and while the daemon that the build started is
    running, the sandbox's Nx connects to it, the daemon refuses a different workspace, and the
    `webServer` fails to start.
-3. Run `npx stryker run stryker.playwright.config.ts`. The config sets `playwright.workers` to 2 and
+3. Run `npx stryker run stryker.playwright.config.ts`. The config sets `lzStrykerPlaywright.workers` to 2 and
    `dryRunTimeoutMinutes` to 20, because the 234-test dry run takes longer than Stryker's default
    5 minutes on one worker.
 
@@ -45,7 +45,7 @@ it uses is `oss/realworld-api`. Then run `npx stryker run stryker.playwright.con
    `pnpm add -D @stryker-mutator/core@10.1.1 @playwright/test@^1.64.1`. The copy's own
    `@playwright/test` is `^1.58.2`, below the runner's 1.63 floor; the copy's `package.json` diff
    after the run showed both versions. Then link the runner as a junction at
-   `node_modules/@layzee/stryker-playwright-runner`, the name that
+   `node_modules/@layzee/lz-stryker-playwright-runner`, the name that
    `analog/stryker.playwright.config.ts` loads.
 2. Apply `analog/copy.patch` and copy `analog/stryker.playwright.config.ts` into the copy. The patch:
    - starts the built SSR server instead of `nx serve-nitro`, whose `PORT=3000 node ...` cannot run
@@ -64,7 +64,7 @@ dev server (`npm run dev`), which compiles Stryker's sandbox on the fly.
 
 1. Copy `.env.example` to `.env`, the repo's own setup step.
 2. Install the runner, StrykerJS, and Playwright as above, plus the operators and the checker:
-   `npm install -D @stryker-mutator/typescript-checker@10.1.1 file:<this repo>/packages/stryker-ui-mutators`.
+   `npm install -D @stryker-mutator/typescript-checker@10.1.1 file:<this repo>/packages/lz-stryker-ui-mutators`.
    The copy pins `@playwright/test` to `^1.58.1`.
 3. Apply `epic-stack/copy.patch` and copy `epic-stack/stryker.playwright.config.ts` into the copy.
    The patch:

@@ -10,17 +10,17 @@ The answer to whether this works, the evidence, and the limits are in `docs/VERD
 
 ## Packages
 
-- `packages/stryker-playwright-runner/README.md`: the runner's requirements, Stryker config, options,
+- `packages/lz-stryker-playwright-runner/README.md`: the runner's requirements, Stryker config, options,
   and the Playwright settings it replaces on every run.
-- `packages/stryker-ui-mutators/README.md`: the ten UI mutation operators and how to turn them on.
+- `packages/lz-stryker-ui-mutators/README.md`: the ten UI mutation operators and how to turn them on.
 
 Both packages ship built JavaScript in `dist`. The workspace's own Stryker runs load them from there, so
 build first (the Nx targets below do).
 
 ## Layout
 
-- `packages/stryker-playwright-runner`: the runner, package `@layzee/stryker-playwright-runner`.
-- `packages/stryker-ui-mutators`: the UI mutation operators, package `@layzee/stryker-ui-mutators`.
+- `packages/lz-stryker-playwright-runner`: the runner, package `@layzee/lz-stryker-playwright-runner`.
+- `packages/lz-stryker-ui-mutators`: the UI mutation operators, package `@layzee/lz-stryker-ui-mutators`.
 - `apps/demo-app` (Nx project `@layzee/demo-app`): the demo app and its Playwright component tests
   (`playwright.components.config.mts`).
 - `apps/demo-app-e2e`: the demo app's Playwright e2e tests.
@@ -46,8 +46,8 @@ install it first.
 npm install
 npx playwright install chromium
 npx nx run-many -t typecheck build
-npx nx run @layzee/stryker-playwright-runner:test
-npx nx run @layzee/stryker-playwright-runner:test-browser
+npx nx run @layzee/lz-stryker-playwright-runner:test
+npx nx run @layzee/lz-stryker-playwright-runner:test-browser
 ```
 
 `test/browser/ui-mutators.test.ts` runs the runner against a page instrumented with the UI operators
@@ -56,7 +56,7 @@ and checks that a Playwright test kills each operator's mutant.
 The UI operators' tests need no browser:
 
 ```sh
-npx nx run @layzee/stryker-ui-mutators:test
+npx nx run @layzee/lz-stryker-ui-mutators:test
 ```
 
 To run Stryker on the demo app, use `npx nx run @layzee/demo-app-e2e:mutate-e2e`,

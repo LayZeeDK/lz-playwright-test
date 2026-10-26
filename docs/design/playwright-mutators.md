@@ -1,7 +1,7 @@
 # Design: UI mutation operators that Playwright tests can kill
 
 Status: chosen design, 2026-10-25, by Claude during an AFK run. Built on 2026-10-26 as
-`packages/stryker-ui-mutators`. Lars approved the operator and mutation names in Names, without a
+`packages/lz-stryker-ui-mutators`. Lars approved the operator and mutation names in Names, without a
 namespace prefix, on 2026-10-25 ("2-3: Approve").
 
 ## Why
@@ -28,7 +28,7 @@ fix, and it keeps the Fable `ListExpression` for Later.
 | --------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | Attribute placement                           | switch inside the attribute value: `aria-label={c ? "" : "Close"}`  | the attribute becomes a spread object `{...c ? {...} : {...}}`                          | Opus: smaller output, React sees the same props, no `key`/`ref` exception, handles `&amp;` |
 | Emptied text                                  | `null`, identical render to the original                            | `""`                                                                                    | Opus                                                                                       |
-| Element-level mutants (tag swap)              | yes, with the JSX child wrap                                        | none in v1                                                                              | Opus (`ElementRole` can swap a tag)                                                        |
+| Element-level mutants (tag swap)              | yes, with the JSX child wrap                                        | none in v1                                                                              | Opus (`LzElementRole` can swap a tag)                                                      |
 | Conditional with a comparison or logical test | no skip, so it repeats the built-in `ConditionalExpression` mutants | skips the test shapes that `ConditionalExpression` already forces (`builtInForcesTrue`) | Fable                                                                                      |
 | Silent plugin failure                         | warning only                                                        | import-time self-check that throws                                                      | Fable, moved to an `Ignore` plugin factory (see Integration)                               |
 | Version drift                                 | peer pinned to `10.1.1` exactly                                     | peer `~10.1.0` plus a runtime warning                                                   | Fable                                                                                      |
@@ -40,16 +40,16 @@ fix, and it keeps the Fable `ListExpression` for Later.
 Ranked by how often realistic Playwright suites would kill them. Full patterns, examples and skip rules
 are in the Opus draft, section 2. Where this list differs from the draft, this list wins.
 
-1. `TextLiteral`: empties JSX text that has a letter or digit. Killed by `getByText`, `getByRole({ name })`, `toHaveText`.
-2. `LabelAttribute`: empties `aria-label`, `aria-labelledby`, `alt`, `title`, `placeholder`, and `htmlFor`, whether the value is a string or a bound expression (`alt={username}`). A template literal is left to the built-in `StringLiteral`, which already empties it. Killed by `getByLabel`, `getByRole({ name })`, `getByPlaceholder`, `getByAltText`.
-3. `EventHandler`: `onX={handler}` becomes `onX={undefined}` when the handler is not inline, so the operator never repeats the built-in `ArrowFunction` mutant. It also skips a handler that is a function declared in the same file (a function declaration, or a `const` whose initializer is a function or an arrow) when this attribute is the handler's only reference. Babel's scope binding gives that reference count. Killed by the assertion after a `click` or `fill`.
-4. `ConditionalElement`: forces `x && <A/>` to render, and forces each branch of a JSX ternary. It skips a shape when the `&&` left operand, or the ternary test, is a `BinaryExpression` with `==`, `!=`, `===`, `!==`, `<`, `<=`, `>`, or `>=`, or a `LogicalExpression` with `&&` or `||`. For those shapes the built-in `ConditionalExpression` already makes the same mutants: `true` for the left operand of `&&`, which renders the element, and `true` and `false` for a ternary test, which force each branch. So `{open && <p/>}` and `{busy ? <A/> : <B/>}` get operator mutants, and `{off > 0 && <s/>}` and `{n > 1 ? <A/> : <B/>}` get none. Killed by `toBeVisible`, `toHaveCount(0)`.
-5. `UrlAttribute`: `href`, `to`, and `action` become `""`, from a string or a bound expression; a template literal is left to `StringLiteral`, as for `LabelAttribute`. Killed by `toHaveURL`.
-6. `DisabledAttribute`: forces `disabled`, `readOnly`, and `aria-disabled` off, and skips boolean-literal values (`disabled={true}`), which `BooleanLiteral` already flips. Killed by `toBeDisabled`, `toBeEditable`.
-7. `HiddenAttribute`: forces `hidden` and `aria-hidden` off. It never forces an element hidden. It skips `aria-hidden` on `svg`, `img`, and `i`, as the Opus draft did (2.7): those are decorative icons, and exposing one changes nothing a role, label, or text query sees. Killed by `toBeVisible`, `getByRole` (hidden elements leave the tree).
-8. `ElementRole`: removes `role`, or swaps a semantic tag for `span`: `button` always, and `a` only when it has an `href`. An `<a>` without `href` has no `link` role, so swapping it would be an equivalent mutant. The `span` drops `href`, `type`, and `disabled`, which a `span` cannot take (see "Rules the synthetic cases settled"). Killed by `getByRole`.
-9. `ChildExpression`: a `{value}` child becomes `null`. Killed by `toHaveText`.
-10. `StateAttribute`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, `aria-selected`. A string value flips between `"true"` and `"false"`, and an expression is negated, except where negating would give a constant: a ternary flips each branch instead, and a `String()` or `.toString()` call gets no mutant (see "Rules the synthetic cases settled"). Killed by `toHaveAttribute` and role queries with state options.
+1. `LzTextLiteral`: empties JSX text that has a letter or digit. Killed by `getByText`, `getByRole({ name })`, `toHaveText`.
+2. `LzLabelAttribute`: empties `aria-label`, `aria-labelledby`, `alt`, `title`, `placeholder`, and `htmlFor`, whether the value is a string or a bound expression (`alt={username}`). A template literal is left to the built-in `StringLiteral`, which already empties it. Killed by `getByLabel`, `getByRole({ name })`, `getByPlaceholder`, `getByAltText`.
+3. `LzEventHandler`: `onX={handler}` becomes `onX={undefined}` when the handler is not inline, so the operator never repeats the built-in `ArrowFunction` mutant. It also skips a handler that is a function declared in the same file (a function declaration, or a `const` whose initializer is a function or an arrow) when this attribute is the handler's only reference. Babel's scope binding gives that reference count. Killed by the assertion after a `click` or `fill`.
+4. `LzConditionalElement`: forces `x && <A/>` to render, and forces each branch of a JSX ternary. It skips a shape when the `&&` left operand, or the ternary test, is a `BinaryExpression` with `==`, `!=`, `===`, `!==`, `<`, `<=`, `>`, or `>=`, or a `LogicalExpression` with `&&` or `||`. For those shapes the built-in `ConditionalExpression` already makes the same mutants: `true` for the left operand of `&&`, which renders the element, and `true` and `false` for a ternary test, which force each branch. So `{open && <p/>}` and `{busy ? <A/> : <B/>}` get operator mutants, and `{off > 0 && <s/>}` and `{n > 1 ? <A/> : <B/>}` get none. Killed by `toBeVisible`, `toHaveCount(0)`.
+5. `LzUrlAttribute`: `href`, `to`, and `action` become `""`, from a string or a bound expression; a template literal is left to `StringLiteral`, as for `LzLabelAttribute`. Killed by `toHaveURL`.
+6. `LzDisabledAttribute`: forces `disabled`, `readOnly`, and `aria-disabled` off, and skips boolean-literal values (`disabled={true}`), which `BooleanLiteral` already flips. Killed by `toBeDisabled`, `toBeEditable`.
+7. `LzHiddenAttribute`: forces `hidden` and `aria-hidden` off. It never forces an element hidden. It skips `aria-hidden` on `svg`, `img`, and `i`, as the Opus draft did (2.7): those are decorative icons, and exposing one changes nothing a role, label, or text query sees. Killed by `toBeVisible`, `getByRole` (hidden elements leave the tree).
+8. `LzElementRole`: removes `role`, or swaps a semantic tag for `span`: `button` always, and `a` only when it has an `href`. An `<a>` without `href` has no `link` role, so swapping it would be an equivalent mutant. The `span` drops `href`, `type`, and `disabled`, which a `span` cannot take (see "Rules the synthetic cases settled"). Killed by `getByRole`.
+9. `LzChildExpression`: a `{value}` child becomes `null`. Killed by `toHaveText`.
+10. `LzStateAttribute`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, `aria-selected`. A string value flips between `"true"` and `"false"`, and an expression is negated, except where negating would give a constant: a ternary flips each branch instead, and a `String()` or `.toString()` call gets no mutant (see "Rules the synthetic cases settled"). Killed by `toHaveAttribute` and role queries with state options.
 
 Later: `ListExpression` (`.map` becomes `.slice(0, 1).map`, from the Fable draft), button `type` swap, Angular
 templates, and CSS. Each waits for a reason given in the drafts' "later" sections.
@@ -62,7 +62,7 @@ lists, and landmarks wrap far larger subtrees than buttons and links. The first 
 cost on `button` and `a` first.
 
 Deleting an element has no operator. It is the first of the four JSX operators proposed in StrykerJS
-issue #4375 (`docs/research/jsx-prior-art.md`, section 1.1), and `ConditionalElement` covers it only
+issue #4375 (`docs/research/jsx-prior-art.md`, section 1.1), and `LzConditionalElement` covers it only
 where a condition already guards the element.
 
 ## Names
@@ -90,16 +90,16 @@ and stryker4s (`modules/core/src/main/scala/stryker4s/mutation/`), both at their
 
 | Operator                 | Mutations                                                                                              | Earlier name (drafts, spike) |
 | ------------------------ | ------------------------------------------------------------------------------------------------------ | ---------------------------- |
-| `TextLiteral`            | `TextRemoval`                                                                                          | `TextContent`                |
-| `LabelAttribute`         | `LabelRemoval`                                                                                         | `AccessibleName`             |
-| `EventHandler`           | `EventHandlerRemoval`                                                                                  | `EventHandler`               |
-| `ConditionalElement`     | `ConditionalGuardRemoval` (`x && <A/>` to `<A/>`), `ConditionalToConsequent`, `ConditionalToAlternate` | `ConditionalRendering`       |
-| `UrlAttribute`           | `UrlRemoval`                                                                                           | `NavigationTarget`           |
-| `DisabledAttribute`      | `DisabledRemoval`                                                                                      | `DisabledState`              |
-| `HiddenAttribute`        | `HiddenRemoval`                                                                                        | `HiddenState`                |
-| `ElementRole`            | `RoleRemoval`, `ElementToSpan`                                                                         | `Role`                       |
-| `ChildExpression`        | `ChildExpressionRemoval`                                                                               | `ChildExpression`            |
-| `StateAttribute`         | `StateNegation`                                                                                        | `AriaState`                  |
+| `LzTextLiteral`          | `TextRemoval`                                                                                          | `TextContent`                |
+| `LzLabelAttribute`       | `LabelRemoval`                                                                                         | `AccessibleName`             |
+| `LzEventHandler`         | `EventHandlerRemoval`                                                                                  | `LzEventHandler`             |
+| `LzConditionalElement`   | `ConditionalGuardRemoval` (`x && <A/>` to `<A/>`), `ConditionalToConsequent`, `ConditionalToAlternate` | `ConditionalRendering`       |
+| `LzUrlAttribute`         | `UrlRemoval`                                                                                           | `NavigationTarget`           |
+| `LzDisabledAttribute`    | `DisabledRemoval`                                                                                      | `DisabledState`              |
+| `LzHiddenAttribute`      | `HiddenRemoval`                                                                                        | `HiddenState`                |
+| `LzElementRole`          | `RoleRemoval`, `ElementToSpan`                                                                         | `Role`                       |
+| `LzChildExpression`      | `ChildExpressionRemoval`                                                                               | `LzChildExpression`          |
+| `LzStateAttribute`       | `StateNegation`                                                                                        | `AriaState`                  |
 | `ListExpression` (later) | `ListTruncation`                                                                                       | `ListTruncate`               |
 
 Every name is letters only, because a `// Stryker disable` comment accepts only letters in mutator names,
@@ -113,28 +113,28 @@ StrykerJS matches it with `includes` (`babel-transformer.ts:278`), so users writ
 the table spells them.
 
 Two names do not fit the pattern exactly, the way StrykerJS's `ConditionalExpression` also mutates `if`
-tests and loops. `DisabledAttribute` also covers `readOnly`, and `ElementRole` changes either the `role`
+tests and loops. `LzDisabledAttribute` also covers `readOnly`, and `LzElementRole` changes either the `role`
 attribute or the tag that gives an element its implicit role.
 
 ## Rules the synthetic cases settled
 
-`packages/stryker-ui-mutators/test/cases.ts` holds 142 synthetic cases: JSX versions of UI shapes in the repos
+`packages/lz-stryker-ui-mutators/test/cases.ts` holds 142 synthetic cases: JSX versions of UI shapes in the repos
 the runner was exercised on (RealWorld, ngx-yeti, Analog and hello-world at the commits `oss/README.md` names,
 and the demo app), each with the exact UI mutants it must give. `spikes/ui-mutator-cases/` keeps the mined rows
 they came from. The cases first ran against the prototype and now run against the package. The design was silent on
 these points; Claude settled them on 2026-10-25 from the prototype's behaviour and the Opus draft:
 
-- `LabelAttribute` takes bound values, as the Opus draft's rule did (2.2); the earlier "plain-string"
+- `LzLabelAttribute` takes bound values, as the Opus draft's rule did (2.2); the earlier "plain-string"
   wording here narrowed it without a reason, and no built-in mutant empties a bound label.
-- `HiddenAttribute` skips a boolean-literal value, as `DisabledAttribute` does, because `BooleanLiteral`
+- `LzHiddenAttribute` skips a boolean-literal value, as `LzDisabledAttribute` does, because `BooleanLiteral`
   already flips it.
 - Forcing an attribute off removes a string or bare value (`disabled={undefined}`) and sets an expression to
   `{false}`; both give the same accessibility tree as `"false"`. `RoleRemoval` prints `role={undefined}`.
-- `ChildExpression` empties an identifier, a member expression, an optional chain, or a call, and skips a
-  string literal, a conditional (left to `ConditionalElement`), and a `.map`, `.filter` or `.flatMap` list,
+- `LzChildExpression` empties an identifier, a member expression, an optional chain, or a call, and skips a
+  string literal, a conditional (left to `LzConditionalElement`), and a `.map`, `.filter` or `.flatMap` list,
   which the later `ListExpression` owns. Until then a rendered list gets no UI mutant of its own.
-- `EventHandler` applies to an `onX` prop on a component as well as on an element.
-- `ConditionalElement` forces branches of a ternary rendered as a JSX child only, not a ternary inside an
+- `LzEventHandler` applies to an `onX` prop on a component as well as on an element.
+- `LzConditionalElement` forces branches of a ternary rendered as a JSX child only, not a ternary inside an
   attribute value (`href={last ? null : '/replay'}`).
 - An attribute whose value is already empty (`alt=""`, `href=""`) gets no mutant, because emptying it
   changes nothing. The built-in `StringLiteral` skips the same no-op, and the Opus draft's common rule
@@ -144,7 +144,7 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
   disables an enabled button, so any test that clicks it kills that mutant. `{false}` changes the element
   only while it is disabled, so only a test that checks the disabled state kills it. The operator
   mutant is the stronger one, and the Fable draft's skip of `!` is not taken.
-- `StateAttribute` negates a value that renders a boolean (`aria-expanded={open}` becomes
+- `LzStateAttribute` negates a value that renders a boolean (`aria-expanded={open}` becomes
   `{!open}`), but not one that renders a string, because a non-empty string negates to a constant
   `false`. tldraw (12921f6d3) writes `aria-pressed={isSelected ? 'true' : 'false'}` at five of its six state
   sites; `!(...)` there is equivalent whenever the item is not selected. A ternary therefore keeps its test
@@ -163,9 +163,9 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
   `npx tsc --jsx react-jsx --strict` on `<span href="/a">`, `<span type="submit">`, and
   `<span disabled>`: each gives TS2322. Other attributes a `span` accepts, such as `className`, `id`,
   `aria-*`, and handlers, stay.
-- Three skips from the Opus draft (section 2) hold here too. `LabelAttribute` skips `htmlFor` on a
-  `label` that also wraps its control, because nesting keeps the association. `TextLiteral` skips text
-  inside `style` and `script`, which is CSS or code, not rendered text. `ElementRole` skips a `role` equal
+- Three skips from the Opus draft (section 2) hold here too. `LzLabelAttribute` skips `htmlFor` on a
+  `label` that also wraps its control, because nesting keeps the association. `LzTextLiteral` skips text
+  inside `style` and `script`, which is CSS or code, not rendered text. `LzElementRole` skips a `role` equal
   to the element's implicit role, such as `<button role="button">`, because removing it changes nothing.
   The implicit roles are the ones Playwright 1.64.1's `getByRole` computes for a tag from its name alone
   (`getImplicitAriaRole` in `playwright-core/lib/coreBundle.js`), plus `a` with `href` (`link`). That is
@@ -184,15 +184,15 @@ The prototype also matches `formAction`, `inert`, `aria-current`, `aria-invalid`
 design does not list; they stay out of the first release.
 
 The Opus prototype (`spikes/design-opus/ui-mutators.ts`) and both drafts use the earlier names. The
-prototype also predates seven of the rules in this design: the `ConditionalElement` comparison and logical skip, the
-`ConditionalElement` limit to JSX children, the `EventHandler` single-reference skip, the `href`
+prototype also predates seven of the rules in this design: the `LzConditionalElement` comparison and logical skip, the
+`LzConditionalElement` limit to JSX children, the `LzEventHandler` single-reference skip, the `href`
 condition on the `a` swap, the skip of an empty value, the attributes that `ElementToSpan` drops, and the
-`HiddenAttribute` skip of `aria-hidden` on `svg`, `img`, and `i`. The package implements them, and the
+`LzHiddenAttribute` skip of `aria-hidden` on `svg`, `img`, and `i`. The package implements them, and the
 synthetic cases that test them pass. Two more prototype behaviours differ from this design. The prototype skips, without a word, an operator whose name is already registered
 (a case-sensitive `Set.has`), and wraps the placer only when it added every operator, where the design
 refuses the name. It also removes a string state value, so `aria-pressed="true"` becomes
-`aria-pressed={undefined}`, where `StateAttribute` flips it. Its counts in `neutral-output.txt`
-therefore include one `ConditionalRendering` (now `ConditionalElement`) mutant on
+`aria-pressed={undefined}`, where `LzStateAttribute` flips it. Its counts in `neutral-output.txt`
+therefore include one `ConditionalRendering` (now `LzConditionalElement`) mutant on
 `price-tag.tsx` line 22 (`off > 0 && (...)`) that the skip removes. With the skip, the demo's
 `price-tag.tsx` gets 2 UI mutants instead of 3, and `app.tsx` stays at 15. The verification plan's
 must-not-generate rows (Opus draft, section 6.1) gain `n > 0 && <A/>`, `a === b ? <A/> : <B/>`, a
@@ -204,23 +204,23 @@ Some operator mutants behave the same as a mutant StrykerJS or the source alread
 remove the cases that are cheap to detect. Each operator's match rule holds its skips. StrykerJS's
 `NodeMutator.filter` hook (`node-mutator.ts:14`) cannot hold them: it sees only the mutants of the node
 and its subtree, without the ones that carry an ignore reason (`babel-transformer.ts:122-153`). A skip
-written as a filter would then change with the user's `excludedMutations`, and the `EventHandler`
+written as a filter would then change with the user's `excludedMutations`, and the `LzEventHandler`
 single-reference skip needs the handler's binding, which is outside the attribute's subtree. These
 remain:
 
-- `EventHandler` on a handler that the skip does not catch can still match the built-in `BlockStatement`
+- `LzEventHandler` on a handler that the skip does not catch can still match the built-in `BlockStatement`
   mutant, which empties the handler's body. A click does nothing in both, and for `onSubmit` both let
   the native submit through. The two differ only when the handler is shared or a parent handler relies
   on the event bubbling. Examples are a handler imported from another file, or a handler passed in
   through props and emptied in the parent's file.
-- `ConditionalElement` on an empty list renders an empty `<ul>`, which Playwright reports as not
+- `LzConditionalElement` on an empty list renders an empty `<ul>`, which Playwright reports as not
   visible. The mutant is not equivalent, but `toBeHidden` does not kill it. `toHaveCount(0)` on the items
   does.
 
 Mutants that a lint rule would reject stay, unlabelled. Claude decided this on 2026-10-26. With all 36
 `eslint-plugin-jsx-a11y` rules at `error`, 88 of the 224 UI mutants of the synthetic cases, the demo app,
 the UI fixture and the corpus add a finding the original did not have: an emptied heading, label or link
-text (`TextLiteral`, `LabelAttribute`), an empty `href` (`UrlAttribute`), or a `span` that keeps a click
+text (`LzTextLiteral`, `LzLabelAttribute`), an empty `href` (`LzUrlAttribute`), or a `span` that keeps a click
 handler (`ElementToSpan`). Claude measured this at 63d0209 by applying each UI mutant's replacement at
 its location and linting the original and the mutant. They are kept because:
 
@@ -238,7 +238,7 @@ shapes cannot ship there, and the operators measure what lint cannot see.
 
 ## Integration
 
-- **Package.** `@layzee/stryker-ui-mutators`. The user lists it in `plugins` and lists its ignorer in
+- **Package.** `@layzee/lz-stryker-ui-mutators`. The user lists it in `plugins` and lists its ignorer in
   `ignorers`, or imports it from a JavaScript or TypeScript config (see "Fail loud"). No other options in v1. Users exclude operators with
   `mutator.excludedMutations` and with `// Stryker disable` comments, both of which already match custom
   mutator names.
@@ -259,9 +259,9 @@ shapes cannot ship there, and the operators measure what lint cannot see.
   one operator that a StrykerJS change breaks cannot hide behind the others. An install or self-check
   error rejects the module's import. Core turns a plugin import error into a warning and runs on without
   the mutators (`packages/core/src/di/plugin-loader.ts:193-209`), so the module also exports an `Ignore`
-  plugin named `ui-mutators`. Core creates every ignorer listed in `ignorers` right before `instrument()`
+  plugin named `lz-stryker-ui-mutators`. Core creates every ignorer listed in `ignorers` right before `instrument()`
   (`2-mutant-instrumenter-executor.ts:67-69`), with no catch. After a failed install the module exported
-  nothing, so core throws `Cannot find Ignore plugin "ui-mutators"` there (`plugin-creator.ts:57-64`), and
+  nothing, so core throws `Cannot find Ignore plugin "lz-stryker-ui-mutators"` there (`plugin-creator.ts:57-64`), and
   the install error is in the warning above it. After a skipped install (see "Process placement") the
   factory throws "install did not run". Otherwise it returns an ignorer that ignores nothing.
   `spikes/ignorer-route/` measured on StrykerJS 10.1.1 that a factory that throws makes `stryker run` exit
@@ -271,14 +271,14 @@ shapes cannot ship there, and the operators measure what lint cannot see.
   below: a module that keeps its error loads without one, so a config that imports it would not stop.
 - **The `ignorers` entry is required.** `ignorers` defaults to `[]`
   (`packages/api/schema/stryker-core.json:509-516`), and core creates only the listed names. A
-  documented config that lists the plugin in `plugins` therefore always has `ignorers: ['ui-mutators']`
+  documented config that lists the plugin in `plugins` therefore always has `ignorers: ['lz-stryker-ui-mutators']`
   next to it.
   Without it, a successful install still registers and runs every operator, because registration
   happens at import. A failed install falls back to core's warning
-  `Error during loading "@layzee/stryker-ui-mutators" plugin`, and the run finishes without UI mutants. The
+  `Error during loading "@layzee/lz-stryker-ui-mutators" plugin`, and the run finishes without UI mutants. The
   plugin cannot detect the missing entry in that case, because its import has already failed.
 - **A config import fails loud with one entry.** A config written as a JavaScript or TypeScript module
-  can `import '@layzee/stryker-ui-mutators'` on its first line instead. The module installs with a
+  can `import '@layzee/lz-stryker-ui-mutators'` on its first line instead. The module installs with a
   top-level `await`, so an install or self-check error rejects the config import, and the run stops
   before it starts, with no `ignorers` entry. The thermos plugin's Node operators use this route
   (`stryker.config.mjs:1`). A JSON config cannot import, so it keeps `plugins` and `ignorers`. The same
@@ -289,7 +289,7 @@ shapes cannot ship there, and the operators measure what lint cannot see.
   the name check does not count them as collisions, and the placer is wrapped once.
 - **Options, later.** A plugin module can export `strykerValidationSchema`, so options such as extra
   accessible-name props validate against the Stryker config. Mutators still cannot read them at run
-  time, because `NodeMutatorContext` carries only `isExpressionContext`. The `ui-mutators` ignorer
+  time, because `NodeMutatorContext` carries only `isExpressionContext`. The `lz-stryker-ui-mutators` ignorer
   factory receives the full options before `instrument()` and is the hook that can pass them on.
 - **Process placement.** Exporting `strykerPlugins` puts the module into `pluginModulePaths`
   (`plugin-loader.ts:83-86`). Every test-runner and checker worker re-imports those modules
@@ -302,7 +302,7 @@ shapes cannot ship there, and the operators measure what lint cannot see.
   worker, for example a mutation run of a test that starts Stryker, the inner main process inherits the
   variable. The ignorer then throws the "install did not run" error, so the run stops instead of
   silently losing UI mutants.
-- **Reports.** Each operator keeps its own `mutatorName`, so reports and filters show `TextLiteral` next
+- **Reports.** Each operator keeps its own `mutatorName`, so reports and filters show `LzTextLiteral` next
   to `StringLiteral`.
 
 Claude read the call sites cited in this section in the StrykerJS `v10.1.1` tag
@@ -341,11 +341,11 @@ level is a new concept in the StrykerJS schema that every built-in would need a 
 
 The built package has gone through `stryker run` with a browser on the demo app and on a copy of
 epic-stack, and a Playwright test kills a mutant of every operator in
-`packages/stryker-playwright-runner/test/browser/ui-mutators.test.ts`. `docs/VERDICT.md` (Evidence)
+`packages/lz-stryker-playwright-runner/test/browser/ui-mutators.test.ts`. `docs/VERDICT.md` (Evidence)
 has the counts. Two risks remain from those runs. On a server-rendered app the runner activates the
 mutant in the browser only, so a text or element mutant breaks hydration and is killed by an
 unrelated step, and an attribute mutant never reaches the DOM (VERDICT, Limits). And three operators,
-`EventHandler`, `HiddenAttribute`, and `StateAttribute`, have had no site in a real app yet, only in
+`LzEventHandler`, `LzHiddenAttribute`, and `LzStateAttribute`, have had no site in a real app yet, only in
 the test fixture.
 
 The self-check instruments through the instrumenter the plugin resolved and imported itself. That is the
@@ -385,12 +385,12 @@ decides each operator.
    - A Playwright test written for the behaviour kills at least one of its mutants.
 
    Measured on 2026-10-26 (`docs/VERDICT.md`, Evidence): every operator meets the bar. The corpus diff
-   is the placement test in `packages/stryker-ui-mutators/test/`. On the demo app, with
+   is the placement test in `packages/lz-stryker-ui-mutators/test/`. On the demo app, with
    `actionTimeout` set, none of the 17 UI mutants is equivalent or an error, and without it 3 kills
-   show as Timeout. In `packages/stryker-playwright-runner/test/browser/ui-mutators.test.ts` a
+   show as Timeout. In `packages/lz-stryker-playwright-runner/test/browser/ui-mutators.test.ts` a
    written test kills a mutant of each operator. A copy of epic-stack, outside the bar's scope, adds
    the first real ratios: 1 equivalent and 0 errors among 45 UI mutants, the equivalent one a
-   `ConditionalElement` (1 of 8 for that operator). Three operators have had no site in a real app yet, so the limit stays
+   `LzConditionalElement` (1 of 8 for that operator). Three operators have had no site in a real app yet, so the limit stays
    a starting value.
 
 ## Rerun the evidence
@@ -401,7 +401,7 @@ MODE=patched node spikes/design-opus/neutral.ts
 MODE=ui node spikes/design-opus/neutral.ts
 node spikes/design-opus/directive.ts
 node spikes/design-fable/spike-jsx-placement.ts
-node --test packages/stryker-ui-mutators/test/cases.test.ts
+node --test packages/lz-stryker-ui-mutators/test/cases.test.ts
 ```
 
 `MODE=patched` shows that the placer patch leaves built-in mutants unchanged, and `MODE=ui` prints the

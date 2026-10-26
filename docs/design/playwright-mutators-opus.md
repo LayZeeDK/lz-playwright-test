@@ -49,13 +49,13 @@ Common rules for every attribute operator [checked: prototype `classifyValue` in
 - **Built-in overlap**: none for plain attribute strings; `StringLiteral` skips `JSXAttribute` parents [checked: research 2.2].
 - **Frameworks**: JSX now; Angular static attributes, `[attr.aria-label]`, `[alt]`, `for` later.
 
-### 2.3 `EventHandler` (rank 3)
+### 2.3 `LzEventHandler` (rank 3)
 
 - **Matches**: `JSXAttribute` whose name matches `/^on[A-Z]/`, with a `JSXExpressionContainer` value that is not a function or literal (an identifier, member expression, call such as `onClick={select(id)}`, or conditional).
 - **Replacement**: `onX={undefined}`; React attaches no listener for `undefined` [inferred from React prop semantics; the render oracle in 5.1 shows the prop disappears]. Placement level: attribute.
 - **Example**: `<button onClick={save}>Save</button>` -> `<button onClick={undefined}>Save</button>`.
 - **Killed by**: whatever the test asserts after the action: `toHaveURL`, `toHaveText`, `toBeVisible` of the next UI state. On a controlled input, a missing `onChange` makes React revert the value, so `fill()` followed by any value-dependent assertion kills it.
-- **Equivalent risk and avoidance**: inline arrows and function expressions are skipped because `ArrowFunction` (`() => undefined`) and `BlockStatement` (`{}`) already empty them; the demo app has only inline handlers and got 0 `EventHandler` mutants [checked: `neutral-output.txt`]. Handlers with no visible effect (analytics, logging) survive legitimately; users mark them with a directive (see 3.5 for the JSX-comment caveat). On a component (`<Dialog onClose={close}>`) the prop becomes `undefined`, and a component that calls it unguarded throws: a kill by crash, which is cheap but says little [inferred].
+- **Equivalent risk and avoidance**: inline arrows and function expressions are skipped because `ArrowFunction` (`() => undefined`) and `BlockStatement` (`{}`) already empty them; the demo app has only inline handlers and got 0 `LzEventHandler` mutants [checked: `neutral-output.txt`]. Handlers with no visible effect (analytics, logging) survive legitimately; users mark them with a directive (see 3.5 for the JSX-comment caveat). On a component (`<Dialog onClose={close}>`) the prop becomes `undefined`, and a component that calls it unguarded throws: a kill by crash, which is cheap but says little [inferred].
 - **Why rank 3**: event-handler removal is the most valuable and least killed class in the prior art (MaewU EHDM score 0.00, research 1.1 and 1.3).
 - **Frameworks**: JSX now; Angular `(click)="save()"` output bindings later.
 
@@ -108,7 +108,7 @@ Common rules for every attribute operator [checked: prototype `classifyValue` in
 - **Cost**: (b) duplicates the element subtree once per mutant; limiting it to `button` and `a` keeps the copies small. The sample's four tag swaps are part of the 1,657 -> 6,803 character growth [checked: `spike-output.txt`].
 - **Frameworks**: JSX now; Angular `role` attribute and template tag swap later.
 
-### 2.9 `ChildExpression` (rank 9)
+### 2.9 `LzChildExpression` (rank 9)
 
 - **Matches**: an `Identifier`, `MemberExpression`, `OptionalMemberExpression` or `CallExpression` that is the expression of a `JSXExpressionContainer` in child position (parent `JSXElement`/`JSXFragment`), except calls to `.map`, `.filter` or `.flatMap` (list rendering, already emptied by `ArrowFunction`).
 - **Replacement**: `null`. Placement level: value.
@@ -147,7 +147,7 @@ Common rules for every attribute operator [checked: prototype `classifyValue` in
 
 ### 3.1 Package shape
 
-One package, `packages/stryker-ui-mutators` (`@layzee/stryker-ui-mutators`), ESM, TypeScript source run by Node type stripping like the runner package (`"main": "./src/index.ts"` [checked: `packages/stryker-playwright-runner/package.json`]). Three modules:
+One package, `packages/lz-stryker-ui-mutators` (`@layzee/lz-stryker-ui-mutators`), ESM, TypeScript source run by Node type stripping like the runner package (`"main": "./src/index.ts"` [checked: `packages/lz-stryker-playwright-runner/package.json`]). Three modules:
 
 | Module             | Contents                                                                                                                                                                  | Depends on                                              |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
@@ -167,7 +167,7 @@ Splitting `operators.ts` into its own package (the weapon-regex shape) waits unt
 4. It imports `dist/src/mutators/mutate.js` and `dist/src/mutant-placers/index.js` by file URL (the `exports` map exposes only `.`, research 3.2), pushes one `NodeMutator` per enabled operator into `allMutators`, which `transformBabel` reads by reference (`babel-transformer.ts:36`), and patches the placer (3.3). It is idempotent: a second call adds nothing [checked: `spike.ts` asserts `again.added` is empty].
 5. The module exports only `strykerValidationSchema`, not `strykerPlugins`. Core puts a module in `pluginModulePaths` only when it exports plugins [checked: `node_modules/@stryker-mutator/core/dist/src/di/plugin-loader.js:41-56`], so the module (and Babel) is not imported again into every test-runner and checker child process.
 
-Known weakness: core downgrades any error thrown while importing a plugin to a warning and continues [checked: `plugin-loader.js:112-120`], so a version mismatch prints `Error during loading "@layzee/stryker-ui-mutators" plugin: ...` and the run proceeds with built-in mutators only. The report then shows no UI mutator names. Section 5 lists this risk.
+Known weakness: core downgrades any error thrown while importing a plugin to a warning and continues [checked: `plugin-loader.js:112-120`], so a version mismatch prints `Error during loading "@layzee/lz-stryker-ui-mutators" plugin: ...` and the run proceeds with built-in mutators only. The report then shows no UI mutator names. Section 5 lists this risk.
 
 ### 3.3 JSX-safe placement
 
@@ -194,15 +194,15 @@ Two details the spike surfaced:
 - **Enable**: add the package to `plugins`. All ten operators are on.
 - **Exclude**: the existing `mutator.excludedMutations` takes the operator names, exactly as for built-ins [checked: `babel-transformer.ts:275-283`; `neutral.ts` MODE=patched]. Excluded mutants are not placed but appear in the report as `Ignored` (the sample reported 48 ignored mutants [checked: `neutral-output.txt`]); that is the same behaviour users already get for built-ins.
 - **Per location**: `// Stryker disable next-line TextContent` works in JavaScript context and as a line comment inside `{ }`, but the JSX comment form `{/* Stryker disable next-line TextContent */}` is silently ignored [checked: `directive-output.txt`, L5 placed, L9 and L15 ignored, no warning]. The directive bookkeeper reads only `leadingComments` (`directive-bookkeeper.ts:76`), and a JSX comment is an inner comment of `JSXEmptyExpression`. This affects built-in mutators in JSX equally [inferred]. Documented workaround: a file- or function-level `// Stryker disable TextContent`; the fix goes into the upstream PR (3.6).
-- **No plugin-specific config in v1.** Every candidate option (an allow-list of operators, extra accessible-name prop names for a design system) needs the options object, which a plugin only receives through dependency injection; the earliest DI hook before instrumentation is an `Ignore` plugin factory (core creates ignorers right before `instrument()` [checked: `core/src/process/2-mutant-instrumenter-executor.ts:64-73`]). Adding it costs users an extra `ignorers: ['ui-mutators']` line that, when forgotten, silently turns the options off. Deferred until a user needs tuning; the shape is in section 4.
+- **No plugin-specific config in v1.** Every candidate option (an allow-list of operators, extra accessible-name prop names for a design system) needs the options object, which a plugin only receives through dependency injection; the earliest DI hook before instrumentation is an `Ignore` plugin factory (core creates ignorers right before `instrument()` [checked: `core/src/process/2-mutant-instrumenter-executor.ts:64-73`]). Adding it costs users an extra `ignorers: ['lz-stryker-ui-mutators']` line that, when forgotten, silently turns the options off. Deferred until a user needs tuning; the shape is in section 4.
 
 Example (this repository's config style [checked: `stryker.e2e.config.ts`]):
 
 ```ts
 export default {
-  plugins: ['@layzee/stryker-playwright-runner', '@layzee/stryker-ui-mutators'],
-  testRunner: 'playwright',
-  playwright: { configFile: 'apps/demo-app-e2e/playwright.config.mts' },
+  plugins: ['@layzee/lz-stryker-playwright-runner', '@layzee/lz-stryker-ui-mutators'],
+  testRunner: 'lz-stryker-playwright',
+  lzStrykerPlaywright: { configFile: 'apps/demo-app-e2e/playwright.config.mts' },
   mutate: ['apps/demo-app/src/app/**/*.tsx', '!**/*.story.tsx'],
   mutator: { excludedMutations: ['AriaState'] },
   coverageAnalysis: 'perTest',
@@ -234,7 +234,7 @@ Erasable TypeScript only (no enums, namespaces or parameter properties). The reg
 ```ts
 import type { NodePath, types } from '@babel/core';
 
-export type OperatorName = 'TextContent' | 'AccessibleName' | 'EventHandler' | 'ConditionalRendering' | 'NavigationTarget' | 'DisabledState' | 'HiddenState' | 'Role' | 'ChildExpression' | 'AriaState';
+export type OperatorName = 'TextContent' | 'AccessibleName' | 'LzEventHandler' | 'ConditionalRendering' | 'NavigationTarget' | 'DisabledState' | 'HiddenState' | 'Role' | 'LzChildExpression' | 'AriaState';
 
 /** How an attribute's value is written in the source. Literal-in-braces and function values are never matched. */
 export type ValueKind = 'string' | 'bare' | 'expression';
@@ -345,9 +345,9 @@ Method: `install()` the prototype into the installed `@stryker-mutator/instrumen
 Result:
 
 ```
-installed: TextContent, AccessibleName, EventHandler, ConditionalRendering, NavigationTarget, DisabledState, HiddenState, Role, ChildExpression, AriaState
+installed: TextContent, AccessibleName, LzEventHandler, ConditionalRendering, NavigationTarget, DisabledState, HiddenState, Role, LzChildExpression, AriaState
 mutants: 61 total, 48 from UI operators
-per mutator: BlockStatement=2 TextContent=14 ChildExpression=4 AccessibleName=6 Role=8 EventHandler=2 DisabledState=3 NavigationTarget=2 HiddenState=2 BooleanLiteral=2 ConditionalExpression=2 LogicalOperator=1 ConditionalRendering=5 AriaState=2 ArrowFunction=2 StringLiteral=4
+per mutator: BlockStatement=2 TextContent=14 LzChildExpression=4 AccessibleName=6 Role=8 LzEventHandler=2 DisabledState=3 NavigationTarget=2 HiddenState=2 BooleanLiteral=2 ConditionalExpression=2 LogicalOperator=1 ConditionalRendering=5 AriaState=2 ArrowFunction=2 StringLiteral=4
 size: original 1657 chars, instrumented 6803 chars
 ...48 lines "ok   L<n> <Operator>: <original> -> <replacement>"...
 mutants rendering identically to the original in both scenarios (equivalent for this oracle): 1
@@ -377,12 +377,12 @@ patched sample.tsx: sha (ids masked) 2a5dc33ba953, 1657 -> 3786 chars, mutants p
 patched app.tsx: sha (ids masked) 0f4bff0567d9, 2066 -> 4573 chars, mutants placed 21 (ui 0), ignored 15
 patched price-tag.tsx: sha (ids masked) bc0accb7ef05, 817 -> 3901 chars, mutants placed 27 (ui 0), ignored 3
 ui app.tsx: ... mutants placed 36 (ui 15)
-  TextContent=8 AccessibleName=0 EventHandler=0 ConditionalRendering=0 NavigationTarget=2 DisabledState=0 HiddenState=0 Role=0 ChildExpression=5 AriaState=0
+  TextContent=8 AccessibleName=0 LzEventHandler=0 ConditionalRendering=0 NavigationTarget=2 DisabledState=0 HiddenState=0 Role=0 LzChildExpression=5 AriaState=0
 ui price-tag.tsx: ... mutants placed 30 (ui 3)
-  TextContent=0 AccessibleName=0 EventHandler=0 ConditionalRendering=1 NavigationTarget=0 DisabledState=0 HiddenState=0 Role=0 ChildExpression=2 AriaState=0
+  TextContent=0 AccessibleName=0 LzEventHandler=0 ConditionalRendering=1 NavigationTarget=0 DisabledState=0 HiddenState=0 Role=0 LzChildExpression=2 AriaState=0
 ```
 
-With the patch installed and the UI operators excluded, the output equals stock output once mutant ids are masked [checked]. Raw output differs only because ignored mutants still consume ids (the `sample.tsx` length differs by 16 characters of longer ids). On the demo's real components the operators add 15 and 3 mutants, and the duplicate-avoidance rules held: no `EventHandler` mutants for inline arrows, no `AccessibleName` mutants for template literals [checked].
+With the patch installed and the UI operators excluded, the output equals stock output once mutant ids are masked [checked]. Raw output differs only because ignored mutants still consume ids (the `sample.tsx` length differs by 16 characters of longer ids). On the demo's real components the operators add 15 and 3 mutants, and the duplicate-avoidance rules held: no `LzEventHandler` mutants for inline arrows, no `AccessibleName` mutants for template literals [checked].
 
 ### 5.3 Spike: directives in JSX (risk 8)
 
@@ -394,9 +394,9 @@ Three layers, cheapest first. Each layer has a negative control, so a green resu
 
 ### 6.1 Operator unit tests (Node, no browser)
 
-`packages/stryker-ui-mutators/test/operators.test.ts`, run with `node --test`, in the style of `packages/stryker-playwright-runner/test/runner.test.ts` (plain `node:test` + `assert/strict`, the real `Instrumenter`, helper lookups by `mutatorName` and `replacement`).
+`packages/lz-stryker-ui-mutators/test/operators.test.ts`, run with `node --test`, in the style of `packages/lz-stryker-playwright-runner/test/runner.test.ts` (plain `node:test` + `assert/strict`, the real `Instrumenter`, helper lookups by `mutatorName` and `replacement`).
 
-- **Generation table**: one row per operator with a TSX snippet and the exact set of `(mutatorName, replacement)` pairs expected, filtered to UI operators. For example `<button aria-label="Close" onClick={close}>Save</button>` must give exactly `AccessibleName aria-label=""`, `EventHandler onClick={undefined}`, `TextContent ""`, `Role <span ...>`.
+- **Generation table**: one row per operator with a TSX snippet and the exact set of `(mutatorName, replacement)` pairs expected, filtered to UI operators. For example `<button aria-label="Close" onClick={close}>Save</button>` must give exactly `AccessibleName aria-label=""`, `LzEventHandler onClick={undefined}`, `TextContent ""`, `Role <span ...>`.
 - **Must-not-generate rows**, one per skip rule: `aria-label=""`, `aria-label={'x'}`, ``aria-label={`${x}`}``, `onClick={() => f()}`, `<button>&times;</button>`, `<style>{'...'}</style>` text, `<button role="button">`, `<label htmlFor="q">Q <input id="q"/></label>`, `user && <p>{user.name}</p>`, `c ? <A/> : <A/>`, `<svg aria-hidden="true">`, `disabled={true}`, `items.map(...)` as a child.
 - **Render oracle**: `spike.ts` promoted to a test over a fixture that covers all ten operators and the edge cases of 5.1: zero mismatches, baseline equal.
 - **Neutrality**: `neutral.ts` promoted: for a small corpus (the three spike files plus a few of upstream's `testResources/instrumenter/*.tsx` inputs read from the StrykerJS clone), masked output with the patch and all UI operators excluded equals stock output.
@@ -405,7 +405,7 @@ Three layers, cheapest first. Each layer has a negative control, so a green resu
 
 ### 6.2 Runner integration: a Playwright test kills each operator's mutant
 
-`packages/stryker-playwright-runner/test/ui-mutators.test.ts`, structured like `runner.test.ts`: `before()` installs the operators, instruments a fixture, writes the served bundle, creates `PlaywrightTestRunner`, and runs the dry run with `coverageAnalysis: 'perTest'`; each test calls `mutantRun` with a `testFilter` and asserts the status and `killedBy`.
+`packages/lz-stryker-playwright-runner/test/ui-mutators.test.ts`, structured like `runner.test.ts`: `before()` installs the operators, instruments a fixture, writes the served bundle, creates `LzStrykerPlaywrightTestRunner`, and runs the dry run with `coverageAnalysis: 'perTest'`; each test calls `mutantRun` with a `testFilter` and asserts the status and `killedBy`.
 
 Fixture `test/ui-fixture/`:
 
@@ -419,13 +419,13 @@ Assertions, one test per row:
 | ---------------------- | ----------------------------------- | ---------------------------------------------------------------------- | ------------------------------ |
 | `TextContent`          | `<h1>Orders</h1>` emptied           | "shows the heading" (`getByRole('heading', { name: 'Orders' })`)       | Killed, `killedBy` = that test |
 | `AccessibleName`       | `aria-label=""` on the close button | "closes the dialog" (`getByRole('button', { name: 'Close' }).click()`) | Killed                         |
-| `EventHandler`         | `onClick={undefined}` on Show       | "reveals the status" (`click`, then `toBeVisible`)                     | Killed                         |
+| `LzEventHandler`       | `onClick={undefined}` on Show       | "reveals the status" (`click`, then `toBeVisible`)                     | Killed                         |
 | `ConditionalRendering` | `open && <Panel/>` forced           | "panel starts hidden" (`toBeHidden`)                                   | Killed                         |
 | `NavigationTarget`     | `href=""` on Done                   | "navigates to done" (`click`, `toHaveURL(/#\/done/)`)                  | Killed                         |
 | `DisabledState`        | `disabled={false}`                  | "submit is disabled while busy" (`toBeDisabled`)                       | Killed                         |
 | `HiddenState`          | `hidden={false}`                    | "region hidden until opened" (`toBeHidden`)                            | Killed                         |
 | `Role`                 | `role={undefined}` on the dialog    | "opens the dialog" (`getByRole('dialog')`)                             | Killed                         |
-| `ChildExpression`      | `{total}` -> `{null}`               | "shows the total" (`getByTestId('total')` + `toHaveText`)              | Killed                         |
+| `LzChildExpression`    | `{total}` -> `{null}`               | "shows the total" (`getByTestId('total')` + `toHaveText`)              | Killed                         |
 | `AriaState`            | `aria-expanded={!open}`             | "toggle reports expanded" (`getByRole('button', { expanded: true })`)  | Killed                         |
 
 Negative controls in the same file: each operator also gets one mutant that a selected test does not observe (for example `TextContent` on a footer note run against "shows the heading" only), which must be `Survived`, followed by the killing run of the same mutant in the same file, as `runner.test.ts` already does for its survivor case. This proves the kill comes from the observation and not from a broken page. A last test asserts that the dry run's per-test coverage credits the text mutant only to tests that render the page, as the existing per-test coverage test does.
@@ -435,5 +435,5 @@ Negative controls in the same file: each operator also gets one mutant that a se
 `stryker.e2e.ui.config.ts` (the 3.4 example with `mutate: ['apps/demo-app/src/app/app.tsx']`, JSON reporter to `reports/e2e-ui/mutation.json`), run by `npx stryker run stryker.e2e.ui.config.ts`, and a small Node check that reads the JSON report:
 
 - the report contains exactly the 15 UI mutants counted in 5.2, with mutator names and replacements as listed there;
-- predicted statuses [inferred from `cart.spec.ts` and `example.spec.ts`]: killed: `TextContent` on `Cart`, `Discount code`, `About` (link), `About` (heading), `Back to cart`; both `NavigationTarget`; `ChildExpression` on the four `formatPrice(...)` outputs. Survived: `TextContent` on `Subtotal`, `Shipping`, `Total` (tests use test ids), `ChildExpression` on `{line.name}` (the `aria-label` provides the name). That is 11 killed, 4 survived;
+- predicted statuses [inferred from `cart.spec.ts` and `example.spec.ts`]: killed: `TextContent` on `Cart`, `Discount code`, `About` (link), `About` (heading), `Back to cart`; both `NavigationTarget`; `LzChildExpression` on the four `formatPrice(...)` outputs. Survived: `TextContent` on `Subtotal`, `Shipping`, `Total` (tests use test ids), `LzChildExpression` on `{line.name}` (the `aria-label` provides the name). That is 11 killed, 4 survived;
 - any deviation from the prediction is triaged by hand and fed into risk 6. Wall time and the kill/timeout split are recorded for risk 5, once with the e2e config's current timeouts and once with `use.actionTimeout: 5000`.

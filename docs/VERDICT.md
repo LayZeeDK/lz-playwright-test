@@ -14,7 +14,7 @@ the active mutant into the browser: a Vite `define` and a dev-server restart per
 
 ## The answer
 
-Yes, with one plugin (`testRunner: 'playwright'`) for both kinds of test. Playwright 1.63 removed the
+Yes, with one plugin (`testRunner: 'lz-stryker-playwright'`) for both kinds of test. Playwright 1.63 removed the
 `@playwright/experimental-ct-*` packages. Component tests are now plain `@playwright/test` tests that
 call the built-in `mount()` fixture against your own dev server. The same runner code runs both, with no
 component-specific branch. The price is a dependency on undocumented Playwright internals, which any
@@ -28,7 +28,7 @@ needed changes before its suite passed (an upstream test bug, a build switch, an
 Analog file has no server-only code, so it does not exercise server-side rendering. The Evidence section
 lists the changes, and Limits lists the general ones.
 
-A second plugin, `@layzee/stryker-ui-mutators`, adds ten mutation operators for the JSX that Playwright
+A second plugin, `@layzee/lz-stryker-ui-mutators`, adds ten mutation operators for the JSX that Playwright
 tests look at, such as text, labels, links, and disabled or hidden state. StrykerJS 10.1.1 leaves those
 parts of a component unmutated (`docs/design/playwright-mutators.md`). On the demo app's e2e suite they
 add 17 mutants to 48 built-in ones: 11 killed, 4 survived because of gaps in the tests, and 2 in a
@@ -127,8 +127,9 @@ indicative. Each row is a single run unless it says otherwise. The run logs and 
 this section cites are local working records in gitignored folders, not part of the repo. To check a
 row, rerun it with the commands in Rerun.
 
-The Code column names the runner commit a row ran on. `git log -- packages/stryker-playwright-runner`
-lists every runner change after it, and a row is not rerun when the runner changes. fca053d rewrote how
+The Code column names the runner commit a row ran on.
+`git log -- packages/lz-stryker-playwright-runner packages/stryker-playwright-runner` lists every runner
+change after it, and a row is not rerun when the runner changes. fca053d rewrote how
 a run's test results become a mutant result. A row marked "before fca053d" ran on earlier code, and its
 log times do not pin it to one commit. A `command` runner row does not use this runner, so it has no
 commit. The open-source rows marked ff95b44 were rerun on that commit with the `oss/` files of that
@@ -138,6 +139,10 @@ shared machine cannot explain. One `oss/README.md` step needed a fix for the ngx
 
 Wall time is Stryker's own "Done in" from the run's log. The define row has no kept log, so its time is
 the shell's elapsed time for the whole command.
+
+The packages and their public names changed to `lz-` names at 7b9a022; the rows below ran before it and
+use the old names (`@layzee/stryker-playwright-runner`, `@layzee/stryker-ui-mutators`, `testRunner:
+'playwright'`, the `playwright` options key, and operator names without the `Lz` prefix).
 
 | Case                                                                                                                                                                  | Runner                                                                                       | Code                             | Score                                                                                                            | Wall time                      |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------ |
@@ -172,34 +177,34 @@ four survivors are gaps in the demo's tests, not equivalent mutants: the tests r
 by test id, not by their labels, and read each line's name from its input's `aria-label`, not from the
 label text. The two uncovered mutants are in `price-tag.tsx`, which no e2e page renders. No UI mutant
 was equivalent, and none was a compile or runtime error. The demo app has sites for only three of the
-ten operators (`TextLiteral`, `ChildExpression`, `UrlAttribute`). The other seven have evidence from
+ten operators (`LzTextLiteral`, `LzChildExpression`, `LzUrlAttribute`). The other seven have evidence from
 tests only, below.
 
 On epic-stack, the worker that ran it predicted each of the 45 UI mutants before the run; 36 matched.
 Of the 22 kills, 14 come from a test step that reads or follows the mutated element, and 8 from a later,
 unrelated step on a server-rendered page whose hydration the mutant broke (Limits). Of the 16
-survivors, 14 are gaps in the tests, 1 is equivalent (`ConditionalElement` forcing a span that renders
-empty), and 1 is a `UrlAttribute` mutant of a form `action` that server rendering kept out of the DOM.
-Two `LabelAttribute` survivors on the search input, its `htmlFor` and its `placeholder`, leave the
+survivors, 14 are gaps in the tests, 1 is equivalent (`LzConditionalElement` forcing a span that renders
+empty), and 1 is a `LzUrlAttribute` mutant of a form `action` that server rendering kept out of the DOM.
+Two `LzLabelAttribute` survivors on the search input, its `htmlFor` and its `placeholder`, leave the
 input named by the other one for role queries; `getByLabel` and `getByPlaceholder` would kill them,
-so they count as gaps. The one `ElementRole` tag swap, `<a href>` to `<span>` without the `href`,
+so they count as gaps. The one `LzElementRole` tag swap, `<a href>` to `<span>` without the `href`,
 compiled. The 80 built-in compile errors are real type errors, mostly emptied object and string
 literals. epic-stack needed a Prisma engine that runs on Windows arm64, a fixed port, a longer test
 timeout, and one upstream test marked `fixme`; `oss/README.md` lists each change.
 
 The UI operators have three more layers of evidence, all at or after 107505c.
-`packages/stryker-ui-mutators/test/` runs without a browser: 107 synthetic cases from the open-source
+`packages/lz-stryker-ui-mutators/test/` runs without a browser: 107 synthetic cases from the open-source
 repos and the design, each with the exact UI mutants it must give (0 todo); install checks for the
 name refusal, a second install, the self-check, and core resolution; an in-process check that the
 JSX placement leaves the built-in mutants of five files unchanged, with a negative control; and a
 render check that every mutant of the design spike's sample renders like the same edit made by hand.
-`packages/stryker-playwright-runner/test/browser/ui-mutators.test.ts` runs the runner on a page
+`packages/lz-stryker-playwright-runner/test/browser/ui-mutators.test.ts` runs the runner on a page
 instrumented with the UI operators: for each of the ten operators a Playwright test kills one of its
 mutants, and a test that does not observe that mutant lets it survive. `spikes/fail-loud/` runs
 `stryker run` with the plugin listed in `plugins` and with the plugin imported from the config. Both report UI mutants,
 and with one operator's sample broken on purpose both exit 1 and name that operator.
 
-`packages/stryker-playwright-runner/test/browser/runner.test.ts` checks the runner against a fixture
+`packages/lz-stryker-playwright-runner/test/browser/runner.test.ts` checks the runner against a fixture
 instrumented by Stryker's own instrumenter. It checks that per-test coverage separates a test that
 reaches a function from one that does not, coverage across a navigation to a page without the app,
 static coverage for a shared `beforeAll` page and for a page the worker closes, per-test coverage for a
@@ -272,7 +277,7 @@ mutant counts as covered because logout creates the handler, but no test makes l
 handler never runs. The 12 uncovered mutants are the inner callbacks of register and update, which the
 suite only calls through the API.
 
-The ngx-yeti run is the only one with `playwright.workers` above 1, which `runner.test.ts` does not
+The ngx-yeti run is the only one with `lzStrykerPlaywright.workers` above 1, which `runner.test.ts` does not
 cover. Coverage still came back per test. Each mutant was covered by 20 of the 234 tests, and Stryker
 stopped at the first kill, after 7 tests for one mutant and after 1 for the other. On one worker the dry
 run ran longer than Stryker's default 5-minute `dryRunTimeoutMinutes` (decision log, not rerun). With 2
@@ -351,7 +356,7 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   mutants only that document reached show as NoCoverage (inferred from the hook's code, not run).
 - Runners before this change named their private temp directories `stryker-pw-<worker>-*`, and a
   runner that Stryker killed while its teardown hung left one behind. The runner now names them
-  `stryker-playwright-<pid>-*` and removes, at `init`, those of runners of the same user that no longer
+  `lz-stryker-playwright-<pid>-*` and removes, at `init`, those of runners of the same user that no longer
   run. It never removes `stryker-pw-*` directories, because their number is no pid and a live one of an
   older runner would look dead; remove those from the system temp folder once by hand.
 - A pid names a process only in the PID namespace and on the host that gave it out. Each temp
@@ -361,7 +366,7 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   one another's directories, provided those hosts have different host names: every Linux host's first
   PID namespace has the same inode. On Linux without `/proc` the token is unique to the runner, so no
   later runner removes its directory. A directory without a readable `owner` file is kept, including
-  the `stryker-playwright-<pid>-*` directories of runners from before the `owner` file; remove those
+  the `lz-stryker-playwright-<pid>-*` directories of runners from before the `owner` file; remove those
   by hand. The root is removed again at once if its `owner` file cannot be written.
 - In a Stryker run started inside a Playwright worker, the worker hook of the inner runner installs
   and an outer copy of the same hook stays out; a copy from before that rule installs too and counts
@@ -376,7 +381,7 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   the hook and the runner. The prototype is used through a symlink, which Node resolves outside
   `node_modules`.
 - `disableBail` cannot lift a `maxFailures` set in the user's Playwright config.
-- The runner runs Playwright with `playwright.workers` from the Stryker config (default 1), not the
+- The runner runs Playwright with `lzStrykerPlaywright.workers` from the Stryker config (default 1), not the
   `workers` value in the Playwright config. A suite that passes only when its tests spread over several
   workers fails the dry run. RealWorld's `auth.spec.ts` makes its user id once per worker and registers
   that user before every test, so it failed the same way under plain `npx playwright test --workers=1`.
@@ -455,9 +460,9 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
 npm install
 npx playwright install chromium
 npx nx run-many -t typecheck build
-npx nx run @layzee/stryker-playwright-runner:test
-npx nx run @layzee/stryker-playwright-runner:test-browser
-npx nx run @layzee/stryker-ui-mutators:test
+npx nx run @layzee/lz-stryker-playwright-runner:test
+npx nx run @layzee/lz-stryker-playwright-runner:test-browser
+npx nx run @layzee/lz-stryker-ui-mutators:test
 npx nx run @layzee/demo-app-e2e:mutate-e2e
 npx nx run @layzee/demo-app-e2e:mutate-e2e-ui
 npx nx run @layzee/demo-app:mutate-ct

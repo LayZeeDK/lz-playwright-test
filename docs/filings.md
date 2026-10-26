@@ -269,8 +269,8 @@ that checks the element is visible kills both; a test that checks it is hidden k
 replace the `true` mutant with the right operand (`<p>Details</p>`), which forces the element to show
 and is the mutant `true` stands for in plain JavaScript. A smaller fix drops the `true` mutant there.
 
-**Context.** `@layzee/stryker-ui-mutators` in this repo adds that force-show mutant as
-`ConditionalElement`, and skips a `&&` whose left operand is a comparison or a `&&` or `||` expression,
+**Context.** `@layzee/lz-stryker-ui-mutators` in this repo adds that force-show mutant as
+`LzConditionalElement`, and skips a `&&` whose left operand is a comparison or a `&&` or `||` expression,
 because there the built-in `true` already exists. An upstream fix would make that skip need revisiting.
 
 ## stryker-mutator/stryker-js: no mutants inside an `as` expression (already reported)
