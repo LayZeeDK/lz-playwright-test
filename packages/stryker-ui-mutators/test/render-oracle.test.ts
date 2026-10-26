@@ -3,16 +3,23 @@
 // is the design spike's sample (spikes/design-opus/sample.tsx), rendered for two prop scenarios into a serialized
 // element tree (props, handler presence, children).
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { after, describe, it } from 'node:test';
+import { after, before, describe, it } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
 import {
   install,
   resolveFromCore,
   type InstrumentedMutant,
+  type InstrumentResult,
 } from '../src/install.ts';
 import { operatorNames, operators } from '../src/operators.ts';
 
@@ -27,24 +34,38 @@ const root = join(import.meta.dirname, '..', '..', '..');
 const samplePath = join(root, 'spikes', 'design-opus', 'sample.tsx');
 const source = readFileSync(samplePath, 'utf8');
 // Under the package, not os.tmpdir(), so the `react/jsx-runtime` import the transpiler emits resolves from the
-// workspace; `tmp` is ignored by git and removed after the run.
+// workspace; `tmp` is ignored by git. A directory per process, removed after it, as a Stryker run of this package
+// runs several processes of this file in one sandbox at once.
 const tmpDir = join(import.meta.dirname, '..', 'tmp');
-const outDir = join(tmpDir, 'render-oracle');
 const ts: typeof import('typescript') = createRequire(
   join(root, 'package.json'),
 )('typescript');
-
-rmSync(outDir, { recursive: true, force: true });
-mkdirSync(outDir, { recursive: true });
-after(() => rmSync(tmpDir, { recursive: true, force: true }));
-
-const instrumenter = await resolveFromCore();
-await install(operators, async () => instrumenter);
-const result = await instrumenter.instrument([
-  { name: samplePath, content: source },
-]);
-const instrumented = result.files[0]!.content;
+let outDir: string;
+let result: InstrumentResult;
+let original: string;
+let build: Component;
 let counter = 0;
+
+// The build gets a runtime namespace and an active-mutant variable of its own, so that it never reads or counts the
+// mutants of a Stryker run of this package in the same process.
+function isolated(code: string): string {
+  return code
+    .replaceAll('__stryker__', '__renderOracle__')
+    .replaceAll('__STRYKER_ACTIVE_MUTANT__', '__RENDER_ORACLE_ACTIVE_MUTANT__');
+}
+
+before(async () => {
+  mkdirSync(tmpDir, { recursive: true });
+  outDir = mkdtempSync(join(tmpDir, 'render-oracle-'));
+  const instrumenter = await resolveFromCore();
+  await install(operators, async () => instrumenter);
+  result = await instrumenter.instrument([
+    { name: samplePath, content: source },
+  ]);
+  original = renderAll(await load(source));
+  build = await load(isolated(result.files[0]!.content));
+});
+after(() => rmSync(outDir, { recursive: true, force: true }));
 
 async function load(tsx: string): Promise<Component> {
   const js = ts.transpileModule(tsx, {
@@ -158,11 +179,8 @@ function offsetOf(line: number, column: number): number {
 
 // The instrumented header caches the namespace object, so the test changes it in place rather than replacing it.
 const namespace: { activeMutant?: string } = ((
-  globalThis as { __stryker__?: { activeMutant?: string } }
-).__stryker__ ??= {});
-
-const original = renderAll(await load(source));
-const build = await load(instrumented);
+  globalThis as { __renderOracle__?: { activeMutant?: string } }
+).__renderOracle__ ??= {});
 
 /** Each mutant's render through the build and through the hand-applied source, `undefined` id for the baseline. */
 async function renders(mutant: InstrumentedMutant) {
