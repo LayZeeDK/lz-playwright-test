@@ -16,6 +16,7 @@ import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
 import {
   instrumentationOf,
+  isRecord,
   runningSlotOf,
   type SlotType,
   WORKER_ENTRY,
@@ -173,7 +174,7 @@ function workerNamespace(name: string): StrykerNamespace {
   const scope: Record<string, unknown> = globalThis;
   const found = scope[name];
 
-  if (typeof found === 'object' && found !== null) {
+  if (isRecord(found)) {
     return found;
   }
 

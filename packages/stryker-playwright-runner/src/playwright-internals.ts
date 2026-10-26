@@ -244,7 +244,7 @@ function isSlotType(value: unknown): value is SlotType {
   return SLOT_TYPES.some((type) => type === value);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 

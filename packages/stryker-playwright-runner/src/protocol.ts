@@ -3,6 +3,8 @@ import path from 'node:path';
 
 import type { MutantCoverage } from '@stryker-mutator/api/core';
 
+import { isRecord } from './playwright-internals.ts';
+
 export const RUN_SETTINGS = 'STRYKER_PLAYWRIGHT_RUN';
 
 export const SNAPSHOT_SUFFIX = '.ndjson';
@@ -53,16 +55,12 @@ export function serializeSnapshot(line: SnapshotLine): string {
   }
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
 // A key such as __proto__ or a count that is not a hit count must not reach an ordinary object.
 function hitCounts(value: unknown): Record<string, number> {
   const counts: Record<string, number> = Object.create(null);
 
   for (const [mutantId, count] of Object.entries(
-    isObject(value) ? value : {},
+    isRecord(value) ? value : {},
   )) {
     if (isHitCount(count)) {
       counts[mutantId] = count;
@@ -73,14 +71,14 @@ function hitCounts(value: unknown): Record<string, number> {
 }
 
 function parseCoverage(value: unknown): MutantCoverage | undefined {
-  if (!isObject(value)) {
+  if (!isRecord(value)) {
     return undefined;
   }
 
   const perTest: MutantCoverage['perTest'] = Object.create(null);
 
   for (const [testId, hits] of Object.entries(
-    isObject(value.perTest) ? value.perTest : {},
+    isRecord(value.perTest) ? value.perTest : {},
   )) {
     perTest[testId] = hitCounts(hits);
   }
@@ -97,7 +95,7 @@ export function parseSnapshotLine(line: string): Snapshot | undefined {
     // A killed worker leaves a partial last line; raw stays undefined.
   }
 
-  if (!isObject(raw)) {
+  if (!isRecord(raw)) {
     return undefined;
   }
 
