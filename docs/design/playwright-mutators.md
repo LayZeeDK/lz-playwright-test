@@ -205,6 +205,25 @@ remain:
   visible. The mutant is not equivalent, but `toBeHidden` does not kill it. `toHaveCount(0)` on the items
   does.
 
+Mutants that a lint rule would reject stay, unlabelled. Claude decided this on 2026-10-26. With all 36
+`eslint-plugin-jsx-a11y` rules at `error`, 88 of the 224 UI mutants of the synthetic cases, the demo app,
+the UI fixture and the corpus add a finding the original did not have: an emptied heading, label or link
+text (`TextLiteral`, `LabelAttribute`), an empty `href` (`UrlAttribute`), or a `span` that keeps a click
+handler (`ElementToSpan`). Claude measured this at 63d0209 by applying each UI mutant's replacement at
+its location and linting the original and the mutant. They are kept because:
+
+- an operator cannot know a project's lint config, and a skip keyed to jsx-a11y would drop 39 percent of
+  the UI mutants, including the ones a role, label or text locator kills most often. A surviving one says
+  that no test looks at the element by name, which lint cannot tell;
+- StrykerJS cannot label them. Its checker API has two outcomes, `Passed` and `CompileError`
+  (`@stryker-mutator/api/dist/src/check/check-status.d.ts`), so an ESLint checker would report them as
+  compile errors and take them out of the score, and the package's ignorer works per AST node, so it
+  would also hide the built-in mutants at that node.
+
+The cost is a small score lift in projects whose lint already blocks these shapes, as they are easy to
+kill. The demo app takes the other side of this: it runs jsx-a11y's `strict` set at `error`, so these
+shapes cannot ship there, and the operators measure what lint cannot see.
+
 ## Integration
 
 - **Package.** `@layzee/stryker-ui-mutators`. The user lists it in `plugins` and lists its ignorer in
