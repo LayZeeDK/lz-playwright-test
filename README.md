@@ -98,8 +98,11 @@ Run these from the repo root. The tests start a browser, so install Chromium fir
 npm install
 npx playwright install chromium
 npx tsc -p packages/stryker-playwright-runner/tsconfig.json
-node --test packages/stryker-playwright-runner/test/runner.test.ts packages/stryker-playwright-runner/test/run-result.test.ts
+node --test packages/stryker-playwright-runner/test/runner.test.ts packages/stryker-playwright-runner/test/run-result.test.ts packages/stryker-playwright-runner/test/ui-mutators.test.ts
 ```
+
+`ui-mutators.test.ts` runs the runner against a page instrumented with the UI operators and checks that a
+Playwright test kills each operator's mutant.
 
 The UI operators' tests need no browser:
 
