@@ -1077,4 +1077,147 @@ export const cases: readonly Case[] = [
       ['StateAttribute', 'aria-selected={!(tab === current)}'],
     ],
   },
+  {
+    id: 'design-17',
+    title: 'a boolean-literal ternary state flips each branch',
+    origin: 'design:Operators in the first release, StateAttribute',
+    jsx: '<div aria-pressed={on ? true : false} />',
+    expect: [['StateAttribute', 'aria-pressed={on ? false : true}']],
+  },
+  {
+    id: 'design-18',
+    title:
+      'a .toString() state gets no negation; another method call is negated',
+    origin: 'design:Operators in the first release, StateAttribute',
+    jsx: '<div aria-expanded={open.toString()} aria-checked={state.get()} aria-selected={isOpen()} />',
+    expect: [
+      ['StateAttribute', 'aria-checked={!state.get()}'],
+      ['StateAttribute', 'aria-selected={!isOpen()}'],
+    ],
+  },
+  {
+    id: 'design-19',
+    title:
+      'a ternary state with no negatable branch gets no mutant; one with a single negatable branch flips only that one',
+    origin: 'design:Operators in the first release, StateAttribute',
+    jsx: "<div><div aria-pressed={c ? undefined : String(x)} /><div aria-expanded={c ? 'true' : undefined} /></div>",
+    expect: [['StateAttribute', 'aria-expanded={c ? "false" : undefined}']],
+  },
+  {
+    id: 'design-20',
+    title: 'a rendered value among the children of a fragment is removed',
+    origin: 'design:Operators in the first release, ChildExpression',
+    jsx: '<>{user.name}</>',
+    expect: [['ChildExpression', 'null']],
+  },
+  {
+    id: 'design-21',
+    title:
+      'a member-named element is never swapped to a span, and its role has no implicit equal',
+    origin: 'design:Operators in the first release, ElementRole',
+    jsx: '<div><UI.Button>Go</UI.Button><UI.Dialog role="dialog" /></div>',
+    expect: [
+      ['ElementRole', 'role={undefined}'],
+      ['TextLiteral', ''],
+    ],
+  },
+  {
+    id: 'design-22',
+    title: 'an href on an element other than a is not swapped to a span',
+    origin: 'design:Operators in the first release, ElementRole',
+    jsx: '<area href="/x" />',
+    expect: [['UrlAttribute', 'href=""']],
+  },
+  {
+    id: 'design-23',
+    title:
+      'a guard whose test is an ===, < or >= comparison is left to the built-in ConditionalExpression',
+    origin: 'design:Operators in the first release, ConditionalElement',
+    jsx: '<div>{a == b && <p />}{a === b && <p />}{a < b && <p />}{a <= b && <p />}{a >= b && <p />}</div>',
+    expect: [],
+  },
+  {
+    id: 'design-24',
+    title: 'a filter call among the children is left to ListExpression',
+    origin: 'design:Operators in the first release, ChildExpression',
+    jsx: '<ul>{items.filter(visible)}{groups.flatMap(rows)}</ul>',
+    expect: [],
+  },
+  {
+    id: 'design-25',
+    title:
+      'htmlFor on a label that wraps a select, or an input inside a fragment, is skipped',
+    origin: 'design:Operators in the first release, LabelAttribute',
+    jsx: '<div><label htmlFor="a"><select /></label><label htmlFor="b"><><input /></></label><label htmlFor="c"><textarea /></label></div>',
+    expect: [],
+  },
+  {
+    id: 'design-29',
+    title: 'htmlFor on a label whose children hold no form control is emptied',
+    origin: 'design:Operators in the first release, LabelAttribute',
+    jsx: '<label htmlFor="d"><span>Name</span></label>',
+    expect: [
+      ['LabelAttribute', 'htmlFor=""'],
+      ['TextLiteral', ''],
+    ],
+  },
+  {
+    id: 'design-30',
+    title:
+      'a negated state holds no built-in mutant of its own expression in the instrumented file',
+    origin: 'design:Operators in the first release, StateAttribute',
+    jsx: '<div aria-expanded={isOpen(a && b)} />',
+    expect: [['StateAttribute', 'aria-expanded={!isOpen(a && b)}']],
+    instrumented: '? !isOpen(a && b) : (stryCov_9fa48(',
+  },
+  {
+    id: 'design-31',
+    title:
+      'a flipped ternary state holds no built-in mutant of its test in the instrumented file',
+    origin: 'design:Operators in the first release, StateAttribute',
+    jsx: "<div aria-pressed={isOpen(a && b) ? 'true' : 'false'} />",
+    expect: [
+      ['StateAttribute', 'aria-pressed={isOpen(a && b) ? "false" : "true"}'],
+    ],
+    instrumented: '? isOpen(a && b) ? "false" : "true" : (stryCov_9fa48(',
+  },
+  {
+    id: 'design-26',
+    title:
+      'a guard or a ternary whose branches are not JSX gives no ConditionalElement mutant',
+    origin: 'design:Operators in the first release, ConditionalElement',
+    jsx: "<div>{open && label}{open ? 'a' : 'b'}</div>",
+    expect: [],
+  },
+  {
+    id: 'design-27',
+    title:
+      'a const handler that is not a function keeps its mutant; a const function expression is skipped',
+    origin: 'design:Operators in the first release, EventHandler',
+    setup: 'const onSave = makeHandler();\nconst onReset = function () {};',
+    jsx: '<form onSubmit={onSave} onReset={onReset}></form>',
+    expect: [['EventHandler', 'onSubmit={undefined}']],
+  },
+  {
+    id: 'design-28',
+    title:
+      "a role equal to the tag's implicit role in Playwright's getByRole is skipped, for every such tag",
+    origin: RULES,
+    jsx:
+      '<div><article role="article" /><aside role="complementary" /><blockquote role="blockquote" />' +
+      '<button role="button" /><caption role="caption" /><code role="code" /><datalist role="listbox" />' +
+      '<dd role="definition" /><del role="deletion" /><details role="group" /><dfn role="term" />' +
+      '<dialog role="dialog" /><dt role="term" /><em role="emphasis" /><fieldset role="group" />' +
+      '<figure role="figure" /><h1 role="heading" /><h2 role="heading" /><h3 role="heading" />' +
+      '<h4 role="heading" /><h5 role="heading" /><h6 role="heading" /><hr role="separator" />' +
+      '<html role="document" /><ins role="insertion" /><li role="listitem" /><main role="main" />' +
+      '<mark role="mark" /><math role="math" /><menu role="list" /><meter role="meter" />' +
+      '<nav role="navigation" /><ol role="list" /><optgroup role="group" /><option role="option" />' +
+      '<output role="status" /><p role="paragraph" /><progress role="progressbar" />' +
+      '<search role="search" /><strong role="strong" /><sub role="subscript" />' +
+      '<sup role="superscript" /><svg role="img" /><table role="table" /><tbody role="rowgroup" />' +
+      '<textarea role="textbox" /><tfoot role="rowgroup" /><thead role="rowgroup" />' +
+      '<time role="time" /><tr role="row" /><ul role="list" /></div>',
+    expect: [['ElementRole', '<span role="button" />']],
+  },
 ];
