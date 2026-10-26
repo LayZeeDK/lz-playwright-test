@@ -45,3 +45,73 @@ which hides it. Possible fix: register in `test.beforeAll`, or make the id per t
 **Also noticed.** `apps/conduit-e2e/playwright.config.ts` starts `npx nx run frontend:serve-static`,
 but the workspace has no `frontend` project (`nx show project frontend`: "Could not find project
 frontend"), so the suite works only next to a dev server someone already started on port 4200.
+
+## stryker-mutator/stryker-js: a `// Stryker disable` directive written as a JSX comment is ignored
+
+Status: draft, not filed (2026-10-26). A search of the repo's issues for "JSX comment disable",
+"Stryker disable jsx" and "jsx directive" found no existing report on 2026-10-26.
+
+**Versions.** `@stryker-mutator/instrumenter` 10.1.1, Node 24.22.0, Windows 11 arm64. Built-in
+mutators only, no plugin.
+
+**Reproduction.** Instrument this TSX with the stock `Instrumenter` and list the `StringLiteral`
+mutants and their status:
+
+```tsx
+export function A({ open }: { open: boolean }) {
+  return (
+    <div>
+      {/* Stryker disable next-line StringLiteral */}
+      <p title={'one'}>x</p>
+      {
+        // Stryker disable next-line StringLiteral
+        <p title={'two'}>y</p>
+      }
+      <p title={'three'}>z</p>
+    </div>
+  );
+}
+```
+
+Result (2026-10-26): line 5 `'one'` is placed, line 8 `'two'` is `Ignored` ("Ignored using a
+comment"), line 10 `'three'` is placed. The JSX comment form on line 4 has no effect and gives no
+warning. Inside JSX children, a `{/* ... */}` comment is the only comment form that does not need an
+extra pair of braces around the element, so React users reach for it first.
+
+**Cause (read, not debugged).** The directive bookkeeper reads `leadingComments`
+(`packages/instrumenter/src/transformers/directive-bookkeeper.ts:76` at v10.1.1). Babel stores a JSX
+comment as an inner comment of the `JSXEmptyExpression` in its own `JSXExpressionContainer`, so no
+node carries it as a leading comment.
+
+**Possible fix.** When a `JSXExpressionContainer` holds only a `JSXEmptyExpression` with a directive
+in its `innerComments`, apply the directive to the next JSX sibling, the way a leading comment applies
+to the next statement.
+
+## stryker-mutator/stryker-js: `ConditionalExpression` gives two mutants that render the same for a JSX `&&`
+
+Status: draft, not filed (2026-10-26). A search of the repo's issues for "ConditionalExpression jsx
+&&", "equivalent mutant react" and "react true false render" found no existing report on 2026-10-26.
+
+**Versions.** `@stryker-mutator/instrumenter` 10.1.1, built-in mutators only.
+
+**Reproduction.** Instrument this TSX with the stock `Instrumenter`:
+
+```tsx
+export function B({ open }: { open: boolean }) {
+  return <div>{open && <p>Details</p>}</div>;
+}
+```
+
+Result (2026-10-26): `ConditionalExpression` gives `true` and `false` for `open && <p>Details</p>`,
+and `LogicalOperator` gives `open || <p>Details</p>`. React renders `true` and `false` children as
+nothing (React docs, "Conditional rendering"), so the `true` mutant and the `false` mutant both hide
+the element: two mutants with the same behaviour, and none that forces the element to show. A test
+that checks the element is visible kills both; a test that checks it is hidden kills neither.
+
+**Possible fix.** For a `&&` whose right operand is a JSX element or fragment and that is a JSX child,
+replace the `true` mutant with the right operand (`<p>Details</p>`), which forces the element to show
+and is the mutant `true` stands for in plain JavaScript. A smaller fix drops the `true` mutant there.
+
+**Context.** `@layzee/stryker-ui-mutators` in this repo adds that force-show mutant as
+`ConditionalElement`, and skips a `&&` whose left operand is a comparison or a logical expression,
+because there the built-in `true` already exists. An upstream fix would make that skip need revisiting.
