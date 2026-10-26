@@ -137,10 +137,10 @@ function elementSite(
   };
 }
 
-function readValue(
+export function decodeValue(
   value: types.JSXAttribute['value'],
   t: BabelTypes,
-): AttributeValue | undefined {
+): AttributeValue | { readonly kind: 'other' } {
   if (value === null || value === undefined) {
     return { kind: 'bare' };
   }
@@ -149,19 +149,27 @@ function readValue(
     return { kind: 'string', text: value.value };
   }
 
-  if (
-    !t.isJSXExpressionContainer(value) ||
-    t.isJSXEmptyExpression(value.expression)
-  ) {
+  return t.isJSXExpressionContainer(value) &&
+    !t.isJSXEmptyExpression(value.expression)
+    ? { kind: 'expression', expression: value.expression }
+    : { kind: 'other' };
+}
+
+function readValue(
+  value: types.JSXAttribute['value'],
+  t: BabelTypes,
+): AttributeValue | undefined {
+  const decoded = decodeValue(value, t);
+
+  if (decoded.kind === 'other') {
     return undefined;
   }
 
-  const { expression } = value;
-
   // The built-in StringLiteral, BooleanLiteral, ArrowFunction and BlockStatement mutators own these.
-  return t.isLiteral(expression) || t.isFunction(expression)
+  return decoded.kind === 'expression' &&
+    (t.isLiteral(decoded.expression) || t.isFunction(decoded.expression))
     ? undefined
-    : { kind: 'expression', expression };
+    : decoded;
 }
 
 function* replaced(

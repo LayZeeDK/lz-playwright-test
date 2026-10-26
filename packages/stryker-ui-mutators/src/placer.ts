@@ -1,6 +1,6 @@
 import type { NodePath, types } from '@babel/core';
 
-import { isJsxChild, type BabelTypes } from './mutator.ts';
+import { decodeValue, isJsxChild, type BabelTypes } from './mutator.ts';
 
 export interface MutantPlacerLike {
   readonly name: string;
@@ -23,13 +23,11 @@ export function withJsxPlacement(
     place(path, appliedMutants) {
       if (path.isJSXAttribute()) {
         path.node.value = t.jsxExpressionContainer(
-          valueExpression(path.node.value, t),
+          valueExpression(path.node, t),
         );
         place(
           child(path, 'value.expression'),
-          remap(appliedMutants, (node) =>
-            valueExpression((node as types.JSXAttribute).value, t),
-          ),
+          remap(appliedMutants, (node) => valueExpression(node, t)),
         );
 
         return;
@@ -41,17 +39,15 @@ export function withJsxPlacement(
         );
         place(
           child(container, 'expression'),
-          remap(appliedMutants, (node) =>
-            cleanedText(node as types.JSXText, t),
-          ),
+          remap(appliedMutants, (node) => cleanedText(node, t)),
         );
 
         return;
       }
 
-      if (isJsxChild(path)) {
+      if (isJsxChild(path) && path.isExpression()) {
         const [container] = path.replaceWith(
-          t.jsxExpressionContainer(path.node as types.Expression),
+          t.jsxExpressionContainer(path.node),
         );
         place(child(container, 'expression'), appliedMutants);
 
@@ -80,23 +76,41 @@ function remap(
   );
 }
 
+function unplaceable(type: string): Error {
+  return new Error(
+    `stryker-ui-mutators: cannot place a UI mutant at a ${type}.`,
+  );
+}
+
 function valueExpression(
-  value: types.JSXAttribute['value'],
+  attribute: types.Node,
   t: BabelTypes,
 ): types.Expression {
-  if (value === null || value === undefined) {
+  const value = t.isJSXAttribute(attribute)
+    ? decodeValue(attribute.value, t)
+    : undefined;
+
+  if (value?.kind === 'bare') {
     return t.booleanLiteral(true);
   }
 
   // A fresh StringLiteral drops the `extra.raw` that holds undecoded entities such as `&amp;`.
-  if (t.isStringLiteral(value)) {
-    return t.stringLiteral(value.value);
+  if (value?.kind === 'string') {
+    return t.stringLiteral(value.text);
   }
 
-  return (value as types.JSXExpressionContainer).expression as types.Expression;
+  if (value?.kind === 'expression') {
+    return value.expression;
+  }
+
+  throw unplaceable('JSXAttribute');
 }
 
-function cleanedText(node: types.JSXText, t: BabelTypes): types.Expression {
+function cleanedText(node: types.Node, t: BabelTypes): types.Expression {
+  if (!t.isJSXText(node)) {
+    throw unplaceable('JSXText');
+  }
+
   // Stryker disable StringLiteral: equivalent, as t.react.buildChildren reads only the element's children
   const element = t.jsxElement(
     t.jsxOpeningElement(t.jsxIdentifier('x'), []),
