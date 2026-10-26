@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { test } from 'node:test';
 
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
@@ -29,12 +33,36 @@ function worker(
   };
 }
 
-test('importing the hook outside a Stryker run installs nothing', () => {
-  assert.equal(process.env[RUN_SETTINGS], undefined);
-  assert.equal(
-    (globalThis as Record<string, unknown>)[INSTRUMENTER_CONSTANTS.NAMESPACE],
-    undefined,
-  );
+test('a Playwright worker outside a Stryker run loads the hook and installs nothing', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'worker-hook-test-'));
+
+  try {
+    // A path that ends like Playwright's worker entry, so only the run-settings check keeps the hook out.
+    const entry = path.join(dir, 'playwright/lib/worker/workerProcessEntry.js');
+    mkdirSync(path.dirname(entry), { recursive: true });
+    writeFileSync(
+      entry,
+      `console.log(JSON.stringify(globalThis[${JSON.stringify(INSTRUMENTER_CONSTANTS.NAMESPACE)}] ?? null));`,
+    );
+
+    const child = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        new URL('../src/worker-hook.ts', import.meta.url).href,
+        entry,
+      ],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, [RUN_SETTINGS]: undefined },
+      },
+    );
+
+    assert.equal(child.status, 0, child.stderr);
+    assert.equal(child.stdout.trim(), 'null');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('a worker that ran no instrumented code writes nothing at exit', () => {
