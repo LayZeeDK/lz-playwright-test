@@ -10,9 +10,11 @@
     "types": ["node"],
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "jsx": "react",
+    "jsxFactory": "h"
   },
-  "include": ["test/**/*.ts"],
+  "include": ["test/**/*.ts", "test/**/*.tsx"],
   "references": [
     {
       "path": "./tsconfig.lib.json"
