@@ -1133,7 +1133,7 @@ export const cases: readonly Case[] = [
     title:
       'a guard whose test is an ===, < or >= comparison is left to the built-in ConditionalExpression',
     origin: 'design:Operators in the first release, ConditionalElement',
-    jsx: '<div>{a == b && <p />}{a === b && <p />}{a < b && <p />}{a <= b && <p />}{a >= b && <p />}</div>',
+    jsx: '<div>{a == b && <p />}{a != b && <p />}{a === b && <p />}{a < b && <p />}{a <= b && <p />}{a >= b && <p />}</div>',
     expect: [],
   },
   {
@@ -1180,6 +1180,36 @@ export const cases: readonly Case[] = [
       ['StateAttribute', 'aria-pressed={isOpen(a && b) ? "false" : "true"}'],
     ],
     instrumented: '? isOpen(a && b) ? "false" : "true" : (stryCov_9fa48(',
+  },
+  {
+    id: 'design-32',
+    title:
+      'a ternary state keeps its unflipped consequent free of built-in mutants in the instrumented file',
+    origin: 'design:Operators in the first release, StateAttribute',
+    jsx: "<div aria-expanded={c ? String(a && b) : 'true'} />",
+    expect: [
+      ['StateAttribute', 'aria-expanded={c ? String(a && b) : "false"}'],
+    ],
+    instrumented: '? c ? String(a && b) : "false" : (stryCov_9fa48(',
+  },
+  {
+    id: 'design-33',
+    title:
+      'a ternary state keeps its unflipped alternate free of built-in mutants in the instrumented file',
+    origin: 'design:Operators in the first release, StateAttribute',
+    jsx: "<div aria-expanded={c ? 'true' : String(a && b)} />",
+    expect: [
+      ['StateAttribute', 'aria-expanded={c ? "false" : String(a && b)}'],
+    ],
+    instrumented: '? c ? "false" : String(a && b) : (stryCov_9fa48(',
+  },
+  {
+    id: 'design-34',
+    title:
+      'a guard whose test is a ?? expression is removed, as built-in ConditionalExpression leaves ?? alone',
+    origin: 'design:Operators in the first release, ConditionalElement',
+    jsx: '<div>{(a ?? b) && <p />}</div>',
+    expect: [['ConditionalElement', '<p />']],
   },
   {
     id: 'design-26',
