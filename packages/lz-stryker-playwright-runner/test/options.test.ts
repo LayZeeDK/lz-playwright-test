@@ -57,7 +57,7 @@ test('the runner options refuse --testFiles', () => {
   );
 });
 
-test('without playwright options or with an empty --testFiles the runner takes its defaults', () => {
+test('without lzStrykerPlaywright options or with an empty --testFiles the runner takes its defaults', () => {
   const defaults = {
     configFile: undefined,
     projects: undefined,
