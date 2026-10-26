@@ -22,12 +22,15 @@ import {
   type RunSettings,
   serializeSnapshot,
   SNAPSHOT_SUFFIX,
-  type Snapshot,
+  type SnapshotLine,
 } from './protocol.ts';
+
+/** What the hook reads from one frame before its browser context closes. */
+type FrameRead = Omit<SnapshotLine, 'outlivedItsTest'>;
 
 interface ContextState {
   testId?: string;
-  closedPageSnapshots: Snapshot[];
+  closedPageSnapshots: FrameRead[];
   collected: boolean;
 }
 
@@ -67,7 +70,7 @@ function install(
   fs.writeFileSync(outFile, '', { flag: 'a' });
 
   // Closing a page that owns its context closes the context first, so the same page can come up twice.
-  function readOnce(pages: Page[]): Promise<Snapshot[]> {
+  function readOnce(pages: Page[]): Promise<FrameRead[]> {
     const fresh = pages.filter((page) => !alreadyRead.has(page));
     fresh.forEach((page) => alreadyRead.add(page));
 
@@ -90,7 +93,7 @@ function install(
       perTest &&
       (state.testId === undefined || state.testId !== currentTestId(test));
     const lines = snapshots.map((snapshot) =>
-      serializeSnapshot(snapshot, outlivedItsTest),
+      serializeSnapshot({ ...snapshot, outlivedItsTest }),
     );
 
     // The leading newline ends a partial line a killed worker with the same pid left behind.
@@ -153,7 +156,7 @@ function currentTestId(test: Test): string | undefined {
   }
 }
 
-async function readPages(pages: Page[], ns: string): Promise<Snapshot[]> {
+async function readPages(pages: Page[], ns: string): Promise<FrameRead[]> {
   const snapshots = await Promise.all(
     pages
       .flatMap((page) => page.frames())
@@ -166,24 +169,24 @@ async function readPages(pages: Page[], ns: string): Promise<Snapshot[]> {
 async function readNamespace(
   frame: Frame,
   ns: string,
-): Promise<Snapshot | undefined> {
-  const { promise: lost, resolve } = Promise.withResolvers<Snapshot>();
+): Promise<FrameRead | undefined> {
+  const { promise: lost, resolve } = Promise.withResolvers<FrameRead>();
   const timer = setTimeout(
     () => resolve({ lost: true }),
     FRAME_READ_TIMEOUT_MS,
   );
   const read = frame
     .evaluate((name) => {
-      const s = (globalThis as unknown as Record<string, Snapshot | undefined>)[
-        name
-      ];
+      const s = (
+        globalThis as unknown as Record<string, FrameRead | undefined>
+      )[name];
 
       return s
         ? { mutantCoverage: s.mutantCoverage, hitCount: s.hitCount }
         : undefined;
     }, ns)
     .catch(() =>
-      frame.isDetached() ? undefined : ({ lost: true } satisfies Snapshot),
+      frame.isDetached() ? undefined : ({ lost: true } satisfies FrameRead),
     );
 
   try {
@@ -223,7 +226,7 @@ function initPage({ ns, activeMutant, testId, hitLimit }: PageSettings) {
   try {
     const carried = JSON.parse(
       sessionStorage.getItem(key) ?? 'null',
-    ) as Snapshot | null;
+    ) as FrameRead | null;
 
     if (carried) {
       s.mutantCoverage = carried.mutantCoverage;

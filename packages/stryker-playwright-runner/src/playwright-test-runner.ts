@@ -28,14 +28,13 @@ import {
   type TestRunner,
 } from './playwright-internals.ts';
 import {
+  readSnapshotDir,
   RUN_SETTINGS,
   type RunSettings,
-  SNAPSHOT_SUFFIX,
   type Snapshot,
 } from './protocol.ts';
 import {
   CollectingReporter,
-  isHitCount,
   listSerialGroups,
   mergeCoverage,
   missingCoverageError,
@@ -180,7 +179,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   private reportCoverageGaps(snapshots: Snapshot[]) {
     const lost = snapshots.filter((snapshot) => snapshot.lost).length;
     const shared = snapshots.filter(
-      (snapshot) => snapshot.outlivedItsTest && snapshot.mutantCoverage,
+      (snapshot) => snapshot.outlivedItsTest && snapshot.coverage,
     ).length;
 
     if (lost > 0) {
@@ -212,10 +211,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     });
     const hitCount =
       run.status === DryRunStatus.Complete
-        ? run.snapshots.reduce(
-            (sum, { hitCount }) => sum + (isHitCount(hitCount) ? hitCount : 0),
-            0,
-          )
+        ? run.snapshots.reduce((sum, { hitCount }) => sum + hitCount, 0)
         : undefined;
     this.log.debug(
       `Mutant ${activeMutant.id}: ${run.status}, hitCount ${hitCount}/${hitLimit}`,
@@ -272,16 +268,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
         timeout: request.testTimeout,
         disableConfigReporters: true,
       });
-      const snapshotFiles = fs
-        .readdirSync(outDir)
-        .filter((file) => file.endsWith(SNAPSHOT_SUFFIX));
-
-      return {
-        status,
-        reporter,
-        snapshots: readSnapshots(outDir, snapshotFiles),
-        hookInstalled: snapshotFiles.length > 0,
-      };
+      return { status, reporter, ...readSnapshotDir(outDir) };
     } finally {
       restoreEnv();
       fs.rmSync(outDir, { recursive: true, force: true, maxRetries: 3 });
@@ -380,20 +367,4 @@ function overrideEnv(values: Record<string, string | undefined>): () => void {
   apply(values);
 
   return () => apply(previous);
-}
-
-function readSnapshots(outDir: string, files: string[]): Snapshot[] {
-  return files
-    .flatMap((file) =>
-      fs.readFileSync(path.join(outDir, file), 'utf8').split('\n'),
-    )
-    .filter(Boolean)
-    .flatMap((line) => {
-      try {
-        return [JSON.parse(line) as Snapshot];
-      } catch {
-        // A worker killed mid-write leaves a partial last line.
-        return [];
-      }
-    });
 }

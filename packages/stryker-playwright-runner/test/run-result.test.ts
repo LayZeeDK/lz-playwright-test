@@ -14,7 +14,12 @@ import type { Logger } from '@stryker-mutator/api/logging';
 import { DryRunStatus, TestStatus } from '@stryker-mutator/api/test-runner';
 
 import { PlaywrightTestRunner } from '../src/playwright-test-runner.ts';
-import { serializeSnapshot, type Snapshot } from '../src/protocol.ts';
+import {
+  parseSnapshotLine,
+  serializeSnapshot,
+  type Snapshot,
+  type SnapshotLine,
+} from '../src/protocol.ts';
 import {
   CollectingReporter,
   listSerialGroups,
@@ -27,6 +32,18 @@ import {
 } from '../src/run-result.ts';
 
 type Outcome = ReturnType<TestCase['outcome']>;
+
+// A snapshot as the runner reads it from a line the hook wrote.
+function parsed(line: Partial<SnapshotLine>): Snapshot {
+  const snapshot = parseSnapshotLine(JSON.stringify(line));
+  assert.ok(snapshot);
+
+  return snapshot;
+}
+
+function merge(lines: Partial<SnapshotLine>[]) {
+  return mergeCoverage(lines.map(parsed));
+}
 
 // Playwright passes the same TestCase for every attempt and appends each attempt to its results.
 function attempt(
@@ -224,31 +241,34 @@ test('the missing-coverage error names lost frames when every frame was lost', (
   } as const;
 
   assert.match(
-    missingCoverageError([passed], [{ lost: true }, { lost: true }]) ?? '',
+    missingCoverageError(
+      [passed],
+      [parsed({ lost: true }), parsed({ lost: true })],
+    ) ?? '',
     /all 2 frame\(s\) did not answer/,
   );
 });
 
 test('a snapshot with a BigInt hit count is written as a lost frame', () => {
-  const snapshot: Snapshot = { hitCount: 1n as unknown as number };
+  const line = serializeSnapshot({ hitCount: 1n, outlivedItsTest: true });
 
-  assert.deepEqual(JSON.parse(serializeSnapshot(snapshot, true)), {
-    lost: true,
-    outlivedItsTest: true,
-  });
+  assert.deepEqual(JSON.parse(line), { lost: true, outlivedItsTest: true });
+  assert.equal(parseSnapshotLine(line)?.lost, true);
 });
 
 test('a snapshot with cyclic coverage is written as a lost frame', () => {
   const cyclic: Record<string, unknown> = {};
   cyclic.self = cyclic;
-  const snapshot: Snapshot = {
-    mutantCoverage: cyclic as unknown as Snapshot['mutantCoverage'],
-  };
 
-  assert.deepEqual(JSON.parse(serializeSnapshot(snapshot, true)), {
-    lost: true,
-    outlivedItsTest: true,
-  });
+  assert.deepEqual(
+    JSON.parse(
+      serializeSnapshot({ mutantCoverage: cyclic, outlivedItsTest: true }),
+    ),
+    {
+      lost: true,
+      outlivedItsTest: true,
+    },
+  );
 });
 
 test('the missing-coverage error says no page opened instead of blaming the webServer', () => {
@@ -413,9 +433,7 @@ test('a page cannot reach Object.prototype through a __proto__ test id in its co
   >;
 
   try {
-    const coverage = mergeCoverage([
-      { mutantCoverage: { static: {}, perTest } },
-    ]);
+    const coverage = merge([{ mutantCoverage: { static: {}, perTest } }]);
 
     assert.equal(({} as Record<string, unknown>)['1'], undefined);
     assert.deepEqual({ ...coverage.perTest['__proto__'] }, { '1': 1 });
@@ -424,13 +442,10 @@ test('a page cannot reach Object.prototype through a __proto__ test id in its co
   }
 });
 
-test('coverage merging drops counts that are not hit counts and sums the rest', () => {
-  const hits = { '1': 2, '2': NaN, '3': -1, '4': '3' } as unknown as Record<
-    string,
-    number
-  >;
+test('a parsed line drops counts that are not hit counts, and merging sums the rest', () => {
+  const hits = { '1': 2, '2': NaN, '3': -1, '4': '3', '5': null };
 
-  const coverage = mergeCoverage([
+  const coverage = merge([
     { mutantCoverage: { static: hits, perTest: { a: hits } } },
     { mutantCoverage: { static: { '1': 1 }, perTest: {} } },
   ]);
@@ -440,12 +455,47 @@ test('coverage merging drops counts that are not hit counts and sums the rest', 
 });
 
 // mergeCoverage builds null-prototype maps, which deepEqual tells apart from object literals.
-function plain(coverage: MutantCoverage): MutantCoverage {
+function plain(coverage: MutantCoverage | undefined): MutantCoverage {
   return JSON.parse(JSON.stringify(coverage)) as MutantCoverage;
 }
 
+test('a line that is cut off or not an object is skipped', () => {
+  assert.equal(parseSnapshotLine('{"mutantCoverage":{"sta'), undefined);
+  assert.equal(parseSnapshotLine('3'), undefined);
+  assert.equal(parseSnapshotLine('null'), undefined);
+});
+
+test('a parsed line sets every flag and a valid hit count', () => {
+  assert.deepEqual(parseSnapshotLine('{}'), {
+    coverage: undefined,
+    hitCount: 0,
+    outlivedItsTest: false,
+    lost: false,
+  });
+  assert.equal(parseSnapshotLine('{"hitCount":-1}')?.hitCount, 0);
+  assert.equal(parseSnapshotLine('{"hitCount":"3"}')?.hitCount, 0);
+  assert.equal(parseSnapshotLine('{"hitCount":7}')?.hitCount, 7);
+  assert.deepEqual(parseSnapshotLine('{"lost":true,"outlivedItsTest":true}'), {
+    coverage: undefined,
+    hitCount: 0,
+    outlivedItsTest: true,
+    lost: true,
+  });
+});
+
+test('a parsed line keeps no coverage that is not a map', () => {
+  assert.equal(parseSnapshotLine('{"mutantCoverage":3}')?.coverage, undefined);
+  assert.deepEqual(
+    plain(
+      parseSnapshotLine('{"mutantCoverage":{"static":3,"perTest":{"a":3}}}')
+        ?.coverage,
+    ),
+    { static: {}, perTest: { a: {} } },
+  );
+});
+
 test('a page frame puts its per-test coverage under its test and its static coverage in static', () => {
-  const coverage = mergeCoverage([
+  const coverage = merge([
     {
       outlivedItsTest: false,
       mutantCoverage: { static: { '3': 1 }, perTest: { a: { '1': 2 } } },
@@ -459,7 +509,7 @@ test('a page frame puts its per-test coverage under its test and its static cove
 });
 
 test('a frame of a shared context puts all its coverage in static', () => {
-  const coverage = mergeCoverage([
+  const coverage = merge([
     {
       outlivedItsTest: true,
       mutantCoverage: { static: { '3': 1 }, perTest: { b: { '2': 1 } } },
@@ -482,7 +532,7 @@ test('two frames of one test sum their counts', () => {
     mutantCoverage: { static: {}, perTest: { a: { '1': 2 } } },
   };
 
-  assert.deepEqual(plain(mergeCoverage([frame, other])), {
+  assert.deepEqual(plain(merge([frame, other])), {
     static: {},
     perTest: { a: { '1': 3, '2': 1 } },
   });
@@ -497,14 +547,14 @@ test('a worker line with coverage and no flags merges like a page frame', () => 
     mutantCoverage: { static: { '4': 5 }, perTest: { a: { '1': 2 } } },
   };
 
-  assert.deepEqual(plain(mergeCoverage([page, worker])), {
+  assert.deepEqual(plain(merge([page, worker])), {
     static: { '4': 5 },
     perTest: { a: { '1': 3 } },
   });
 });
 
 test('coverage from a context that outlived its test counts as static', () => {
-  const coverage = mergeCoverage([
+  const coverage = merge([
     {
       outlivedItsTest: true,
       mutantCoverage: { static: {}, perTest: { a: { '1': 1 } } },

@@ -261,7 +261,7 @@ export function missingCoverageError(
   const ran = tests.some((test) => test.status !== TestStatus.Skipped);
   const failed = tests.some((test) => test.status === TestStatus.Failed);
 
-  if (!ran || failed || snapshots.some((snapshot) => snapshot.mutantCoverage)) {
+  if (!ran || failed || snapshots.some((snapshot) => snapshot.coverage)) {
     return undefined;
   }
 
@@ -278,47 +278,39 @@ export function missingCoverageError(
   return 'No page loaded instrumented code. Is the webServer serving the Stryker sandbox? A server that was already running (reuseExistingServer) serves the original sources.';
 }
 
-export function isHitCount(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
-}
-
-// Coverage comes from pages, so a key such as __proto__ or a count that is not a hit count must not
-// reach the merged object.
-export function mergeCoverage(snapshots: Snapshot[]): MutantCoverage {
-  const coverage: MutantCoverage = {
+// The output maps have no prototype, so a test id such as __proto__ from a page stays an own key.
+export function mergeCoverage(snapshots: readonly Snapshot[]): MutantCoverage {
+  const merged: MutantCoverage = {
     static: Object.create(null),
     perTest: Object.create(null),
   };
   const add = (
     target: Record<string, number>,
-    hits: Record<string, number> | null | undefined,
+    hits: Record<string, number>,
   ) => {
-    for (const [mutantId, count] of Object.entries(hits ?? {})) {
-      if (isHitCount(count)) {
-        target[mutantId] = (target[mutantId] ?? 0) + count;
-      }
+    for (const [mutantId, count] of Object.entries(hits)) {
+      target[mutantId] = (target[mutantId] ?? 0) + count;
     }
   };
-  const perTestTarget = (snapshot: Snapshot, testId: string) =>
-    snapshot.outlivedItsTest
-      ? coverage.static
-      : (coverage.perTest[testId] ??= Object.create(null));
 
-  for (const snapshot of snapshots) {
-    if (!snapshot.mutantCoverage) {
+  for (const { coverage, outlivedItsTest } of snapshots) {
+    if (!coverage) {
       continue;
     }
 
-    add(coverage.static, snapshot.mutantCoverage.static);
+    add(merged.static, coverage.static);
 
-    for (const [testId, hits] of Object.entries(
-      snapshot.mutantCoverage.perTest ?? {},
-    )) {
-      add(perTestTarget(snapshot, testId), hits);
+    for (const [testId, hits] of Object.entries(coverage.perTest)) {
+      add(
+        outlivedItsTest
+          ? merged.static
+          : (merged.perTest[testId] ??= Object.create(null)),
+        hits,
+      );
     }
   }
 
-  return coverage;
+  return merged;
 }
 
 function emptyRunResult(request: RunRequest): RunResult {
