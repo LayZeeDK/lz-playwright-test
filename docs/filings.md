@@ -150,5 +150,21 @@ replace the `true` mutant with the right operand (`<p>Details</p>`), which force
 and is the mutant `true` stands for in plain JavaScript. A smaller fix drops the `true` mutant there.
 
 **Context.** `@layzee/stryker-ui-mutators` in this repo adds that force-show mutant as
-`ConditionalElement`, and skips a `&&` whose left operand is a comparison or a logical expression,
+`ConditionalElement`, and skips a `&&` whose left operand is a comparison or a `&&` or `||` expression,
 because there the built-in `true` already exists. An upstream fix would make that skip need revisiting.
+
+## stryker-mutator/stryker-js: no mutants inside an `as` expression (already reported)
+
+Status: no draft needed (2026-10-26). Reported upstream as
+[#6208](https://github.com/stryker-mutator/stryker-js/issues/6208) and
+[#6227](https://github.com/stryker-mutator/stryker-js/issues/6227), with a fix proposed in
+[#6228](https://github.com/stryker-mutator/stryker-js/pull/6228), all open on 2026-10-26.
+
+**What it cost here.** `@stryker-mutator/instrumenter` 10.1.1 lists `TSAsExpression` among its type nodes
+(`dist/src/util/syntax-helpers.js:140`), so it makes no mutant anywhere inside `expr as Type`. Measured on
+2026-10-26: `export const a = [1 + 1] as const;` gives none, while the same line with `satisfies number[]`
+or with no suffix gives ArrayDeclaration and ArithmeticOperator. The UI operators' table was written as
+`[...] as const satisfies ...`, so a mutation run scored 100% with no mutant in any rule body; the
+package now builds the table through a helper with a `const` type parameter, and the run then found 15
+survivors. Worth a comment on #6208 if Lars wants one: a `const` assertion is the common case, and it
+hides the most code.
