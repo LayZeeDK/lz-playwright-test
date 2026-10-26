@@ -1,6 +1,4 @@
-// The one module that reaches into @stryker-mutator/instrumenter's dist (its exports map exposes only `.`), and the
-// only writer of the state the install keeps: the marks on the live `allMutators` entries and on the expression
-// placer. The marks use a global symbol, so a second copy of this package in the same process reads them too.
+// Reaches into @stryker-mutator/instrumenter's dist because its exports map exposes only `.` and `./package.json`.
 import { realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -19,7 +17,6 @@ import { withJsxPlacement, type MutantPlacerLike } from './placer.ts';
 const TESTED_VERSION = '10.1.1';
 const CORE_BIN = /[\\/]@stryker-mutator[\\/]core[\\/]bin[\\/]stryker\.js$/;
 const NAME = /^[A-Za-z]+$/;
-/** Marks what this package put into the instrumenter; `Symbol.for`, so every copy of the package sees one key. */
 const OWN: unique symbol = Symbol.for('@layzee/stryker-ui-mutators');
 const nothing = (): undefined => undefined;
 const SILENT = {
@@ -48,30 +45,20 @@ export interface InstrumentResult {
   readonly mutants: readonly InstrumentedMutant[];
 }
 
-/** The instrumenter that core runs, with the two live objects the install changes. */
 export interface Instrumenter {
   readonly dir: string;
   readonly version: string;
-  /** Babel's types from the instrumenter's own @babel/core (8.x), to build the nodes it places. */
   readonly types: BabelTypes;
   /** The array `transformBabel` reads by default on every file (`babel-transformer.js:8`). */
   readonly allMutators: NodeMutatorLike[];
   /** First entry of the frozen `allMutantPlacers`; the array is frozen, this object is not (`mutant-placers/index.js:6`). */
   readonly expressionPlacer: MutantPlacerLike;
-  /** Instruments with the live lists, as core does; `excludedMutations` as in Stryker's `mutator` option. */
   instrument(
     files: readonly SourceFile[],
     excludedMutations?: readonly string[],
   ): Promise<InstrumentResult>;
 }
 
-/**
- * Registers `operators` in the instrumenter core uses, makes JSX a placement site, and proves both with one sample
- * per operator. Throws, before changing anything, on a name that is not letters only or that equals another name
- * ignoring case; throws, naming every silent operator, when a sample gives no mutant of its operator. A second
- * install in the process (another copy of this package, or a test) adds no operator twice and wraps the placer once.
- * Warns, after the self-check passed, when the instrumenter is not the tested version.
- */
 export async function install(
   operators: readonly Operator[],
   resolve: () => Promise<Instrumenter> = resolveFromCore,
@@ -91,7 +78,6 @@ export async function install(
   }
 }
 
-/** Letters only; no two equal ignoring case among `operators` and the mutators not marked as this package's. */
 function checkNames(
   operators: readonly Operator[],
   present: readonly NodeMutatorLike[],
@@ -125,7 +111,6 @@ function checkNames(
   }
 }
 
-/** Pushes each operator whose name no marked mutator has yet, and wraps the placer unless it is marked. */
 function register(
   instrumenter: Instrumenter,
   operators: readonly Operator[],
@@ -149,11 +134,6 @@ function register(
   }
 }
 
-/**
- * Instruments every sample through the live lists in one call, as `<name>.self-check.tsx`, and throws unless each
- * gives a mutant of its own operator in its own file. Names the instrumenter's dir and version in the error, since a
- * bundled or second instrumenter copy is the likely cause.
- */
 async function selfCheck(
   instrumenter: Instrumenter,
   operators: readonly Operator[],
@@ -181,10 +161,6 @@ async function selfCheck(
   }
 }
 
-/**
- * The package.json of the @stryker-mutator/core that runs this process: from `argv1` when its realpath is core's
- * `bin/stryker.js` (a global or differently hoisted Stryker), else the core this module resolves (Stryker's API).
- */
 export function corePackageJson(
   argv1: string | undefined = process.argv[1],
   realpath: (path: string) => string = realpathSync,
@@ -196,7 +172,7 @@ export function corePackageJson(
   try {
     bin = argv1 === undefined ? undefined : realpath(argv1);
   } catch {
-    // `node --eval` and the REPL run no script file.
+    // argv1 names no file on disk; fall back to the core this module resolves.
   }
 
   return bin !== undefined && CORE_BIN.test(bin)
@@ -217,11 +193,6 @@ interface InstrumenterModule {
   };
 }
 
-/**
- * Resolves the instrumenter from core's folder and imports, by file URL, `dist/src/mutators/mutate.js`
- * (`allMutators`), `dist/src/mutant-placers/index.js` (`allMutantPlacers`, of which it takes the one named
- * `expressionMutantPlacer`), `dist/src/index.js` (`Instrumenter`) and the instrumenter's own `@babel/core`.
- */
 export async function resolveFromCore(
   corePackage: string = corePackageJson(),
 ): Promise<Instrumenter> {
@@ -269,7 +240,6 @@ export async function resolveFromCore(
   };
 }
 
-/** Untyped by nature; `resolveFromCore` states each module's shape where it destructures them. */
 function importFile(path: string) {
   return import(pathToFileURL(path).href);
 }

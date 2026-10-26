@@ -1,10 +1,7 @@
-// JSX-safe placement for Stryker's expression placer. Pure: it builds new methods from the placer's own and
-// never touches the live object; install.ts is the only module that assigns them.
 import type { NodePath, types } from '@babel/core';
 
 import { isJsxChild, type BabelTypes } from './mutator.ts';
 
-/** The shape of Stryker's `MutantPlacer` (instrumenter `mutant-placers/mutant-placer.ts`), mutant ids opaque. */
 export interface MutantPlacerLike {
   readonly name: string;
   canPlace(path: NodePath): boolean;
@@ -13,19 +10,6 @@ export interface MutantPlacerLike {
 
 export type PlacerMethods = Pick<MutantPlacerLike, 'canPlace' | 'place'>;
 
-/**
- * `original`'s methods, extended so that:
- * - a `JSXAttribute` is a placement site: its value becomes `{expr}` (bare -> `true`, string -> a fresh
- *   StringLiteral, which drops the `extra.raw` that holds undecoded entities such as `&amp;`), each mutant's
- *   replacement attribute maps the same way (`{undefined}` for a removed attribute), then `original.place` runs
- *   on that expression;
- * - a `JSXText` is a placement site: it becomes `{"text"}`, cleaned by `t.react.buildChildren` as the JSX
- *   transform cleans it; emptied text becomes `null`, which renders exactly like no child;
- * - an expression among JSX children (an `ElementToSpan` swap) is wrapped in a `JSXExpressionContainer` first;
- * - everything else goes to `original` unchanged. Built-in mutators never mutate a `JSXAttribute` or `JSXText`,
- *   and built-in mutants inside an attribute's expression find that expression as their nearest site first, so
- *   their placement does not change (test/placement.test.ts proves it on a corpus).
- */
 export function withJsxPlacement(
   original: PlacerMethods,
   t: BabelTypes,
@@ -79,7 +63,7 @@ export function withJsxPlacement(
   };
 }
 
-/** The one path under `key`; the `as` stays here, around no code Stryker could mutate, as it skips `as` expressions. */
+// The `as` stays here, around no code Stryker could mutate, as it skips `as` expressions.
 function child(path: NodePath, key: string): NodePath {
   return path.get(key) as NodePath;
 }
@@ -104,11 +88,11 @@ function valueExpression(
     return t.booleanLiteral(true);
   }
 
+  // A fresh StringLiteral drops the `extra.raw` that holds undecoded entities such as `&amp;`.
   if (t.isStringLiteral(value)) {
     return t.stringLiteral(value.value);
   }
 
-  // The rules never match a JSX element value or an empty container (mutator.ts readValue).
   return (value as types.JSXExpressionContainer).expression as types.Expression;
 }
 

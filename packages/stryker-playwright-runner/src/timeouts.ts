@@ -1,34 +1,20 @@
-// Every timeout decision the runner makes.
 import { FRAME_READ_TIMEOUT_MS } from './protocol.ts';
 
-/** Config load and worker start before the first test, measured at about 2.7 s. */
+// Config load and worker start before the first test, measured at about 2.7 s.
 export const RUN_START_MS = 3000;
-/**
- * What the runner needs after the last test ends and before Stryker's timer fires: the hook's read of a
- * hung frame plus the context close and the worker exit. The same teardown follows a per-test timeout
- * and a deadline stop, so one value serves both. runner.test.ts's deadline test logs the stop
- * ("deadline stop took N ms"); it measured 2078-2096 ms in 8 of 9 runs, so this is the frame read
- * plus 600 ms.
- */
+// A deadline stop measured 2078-2096 ms in 8 of 9 runs: the hung frame's read plus context close and worker exit.
 export const STOP_HEADROOM_MS = FRAME_READ_TIMEOUT_MS + 600;
-/** Room for a timed-out test to end before Stryker's timer fires. */
 export const TEST_TIMEOUT_HEADROOM_MS = RUN_START_MS + STOP_HEADROOM_MS;
-/** Below this, real tests cannot finish, so Stryker's own timer ends the run instead. */
 export const MIN_TEST_TIMEOUT_MS = 2000;
-/** stopTests() does nothing until runTests has loaded the config (~1.4 s), so the deadline repeats it. */
 export const STOP_RETRY_MS = 100;
-/** Playwright's default expect.timeout. */
+// Playwright's default expect.timeout.
 export const DEFAULT_EXPECT_TIMEOUT_MS = 5000;
 
-/** What the Playwright config says about time. */
 export interface ConfigTimeouts {
-  /** The largest project timeout; Infinity when any project has none (0) or there are no projects. */
   readonly testTimeoutCap: number;
-  /** The largest expect.timeout over the projects. */
   readonly expectTimeout: number;
 }
 
-// Every project, setup dependencies included: the one timeout override applies to all that run.
 export function configTimeouts(
   projects: readonly {
     expect?: { timeout?: number };
@@ -51,10 +37,6 @@ export function configTimeouts(
   };
 }
 
-/**
- * A killed test fails only after its auto-waiting assertion gives up, but Stryker sizes its timeout from
- * passing tests, so a short timeoutMS turns kills into timeouts.
- */
 export function assertionTimeoutWarning(
   config: ConfigTimeouts,
   strykerTimeoutMS: number,
@@ -66,11 +48,8 @@ export function assertionTimeoutWarning(
     : undefined;
 }
 
-/** The time a run may take. Both undefined for the dry run, which keeps the config's timeouts. */
 export interface RunBudget {
-  /** Playwright's per-test `timeout` override. */
   readonly testTimeout: number | undefined;
-  /** Milliseconds after the run starts at which the runner stops it. */
   readonly deadlineMs: number | undefined;
 }
 
@@ -79,13 +58,6 @@ export const DRY_RUN_BUDGET: RunBudget = {
   deadlineMs: undefined,
 };
 
-/**
- * The deadline is undefined when it would leave less than RUN_START_MS + MIN_TEST_TIMEOUT_MS: a stop
- * before any test can finish would report Timeout, which Stryker counts as detected. Because
- * TEST_TIMEOUT_HEADROOM_MS = RUN_START_MS + STOP_HEADROOM_MS, deadlineMs >= RUN_START_MS + testTimeout
- * whenever the cap does not apply, so a test that starts on time ends through its own timeout and the
- * deadline only catches one that raised its timeout or started late.
- */
 export function mutantRunBudget(
   strykerTimeout: number,
   config: ConfigTimeouts,
@@ -102,21 +74,13 @@ export function mutantRunBudget(
   };
 }
 
-/** The facts about a finished run that decide whether it is a Timeout. */
 export interface TimeoutFacts {
   readonly mutantRun: boolean;
-  /** Some attempt failed or passed against its expected status. */
   readonly killed: boolean;
-  /** Some attempt hit its per-test timeout. */
   readonly testTimedOut: boolean;
-  /** The runner's deadline stopped the run. */
   readonly stoppedAtDeadline: boolean;
 }
 
-/**
- * The reason the run is a Timeout, or undefined. A kill outranks a timeout; the dry run reports a
- * timed-out test as the failed test it is.
- */
 export function timeoutReason(facts: TimeoutFacts): string | undefined {
   if (facts.killed) {
     return undefined;
@@ -132,20 +96,15 @@ export function timeoutReason(facts: TimeoutFacts): string | undefined {
 }
 
 export interface ArmedDeadline {
-  /** The `now()` at which stop() was first called, or undefined while it was not. */
   readonly firedAt: number | undefined;
-  /** Clears the timer and the retry interval. */
   disarm(): void;
 }
 
 // setTimeout fires at once for a longer delay.
 const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
 
-/**
- * Calls `stop` when `at` (a `now()` value) passes, then again every STOP_RETRY_MS until disarmed:
- * Playwright's stopTests() does nothing while runTests is still loading the config, and a second call
- * is harmless. `at` undefined never fires.
- */
+// Playwright's stopTests() does nothing while runTests is still loading the config, and a second call
+// is harmless.
 export function armDeadline(
   at: number | undefined,
   stop: () => Promise<void>,

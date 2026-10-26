@@ -1,22 +1,15 @@
-// The operator table's types and the one interpreter that turns a table row into a Stryker NodeMutator. Free of
-// Stryker: Babel's types arrive as an argument.
 import type { NodePath, types } from '@babel/core';
 
 export type BabelTypes = typeof types;
 
-/** One UI mutation operator: a row of the table in operators.ts. */
 export interface Operator {
-  /** Letters only (Stryker directives match no other character); what reports, `excludedMutations` and directives use. */
   readonly name: string;
-  /** A TSX module in which the operator makes at least one mutant; the install's self-check instruments it. */
   readonly sample: string;
   readonly rules: readonly Rule[];
 }
 
-/**
- * The table as written, its names kept as literal types. In place of `as const`: Stryker mutates nothing inside an
- * `as` expression, which would leave every rule of the table out of a mutation run.
- */
+// In place of `as const`: Stryker mutates nothing inside an `as` expression, which would leave every rule of the
+// table out of a mutation run.
 export function operatorTable<const T extends readonly Operator[]>(
   table: T,
 ): T {
@@ -25,37 +18,26 @@ export function operatorTable<const T extends readonly Operator[]>(
 
 export type Rule = AttributeRule | NodeRule;
 
-/**
- * A rule stated as data: which JSX attributes it matches and what each kind of value becomes. Values that are
- * literals in braces, template literals or functions never reach it (see `readValue`): the built-in
- * StringLiteral, BooleanLiteral, ArrowFunction and BlockStatement own them.
- */
 export interface AttributeRule {
   readonly kind: 'attribute';
-  /** Plain `JSXIdentifier` names; a namespaced name (`xlink:href`) never matches. */
   readonly attributes: readonly string[] | RegExp;
-  /** The replacement per value kind. A kind left out gives no mutant. The types allow only replacements that fit the kind. */
   readonly on: {
     readonly bare?: 'remove';
     readonly string?: 'empty' | 'remove' | 'flip';
     readonly expression?: 'empty' | 'remove' | 'false' | 'negate';
   };
-  /** An equivalent-mutant skip that needs the element, its other attributes, or the scope (through `site.path`). */
   skip?(site: AttributeSite): boolean;
 }
 
-/** A rule that needs the shape of the tree around a node; it yields each replacement node. */
 export interface NodeRule {
   readonly kind: 'node';
   mutate(path: NodePath, t: BabelTypes): Iterable<types.Node>;
 }
 
-/** A matched attribute, parsed once by the interpreter so that rules never re-read raw Babel shapes. */
 export interface AttributeSite {
   readonly name: string;
   readonly value: AttributeValue;
   readonly element: ElementSite;
-  /** For scope lookups (`path.scope.getBinding`); the parent element is in `element`. */
   readonly path: NodePath<types.JSXAttribute>;
 }
 
@@ -65,16 +47,13 @@ export type AttributeValue =
   | { readonly kind: 'expression'; readonly expression: types.Expression };
 
 export interface ElementSite {
-  /** `button`, `Link`; undefined for a member or namespaced name (`Foo.Bar`, `svg:rect`). */
   readonly name: string | undefined;
-  /** The names of all its plain attributes, for rules that depend on a sibling (`a` with `href`). */
   readonly attributes: ReadonlySet<string>;
   readonly node: types.JSXElement;
 }
 
 type Replacement = 'empty' | 'remove' | 'false' | 'negate' | 'flip';
 
-/** The part of Stryker's `NodeMutator` (instrumenter `mutators/node-mutator.ts`) that the adapter produces. */
 export interface NodeMutatorLike {
   readonly name: string;
   mutate(
@@ -83,7 +62,6 @@ export interface NodeMutatorLike {
   ): Iterable<types.Node>;
 }
 
-/** Interprets one table row. Attribute rules: parse the site, run `skip`, read the value, build the replacement. */
 export function toNodeMutator(
   operator: Operator,
   t: BabelTypes,
@@ -113,7 +91,6 @@ export function toNodeMutator(
   };
 }
 
-/** Undefined unless `path` is a `JSXAttribute` with a plain name that `rule.attributes` matches and a value `readValue` accepts. */
 function attributeSite(
   path: NodePath,
   rule: AttributeRule,
@@ -136,7 +113,6 @@ function attributeSite(
     : { name, value, element, path };
 }
 
-/** The element that carries `attribute`: JSXAttribute -> JSXOpeningElement -> JSXElement. */
 function elementSite(
   attribute: NodePath<types.JSXAttribute>,
   t: BabelTypes,
@@ -161,12 +137,6 @@ function elementSite(
   };
 }
 
-/**
- * The only place that decides which values the UI operators leave to the built-ins: bare -> bare; StringLiteral ->
- * string; a container whose expression is a literal (`{true}`, `{'x'}`, `{null}`, a template literal: Babel's
- * `Literal` alias) or a function -> undefined; any other expression -> expression. `JSXEmptyExpression` and a JSX
- * element as the value -> undefined.
- */
 function readValue(
   value: types.JSXAttribute['value'],
   t: BabelTypes,
@@ -193,12 +163,6 @@ function readValue(
     : { kind: 'expression', expression };
 }
 
-/**
- * The replacement attribute, or nothing when it would not change the value. The only place that holds the
- * empty-value skip: `empty` on a string whose text is already `""` yields nothing (`alt=""`, `href=""`).
- * empty -> `name=""`; remove -> `name={undefined}`; false -> `name={false}`; negate -> `name={…}` from `negation`;
- * flip -> `name="false"` from `"true"`, else `name="true"`.
- */
 function* replaced(
   site: AttributeSite,
   replacement: Replacement,
@@ -258,13 +222,6 @@ function* replaced(
   }
 }
 
-/**
- * The expression that renders the opposite state, or undefined when the syntax cannot tell one. `!(expr)` alone
- * is wrong for a value that is a string: `!(c ? 'true' : 'false')` and `!String(open)` are always `false`. So a
- * conditional negates each branch and keeps its test; a string branch flips as a string value does; a boolean
- * branch flips; `undefined`, another literal, or a `String()` or `.toString()` call stays as it is (a conditional)
- * or gives no mutant (the whole value); anything else becomes `!(expr)`.
- */
 function negation(
   expression: types.Expression,
   t: BabelTypes,
@@ -315,7 +272,6 @@ function isStringCall(expression: types.Expression, t: BabelTypes): boolean {
   );
 }
 
-/** A node whose parent is a `JSXElement` or `JSXFragment`: a JSX child. Shared by the rules and the placer. */
 export function isJsxChild(path: NodePath): boolean {
   return (
     path.parentPath?.isJSXElement() === true ||

@@ -1,4 +1,3 @@
-// The package's only entry. Two routes import it: core's plugin loader (`plugins`) and a JS/TS config's first line.
 import type { Ignorer } from '@stryker-mutator/api/ignore';
 import { declareFactoryPlugin, PluginKind } from '@stryker-mutator/api/plugin';
 
@@ -6,7 +5,7 @@ import { install } from './install.ts';
 import { operators } from './operators.ts';
 
 // Core sets this in every test-runner and checker child process (child-process-proxy.js:32), which re-import plugin
-// modules but never instrument. A Stryker run started inside such a process inherits it; the ignorer then refuses.
+// modules but never instrument.
 const installRan = process.env.STRYKER_MUTATOR_WORKER === undefined;
 
 if (installRan) {

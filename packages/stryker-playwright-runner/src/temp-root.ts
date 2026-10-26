@@ -3,28 +3,19 @@ import os from 'node:os';
 import path from 'node:path';
 
 /**
- * The runner's private temp directory. Playwright deletes and recreates `outputDir` in global setup, so
- * both directories live in a root it never touches: on a shared /tmp no other user can claim either
- * name in between. One root per runner process.
+ * Playwright deletes and recreates `outputDir` in global setup, so both directories live in a root it
+ * never touches: on a shared /tmp no other user can claim either name in between.
  */
 export interface TempRoot {
   readonly dir: string;
   readonly outputDir: string;
-  /** A fresh directory for one run's snapshot files. */
   nextRunDir(): string;
-  /** The first step of dispose: a run that Stryker timed out never reaches its own cleanup. */
   removeRunsAndOutput(): void;
-  /** The last step of dispose: the test that stopTests ends still writes its error context here. */
   remove(): void;
 }
 
-/**
- * Roots are named by the pid of the runner that owns them. The old scheme, `stryker-pw-<worker index>-`,
- * never matches: its number is no pid, so a live root of an older runner would look dead.
- */
 export const ROOT_PREFIX = 'stryker-playwright-';
 
-/** `stryker-playwright-<pid>-XXXXXX` -> pid; any other name -> undefined. */
 export function rootPid(name: string): number | undefined {
   const pid = name.startsWith(ROOT_PREFIX)
     ? /^(\d+)-/.exec(name.slice(ROOT_PREFIX.length))?.[1]
@@ -48,10 +39,7 @@ export function isRunning(
   }
 }
 
-/**
- * A real directory this user owns, not a link. Windows has no uids and a temp directory per user, so
- * there every real directory counts as owned.
- */
+// Windows has no uids and a temp directory per user, so there every real directory counts as owned.
 export function isOwnDir(
   dir: string,
   user: { getuid?: () => number } = process,
@@ -73,9 +61,8 @@ export function isOwnDir(
 }
 
 /**
- * Removes the roots in `tmp` of runners that no longer run and that this user owns, and returns their
- * names. Two runners that start at once may both try one root, and a process the dead runner started
- * may still hold it on Windows, so a removal that fails is skipped; the next runner tries again.
+ * Two runners that start at once may both try one root, and a process the dead runner started may
+ * still hold it on Windows, so a removal that fails is skipped; the next runner tries again.
  */
 export function removeLeftRoots(
   tmp: string,
@@ -105,7 +92,7 @@ export function removeLeftRoots(
       remove(dir);
       removed.push(name);
     } catch {
-      // Tried again by the next runner that starts.
+      // The next runner that starts tries again.
     }
   }
 

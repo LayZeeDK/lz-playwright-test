@@ -27,7 +27,6 @@ import {
   timeoutReason,
 } from './timeouts.ts';
 
-/** A Complete result that still carries the snapshots for the dry-run and mutant-run folds. */
 export type RunResult =
   | {
       status: DryRunStatus.Complete;
@@ -49,16 +48,11 @@ export interface MutantRunRequest {
   readonly kind: 'mutant';
   readonly disableBail: boolean;
   readonly activeMutant: string;
-  /** Already widened to whole describe.serial groups. */
   readonly testFilter: string[] | undefined;
   readonly hitLimit: number | undefined;
   readonly budget: RunBudget;
 }
 
-/**
- * Playwright's status, plus 'deadline': the runner's own timer stopped the run. An 'interrupted' that
- * reaches the folds is never the runner's doing.
- */
 export type RunStatus = FullResult['status'] | 'deadline';
 
 export interface RunOutput {
@@ -68,7 +62,6 @@ export interface RunOutput {
   readonly hookInstalled: boolean;
 }
 
-/** The counts the dry run logs. */
 export interface CoverageGaps {
   readonly lostFrames: number;
   readonly sharedFrames: number;
@@ -81,10 +74,8 @@ const OUTCOME: Record<ReturnType<TestCase['outcome']>, TestStatus> = {
   skipped: TestStatus.Skipped,
 };
 
-/** Records what Playwright reports, for `toRunResult` after a run and `listSerialGroups` after a listing. */
 export class CollectingReporter {
   readonly errors: string[] = [];
-  // The tail of webServer and global setup output, which carries the reason a server failed to start.
   output = '';
   // Playwright reports each attempt of a retried test with the same TestCase, which holds them all.
   readonly testCases = new Map<string, TestCase>();
@@ -98,7 +89,6 @@ export class CollectingReporter {
     this.suite = suite;
   }
 
-  // Every test Playwright loaded, run or not.
   get listedTests(): TestCase[] {
     return this.suite?.allTests() ?? [];
   }
@@ -129,8 +119,7 @@ export class CollectingReporter {
   }
 }
 
-// The projects runTests runs: the option's, else the default ones. Given no names, listTests would also
-// load the default: false projects.
+// Given no names, listTests would also load the default: false projects.
 export function projectsThatRun(
   option: string[] | undefined,
   projects: { default: boolean; project: { name: string } }[],
@@ -171,10 +160,6 @@ export async function listSerialGroups(
   return serialGroups(reporter.listedTests);
 }
 
-/**
- * The tests of each `describe.serial` group, keyed by every test in it. A later test in a serial
- * group depends on the ones before it, so it cannot run alone.
- */
 export function serialGroups(
   testCases: Iterable<TestCase>,
 ): Map<string, string[]> {
@@ -246,17 +231,12 @@ export function mutantRunRequest(
   };
 }
 
-/** What the hook needs to know about this run. */
 export function runSettings(request: RunRequest, outDir: string): RunSettings {
   return request.kind === 'dry'
     ? { outDir, perTest: request.coverageAnalysis === 'perTest' }
     : { outDir, perTest: false, hitLimit: request.hitLimit };
 }
 
-/**
- * A failed attempt may come from a server that died during the run. Never after the deadline: the
- * stopped test counts as failed, and the budget is spent.
- */
 export function mayHaveLostItsServer(output: RunOutput): boolean {
   return output.status !== 'deadline' && output.reporter.anyAttemptFailed();
 }
@@ -266,8 +246,7 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
   const isMutantRun = request.kind === 'mutant';
   const testCases = [...reporter.testCases.values()];
   const tests = testCases.map((test) => toTestResult(test, isMutantRun));
-  // An attempt that failed on its own kills the mutant even when another attempt, or another test,
-  // timed out. The test a deadline stop interrupts ends as skipped, so it is no kill.
+  // The test a deadline stop interrupts ends as skipped, so it is no kill.
   const reason = timeoutReason({
     mutantRun: isMutantRun,
     killed: testCases.some((test) =>
@@ -407,10 +386,6 @@ export function sumHitCounts(snapshots: readonly Snapshot[]): number {
   return snapshots.reduce((sum, { hitCount }) => sum + hitCount, 0);
 }
 
-/**
- * The missing-coverage check runs with coverage off too. `gaps` is set only when coverage was merged,
- * for the shell to log.
- */
 export function dryRunResult(
   output: RunOutput,
   request: DryRunRequest,
@@ -441,10 +416,6 @@ export function dryRunResult(
   };
 }
 
-/**
- * The hit limit outranks every other result, and the count is summed on every status: a limit that a
- * test file trips while it loads leaves a run without tests, which would otherwise be an Error.
- */
 export function mutantRunResult(
   output: RunOutput,
   request: MutantRunRequest,

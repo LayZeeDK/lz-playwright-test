@@ -2,7 +2,6 @@ import path from 'node:path';
 
 import type { StrykerOptions } from '@stryker-mutator/api/core';
 
-/** What a user writes under `playwright` in the Stryker config. */
 export interface PlaywrightRunnerOptions {
   configFile?: string;
   projects?: string[];
@@ -17,8 +16,6 @@ type JsonType<T> = T extends string
       ? 'array'
       : never;
 
-// One schema entry per option with a JSON type that matches the TypeScript type, so the compiler fails
-// when the interface and OPTION_PROPERTIES drift apart.
 type OptionSchemas = {
   [K in keyof Required<PlaywrightRunnerOptions>]: {
     type: JsonType<Required<PlaywrightRunnerOptions>[K]>;
@@ -62,19 +59,13 @@ export const strykerValidationSchema = {
   },
 };
 
-/** The options as the runner uses them: resolved, with the defaults applied. */
 export interface RunnerOptions {
-  /** Absolute; undefined lets Playwright find playwright.config.* in the working directory. */
   readonly configFile: string | undefined;
   readonly projects: string[] | undefined;
   readonly workers: number;
   readonly strykerTimeoutMS: number;
 }
 
-/**
- * The only reader of `StrykerOptions` for this runner. Stryker has validated the options against
- * `strykerValidationSchema`, so this only resolves them.
- */
 export function readRunnerOptions(options: StrykerOptions): RunnerOptions {
   if (options.testFiles?.length) {
     throw new Error(

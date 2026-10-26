@@ -1,6 +1,3 @@
-// Preloaded into Playwright's worker processes (NODE_OPTIONS=--import, set only while a run lasts).
-// It injects the Stryker namespace into every page through Playwright's client instrumentation, so
-// one build that contains every mutant serves all runs.
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -25,7 +22,6 @@ import {
   type SnapshotLine,
 } from './protocol.ts';
 
-/** What the hook reads from one frame before its browser context closes. */
 type FrameRead = Omit<SnapshotLine, 'outlivedItsTest'>;
 
 interface ContextState {
@@ -43,8 +39,7 @@ export interface PageSettings {
 
 type Test = TestType<object, object>;
 
-// Undefined under `node -e`, which a Playwright worker's NODE_OPTIONS can reach; test() reads it as
-// "undefined", which is no worker entry.
+// Undefined under `node -e`, which a worker's NODE_OPTIONS can reach; RegExp.test reads it as "undefined".
 const entry = process.argv[1];
 const settings = readRunSettings(process.env);
 
@@ -52,7 +47,6 @@ if (settings && isMainThread && WORKER_ENTRY.test(entry)) {
   install(createRequire(entry), settings);
 }
 
-/** `ns` is the global the instrumented code keeps its state in, in the worker and in its pages. */
 export function install(
   playwrightRequire: NodeJS.Require,
   { outDir, perTest, hitLimit }: RunSettings,
@@ -67,11 +61,7 @@ export function install(
   const alreadyRead = new WeakSet<Page>();
   const patchedBrowsers = new WeakSet<Browser>();
 
-  // The file exists from install on, so the runner can tell "the hook never installed" apart from
-  // "no page loaded instrumented code". Appending keeps the snapshots of an earlier worker in this
-  // run that had the same pid.
   fs.writeFileSync(outFile, '', { flag: 'a' });
-  // Before any test file is imported: the hook is preloaded with --import.
   const scope = globalThis as unknown as Record<
     string,
     NodeNamespace | undefined
@@ -80,7 +70,6 @@ export function install(
     (scope[ns] ??= {}),
     { perTest, hitLimit },
     () => currentTestId(test),
-    // The leading newline ends a partial line a killed worker with the same pid left behind.
     (line) => fs.appendFileSync(outFile, '\n' + line + '\n'),
   );
 
@@ -111,7 +100,6 @@ export function install(
       serializeSnapshot({ ...snapshot, outlivedItsTest }),
     );
 
-    // The leading newline ends a partial line a killed worker with the same pid left behind.
     if (lines.length) {
       fs.appendFileSync(outFile, '\n' + lines.join('\n') + '\n');
     }
@@ -163,7 +151,6 @@ export function install(
   });
 }
 
-/** The fields of the worker's own Stryker namespace that the hook sets or reads. */
 export interface NodeNamespace {
   activeMutant?: string;
   currentTestId?: string;
@@ -172,15 +159,6 @@ export interface NodeNamespace {
   hitLimit?: number;
 }
 
-/**
- * Makes the worker's own namespace report the coverage and hits of the app code its tests import. It
- * leaves activeMutant alone: the instrumented code reads it from the environment only while it is
- * unset. The instrumented code reads currentTestId on every call, so a getter puts coverage made
- * during a test under that test, and coverage made while no test runs, such as at import, in static.
- * runTests resolves after its workers exit, so a line written at exit is there to read, except after a
- * failure that reaches maxFailures: then it may resolve first. The hit limit throws, which fails the
- * test, so the count is written the moment it passes the limit instead.
- */
 export function recordNodeCoverage(
   ns: NodeNamespace,
   { perTest, hitLimit }: { perTest: boolean; hitLimit?: number },
@@ -206,11 +184,10 @@ export function recordNodeCoverage(
         }),
       );
     } catch {
-      // Nothing reads this run's snapshots any more.
+      // Dropped, as above.
     }
   };
 
-  // Stryker sizes the limit from the dry run's hits, Node hits included, so Node code counts too.
   if (hitLimit !== undefined) {
     let hits = 0;
     ns.hitLimit = hitLimit;
@@ -287,8 +264,6 @@ async function readNamespace(
   }
 }
 
-// Runs in the browser before any page script. Coverage and the hit count are carried across
-// same-origin navigations of the top frame through sessionStorage, which survives a page load.
 export function initPage({
   ns,
   activeMutant,

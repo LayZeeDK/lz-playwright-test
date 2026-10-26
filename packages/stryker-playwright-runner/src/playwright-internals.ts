@@ -1,7 +1,3 @@
-// Every Playwright internal the runner and the worker hook use. `playwright/lib/runner`,
-// `playwright/lib/common`, and `playwright-core/lib/coreBundle` are exported but undocumented, so their
-// shape is written down here instead of imported. The hook imports this file into every worker, so its
-// only runtime import is node:module (playwright-internals.test.ts checks both).
 import { createRequire } from 'node:module';
 
 import type { BrowserContext } from '@playwright/test';
@@ -43,7 +39,6 @@ export interface TestRunner {
   stopTests(): Promise<void>;
 }
 
-// The compiler keeps this list and the interface above in step.
 const TEST_RUNNER_METHOD_SET: Record<keyof TestRunner, true> = {
   initialize: true,
   loadConfig: true,
@@ -85,7 +80,6 @@ export const MIN_PLAYWRIGHT: {
   readonly minor: number;
 } = { major: 1, minor: 63 };
 
-/** The entry file of a Playwright worker process; the hook installs only there. */
 export const WORKER_ENTRY =
   /[\\/]playwright[\\/]lib[\\/]worker[\\/]workerProcessEntry\.js$/;
 
@@ -95,7 +89,6 @@ export const WORKER_ENTRY =
  */
 export const NO_COPY_PROMPT_ENV = 'PLAYWRIGHT_NO_COPY_PROMPT';
 
-/** `playwright-core`'s client instrumentation, as the hook uses it. */
 export interface Instrumentation {
   addListener(listener: {
     runAfterCreateBrowserContext?(context: BrowserContext): Promise<void>;
@@ -103,7 +96,6 @@ export interface Instrumentation {
   }): void;
 }
 
-/** What the runner may do with a probed Playwright install. */
 export interface Playwright {
   readonly version: string;
   createTestRunner(
@@ -122,7 +114,6 @@ export function supportsPlaywright(version: string): boolean {
   );
 }
 
-/** Checks the three modules and returns the typed `Playwright`, or throws naming every internal. */
 export function probeInternals(
   version: string,
   modules: {
@@ -166,10 +157,6 @@ export function probeInternals(
   };
 }
 
-/**
- * Resolves @playwright/test from the config's folder (or the working directory), then playwright and
- * playwright-core from there, refuses versions below MIN_PLAYWRIGHT, and probes the internals.
- */
 export function loadPlaywright(configFile: string | undefined): Playwright {
   const testRequire = createRequire(
     createRequire(configFile ?? `${process.cwd()}/package.json`).resolve(
@@ -196,7 +183,6 @@ export function loadPlaywright(configFile: string | undefined): Playwright {
   });
 }
 
-/** For the hook: the client instrumentation of the worker's own playwright-core. */
 export function instrumentationOf(
   playwrightRequire: NodeJS.Require,
 ): Instrumentation {
@@ -206,12 +192,10 @@ export function instrumentationOf(
   return core._instrumentation;
 }
 
-/** The describe mode of a reporter Suite, which is Playwright's internal Suite object. */
 export function parallelModeOf(suite: unknown): ParallelMode {
   const mode = (suite as { _parallelMode?: unknown } | undefined)
     ?._parallelMode;
 
-  // Without the field every test would run alone, and serial chains would give false kills.
   if (typeof mode !== 'string') {
     throw new Error(
       'Playwright suites no longer carry Suite._parallelMode, which this runner reads to keep describe.serial groups together.',

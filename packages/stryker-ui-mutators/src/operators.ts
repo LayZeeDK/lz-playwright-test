@@ -1,5 +1,3 @@
-// The operator table: one row per operator, in the design's rank order. Every skip the design names lives in
-// exactly one row (or, for the value kinds and the empty value, in mutator.ts's readValue and replaced).
 import type { NodePath, types } from '@babel/core';
 
 import {
@@ -11,7 +9,6 @@ import {
 } from './mutator.ts';
 
 const HAS_WORD = /[\p{L}\p{N}]/u;
-/** Built-in ConditionalExpression already forces `true`/`false` on a test of these shapes. */
 const COMPARISON: ReadonlySet<string> = new Set([
   '==',
   '!=',
@@ -22,11 +19,8 @@ const COMPARISON: ReadonlySet<string> = new Set([
   '>',
   '>=',
 ]);
-/** Calls that render a list; the later ListExpression owns them. */
 const LIST_METHODS: ReadonlySet<string> = new Set(['map', 'filter', 'flatMap']);
-/** Their text is CSS or code, not rendered text. */
 const UNRENDERED_TEXT: ReadonlySet<string> = new Set(['style', 'script']);
-/** Decorative icons: exposing them is unobservable to role, label and text queries. */
 const DECORATIVE: ReadonlySet<string> = new Set(['svg', 'img', 'i']);
 const LABELABLE: ReadonlySet<string> = new Set(['input', 'select', 'textarea']);
 /** A span cannot take these under @types/react 19.3.0 (TS2322); a span ignores them at run time. */
@@ -153,7 +147,6 @@ export const operators = operatorTable([
       {
         kind: 'node',
         *mutate(path, t) {
-          // ConditionalGuardRemoval: `x && <A/>` becomes `<A/>`.
           if (
             path.isLogicalExpression({ operator: '&&' }) &&
             path.parentPath.isJSXExpressionContainer() &&
@@ -163,7 +156,6 @@ export const operators = operatorTable([
             yield t.cloneNode(path.node.right, true);
           }
 
-          // ConditionalToConsequent and ConditionalToAlternate, for a ternary rendered as a JSX child only.
           if (
             path.isConditionalExpression() &&
             path.parentPath.isJSXExpressionContainer() &&
@@ -221,7 +213,6 @@ export const operators = operatorTable([
     sample: 'export const a = <div role="dialog" />;\n',
     rules: [
       {
-        // RoleRemoval: `role="dialog"` becomes `role={undefined}`.
         kind: 'attribute',
         attributes: ['role'],
         on: { string: 'remove' },
@@ -230,7 +221,6 @@ export const operators = operatorTable([
           implicitRole(site.element) === site.value.text,
       },
       {
-        // ElementToSpan: `button` always; `a` only with `href`, as an `a` without one has no link role.
         kind: 'node',
         *mutate(path, t) {
           if (!path.isJSXElement() || !swapsToSpan(path.node, t)) {
@@ -297,7 +287,6 @@ export const operators = operatorTable([
   },
 ]);
 
-/** Derived from the table; the cases harness types its expectations with it, so no second list of names exists. */
 export type OperatorName = (typeof operators)[number]['name'];
 
 export const operatorNames: readonly OperatorName[] = operators.map(
@@ -365,7 +354,6 @@ function wrapsControl(label: ElementSite): boolean {
   return holds(label.node.children);
 }
 
-/** An identifier, member access, optional member access or call, except a list-rendering call. */
 function isRenderedValue(node: types.Node, t: BabelTypes): boolean {
   if (t.isCallExpression(node)) {
     const { callee } = node;

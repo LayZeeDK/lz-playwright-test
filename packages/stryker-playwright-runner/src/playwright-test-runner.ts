@@ -56,7 +56,6 @@ interface ServerCheck {
   isUp(): Promise<boolean>;
 }
 
-/** Everything init() produced, so the run methods never meet a half-initialised runner. */
 interface Session {
   readonly options: RunnerOptions;
   readonly playwright: TestRunner;
@@ -66,21 +65,15 @@ interface Session {
   readonly timeouts: ConfigTimeouts;
 }
 
-// `.ts` when this module runs from source, `.js` when it runs from the build.
 const HOOK = new URL(
   `./worker-hook${path.extname(import.meta.filename)}`,
   import.meta.url,
 ).href;
 
-/** The overrides README lists under "On every run". */
 const RUN_OVERRIDES = {
   use: { screenshot: 'off', trace: 'off', video: 'off' },
 };
 
-/**
- * Hosts Playwright Test in-process through its undocumented TestRunner, which
- * playwright-internals.ts loads, checks and types.
- */
 export class PlaywrightTestRunner implements StrykerTestRunner {
   static inject = tokens(commonTokens.options, commonTokens.logger);
 
@@ -148,7 +141,6 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
         timeouts,
       };
     } catch (error) {
-      // dispose() sees no session, so release what exists here. The init error is the one to report.
       await playwright?.runGlobalTeardown().catch(() => undefined);
       root.remove();
       throw error;
@@ -209,8 +201,6 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     return this.session;
   }
 
-  // The deadline starts here: the server probe, a restart and a second runOnce all count against
-  // Stryker's one timer.
   private async run(session: Session, request: RunRequest): Promise<RunOutput> {
     const deadlineAt =
       request.budget.deadlineMs === undefined
@@ -219,7 +209,6 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     await this.restartDeadServers(session);
     let output = await this.runOnce(session, request, deadlineAt);
 
-    // A server that died during this run fails its tests for a reason the mutant did not cause.
     if (
       mayHaveLostItsServer(output) &&
       (await this.restartDeadServers(session))
@@ -307,10 +296,6 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   }
 }
 
-/**
- * Sets `values` (undefined deletes) while `fn` runs and restores the previous values afterwards, on
- * success and on throw.
- */
 export async function withEnv<T>(
   values: Readonly<Record<string, string | undefined>>,
   fn: () => Promise<T>,
@@ -364,8 +349,6 @@ async function runGlobalSetup(playwright: TestRunner) {
   }
 }
 
-// The same test Playwright's webServer plugin uses at startup: an HTTP request for a url, a TCP
-// connection for a port.
 function serverCheck(
   server: { url?: string; port?: number; ignoreHTTPSErrors?: boolean },
   isURLAvailable: Playwright['isURLAvailable'],
