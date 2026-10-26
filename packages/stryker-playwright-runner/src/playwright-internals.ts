@@ -44,7 +44,7 @@ export interface TestRunner {
 }
 
 // The compiler keeps this list and the interface above in step.
-export const TEST_RUNNER_METHODS = Object.keys({
+const TEST_RUNNER_METHOD_SET: Record<keyof TestRunner, true> = {
   initialize: true,
   loadConfig: true,
   listTests: true,
@@ -52,7 +52,10 @@ export const TEST_RUNNER_METHODS = Object.keys({
   runGlobalTeardown: true,
   runTests: true,
   stopTests: true,
-} satisfies Record<keyof TestRunner, true>) as (keyof TestRunner)[];
+};
+export const TEST_RUNNER_METHODS = Object.keys(
+  TEST_RUNNER_METHOD_SET,
+) as (keyof TestRunner)[];
 
 export interface RunnerModule {
   testRunner: {
@@ -77,7 +80,10 @@ export interface CommonModule {
 
 type ParallelMode = 'none' | 'default' | 'serial' | 'parallel';
 
-export const MIN_PLAYWRIGHT = { major: 1, minor: 63 } as const;
+export const MIN_PLAYWRIGHT: {
+  readonly major: number;
+  readonly minor: number;
+} = { major: 1, minor: 63 };
 
 /** The entry file of a Playwright worker process; the hook installs only there. */
 export const WORKER_ENTRY =
@@ -175,9 +181,7 @@ export function loadPlaywright(configFile: string | undefined): Playwright {
   const playwrightRequire = createRequire(
     testRequire.resolve('playwright/package.json'),
   );
-  const { version } = playwrightRequire('./package.json') as {
-    version: string;
-  };
+  const { version }: { version: string } = playwrightRequire('./package.json');
 
   if (!supportsPlaywright(version)) {
     throw new Error(
@@ -186,11 +190,9 @@ export function loadPlaywright(configFile: string | undefined): Playwright {
   }
 
   return probeInternals(version, {
-    runner: playwrightRequire('playwright/lib/runner') as Partial<RunnerModule>,
-    common: playwrightRequire('playwright/lib/common') as Partial<CommonModule>,
-    coreBundle: playwrightRequire(
-      'playwright-core/lib/coreBundle',
-    ) as Partial<CoreBundleModule>,
+    runner: playwrightRequire('playwright/lib/runner'),
+    common: playwrightRequire('playwright/lib/common'),
+    coreBundle: playwrightRequire('playwright-core/lib/coreBundle'),
   });
 }
 
@@ -198,11 +200,10 @@ export function loadPlaywright(configFile: string | undefined): Playwright {
 export function instrumentationOf(
   playwrightRequire: NodeJS.Require,
 ): Instrumentation {
-  return (
-    playwrightRequire('playwright-core') as {
-      _instrumentation: Instrumentation;
-    }
-  )._instrumentation;
+  const core: { _instrumentation: Instrumentation } =
+    playwrightRequire('playwright-core');
+
+  return core._instrumentation;
 }
 
 /** The describe mode of a reporter Suite, which is Playwright's internal Suite object. */

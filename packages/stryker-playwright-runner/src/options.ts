@@ -47,7 +47,7 @@ export const OPTION_PROPERTIES = {
     default: 1,
     description: 'Playwright workers per Stryker test runner process.',
   },
-} as const satisfies OptionSchemas;
+} satisfies OptionSchemas;
 
 export const strykerValidationSchema = {
   $schema: 'http://json-schema.org/draft-07/schema#',

@@ -54,7 +54,7 @@ function install(
   playwrightRequire: NodeJS.Require,
   { outDir, perTest, hitLimit }: RunSettings,
 ) {
-  const { test } = playwrightRequire('playwright/test') as { test: Test };
+  const { test }: { test: Test } = playwrightRequire('playwright/test');
   const instrumentation = instrumentationOf(playwrightRequire);
   const ns = INSTRUMENTER_CONSTANTS.NAMESPACE;
   const activeMutant =
@@ -69,8 +69,12 @@ function install(
   // run that had the same pid.
   fs.writeFileSync(outFile, '', { flag: 'a' });
   // Before any test file is imported: the hook is preloaded with --import.
+  const scope = globalThis as unknown as Record<
+    string,
+    NodeNamespace | undefined
+  >;
   recordNodeCoverage(
-    ((globalThis as Record<string, unknown>)[ns] ??= {}) as NodeNamespace,
+    (scope[ns] ??= {}),
     { perTest, hitLimit },
     () => currentTestId(test),
     // The leading newline ends a partial line a killed worker with the same pid left behind.
@@ -314,9 +318,9 @@ function initPage({ ns, activeMutant, testId, hitLimit }: PageSettings) {
   }
 
   try {
-    const carried = JSON.parse(
+    const carried: FrameRead | null = JSON.parse(
       sessionStorage.getItem(key) ?? 'null',
-    ) as FrameRead | null;
+    );
 
     if (carried) {
       s.mutantCoverage = carried.mutantCoverage;

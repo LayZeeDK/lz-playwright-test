@@ -75,7 +75,7 @@ const HOOK = new URL(
 /** The overrides README lists under "On every run". */
 const RUN_OVERRIDES = {
   use: { screenshot: 'off', trace: 'off', video: 'off' },
-} as const;
+};
 
 /**
  * Hosts Playwright Test in-process through its undocumented TestRunner, which

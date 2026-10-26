@@ -74,12 +74,12 @@ export interface CoverageGaps {
   readonly sharedFrames: number;
 }
 
-const OUTCOME = {
+const OUTCOME: Record<ReturnType<TestCase['outcome']>, TestStatus> = {
   expected: TestStatus.Success,
   flaky: TestStatus.Success,
   unexpected: TestStatus.Failed,
   skipped: TestStatus.Skipped,
-} as const;
+};
 
 /** Records what Playwright reports, for `toRunResult` after a run and `listSerialGroups` after a listing. */
 export class CollectingReporter {
