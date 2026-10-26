@@ -1,30 +1,21 @@
 // Synthetic UI shapes from the open-source repos the runner was exercised on, as JSX, with the UI mutants the
-// design (docs/design/playwright-mutators.md) says each gives. An empty expect is a must-not-generate case.
-export type Operator =
-  | 'TextLiteral'
-  | 'LabelAttribute'
-  | 'EventHandler'
-  | 'ConditionalElement'
-  | 'UrlAttribute'
-  | 'DisabledAttribute'
-  | 'HiddenAttribute'
-  | 'ElementRole'
-  | 'ChildExpression'
-  | 'StateAttribute';
+// design (docs/design/playwright-mutators.md) says each gives. An empty expect is a must-not-generate case. The
+// mined rows and their transcription notes are in spikes/ui-mutator-cases/.
+import type { OperatorName } from '../src/operators.ts';
 
 export interface Case {
   readonly id: string;
   readonly title: string;
-  // `<repo>@<commit>:<path>:<line>`, the shape this case reproduces.
+  // `<repo>@<commit>:<path>:<line>`, the shape this case reproduces; `design:<section>` for a design rule.
   readonly origin: string;
   // Module code before the component, for shapes that need a same-file declaration.
   readonly setup?: string;
   // One JSX expression; free identifiers stand for props.
   readonly jsx: string;
   // Each mutant as [operator, replacement source]; mutation names are in the mined-*.md files.
-  readonly expect: readonly (readonly [Operator, string])[];
-  // A design rule the prototype does not implement yet; the case runs as todo.
-  readonly gap?: string;
+  readonly expect: readonly (readonly [OperatorName, string])[];
+  // Text the instrumented file must contain, for a rule about placement rather than about the mutants.
+  readonly instrumented?: string;
 }
 
 const RW = 'realworld@bc7158d:';
@@ -32,8 +23,7 @@ const YETI = 'ngx-yeti@87d4377:apps/yeti-app/src/app/fixtures/';
 const ANALOG = 'analog@a377078ec:';
 const HELLO = 'stryker-playwright-hello-world@fa6dd64:';
 const DEMO = 'stryker-playwright-runner@f00806e:apps/demo-app/src/app/';
-const SPAN =
-  'ElementToSpan drops href, type and disabled, which a span cannot take; the prototype keeps them';
+const RULES = 'design:Rules the synthetic cases settled';
 
 export const cases: readonly Case[] = [
   {
@@ -95,7 +85,6 @@ export const cases: readonly Case[] = [
       ['ElementRole', '<span onClick={logout}>Logout</span>'],
       ['TextLiteral', ''],
     ],
-    gap: 'EventHandler skips a same-file handler referenced once; the prototype does not',
   },
   {
     id: 'realworld-7',
@@ -120,7 +109,6 @@ export const cases: readonly Case[] = [
     origin: `${RW}libs/core/forms/src/lib/list-errors/list-errors.component.html:1`,
     jsx: '<div>{errors.length > 0 && <ul className="error-messages" />}</div>',
     expect: [],
-    gap: 'ConditionalElement skips a comparison or logical guard; the prototype does not',
   },
   {
     id: 'realworld-10',
@@ -131,7 +119,6 @@ export const cases: readonly Case[] = [
       ['ElementRole', '<span data-testid="article-author"></span>'],
       ['UrlAttribute', 'href=""'],
     ],
-    gap: SPAN,
   },
   {
     id: 'realworld-11',
@@ -143,7 +130,6 @@ export const cases: readonly Case[] = [
       ['UrlAttribute', 'href=""'],
       ['TextLiteral', ''],
     ],
-    gap: SPAN,
   },
   {
     id: 'realworld-12',
@@ -155,7 +141,6 @@ export const cases: readonly Case[] = [
       ['DisabledAttribute', 'disabled={false}'],
       ['TextLiteral', ''],
     ],
-    gap: SPAN,
   },
   {
     id: 'realworld-13',
@@ -167,7 +152,6 @@ export const cases: readonly Case[] = [
       ['DisabledAttribute', 'disabled={false}'],
       ['TextLiteral', ''],
     ],
-    gap: SPAN,
   },
   {
     id: 'realworld-14',
@@ -226,7 +210,6 @@ export const cases: readonly Case[] = [
       ['TextLiteral', ''],
       ['TextLiteral', ''],
     ],
-    gap: SPAN,
   },
   {
     id: 'realworld-21',
@@ -241,7 +224,6 @@ export const cases: readonly Case[] = [
     origin: `${RW}libs/ui/components/src/pager/pager.component.html:9`,
     jsx: '<a data-testid="pagination-link" className="page-link">{pageNumber}</a>',
     expect: [['ChildExpression', 'null']],
-    gap: 'ElementRole swaps an a only when it has an href; the prototype swaps every a',
   },
   {
     id: 'ngx-yeti-1',
@@ -257,7 +239,6 @@ export const cases: readonly Case[] = [
       ['DisabledAttribute', 'disabled={false}'],
       ['TextLiteral', ''],
     ],
-    gap: SPAN,
   },
   {
     id: 'ngx-yeti-2',
@@ -277,7 +258,6 @@ export const cases: readonly Case[] = [
       ['UrlAttribute', 'href=""'],
       ['TextLiteral', ''],
     ],
-    gap: `ConditionalElement skips a comparison or logical guard; the prototype does not. ${SPAN}`,
   },
   {
     id: 'ngx-yeti-4',
@@ -288,7 +268,6 @@ export const cases: readonly Case[] = [
       ['DisabledAttribute', 'disabled={undefined}'],
       ['TextLiteral', ''],
     ],
-    gap: 'ElementRole swaps an a only when it has an href; the prototype swaps every a',
   },
   {
     id: 'ngx-yeti-5',
@@ -301,7 +280,6 @@ export const cases: readonly Case[] = [
       ['UrlAttribute', 'href=""'],
       ['TextLiteral', ''],
     ],
-    gap: `ConditionalElement forces a JSX ternary only; the prototype counts a null branch as JSX. ${SPAN}`,
   },
   {
     id: 'ngx-yeti-6',
@@ -313,7 +291,6 @@ export const cases: readonly Case[] = [
       ['UrlAttribute', 'href=""'],
       ['TextLiteral', ''],
     ],
-    gap: SPAN,
   },
   {
     id: 'ngx-yeti-7',
@@ -325,7 +302,6 @@ export const cases: readonly Case[] = [
       ['UrlAttribute', 'href=""'],
       ['TextLiteral', ''],
     ],
-    gap: SPAN,
   },
   {
     id: 'ngx-yeti-8',
@@ -381,7 +357,6 @@ export const cases: readonly Case[] = [
     origin: `${YETI}button-fixture.ts:82`,
     jsx: '<svg aria-hidden="true" viewBox="0 0 24 24"></svg>',
     expect: [],
-    gap: 'HiddenAttribute skips aria-hidden on svg, img and i; the prototype forces it off',
   },
   {
     id: 'ngx-yeti-15',
@@ -397,7 +372,6 @@ export const cases: readonly Case[] = [
       ['StateAttribute', 'aria-pressed={!bold}'],
       ['TextLiteral', ''],
     ],
-    gap: `EventHandler skips a same-file handler referenced once; the prototype does not. ${SPAN}`,
   },
   {
     id: 'ngx-yeti-16',
@@ -413,7 +387,6 @@ export const cases: readonly Case[] = [
       ['EventHandler', 'onClick={undefined}'],
       ['TextLiteral', ''],
     ],
-    gap: SPAN,
   },
   {
     id: 'ngx-yeti-17',
@@ -435,7 +408,6 @@ export const cases: readonly Case[] = [
       ['DisabledAttribute', 'aria-disabled={false}'],
       ['TextLiteral', ''],
     ],
-    gap: SPAN,
   },
   {
     id: 'ngx-yeti-19',
@@ -446,7 +418,6 @@ export const cases: readonly Case[] = [
       ['TextLiteral', ''],
       ['TextLiteral', ''],
     ],
-    gap: 'ElementRole skips a role equal to the implicit role (Playwright maps ul to list); the prototype removes it',
   },
   {
     id: 'ngx-yeti-20',
@@ -457,7 +428,6 @@ export const cases: readonly Case[] = [
       ['ElementRole', '<span id="save">Save</span>'],
       ['TextLiteral', ''],
     ],
-    gap: SPAN,
   },
   {
     id: 'ngx-yeti-21',
@@ -465,7 +435,6 @@ export const cases: readonly Case[] = [
     origin: 'ngx-yeti@87d4377:packages/ngx-yeti/layer/src/layer.stories.ts:153',
     jsx: '<img src={trail} width="1600" height="900" alt="" />',
     expect: [],
-    gap: 'an attribute that is already empty gets no mutant; the prototype empties it again',
   },
   {
     id: 'analog-1',
@@ -477,7 +446,6 @@ export const cases: readonly Case[] = [
       ['UrlAttribute', 'href=""'],
       ['TextLiteral', ''],
     ],
-    gap: SPAN,
   },
   {
     id: 'analog-2',
@@ -493,7 +461,6 @@ export const cases: readonly Case[] = [
       ['TextLiteral', ''],
       ['TextLiteral', ''],
     ],
-    gap: SPAN,
   },
   {
     id: 'analog-3',
@@ -509,7 +476,6 @@ export const cases: readonly Case[] = [
       ['ChildExpression', 'null'],
       ['LabelAttribute', 'title=""'],
     ],
-    gap: SPAN,
   },
   {
     id: 'analog-4',
@@ -533,7 +499,6 @@ export const cases: readonly Case[] = [
       ['ElementRole', '<span onClick={share}>Share</span>'],
       ['TextLiteral', ''],
     ],
-    gap: `EventHandler skips a same-file handler referenced once; the prototype does not. ${SPAN}`,
   },
   {
     id: 'analog-6',
@@ -546,7 +511,6 @@ export const cases: readonly Case[] = [
       ['EventHandler', 'onClick={undefined}'],
       ['TextLiteral', ''],
     ],
-    gap: SPAN,
   },
   {
     id: 'analog-7',
@@ -556,7 +520,6 @@ export const cases: readonly Case[] = [
       "const onNotify = () => {\n  window.alert('You will be notified when the product goes on sale');\n};",
     jsx: '<ProductAlerts product={product} onNotify={onNotify} />',
     expect: [],
-    gap: 'EventHandler skips a same-file handler referenced once; the prototype does not',
   },
   {
     id: 'analog-8',
@@ -567,7 +530,6 @@ export const cases: readonly Case[] = [
       ['ElementRole', '<span onClick={() => notify.emit()}>Notify Me</span>'],
       ['TextLiteral', ''],
     ],
-    gap: `ConditionalElement skips a comparison or logical guard; the prototype does not. ${SPAN}`,
   },
   {
     id: 'analog-9',
@@ -588,7 +550,6 @@ export const cases: readonly Case[] = [
       ['ElementRole', '<span>Submit</span>'],
       ['TextLiteral', ''],
     ],
-    gap: SPAN,
   },
   {
     id: 'analog-10',
@@ -607,7 +568,6 @@ export const cases: readonly Case[] = [
     setup: 'const onSubmit = () => {\n  clearCart();\n};',
     jsx: '<form onSubmit={onSubmit}></form>',
     expect: [],
-    gap: 'EventHandler skips a same-file handler referenced once; the prototype does not',
   },
   {
     id: 'analog-12',
@@ -645,7 +605,6 @@ export const cases: readonly Case[] = [
       ['ElementRole', '<span className="button">Purchase</span>'],
       ['TextLiteral', ''],
     ],
-    gap: SPAN,
   },
   {
     id: 'analog-16',
@@ -686,7 +645,6 @@ export const cases: readonly Case[] = [
       ['ElementRole', '<span onClick={() => addToCart(product)}>Buy</span>'],
       ['TextLiteral', ''],
     ],
-    gap: SPAN,
   },
   {
     id: 'analog-20',
@@ -721,7 +679,6 @@ export const cases: readonly Case[] = [
       ['UrlAttribute', 'href=""'],
       ['TextLiteral', ''],
     ],
-    gap: SPAN,
   },
   {
     id: 'hello-1',
@@ -910,7 +867,6 @@ export const cases: readonly Case[] = [
     origin: `${DEMO}price-tag.tsx:22`,
     jsx: '<p>{off > 0 && (<s>x</s>)}</p>',
     expect: [['TextLiteral', '']],
-    gap: 'ConditionalElement skips a comparison or logical guard; the prototype does not',
   },
   {
     id: 'demo-15',
@@ -954,5 +910,106 @@ export const cases: readonly Case[] = [
     origin: `${DEMO}app.tsx:78`,
     jsx: '<Route path="/" element={<Cart />} />',
     expect: [],
+  },
+  {
+    id: 'design-1',
+    title: 'htmlFor on a label that wraps its control is skipped',
+    origin: RULES,
+    jsx: '<label htmlFor="q">Query <input id="q" /></label>',
+    expect: [['TextLiteral', '']],
+  },
+  {
+    id: 'design-2',
+    title: 'text inside style is not rendered text',
+    origin: RULES,
+    jsx: '<style>.a {"{"} color: red {"}"}</style>',
+    expect: [],
+  },
+  {
+    id: 'design-3',
+    title: 'text inside script is not rendered text',
+    origin: RULES,
+    jsx: '<script>window.ready = true</script>',
+    expect: [],
+  },
+  {
+    id: 'design-4',
+    title: 'a role equal to the implicit role is skipped, and the button still swaps',
+    origin: RULES,
+    jsx: '<button role="button">Save</button>',
+    expect: [
+      ['ElementRole', '<span role="button">Save</span>'],
+      ['TextLiteral', ''],
+    ],
+  },
+  {
+    id: 'design-5',
+    title: 'a link role on an a with href is implicit',
+    origin: RULES,
+    jsx: '<a href="/x" role="link">X</a>',
+    expect: [
+      ['ElementRole', '<span role="link">X</span>'],
+      ['TextLiteral', ''],
+      ['UrlAttribute', 'href=""'],
+    ],
+  },
+  {
+    id: 'design-6',
+    title: 'a link role on an a without href is removed',
+    origin: RULES,
+    jsx: '<a role="link" tabIndex={0}>X</a>',
+    expect: [
+      ['ElementRole', 'role={undefined}'],
+      ['TextLiteral', ''],
+    ],
+  },
+  {
+    id: 'design-7',
+    title: 'implicit roles of landmarks, lists and headings are skipped; a context-dependent one is removed',
+    origin: RULES,
+    jsx: '<div><nav role="navigation" /><aside role="complementary" /><ol role="list"><li role="listitem" /></ol><h2 role="heading" /><header role="banner" /></div>',
+    expect: [['ElementRole', 'role={undefined}']],
+  },
+  {
+    id: 'design-8',
+    title: 'a string state value is flipped',
+    origin: 'design:Operators in the first release, StateAttribute',
+    jsx: '<div role="tab" aria-selected="true" aria-expanded="false">Tab</div>',
+    expect: [
+      ['ElementRole', 'role={undefined}'],
+      ['StateAttribute', 'aria-selected="false"'],
+      ['StateAttribute', 'aria-expanded="true"'],
+      ['TextLiteral', ''],
+    ],
+  },
+  {
+    id: 'design-9',
+    title: 'aria-hidden on an i or img icon is skipped; hidden on an svg is not',
+    origin: 'design:Operators in the first release, HiddenAttribute',
+    jsx: '<p><i className="icon" aria-hidden="true" /><img src="x.png" aria-hidden={hide} /><svg hidden /></p>',
+    expect: [['HiddenAttribute', 'hidden={undefined}']],
+  },
+  {
+    id: 'design-10',
+    title: 'a JSX entity in an emptied attribute is decoded in the instrumented original',
+    origin: 'docs/design/playwright-mutators-opus.md:189',
+    jsx: '<img alt="Fish &amp; Chips" />',
+    expect: [['LabelAttribute', 'alt=""']],
+    instrumented: '"Fish & Chips"',
+  },
+  {
+    id: 'design-11',
+    title: 'a guard and a ternary inside an attribute value: the guard is removed, the ternary is left alone',
+    origin: 'design:Tradeoffs accepted (candidate-opus), ConditionalElement',
+    jsx: '<Card icon={busy && <Spinner />} badge={busy ? <Dot /> : null} />',
+    expect: [['ConditionalElement', '<Spinner />']],
+  },
+  {
+    id: 'design-12',
+    title: 'a function declared in the file but referenced twice keeps its handler mutants',
+    origin: 'design:Operators in the first release, EventHandler',
+    setup: 'function save() {}\nexport const again = save;',
+    jsx: '<form onSubmit={save}></form>',
+    expect: [['EventHandler', 'onSubmit={undefined}']],
   },
 ];

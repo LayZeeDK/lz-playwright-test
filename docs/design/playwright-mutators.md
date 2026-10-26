@@ -117,9 +117,10 @@ attribute or the tag that gives an element its implicit role.
 
 ## Rules the synthetic cases settled
 
-`spikes/ui-mutator-cases/` holds 94 synthetic cases: JSX versions of UI shapes in the repos the runner was
-exercised on (RealWorld, ngx-yeti, Analog and hello-world at the commits `oss/README.md` names, and the demo
-app), each with the exact UI mutants it must give. They run against the prototype. The design was silent on
+`packages/stryker-ui-mutators/test/cases.ts` holds 94 synthetic cases: JSX versions of UI shapes in the repos
+the runner was exercised on (RealWorld, ngx-yeti, Analog and hello-world at the commits `oss/README.md` names,
+and the demo app), each with the exact UI mutants it must give. `spikes/ui-mutator-cases/` keeps the mined rows
+they came from. The cases first ran against the prototype and now run against the package. The design was silent on
 these points; Claude settled them on 2026-10-25 from the prototype's behaviour and the Opus draft:
 
 - `LabelAttribute` takes bound values, as the Opus draft's rule did (2.2); the earlier "plain-string"
@@ -167,9 +168,8 @@ The Opus prototype (`spikes/design-opus/ui-mutators.ts`) and both drafts use the
 prototype also predates seven of the rules in this design: the `ConditionalElement` comparison and logical skip, the
 `ConditionalElement` limit to JSX children, the `EventHandler` single-reference skip, the `href`
 condition on the `a` swap, the skip of an empty value, the attributes that `ElementToSpan` drops, and the
-`HiddenAttribute` skip of `aria-hidden` on `svg`, `img`, and `i`. The
-synthetic cases that test them run as `todo`. Two more prototype behaviours differ from this design, and
-no case tests them. The prototype skips, without a word, an operator whose name is already registered
+`HiddenAttribute` skip of `aria-hidden` on `svg`, `img`, and `i`. The package implements them, and the
+synthetic cases that test them pass. Two more prototype behaviours differ from this design. The prototype skips, without a word, an operator whose name is already registered
 (a case-sensitive `Set.has`), and wraps the placer only when it added every operator, where the design
 refuses the name. It also removes a string state value, so `aria-pressed="true"` becomes
 `aria-pressed={undefined}`, where `StateAttribute` flips it. Its counts in `neutral-output.txt`
@@ -351,7 +351,7 @@ MODE=patched node spikes/design-opus/neutral.ts
 MODE=ui node spikes/design-opus/neutral.ts
 node spikes/design-opus/directive.ts
 node spikes/design-fable/spike-jsx-placement.ts
-node --test spikes/ui-mutator-cases/cases.test.ts
+node --test packages/stryker-ui-mutators/test/cases.test.ts
 ```
 
 `MODE=patched` shows that the placer patch leaves built-in mutants unchanged, and `MODE=ui` prints the

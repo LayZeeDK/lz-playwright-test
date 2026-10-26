@@ -1,9 +1,10 @@
 # Transcription notes: mined rows to `cases.ts`
 
-The 95 rows in `mined-*.md` became 93 cases in `cases.ts`. The other 2 are skipped (see Skipped rows). A later
-review added ngx-yeti-21 (see Gaps). Run `node --test spikes/ui-mutator-cases/cases.test.ts`: 94 tests, 61 pass,
-33 todo, 0 fail, exit 0. Each todo
-case fails only on the mutant that its `gap` names. Every expectation was taken from a run of the design
+The 95 rows in `mined-*.md` became 93 cases in `cases.ts`, now `packages/stryker-ui-mutators/test/cases.ts`. The
+other 2 are skipped (see Skipped rows). A later review added ngx-yeti-21 (see Gaps). Against the prototype, the
+94 cases gave 61 pass, 33 todo, 0 fail; each todo case failed only on the mutant that its `gap` names. The
+package implements every gap rule, so the `gap` field is gone and
+`node --test packages/stryker-ui-mutators/test/cases.test.ts` runs every case. Every expectation was taken from a run of the design
 spike's prototype (`spikes/design-opus/ui-mutators.ts`) on StrykerJS 10.1.1. Claude then changed it by hand
 only where the design's written rules disagree with the prototype (Gaps).
 
