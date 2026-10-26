@@ -349,7 +349,7 @@ async function runGlobalSetup(playwright: TestRunner) {
 
   if (status !== 'passed') {
     throw new Error(
-      `Playwright global setup ${status}:\n${reporter.errors.join('\n')}\n${reporter.output}`,
+      `Playwright global setup ${status}:\n${reporter.errors.join('\n')}\n${reporter.outputTail}`,
     );
   }
 }

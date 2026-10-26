@@ -738,7 +738,7 @@ test('the reporter keeps the last 4000 characters of stdout and stderr, and prin
   reporter.onStdErr(Buffer.from('bcd'));
 
   assert.equal(reporter.printsToStdio(), false);
-  assert.equal(reporter.output, `${'a'.repeat(3997)}bcd`);
+  assert.equal(reporter.outputTail, `${'a'.repeat(3997)}bcd`);
 });
 
 test('a run with errors and no failed test is an error, with every error', () => {

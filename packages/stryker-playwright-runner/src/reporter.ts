@@ -2,7 +2,8 @@ import type { Suite, TestCase, TestError } from '@playwright/test/reporter';
 
 export class CollectingReporter {
   readonly errors: string[] = [];
-  output = '';
+  /** The last 4000 characters of stdout and stderr. */
+  outputTail = '';
   // Playwright reports each attempt of a retried test with the same TestCase, which holds them all.
   readonly testCases = new Map<string, TestCase>();
   private suite?: Suite;
@@ -24,7 +25,7 @@ export class CollectingReporter {
   }
 
   onStdOut(chunk: string | Buffer) {
-    this.output = (this.output + chunk.toString()).slice(-4000);
+    this.outputTail = (this.outputTail + chunk.toString()).slice(-4000);
   }
 
   onStdErr(chunk: string | Buffer) {
