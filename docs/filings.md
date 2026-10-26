@@ -50,7 +50,15 @@ hooks, and declaration annotations that replace `as` expressions so Stryker muta
 setup, no "fails at load versus fails in a test", no refactoring around a tool's blind spot. On a plain Extract
 Class its APPLY/DECLINE count, defined for patterns, had to be improvised.
 
-**O6. What worked.** `lz-refactor` step 1 caught a behaviour change inside a refactor commit (a lock release on a
+**O6. A mutation-driven batch routes around the skills.** The worker that took the runner's source mutation run
+from 92.56% to 100% loaded no lz-tdd skill: 49 surviving or uncovered mutants, one test each, checked by the next
+Stryker run (about 6 minutes per run, inside one lock window). With no guard-test red (O1) and one red per step
+(O2), it had no route for the batch. Its one refactor commit, six deletions of code that runs but cannot change
+an outcome, was then reviewed with `lz-refactor` after the fact: it routed the commit to Fowler's Remove Dead Code,
+whose "Use when" is "code is no longer executed or referenced", which does not cover executed-but-redundant code.
+Evidence: runner progress file, unit B continuation; `references/fowler-catalog/remove-dead-code.md`.
+
+**O7. What worked.** `lz-refactor` step 1 caught a behaviour change inside a refactor commit (a lock release on a
 failed init). `lz-red` step 5's "a not-implemented throw ... is a valid but blunter red" let 13 new tests go red
 without a module-load failure, and its "the failure must originate in the code under test" kept a child-process
 test's red on the hook's own TypeError rather than on a spawn failure. Step 3's message-matrix route fitted a shell
@@ -73,6 +81,11 @@ integration-test note; add a `node:test` mechanics leaf beside the Vitest one.
 
 **S5 (from O5).** Add `lz-refactor` entries for test-setup refactors and for refactoring so a tool (a mutation
 tester, a coverage tool) can see the code.
+
+**S6 (from O6).** Widen Remove Dead Code, or add a sibling entry, for code that runs but that no input can
+observe, which a surviving mutant often exposes: what proof it needs (why no input tells the two versions apart),
+and that deleting it beats a `// Stryker disable` comment. S1's guard-test kind could point there for a survivor
+no test can kill.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
