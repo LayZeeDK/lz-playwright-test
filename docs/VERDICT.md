@@ -140,13 +140,17 @@ earlier run, which the rows replace; the wall times differ by up to 1m14s, which
 shared machine cannot explain. One `oss/README.md` step needed a fix for the ngx-yeti rerun (3ff6277).
 
 Wall time is Stryker's own "Done in" from the run's log. The define row has no kept log, so its time is
-the shell's elapsed time for the whole command. A "(step)" time is the elapsed time of the whole Nx target in
-`tools/linux-run.sh`, build check included, because those logs were not kept.
+the shell's elapsed time for the whole command. A "(step)" time is the elapsed time of the whole Nx target,
+the build it depends on included, because those logs were not kept.
 
-The Linux rows ran at 74df74e and gave the Windows counts. That run also found a bug that shows only on Linux. The runner
-checked whether the `webServer` port answered on `localhost` only, which resolves to `127.0.0.1` for
-`net.connect` in Docker's default network while a server on `localhost` listens on `::1`. 2a53a36 checks both
-loopback addresses, as Playwright does. At 9a27326 the container passed `npm ci`, lint, typecheck, build, the
+The Linux rows ran at 74df74e, with an earlier, uncommitted version of `tools/linux-run.sh` that named the
+projects by their old names, and gave the Windows counts. That run also found a bug that shows only on Linux.
+The runner checked whether a port answered on `localhost` only, which resolves to `127.0.0.1` for
+`net.connect` in Docker's default network, while a server that listens on `localhost` gets `::1`. The bug
+failed the runner's unit suite, in a test whose server listened on `localhost`, and its browser suite, whose
+fixture servers did. The demo rows still count: their `webServer` has a `url`, which Playwright checks with its
+own code, and the bug did not touch that check. 2a53a36 makes the runner check both loopback addresses, as
+Playwright's port check does. At 9a27326 the container passed `npm ci`, lint, typecheck, build, the
 runner's 210 unit tests, the operators' 216, and the 49 browser tests. Its demo Stryker runs were stopped
 after 25 of the first run's 32 mutants (5 survived and none timed out by then), because Docker's virtual
 machine left less than 4 GB of the host's memory free for other work.
@@ -513,9 +517,10 @@ add it. `oss/README.md` gives the steps for the hello-world forced-timeout row, 
 Versions: StrykerJS 10.1.1, Playwright 1.64.1, Nx 24.0.1, Vite 8.3.5, Node 24.22.0 (24.22.1 in the Linux
 container). The runner's and the operators' test suites also pass on Node 22.23.1, on Windows.
 
-The Linux rows ran `tools/linux-run.sh` in the container: `npm ci`, lint, typecheck, build, the three test
-targets, and the three demo targets, each with its log and exit code in the mounted folder. From an empty
-folder `<out>`:
+`tools/linux-run.sh` runs these steps in the container at the commit you archive: `npm ci`, lint,
+typecheck, build, the three test targets, and the three demo targets. It writes each step's log and exit code
+to the mounted folder and exits with the number of failed steps. It reruns the checks at HEAD, not the Linux
+rows at 74df74e, which ran the earlier version of the script. From an empty folder `<out>`:
 
 ```sh
 git archive HEAD -o <out>/head.tar
@@ -523,7 +528,9 @@ cp tools/linux-run.sh <out>/
 docker run --rm --init --ipc=host --memory 6g -v "<out>:/out" mcr.microsoft.com/playwright:v1.64.1-noble bash /out/linux-run.sh
 ```
 
-Without `--memory`, the container's file cache grew Docker's WSL virtual machine to 11 GB on a 32 GB host.
+On the 32 GB host, Docker's WSL virtual machine grew to about 11 GB during the run, with or without
+`--memory 6g`, which bounds the container (it used 1.4 GB) but not the virtual machine. Leave other heavy work
+off the machine while it runs.
 
 ## Research behind the design
 
