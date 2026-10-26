@@ -18,7 +18,10 @@ import {
   TestStatus,
 } from '@stryker-mutator/api/test-runner';
 
-import { PlaywrightTestRunner } from '../src/playwright-test-runner.ts';
+import {
+  PlaywrightTestRunner,
+  withEnv,
+} from '../src/playwright-test-runner.ts';
 import {
   parseSnapshotLine,
   serializeSnapshot,
@@ -446,6 +449,32 @@ test('the hook collects per-test coverage only in a perTest dry run', () => {
     perTest: false,
     hitLimit: 5,
   });
+});
+
+test('a run leaves no run settings behind in the environment, also when it throws', async () => {
+  process.env.WITH_ENV_KEPT = 'before';
+  delete process.env.WITH_ENV_ADDED;
+
+  try {
+    const seen = await withEnv(
+      { WITH_ENV_KEPT: undefined, WITH_ENV_ADDED: 'during' },
+      async () => [process.env.WITH_ENV_KEPT, process.env.WITH_ENV_ADDED],
+    );
+
+    assert.deepEqual(seen, [undefined, 'during']);
+    assert.equal(process.env.WITH_ENV_KEPT, 'before');
+    assert.equal('WITH_ENV_ADDED' in process.env, false);
+
+    await assert.rejects(
+      withEnv({ WITH_ENV_KEPT: 'during' }, async () => {
+        throw new Error('run failed');
+      }),
+      { message: 'run failed' },
+    );
+    assert.equal(process.env.WITH_ENV_KEPT, 'before');
+  } finally {
+    delete process.env.WITH_ENV_KEPT;
+  }
 });
 
 test('a run with a failed attempt may have lost its server', () => {

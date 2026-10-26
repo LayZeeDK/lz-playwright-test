@@ -5,13 +5,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { connect } from 'node:net';
-
-import {
-  INSTRUMENTER_CONSTANTS,
-  type Mutant,
-  type StrykerOptions,
-} from '@stryker-mutator/api/core';
+import type { Mutant, StrykerOptions } from '@stryker-mutator/api/core';
 import type { Logger } from '@stryker-mutator/api/logging';
 import {
   type CompleteDryRunResult,
@@ -22,8 +16,19 @@ import {
 } from '@stryker-mutator/api/test-runner';
 import { Instrumenter } from '@stryker-mutator/instrumenter';
 
-import { PlaywrightTestRunner } from '../src/playwright-test-runner.ts';
-import { RUN_SETTINGS } from '../src/protocol.ts';
+import {
+  acceptsConnections,
+  PlaywrightTestRunner,
+} from '../src/playwright-test-runner.ts';
+
+// The runner's private state, which some tests check directly.
+function session() {
+  return (
+    runner as unknown as {
+      session: { root: { dir: string }; serialGroups: Map<string, string[]> };
+    }
+  ).session;
+}
 
 const fixture = (file: string) =>
   fileURLToPath(new URL(`./fixture/${file}`, import.meta.url));
@@ -90,18 +95,6 @@ function mutantsReached(called: string[]): string[] {
     })
     .map(({ id }) => id)
     .sort();
-}
-
-function listening(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = connect({ host: 'localhost', port });
-    const done = (open: boolean) => {
-      socket.destroy();
-      resolve(open);
-    };
-    socket.once('connect', () => done(true));
-    socket.once('error', () => done(false));
-  });
 }
 
 function mutantRun(
@@ -181,9 +174,7 @@ test('the hook stays out of worker threads that a test starts', () => {
 });
 
 test('init finds the describe.serial groups', () => {
-  const { serialGroups } = runner as unknown as {
-    serialGroups: Map<string, string[]>;
-  };
+  const { serialGroups } = session();
 
   assert.deepEqual(serialGroups.get(testId('second user of the shared page')), [
     testId('first user of the shared page'),
@@ -337,18 +328,6 @@ test('an infinite loop without a hit limit times out within its budget, and the 
   assert.equal(killed.status, MutantRunStatus.Killed, JSON.stringify(killed));
 });
 
-test('a run leaves no run settings or active mutant behind in the environment', async () => {
-  await mutantRun(mutant('ArithmeticOperator', 'a - b'), {
-    testFilter: [testId('shows the greeting')],
-  });
-
-  assert.equal(process.env[RUN_SETTINGS], undefined);
-  assert.equal(
-    process.env[INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE],
-    undefined,
-  );
-});
-
 test('an infinite loop trips the hit limit and reports a timeout', async () => {
   const result = await mutantRun(mutant('UpdateOperator', 'i--'), {
     testFilter: [testId('counts to three')],
@@ -364,7 +343,11 @@ test('an infinite loop trips the hit limit and reports a timeout', async () => {
 
 test('a webServer that dies between runs is restarted instead of failing every test', async () => {
   await fetch('http://localhost:4321/__exit').catch(() => undefined);
-  assert.equal(await listening(4321), false, 'the fixture server stopped');
+  assert.equal(
+    await acceptsConnections(4321),
+    false,
+    'the fixture server stopped',
+  );
 
   const survived = await mutantRun(mutant('ArithmeticOperator', 'a - b'), {
     testFilter: [testId('counts to three')],
@@ -382,7 +365,7 @@ test('no Playwright artifacts are written next to the config', () => {
 });
 
 test('dispose removes the temp directory the runner kept its output and runs in', async () => {
-  const { rootDir } = runner as unknown as { rootDir: string };
+  const rootDir = session().root.dir;
   assert.ok(
     existsSync(rootDir),
     'the temp directory exists while the runner is up',

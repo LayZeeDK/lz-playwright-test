@@ -1,6 +1,4 @@
-import fs from 'node:fs';
 import net from 'node:net';
-import os from 'node:os';
 import path from 'node:path';
 
 import {
@@ -39,6 +37,7 @@ import {
   type RunRequest,
   runSettings,
 } from './run-result.ts';
+import { createTempRoot, removeDir, type TempRoot } from './temp-root.ts';
 import {
   assertionTimeoutWarning,
   type ConfigTimeouts,
@@ -46,8 +45,18 @@ import {
 } from './timeouts.ts';
 
 interface ServerCheck {
-  name: string;
+  readonly name: string;
   isUp(): Promise<boolean>;
+}
+
+/** Everything init() produced, so the run methods never meet a half-initialised runner. */
+interface Session {
+  readonly options: RunnerOptions;
+  readonly playwright: TestRunner;
+  readonly root: TempRoot;
+  readonly servers: readonly ServerCheck[];
+  readonly serialGroups: Map<string, string[]>;
+  readonly timeouts: ConfigTimeouts;
 }
 
 // `.ts` when this module runs from source, `.js` when it runs from the build.
@@ -55,6 +64,11 @@ const HOOK = new URL(
   `./worker-hook${path.extname(import.meta.filename)}`,
   import.meta.url,
 ).href;
+
+/** The overrides README lists under "On every run". */
+const RUN_OVERRIDES = {
+  use: { screenshot: 'off', trace: 'off', video: 'off' },
+} as const;
 
 /**
  * Hosts Playwright Test in-process through its undocumented TestRunner, which
@@ -66,15 +80,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   private readonly strykerOptions: StrykerOptions;
   private readonly log: Logger;
   private readonly baseNodeOptions = process.env.NODE_OPTIONS;
-  private options?: RunnerOptions;
-  private playwright?: TestRunner;
-  private rootDir?: string;
-  private outputDir?: string;
-  private runsDir?: string;
-  private servers: ServerCheck[] = [];
-  private serialGroups = new Map<string, string[]>();
-  private timeouts?: ConfigTimeouts;
-  private runCounter = 0;
+  private session?: Session;
 
   constructor(options: StrykerOptions, log: Logger) {
     this.strykerOptions = options;
@@ -87,61 +93,75 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
 
   async init(): Promise<void> {
     const options = readRunnerOptions(this.strykerOptions);
-    this.options = options;
     const pw = loadPlaywright(options.configFile);
+    const root = createTempRoot();
+    let playwright: TestRunner | undefined;
 
-    // Playwright deletes and recreates outputDir on global setup, so both directories live in a private
-    // root that it never touches: on a shared /tmp no other user can claim either name in between.
-    this.rootDir = fs.mkdtempSync(
-      path.join(
-        os.tmpdir(),
-        `stryker-pw-${process.env.STRYKER_MUTATOR_WORKER ?? 0}-`,
-      ),
-    );
-    this.outputDir = path.join(this.rootDir, 'output');
-    this.runsDir = path.join(this.rootDir, 'runs');
-    fs.mkdirSync(this.runsDir);
-    this.playwright = await pw.createTestRunner(options.configFile, {
-      outputDir: this.outputDir,
-      use: { screenshot: 'off', trace: 'off', video: 'off' },
-    });
+    try {
+      playwright = await pw.createTestRunner(options.configFile, {
+        outputDir: root.outputDir,
+        ...RUN_OVERRIDES,
+      });
+      const config = await playwright.loadConfig();
+      const timeouts = configTimeouts(config.projects);
+      const warning = assertionTimeoutWarning(
+        timeouts,
+        options.strykerTimeoutMS,
+      );
 
-    const config = await this.playwright.loadConfig();
-    this.servers = config.webServers.flatMap((server) =>
-      serverCheck(server, pw.isURLAvailable),
-    );
-    this.timeouts = configTimeouts(config.projects);
-    const warning = assertionTimeoutWarning(
-      this.timeouts,
-      options.strykerTimeoutMS,
-    );
+      if (warning) {
+        this.log.warn(warning);
+      }
 
-    if (warning) {
-      this.log.warn(warning);
+      const servers = config.webServers.flatMap((server) =>
+        serverCheck(server, pw.isURLAvailable),
+      );
+      await runGlobalSetup(playwright);
+      // Every Stryker test runner process needs the groups, and only one of them runs the dry run.
+      // Listed after global setup, like Playwright's own CLI, because test files may read what it
+      // creates.
+      const serialGroups = await listSerialGroups(
+        playwright,
+        projectsThatRun(options.projects, config.projects),
+      );
+      this.session = {
+        options,
+        playwright,
+        root,
+        servers,
+        serialGroups,
+        timeouts,
+      };
+    } catch (error) {
+      // dispose() sees no session, so release what exists here. The init error is the one to report.
+      await playwright?.runGlobalTeardown().catch(() => undefined);
+      root.remove();
+      throw error;
     }
-
-    await this.runGlobalSetup(this.playwright);
-    // Every Stryker test runner process needs the groups, and only one of them runs the dry run. Listed
-    // after global setup, like Playwright's own CLI, because test files may read what it creates.
-    this.serialGroups = await listSerialGroups(
-      this.playwright,
-      projectsThatRun(options.projects, config.projects),
-    );
   }
 
   async dispose(): Promise<void> {
+    const session = this.session;
+    this.session = undefined;
+
+    if (!session) {
+      return;
+    }
+
     // Stryker disposes a timed-out runner while its run is still going, and kills it 2 s later, so
-    // the run's directories go first: the run's own cleanup never comes. The root stays until the
-    // workers are gone, because the test that stopTests ends still writes its error context.
-    removeDirs([this.runsDir, this.outputDir]);
-    await this.playwright?.stopTests();
-    await this.playwright?.runGlobalTeardown();
-    removeDirs([this.rootDir]);
+    // the run's directories go first. The root stays until the workers are gone.
+    session.root.removeRunsAndOutput();
+    await session.playwright.stopTests();
+    await session.playwright.runGlobalTeardown();
+    session.root.remove();
   }
 
   async dryRun(options: DryRunOptions): Promise<DryRunResult> {
     const request = dryRunRequest(options);
-    const { result, gaps } = dryRunResult(await this.run(request), request);
+    const { result, gaps } = dryRunResult(
+      await this.run(this.ready(), request),
+      request,
+    );
 
     if (gaps) {
       logCoverageGaps(this.log, gaps);
@@ -151,12 +171,10 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   }
 
   async mutantRun(options: MutantRunOptions): Promise<MutantRunResult> {
-    const request = mutantRunRequest(options, {
-      serialGroups: this.serialGroups,
-      timeouts: this.timeouts!,
-    });
+    const session = this.ready();
+    const request = mutantRunRequest(options, session);
     const { result, hitCount } = mutantRunResult(
-      await this.run(request),
+      await this.run(session, request),
       request,
     );
     this.log.debug(
@@ -166,61 +184,74 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     return result;
   }
 
-  private async run(request: RunRequest): Promise<RunOutput> {
-    const playwright = this.playwright!;
-    await this.restartDeadServers(playwright);
-    let output = await this.runOnce(playwright, request);
+  private ready(): Session {
+    if (!this.session) {
+      throw new Error(
+        'The Playwright test runner was used before init() finished.',
+      );
+    }
+
+    return this.session;
+  }
+
+  private async run(session: Session, request: RunRequest): Promise<RunOutput> {
+    await this.restartDeadServers(session);
+    let output = await this.runOnce(session, request);
 
     // A server that died during this run fails its tests for a reason the mutant did not cause.
     if (
       mayHaveLostItsServer(output) &&
-      (await this.restartDeadServers(playwright))
+      (await this.restartDeadServers(session))
     ) {
-      output = await this.runOnce(playwright, request);
+      output = await this.runOnce(session, request);
     }
 
     return output;
   }
 
   private async runOnce(
-    playwright: TestRunner,
+    session: Session,
     request: RunRequest,
   ): Promise<RunOutput> {
-    const outDir = path.join(this.runsDir!, String(this.runCounter++));
-    fs.mkdirSync(outDir);
-    // Only the workers this run forks see these; the webServer started earlier never does.
-    const restoreEnv = overrideEnv({
-      NODE_OPTIONS: `${this.baseNodeOptions ?? ''} --import "${HOOK}"`.trim(),
-      [RUN_SETTINGS]: JSON.stringify(runSettings(request, outDir)),
-      [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]:
-        request.kind === 'mutant' ? request.activeMutant : undefined,
-      [NO_COPY_PROMPT_ENV]: '1',
-    });
+    const outDir = session.root.nextRunDir();
     const reporter = new CollectingReporter();
 
     try {
-      const { status } = await playwright.runTests(reporter, {
-        locations: [],
-        testIds: request.kind === 'mutant' ? request.testFilter : undefined,
-        projects: this.options!.projects,
-        workers: this.options!.workers,
-        maxFailures: request.disableBail ? undefined : 1,
-        timeout: request.budget.testTimeout,
-        disableConfigReporters: true,
-      });
+      // Only the workers this run forks see these; the webServer started earlier never does.
+      const { status } = await withEnv(
+        {
+          NODE_OPTIONS:
+            `${this.baseNodeOptions ?? ''} --import "${HOOK}"`.trim(),
+          [RUN_SETTINGS]: JSON.stringify(runSettings(request, outDir)),
+          [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]:
+            request.kind === 'mutant' ? request.activeMutant : undefined,
+          [NO_COPY_PROMPT_ENV]: '1',
+        },
+        () =>
+          session.playwright.runTests(reporter, {
+            locations: [],
+            testIds: request.kind === 'mutant' ? request.testFilter : undefined,
+            projects: session.options.projects,
+            workers: session.options.workers,
+            maxFailures: request.disableBail ? undefined : 1,
+            timeout: request.budget.testTimeout,
+            disableConfigReporters: true,
+          }),
+      );
 
       return { status, reporter, ...readSnapshotDir(outDir) };
     } finally {
-      restoreEnv();
-      fs.rmSync(outDir, { recursive: true, force: true, maxRetries: 3 });
+      removeDir(outDir);
     }
   }
 
   // Playwright watches a webServer only while it starts. One that dies later would fail every
   // remaining test, and Stryker would count each mutant as killed.
-  private async restartDeadServers(playwright: TestRunner): Promise<boolean> {
-    const up = await Promise.all(this.servers.map((server) => server.isUp()));
-    const dead = this.servers.filter((_, index) => !up[index]);
+  private async restartDeadServers(session: Session): Promise<boolean> {
+    const up = await Promise.all(
+      session.servers.map((server) => server.isUp()),
+    );
+    const dead = session.servers.filter((_, index) => !up[index]);
 
     if (dead.length === 0) {
       return false;
@@ -230,20 +261,63 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     this.log.warn(
       `webServer at ${names} stopped answering; rerunning Playwright global setup (global teardown runs first).`,
     );
-    await this.runGlobalSetup(playwright);
+    await runGlobalSetup(session.playwright);
 
     return true;
   }
+}
 
-  private async runGlobalSetup(playwright: TestRunner) {
-    const reporter = new CollectingReporter();
-    const { status } = await playwright.runGlobalSetup([reporter]);
+/**
+ * Sets `values` (undefined deletes) while `fn` runs and restores the previous values afterwards, on
+ * success and on throw.
+ */
+export async function withEnv<T>(
+  values: Readonly<Record<string, string | undefined>>,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const previous = Object.fromEntries(
+    Object.keys(values).map((name) => [name, process.env[name]]),
+  );
+  setEnv(values);
 
-    if (status !== 'passed') {
-      throw new Error(
-        `Playwright global setup ${status}:\n${reporter.errors.join('\n')}\n${reporter.output}`,
-      );
+  try {
+    return await fn();
+  } finally {
+    setEnv(previous);
+  }
+}
+
+function setEnv(values: Readonly<Record<string, string | undefined>>) {
+  for (const [name, value] of Object.entries(values)) {
+    if (value === undefined) {
+      delete process.env[name];
+    } else {
+      process.env[name] = value;
     }
+  }
+}
+
+export function acceptsConnections(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = net.connect({ host: 'localhost', port, timeout: 5000 });
+    const done = (ok: boolean) => {
+      socket.destroy();
+      resolve(ok);
+    };
+    socket.once('connect', () => done(true));
+    socket.once('error', () => done(false));
+    socket.once('timeout', () => done(false));
+  });
+}
+
+async function runGlobalSetup(playwright: TestRunner) {
+  const reporter = new CollectingReporter();
+  const { status } = await playwright.runGlobalSetup([reporter]);
+
+  if (status !== 'passed') {
+    throw new Error(
+      `Playwright global setup ${status}:\n${reporter.errors.join('\n')}\n${reporter.output}`,
+    );
   }
 }
 
@@ -271,19 +345,6 @@ function serverCheck(
     : [{ name: `port ${port}`, isUp: () => acceptsConnections(port) }];
 }
 
-function acceptsConnections(port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = net.connect({ host: 'localhost', port, timeout: 5000 });
-    const done = (ok: boolean) => {
-      socket.destroy();
-      resolve(ok);
-    };
-    socket.once('connect', () => done(true));
-    socket.once('error', () => done(false));
-    socket.once('timeout', () => done(false));
-  });
-}
-
 function logCoverageGaps(
   log: Logger,
   { lostFrames, sharedFrames }: CoverageGaps,
@@ -299,30 +360,4 @@ function logCoverageGaps(
       `${sharedFrames} frame(s) belonged to contexts that outlived their test (beforeAll or worker fixtures); their coverage counts as static, so every test runs for those mutants.`,
     );
   }
-}
-
-function removeDirs(dirs: (string | undefined)[]) {
-  for (const dir of dirs) {
-    if (dir) {
-      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
-    }
-  }
-}
-
-function overrideEnv(values: Record<string, string | undefined>): () => void {
-  const previous = Object.fromEntries(
-    Object.keys(values).map((name) => [name, process.env[name]]),
-  );
-  const apply = (next: Record<string, string | undefined>) => {
-    for (const [name, value] of Object.entries(next)) {
-      if (value === undefined) {
-        delete process.env[name];
-      } else {
-        process.env[name] = value;
-      }
-    }
-  };
-  apply(values);
-
-  return () => apply(previous);
 }
