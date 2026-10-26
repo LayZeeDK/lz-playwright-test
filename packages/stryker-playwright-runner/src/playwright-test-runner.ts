@@ -142,7 +142,13 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
       };
     } catch (error) {
       await playwright?.runGlobalTeardown().catch(() => undefined);
-      root.remove();
+
+      try {
+        root.remove();
+      } catch {
+        // The next runner's removeLeftRoots removes it once this process has exited.
+      }
+
       throw error;
     }
   }

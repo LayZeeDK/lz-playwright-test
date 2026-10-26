@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import {
+import fs, {
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -523,6 +523,21 @@ test('a TestRunner that fails to initialize fails init without a teardown, and c
   await assert.rejects(shell.init(), { message: 'no config' });
   assert.deepEqual(fake.names(), ['new', 'initialize']);
   assert.deepEqual(readdirSync(fake.tmp), []);
+});
+
+test('a temp root that cannot be removed after a failed init leaves the init error in place', async (t) => {
+  const fake = fakePlaywright(t, {
+    initialize: async () => {
+      t.mock.method(fs, 'rmSync', () => {
+        throw new Error('EBUSY: resource busy or locked');
+      });
+      throw new Error('no config');
+    },
+  });
+  const { runner: shell } = runner(fake.configFile);
+
+  await assert.rejects(shell.init(), { message: 'no config' });
+  t.mock.restoreAll();
 });
 
 test('a run before init finished fails with a clear error', async () => {
