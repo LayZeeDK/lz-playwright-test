@@ -365,9 +365,9 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   its own. Runners in containers that share `/tmp`, or on hosts that share an NFS temp directory, keep
   one another's directories, provided those hosts have different host names: every Linux host's first
   PID namespace has the same inode. On Linux without `/proc` the token is unique to the runner, so no
-  later runner removes its directory. A directory without a readable `owner` file is kept, including
-  the `lz-stryker-playwright-<pid>-*` directories of runners from before the `owner` file; remove those
-  by hand. The root is removed again at once if its `owner` file cannot be written.
+  later runner removes its directory. A directory without a readable `owner` file is kept; remove those
+  by hand. The runner looks only at `lz-stryker-playwright-<pid>-*`, so it never removes the
+  `stryker-playwright-<pid>-*` directories of runners from before the rename at 7b9a022 either. The root is removed again at once if its `owner` file cannot be written.
 - In a Stryker run started inside a Playwright worker, the worker hook of the inner runner installs
   and an outer copy of the same hook stays out; a copy from before that rule installs too and counts
   coverage twice.

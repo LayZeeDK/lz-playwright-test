@@ -78,7 +78,7 @@ and stryker4s (`modules/core/src/main/scala/stryker4s/mutation/`), both at their
   `ConditionalExpression`, `BlockStatement`, `ArrowFunction`. stryker4s uses the same names, and
   Stryker.NET uses the short forms (`Equality`, `String`, `Statement`). The operator name is what users
   write in `mutator.excludedMutations` and `// Stryker disable`, and what reports show as `mutatorName`.
-  The UI operators keep that shape with markup categories that fit JSX and Angular templates alike:
+  The UI operators keep that shape, behind an `Lz` prefix, with markup categories that fit JSX and Angular templates alike:
   `Literal` for static text, `Attribute`, `Element`, `Expression`, and `Handler`. StrykerJS groups one
   syntax by meaning (equality, logical and arithmetic operators are all binary expressions), so the
   attribute operators are grouped by what the attribute does.
@@ -92,20 +92,22 @@ and stryker4s (`modules/core/src/main/scala/stryker4s/mutation/`), both at their
 | ------------------------ | ------------------------------------------------------------------------------------------------------ | ---------------------------- |
 | `LzTextLiteral`          | `TextRemoval`                                                                                          | `TextContent`                |
 | `LzLabelAttribute`       | `LabelRemoval`                                                                                         | `AccessibleName`             |
-| `LzEventHandler`         | `EventHandlerRemoval`                                                                                  | `LzEventHandler`             |
+| `LzEventHandler`         | `EventHandlerRemoval`                                                                                  | `EventHandler`               |
 | `LzConditionalElement`   | `ConditionalGuardRemoval` (`x && <A/>` to `<A/>`), `ConditionalToConsequent`, `ConditionalToAlternate` | `ConditionalRendering`       |
 | `LzUrlAttribute`         | `UrlRemoval`                                                                                           | `NavigationTarget`           |
 | `LzDisabledAttribute`    | `DisabledRemoval`                                                                                      | `DisabledState`              |
 | `LzHiddenAttribute`      | `HiddenRemoval`                                                                                        | `HiddenState`                |
 | `LzElementRole`          | `RoleRemoval`, `ElementToSpan`                                                                         | `Role`                       |
-| `LzChildExpression`      | `ChildExpressionRemoval`                                                                               | `LzChildExpression`          |
+| `LzChildExpression`      | `ChildExpressionRemoval`                                                                               | `ChildExpression`            |
 | `LzStateAttribute`       | `StateNegation`                                                                                        | `AriaState`                  |
 | `ListExpression` (later) | `ListTruncation`                                                                                       | `ListTruncate`               |
 
 Every name is letters only, because a `// Stryker disable` comment accepts only letters in mutator names,
 and StrykerJS matches those names against every registered mutator ignoring case
-(`directive-bookkeeper.ts:63` and `:73`). The names carry no namespace prefix, like the built-ins they
-sit next to, and like the upstream route would need. The install therefore checks every name before it
+(`directive-bookkeeper.ts:63` and `:73`). Each name carries the `Lz` prefix, because Lars ruled on
+2026-10-26 that this repository's public names use an `Lz`, `lz` or `lz-` prefix; the "Earlier name" column
+and the dated drafts use the names from before that rule. The upstream route would drop the prefix to sit with
+the built-ins. Because StrykerJS matches the names ignoring case, the install checks every name before it
 changes `allMutators`. It refuses a name that equals, ignoring case, another of its own operators or a
 mutator that other code registered, and then registers nothing. A future built-in with the same name thus
 fails the run loudly instead of sharing a filter key. `mutator.excludedMutations` does not ignore case:
