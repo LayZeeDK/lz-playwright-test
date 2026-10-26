@@ -118,7 +118,7 @@ attribute or the tag that gives an element its implicit role.
 
 ## Rules the synthetic cases settled
 
-`packages/stryker-ui-mutators/test/cases.ts` holds 112 synthetic cases: JSX versions of UI shapes in the repos
+`packages/stryker-ui-mutators/test/cases.ts` holds 142 synthetic cases: JSX versions of UI shapes in the repos
 the runner was exercised on (RealWorld, ngx-yeti, Analog and hello-world at the commits `oss/README.md` names,
 and the demo app), each with the exact UI mutants it must give. `spikes/ui-mutator-cases/` keeps the mined rows
 they came from. The cases first ran against the prototype and now run against the package. The design was silent on

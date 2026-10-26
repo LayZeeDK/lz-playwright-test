@@ -1136,6 +1136,16 @@ export const cases: readonly Case[] = [
     expect: [],
   },
   {
+    id: 'design-46',
+    title:
+      'a literal or undefined state inside as or ! gets no negation, as it gets none unwrapped',
+    origin: 'design:Operators in the first release, StateAttribute',
+    jsx:
+      '<div><div aria-expanded={0 as any} /><div aria-checked={null!} />' +
+      '<div aria-pressed={undefined as any} /><div aria-selected={0} /></div>',
+    expect: [],
+  },
+  {
     id: 'design-20',
     title: 'a rendered value among the children of a fragment is removed',
     origin: 'design:Operators in the first release, ChildExpression',
