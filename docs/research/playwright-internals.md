@@ -74,13 +74,13 @@ Source: local clone `D:/projects/github/microsoft/playwright`, tags v1.64.1 / v1
 
 ### When the hooks fire (v1.64.1; identical call sites at v1.62.1)
 
-| Path | `runAfterCreateBrowserContext` | `runBeforeCloseBrowserContext` |
-|---|---|---|
-| `browser.newContext()` - used by the default `context` fixture via `_contextFactory`, and by user code | yes, awaited before `newContext` returns [checked `client/browser.ts:63-65,82-95`; fixture `index.ts:400-424`] | yes, from `context.close()`, before the close RPC [checked `client/browserContext.ts:516-528`] |
+| Path                                                                                                                                | `runAfterCreateBrowserContext`                                                                                            | `runBeforeCloseBrowserContext`                                                                    |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `browser.newContext()` - used by the default `context` fixture via `_contextFactory`, and by user code                              | yes, awaited before `newContext` returns [checked `client/browser.ts:63-65,82-95`; fixture `index.ts:400-424`]            | yes, from `context.close()`, before the close RPC [checked `client/browserContext.ts:516-528`]    |
 | Reused context (`_newContextForReuse`, `reuseContext: true` / `_optionContextReuseMode: 'when-possible'` / `PW_TEST_REUSE_CONTEXT`) | yes, every test (the fixture calls `_newContextForReuse` per test) [checked `browser.ts:67-69,82-95`; `index.ts:474-492`] | yes, from `_disconnectFromReusedContext` at test end [checked `browser.ts:71-80`; `index.ts:491`] |
-| `browserType.launchPersistentContext()` | yes [checked `client/browserType.ts:92-118`] | yes, through `context.close()` [checked] |
-| `connect`/`connectOverCDP` default context | yes [checked `browserType.ts:177-183`] | when closed via `close()` [inferred] |
-| Contexts announced by the server (`'context'` event, `_didCreateContext`) | no [checked `browser.ts:54,108-116`] | - |
+| `browserType.launchPersistentContext()`                                                                                             | yes [checked `client/browserType.ts:92-118`]                                                                              | yes, through `context.close()` [checked]                                                          |
+| `connect`/`connectOverCDP` default context                                                                                          | yes [checked `browserType.ts:177-183`]                                                                                    | when closed via `close()` [inferred]                                                              |
+| Contexts announced by the server (`'context'` event, `_didCreateContext`)                                                           | no [checked `browser.ts:54,108-116`]                                                                                      | -                                                                                                 |
 
 - Reuse is effective only when video is `off`. [checked `index.ts:466-472`]
 - 1.62.1 call sites: `browser.ts:75,93`, `browserType.ts:118,180`, `browserContext.ts:523`. [checked]

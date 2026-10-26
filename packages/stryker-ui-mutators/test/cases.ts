@@ -312,7 +312,8 @@ export const cases: readonly Case[] = [
   },
   {
     id: 'ngx-yeti-9',
-    title: 'an svg keeps its img role, as Playwright gives svg that role, and loses its aria-label',
+    title:
+      'an svg keeps its img role, as Playwright gives svg that role, and loses its aria-label',
     origin: `${YETI}icon-fixture.ts:36`,
     jsx: '<svg role="img" aria-label="Warning" viewBox="0 0 24 24"></svg>',
     expect: [['LabelAttribute', 'aria-label=""']],
@@ -408,7 +409,8 @@ export const cases: readonly Case[] = [
   },
   {
     id: 'ngx-yeti-19',
-    title: 'a list role equal to the implicit role is kept; each item text is emptied',
+    title:
+      'a list role equal to the implicit role is kept; each item text is emptied',
     origin: `${YETI}cluster-fixture.ts:24`,
     jsx: '<ul id="tags-cluster" role="list"><li>layout</li><li>intrinsic</li></ul>',
     expect: [
@@ -931,7 +933,8 @@ export const cases: readonly Case[] = [
   },
   {
     id: 'design-4',
-    title: 'a role equal to the implicit role is skipped, and the button still swaps',
+    title:
+      'a role equal to the implicit role is skipped, and the button still swaps',
     origin: RULES,
     jsx: '<button role="button">Save</button>',
     expect: [
@@ -962,7 +965,8 @@ export const cases: readonly Case[] = [
   },
   {
     id: 'design-7',
-    title: 'implicit roles of landmarks, lists and headings are skipped; a context-dependent one is removed',
+    title:
+      'implicit roles of landmarks, lists and headings are skipped; a context-dependent one is removed',
     origin: RULES,
     jsx: '<div><nav role="navigation" /><aside role="complementary" /><ol role="list"><li role="listitem" /></ol><h2 role="heading" /><header role="banner" /></div>',
     expect: [['ElementRole', 'role={undefined}']],
@@ -981,14 +985,16 @@ export const cases: readonly Case[] = [
   },
   {
     id: 'design-9',
-    title: 'aria-hidden on an i or img icon is skipped; hidden on an svg is not',
+    title:
+      'aria-hidden on an i or img icon is skipped; hidden on an svg is not',
     origin: 'design:Operators in the first release, HiddenAttribute',
     jsx: '<p><i className="icon" aria-hidden="true" /><img src="x.png" aria-hidden={hide} /><svg hidden /></p>',
     expect: [['HiddenAttribute', 'hidden={undefined}']],
   },
   {
     id: 'design-10',
-    title: 'a JSX entity in an emptied attribute is decoded in the instrumented original',
+    title:
+      'a JSX entity in an emptied attribute is decoded in the instrumented original',
     origin: 'docs/design/playwright-mutators-opus.md:189',
     jsx: '<img alt="Fish &amp; Chips" />',
     expect: [['LabelAttribute', 'alt=""']],
@@ -996,14 +1002,16 @@ export const cases: readonly Case[] = [
   },
   {
     id: 'design-11',
-    title: 'a guard and a ternary inside an attribute value: the guard is removed, the ternary is left alone',
+    title:
+      'a guard and a ternary inside an attribute value: the guard is removed, the ternary is left alone',
     origin: 'design:Tradeoffs accepted (candidate-opus), ConditionalElement',
     jsx: '<Card icon={busy && <Spinner />} badge={busy ? <Dot /> : null} />',
     expect: [['ConditionalElement', '<Spinner />']],
   },
   {
     id: 'design-12',
-    title: 'a function declared in the file but referenced twice keeps its handler mutants',
+    title:
+      'a function declared in the file but referenced twice keeps its handler mutants',
     origin: 'design:Operators in the first release, EventHandler',
     setup: 'function save() {}\nexport const again = save;',
     jsx: '<form onSubmit={save}></form>',
@@ -1011,7 +1019,8 @@ export const cases: readonly Case[] = [
   },
   {
     id: 'design-13',
-    title: 'a let handler referenced once keeps its handler mutant, as only a const or a declaration is skipped',
+    title:
+      'a let handler referenced once keeps its handler mutant, as only a const or a declaration is skipped',
     origin: 'design:Operators in the first release, EventHandler',
     setup: 'let save = () => {};',
     jsx: '<form onSubmit={save}></form>',
@@ -1019,28 +1028,41 @@ export const cases: readonly Case[] = [
   },
   {
     id: 'design-14',
-    title: 'implicit roles of status, separator, paragraph, group, option, progressbar and textbox are skipped',
+    title:
+      'implicit roles of status, separator, paragraph, group, option, progressbar and textbox are skipped',
     origin: RULES,
     jsx: '<div><output role="status" /><hr role="separator" /><p role="paragraph" /><fieldset role="group" /><option role="option" /><progress role="progressbar" /><textarea role="textbox" /></div>',
     expect: [],
   },
   {
     id: 'tldraw-1',
-    title: "a 'true'/'false' ternary state is flipped in each branch, not negated to a constant",
-    origin: 'tldraw@12921f6d3:packages/tldraw/src/lib/ui/components/primitives/menus/TldrawUiMenuItem.tsx:233',
+    title:
+      "a 'true'/'false' ternary state is flipped in each branch, not negated to a constant",
+    origin:
+      'tldraw@12921f6d3:packages/tldraw/src/lib/ui/components/primitives/menus/TldrawUiMenuItem.tsx:233',
     jsx: "<div aria-pressed={isSelected ? 'true' : 'false'} />",
-    expect: [['StateAttribute', 'aria-pressed={isSelected ? "false" : "true"}']],
+    expect: [
+      ['StateAttribute', 'aria-pressed={isSelected ? "false" : "true"}'],
+    ],
   },
   {
     id: 'tldraw-2',
-    title: 'a nested ternary state keeps its undefined branch and flips the string branches',
-    origin: 'tldraw@12921f6d3:packages/tldraw/src/lib/ui/components/primitives/menus/TldrawUiMenuItem.tsx:173',
+    title:
+      'a nested ternary state keeps its undefined branch and flips the string branches',
+    origin:
+      'tldraw@12921f6d3:packages/tldraw/src/lib/ui/components/primitives/menus/TldrawUiMenuItem.tsx:173',
     jsx: "<div aria-pressed={isSelected === undefined ? undefined : isSelected ? 'true' : 'false'} />",
-    expect: [['StateAttribute', 'aria-pressed={isSelected === undefined ? undefined : isSelected ? "false" : "true"}']],
+    expect: [
+      [
+        'StateAttribute',
+        'aria-pressed={isSelected === undefined ? undefined : isSelected ? "false" : "true"}',
+      ],
+    ],
   },
   {
     id: 'design-15',
-    title: 'a String() or template-literal state gets no negation, which would be a constant false',
+    title:
+      'a String() or template-literal state gets no negation, which would be a constant false',
     origin: 'design:Operators in the first release, StateAttribute',
     jsx: '<div><div aria-expanded={String(open)} /><div aria-checked={`${checked}`} /></div>',
     expect: [],

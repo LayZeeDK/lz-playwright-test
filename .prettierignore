@@ -4,3 +4,6 @@
 /.nx/cache
 /.nx/workspace-data
 package-lock.json
+# Historical spike records and bundles the tests generate
+/spikes
+/packages/*/test/*/public

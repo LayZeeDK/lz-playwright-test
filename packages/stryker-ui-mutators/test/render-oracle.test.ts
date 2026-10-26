@@ -9,7 +9,11 @@ import { join } from 'node:path';
 import { after, describe, it } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-import { install, resolveFromCore, type InstrumentedMutant } from '../src/install.ts';
+import {
+  install,
+  resolveFromCore,
+  type InstrumentedMutant,
+} from '../src/install.ts';
 import { operatorNames, operators } from '../src/operators.ts';
 
 type Component = (props: unknown) => unknown;
@@ -26,7 +30,9 @@ const source = readFileSync(samplePath, 'utf8');
 // workspace; `tmp` is ignored by git and removed after the run.
 const tmpDir = join(import.meta.dirname, '..', 'tmp');
 const outDir = join(tmpDir, 'render-oracle');
-const ts: typeof import('typescript') = createRequire(join(root, 'package.json'))('typescript');
+const ts: typeof import('typescript') = createRequire(
+  join(root, 'package.json'),
+)('typescript');
 
 rmSync(outDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
@@ -34,13 +40,19 @@ after(() => rmSync(tmpDir, { recursive: true, force: true }));
 
 const instrumenter = await resolveFromCore();
 await install(operators, async () => instrumenter);
-const result = await instrumenter.instrument([{ name: samplePath, content: source }]);
+const result = await instrumenter.instrument([
+  { name: samplePath, content: source },
+]);
 const instrumented = result.files[0]!.content;
 let counter = 0;
 
 async function load(tsx: string): Promise<Component> {
   const js = ts.transpileModule(tsx, {
-    compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+    compilerOptions: {
+      jsx: ts.JsxEmit.ReactJSX,
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+    },
   }).outputText;
   const file = join(outDir, `m${counter++}.mjs`);
   writeFileSync(file, js);
@@ -86,7 +98,10 @@ function serialize(node: unknown): string {
   const attributes = Object.keys(rest)
     .sort()
     .filter((key) => rest[key] !== undefined)
-    .map((key) => `${key}=${typeof rest[key] === 'function' ? 'fn' : JSON.stringify(rest[key])}`)
+    .map(
+      (key) =>
+        `${key}=${typeof rest[key] === 'function' ? 'fn' : JSON.stringify(rest[key])}`,
+    )
     .join(' ');
 
   return `<${String(type)} ${attributes}>${serialize(children)}</${String(type)}>`;
@@ -107,7 +122,17 @@ const scenarios = [
     onClose: noop,
     onSave: noop,
   },
-  { open: false, busy: true, items: [], user: { name: 'Bob' }, error: 'Boom', label: 'Find', url: '/ext', onClose: noop, onSave: noop },
+  {
+    open: false,
+    busy: true,
+    items: [],
+    user: { name: 'Bob' },
+    error: 'Boom',
+    label: 'Find',
+    url: '/ext',
+    onClose: noop,
+    onSave: noop,
+  },
 ];
 
 function renderAll(App: Component): string {
@@ -123,23 +148,32 @@ function renderAll(App: Component): string {
 }
 
 function offsetOf(line: number, column: number): number {
-  return source
-    .split('\n')
-    .slice(0, line)
-    .reduce((sum, text) => sum + text.length + 1, 0) + column;
+  return (
+    source
+      .split('\n')
+      .slice(0, line)
+      .reduce((sum, text) => sum + text.length + 1, 0) + column
+  );
 }
 
 // The instrumented header caches the namespace object, so the test changes it in place rather than replacing it.
-const namespace: { activeMutant?: string } = ((globalThis as { __stryker__?: { activeMutant?: string } }).__stryker__ ??= {});
+const namespace: { activeMutant?: string } = ((
+  globalThis as { __stryker__?: { activeMutant?: string } }
+).__stryker__ ??= {});
 
 const original = renderAll(await load(source));
 const build = await load(instrumented);
 
 /** Each mutant's render through the build and through the hand-applied source, `undefined` id for the baseline. */
 async function renders(mutant: InstrumentedMutant) {
-  const start = offsetOf(mutant.location.start.line, mutant.location.start.column);
+  const start = offsetOf(
+    mutant.location.start.line,
+    mutant.location.start.column,
+  );
   const end = offsetOf(mutant.location.end.line, mutant.location.end.column);
-  const expected = renderAll(await load(source.slice(0, start) + mutant.replacement + source.slice(end)));
+  const expected = renderAll(
+    await load(source.slice(0, start) + mutant.replacement + source.slice(end)),
+  );
   namespace.activeMutant = mutant.id;
   const actual = renderAll(build);
   namespace.activeMutant = undefined;
@@ -148,17 +182,26 @@ async function renders(mutant: InstrumentedMutant) {
 }
 
 const ours: ReadonlySet<string> = new Set(operatorNames);
-const label = ({ id, mutatorName, location, replacement }: InstrumentedMutant): string =>
+const label = ({
+  id,
+  mutatorName,
+  location,
+  replacement,
+}: InstrumentedMutant): string =>
   `${id} ${mutatorName} L${location.start.line + 1}: ${replacement.replace(/\s+/g, ' ').slice(0, 60)}`;
 
-async function mismatches(mutants: readonly InstrumentedMutant[]): Promise<string[]> {
+async function mismatches(
+  mutants: readonly InstrumentedMutant[],
+): Promise<string[]> {
   const found: string[] = [];
 
   for (const mutant of mutants) {
     const { actual, expected } = await renders(mutant);
 
     if (actual !== expected) {
-      found.push(`${label(mutant)}\n  expected ${expected}\n  actual   ${actual}`);
+      found.push(
+        `${label(mutant)}\n  expected ${expected}\n  actual   ${actual}`,
+      );
     }
   }
 
@@ -173,14 +216,31 @@ describe('render oracle on spikes/design-opus/sample.tsx', () => {
   });
 
   it('renders each UI mutant like its hand-applied replacement, in both prop scenarios', async () => {
-    assert.deepEqual(await mismatches(result.mutants.filter(({ mutatorName }) => ours.has(mutatorName))), []);
+    assert.deepEqual(
+      await mismatches(
+        result.mutants.filter(({ mutatorName }) => ours.has(mutatorName)),
+      ),
+      [],
+    );
   });
 
   it('renders each built-in mutant like its hand-applied replacement, in both prop scenarios', async () => {
-    assert.deepEqual(await mismatches(result.mutants.filter(({ mutatorName }) => !ours.has(mutatorName))), []);
+    assert.deepEqual(
+      await mismatches(
+        result.mutants.filter(({ mutatorName }) => !ours.has(mutatorName)),
+      ),
+      [],
+    );
   });
 
   it('gives at least one mutant of every operator in the table', () => {
-    assert.deepEqual(new Set(result.mutants.map(({ mutatorName }) => mutatorName).filter((name) => ours.has(name))), ours);
+    assert.deepEqual(
+      new Set(
+        result.mutants
+          .map(({ mutatorName }) => mutatorName)
+          .filter((name) => ours.has(name)),
+      ),
+      ours,
+    );
   });
 });

@@ -130,18 +130,18 @@ Common rules for every attribute operator [checked: prototype `classifyValue` in
 
 ### 2.11 Later, and why each waits
 
-| Operator | Why it waits |
-|---|---|
-| `ListRendering` (`items.map(f)` -> `items.slice(0, 1).map(f)`) | Killed only by `toHaveCount` or second-item assertions, which are outside the realistic-suite list. "Render none" is already covered by `ArrowFunction`. First candidate for the next release |
-| `InputType` (`type="submit"` -> `type="button"`) | Useful for forms, but the `text`/`email`/`search` swaps are mostly equivalent for roles; needs a per-type table |
-| `FocusManagement` (`autoFocus`, `.focus()` removal) | High survival: suites click before typing. `focus()` statements are already removed by `CallExpression` when alone in their statement |
-| `TabIndex`, `EventTypeSwap` (`onClick` -> `onMouseDown`) | Killed only by keyboard-driven tests; `click()` fires `mousedown`, so the swap survives every mouse-driven test |
-| `HistoryReplace` (`navigate(x)` -> `navigate(x, { replace: true })`) | Router-specific API knowledge; few suites press Back |
-| `DuplicateElement` | Strict-mode kills are valuable, but it is element-level (subtree copied per mutant) and adds many mutants |
-| `AwaitExpression` removal | Mostly equivalent under 5 s auto-retrying assertions and makes runs flaky (research 4.1) |
-| CSS operators (`display`, `visibility`, `pointer-events`) | No parser in the instrumenter; needs route b-2, an init-script activation, and has no per-test coverage (research 3.3 e) |
-| Angular, Vue, lit templates | New file formats (route b-2) and, for Angular, a compiled-template-reachable switch (#5156); the operator names above are reused |
-| `TestId`, `DelayInflate` | Never: the first measures the test hook, the second kills by timeout and creates flaky verdicts |
+| Operator                                                             | Why it waits                                                                                                                                                                                  |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ListRendering` (`items.map(f)` -> `items.slice(0, 1).map(f)`)       | Killed only by `toHaveCount` or second-item assertions, which are outside the realistic-suite list. "Render none" is already covered by `ArrowFunction`. First candidate for the next release |
+| `InputType` (`type="submit"` -> `type="button"`)                     | Useful for forms, but the `text`/`email`/`search` swaps are mostly equivalent for roles; needs a per-type table                                                                               |
+| `FocusManagement` (`autoFocus`, `.focus()` removal)                  | High survival: suites click before typing. `focus()` statements are already removed by `CallExpression` when alone in their statement                                                         |
+| `TabIndex`, `EventTypeSwap` (`onClick` -> `onMouseDown`)             | Killed only by keyboard-driven tests; `click()` fires `mousedown`, so the swap survives every mouse-driven test                                                                               |
+| `HistoryReplace` (`navigate(x)` -> `navigate(x, { replace: true })`) | Router-specific API knowledge; few suites press Back                                                                                                                                          |
+| `DuplicateElement`                                                   | Strict-mode kills are valuable, but it is element-level (subtree copied per mutant) and adds many mutants                                                                                     |
+| `AwaitExpression` removal                                            | Mostly equivalent under 5 s auto-retrying assertions and makes runs flaky (research 4.1)                                                                                                      |
+| CSS operators (`display`, `visibility`, `pointer-events`)            | No parser in the instrumenter; needs route b-2, an init-script activation, and has no per-test coverage (research 3.3 e)                                                                      |
+| Angular, Vue, lit templates                                          | New file formats (route b-2) and, for Angular, a compiled-template-reachable switch (#5156); the operator names above are reused                                                              |
+| `TestId`, `DelayInflate`                                             | Never: the first measures the test hook, the second kills by timeout and creates flaky verdicts                                                                                               |
 
 ## 3. Integration architecture
 
@@ -149,11 +149,11 @@ Common rules for every attribute operator [checked: prototype `classifyValue` in
 
 One package, `packages/stryker-ui-mutators` (`@layzee/stryker-ui-mutators`), ESM, TypeScript source run by Node type stripping like the runner package (`"main": "./src/index.ts"` [checked: `packages/stryker-playwright-runner/package.json`]). Three modules:
 
-| Module | Contents | Depends on |
-|---|---|---|
-| `src/operators.ts` | The registry (section 4): one entry per operator, attribute rules as data, node rules as functions that receive Babel's `types` as an argument | Babel types only (`import type`), no StrykerJS |
-| `src/install.ts` | Resolves the instrumenter that core uses, checks its version, adapts registry entries to `NodeMutator`s, pushes them into `allMutators`, patches `expressionMutantPlacer` | `@stryker-mutator/instrumenter` internals (by file URL) |
-| `src/index.ts` | `await install()` at module top level; `export const strykerValidationSchema = { properties: {} }` | `install.ts` |
+| Module             | Contents                                                                                                                                                                  | Depends on                                              |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| `src/operators.ts` | The registry (section 4): one entry per operator, attribute rules as data, node rules as functions that receive Babel's `types` as an argument                            | Babel types only (`import type`), no StrykerJS          |
+| `src/install.ts`   | Resolves the instrumenter that core uses, checks its version, adapts registry entries to `NodeMutator`s, pushes them into `allMutators`, patches `expressionMutantPlacer` | `@stryker-mutator/instrumenter` internals (by file URL) |
+| `src/index.ts`     | `await install()` at module top level; `export const strykerValidationSchema = { properties: {} }`                                                                        | `install.ts`                                            |
 
 `operators.ts` is the part an upstream PR lifts unchanged (3.6). Peer dependency: `@stryker-mutator/core` `10.1.1` exact, because the plugin patches internals that have no compatibility promise.
 
@@ -175,12 +175,12 @@ The built-in `expressionMutantPlacer` puts `cond ? mutant : original` where the 
 
 The plugin wraps `expressionMutantPlacer`'s `canPlace` and `place` (the `allMutantPlacers` array is frozen, the placer object is not [checked: `mutant-placers/index.ts`]):
 
-| Node | `canPlace` | `place` does |
-|---|---|---|
-| `JSXAttribute` | always (new) | turns the value into `{expr}` (bare -> `true`, string -> a fresh `StringLiteral`, container -> its expression), maps each mutant's replacement attribute the same way (removal is represented as `{undefined}`), then calls the original `place` on that expression |
-| `JSXText` with a letter or digit, in child position | new | replaces the text by `{"cleaned text"}`, using Babel's `types.react.buildChildren` so whitespace is cleaned exactly as the JSX transform cleans it; an emptied text becomes `null` |
-| Any expression whose parent is `JSXElement`/`JSXFragment` | unchanged | wraps the node in a `JSXExpressionContainer` first (the research F.1 fix) |
-| Everything else | unchanged | original behaviour |
+| Node                                                      | `canPlace`   | `place` does                                                                                                                                                                                                                                                        |
+| --------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JSXAttribute`                                            | always (new) | turns the value into `{expr}` (bare -> `true`, string -> a fresh `StringLiteral`, container -> its expression), maps each mutant's replacement attribute the same way (removal is represented as `{undefined}`), then calls the original `place` on that expression |
+| `JSXText` with a letter or digit, in child position       | new          | replaces the text by `{"cleaned text"}`, using Babel's `types.react.buildChildren` so whitespace is cleaned exactly as the JSX transform cleans it; an emptied text becomes `null`                                                                                  |
+| Any expression whose parent is `JSXElement`/`JSXFragment` | unchanged    | wraps the node in a `JSXExpressionContainer` first (the research F.1 fix)                                                                                                                                                                                           |
+| Everything else                                           | unchanged    | original behaviour                                                                                                                                                                                                                                                  |
 
 Why every attribute operator targets the `JSXAttribute` node rather than its value: the transformer registers a mutant at the nearest placement site on the path from the mutated node upwards (`babel-transformer.ts:158-172`). Making `JSXAttribute` a placement site keeps the switch inside the attribute, so the element is not copied, while built-in mutants inside an attribute's expression still find their own expression first. Nested placement works: `<a href="/docs">Docs</a>` carries an element-level `Role` switch, an attribute-level `NavigationTarget` switch and a text-level `TextContent` switch at once [checked: `out/instrumented.tsx` line 105].
 
@@ -234,17 +234,7 @@ Erasable TypeScript only (no enums, namespaces or parameter properties). The reg
 ```ts
 import type { NodePath, types } from '@babel/core';
 
-export type OperatorName =
-  | 'TextContent'
-  | 'AccessibleName'
-  | 'EventHandler'
-  | 'ConditionalRendering'
-  | 'NavigationTarget'
-  | 'DisabledState'
-  | 'HiddenState'
-  | 'Role'
-  | 'ChildExpression'
-  | 'AriaState';
+export type OperatorName = 'TextContent' | 'AccessibleName' | 'EventHandler' | 'ConditionalRendering' | 'NavigationTarget' | 'DisabledState' | 'HiddenState' | 'Role' | 'ChildExpression' | 'AriaState';
 
 /** How an attribute's value is written in the source. Literal-in-braces and function values are never matched. */
 export type ValueKind = 'string' | 'bare' | 'expression';
@@ -334,17 +324,17 @@ const disabledState: UiOperator = {
 
 ## 5. Risks and spikes, riskiest first
 
-| # | Risk | Status | How a spike settles it |
-|---|---|---|---|
-| 1 | JSX-safe placement produces code that parses but behaves differently from the intended mutation (wrong whitespace, entities, nesting, inert baseline) | **Settled for React in Node** (5.1) | Done: instrumented build vs hand-applied source, per mutant. Remaining: Vue/HTML `<script>` and Svelte files are not exercised (the operators match only JSX nodes, so they should stay inert there [inferred]) |
-| 2 | The placer patch changes built-in mutants | **Settled** (5.2) | Done: masked-id output equality on three files |
-| 3 | Patched internals: the plugin patches a different instrumenter copy than core uses, or a StrykerJS upgrade moves `dist/src/mutators/mutate.js` | Partly settled: resolution from core's directory works in the spike; version pin refuses other versions | Run a real `stryker run` through core with `testRunner: 'command'` and `commandRunner.command: 'node -e 0'` (no browser) on `sample.tsx`, and assert that `mutation.json` lists the ten operator names. Repeat on every StrykerJS bump in CI |
-| 4 | A failed install is only a warning, so users believe UI mutants ran | Open | Same core run with the pin set to a wrong version: confirm the warning text, then decide whether the plugin should also refuse to continue (for example by pushing a mutator that throws a clear error on the first file) |
-| 5 | Run time: `TextContent` adds many mutants, and kills through a missing locator wait for the 30 s test timeout because the action timeout defaults to none [checked: Playwright docs, 2.6] | Open; measured counts only: demo `app.tsx` 21 -> 36 mutants (+15 UI) [checked: `neutral-output.txt`] | Run `stryker.e2e.config.ts` on `app.tsx` with the plugin, with and without `use.actionTimeout: 5000`; record wall time and kill/timeout split. If timeouts dominate, the runner should set an action timeout under mutation (a runner change, not an operator change) |
-| 6 | Equivalent and noise rates differ from the estimates in section 2 | Open | Classify every survivor by hand on the demo app and `stryker-playwright-hello-world` (VERDICT evidence table); adjust skip rules where a pattern repeats |
-| 7 | Replacements fail type checking (`onClose={undefined}` on a required prop) and inflate CompileErrors with the TypeScript checker | Open | Run `@stryker-mutator/typescript-checker` on the demo app; CompileError is the correct verdict, but count it |
-| 8 | `{/* Stryker disable */}` JSX comments are ignored | **Checked** (5.3) | Fix upstream (PR A); a 5-line patch of `DirectiveBookkeeper.prototype.processStrykerDirectives` is possible in the plugin but not planned |
-| 9 | React semantics assumed (`undefined` props omitted, `null` children render nothing); other JSX runtimes may differ | Open | Out of scope for v1; documented as React-only |
+| #   | Risk                                                                                                                                                                                      | Status                                                                                                  | How a spike settles it                                                                                                                                                                                                                                                |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | JSX-safe placement produces code that parses but behaves differently from the intended mutation (wrong whitespace, entities, nesting, inert baseline)                                     | **Settled for React in Node** (5.1)                                                                     | Done: instrumented build vs hand-applied source, per mutant. Remaining: Vue/HTML `<script>` and Svelte files are not exercised (the operators match only JSX nodes, so they should stay inert there [inferred])                                                       |
+| 2   | The placer patch changes built-in mutants                                                                                                                                                 | **Settled** (5.2)                                                                                       | Done: masked-id output equality on three files                                                                                                                                                                                                                        |
+| 3   | Patched internals: the plugin patches a different instrumenter copy than core uses, or a StrykerJS upgrade moves `dist/src/mutators/mutate.js`                                            | Partly settled: resolution from core's directory works in the spike; version pin refuses other versions | Run a real `stryker run` through core with `testRunner: 'command'` and `commandRunner.command: 'node -e 0'` (no browser) on `sample.tsx`, and assert that `mutation.json` lists the ten operator names. Repeat on every StrykerJS bump in CI                          |
+| 4   | A failed install is only a warning, so users believe UI mutants ran                                                                                                                       | Open                                                                                                    | Same core run with the pin set to a wrong version: confirm the warning text, then decide whether the plugin should also refuse to continue (for example by pushing a mutator that throws a clear error on the first file)                                             |
+| 5   | Run time: `TextContent` adds many mutants, and kills through a missing locator wait for the 30 s test timeout because the action timeout defaults to none [checked: Playwright docs, 2.6] | Open; measured counts only: demo `app.tsx` 21 -> 36 mutants (+15 UI) [checked: `neutral-output.txt`]    | Run `stryker.e2e.config.ts` on `app.tsx` with the plugin, with and without `use.actionTimeout: 5000`; record wall time and kill/timeout split. If timeouts dominate, the runner should set an action timeout under mutation (a runner change, not an operator change) |
+| 6   | Equivalent and noise rates differ from the estimates in section 2                                                                                                                         | Open                                                                                                    | Classify every survivor by hand on the demo app and `stryker-playwright-hello-world` (VERDICT evidence table); adjust skip rules where a pattern repeats                                                                                                              |
+| 7   | Replacements fail type checking (`onClose={undefined}` on a required prop) and inflate CompileErrors with the TypeScript checker                                                          | Open                                                                                                    | Run `@stryker-mutator/typescript-checker` on the demo app; CompileError is the correct verdict, but count it                                                                                                                                                          |
+| 8   | `{/* Stryker disable */}` JSX comments are ignored                                                                                                                                        | **Checked** (5.3)                                                                                       | Fix upstream (PR A); a 5-line patch of `DirectiveBookkeeper.prototype.processStrykerDirectives` is possible in the plugin but not planned                                                                                                                             |
+| 9   | React semantics assumed (`undefined` props omitted, `null` children render nothing); other JSX runtimes may differ                                                                        | Open                                                                                                    | Out of scope for v1; documented as React-only                                                                                                                                                                                                                         |
 
 ### 5.1 Spike: placement correctness (risk 1)
 
@@ -425,18 +415,18 @@ Fixture `test/ui-fixture/`:
 
 Assertions, one test per row:
 
-| Operator | Mutant (lookup) | Killing test | Expected |
-|---|---|---|---|
-| `TextContent` | `<h1>Orders</h1>` emptied | "shows the heading" (`getByRole('heading', { name: 'Orders' })`) | Killed, `killedBy` = that test |
-| `AccessibleName` | `aria-label=""` on the close button | "closes the dialog" (`getByRole('button', { name: 'Close' }).click()`) | Killed |
-| `EventHandler` | `onClick={undefined}` on Show | "reveals the status" (`click`, then `toBeVisible`) | Killed |
-| `ConditionalRendering` | `open && <Panel/>` forced | "panel starts hidden" (`toBeHidden`) | Killed |
-| `NavigationTarget` | `href=""` on Done | "navigates to done" (`click`, `toHaveURL(/#\/done/)`) | Killed |
-| `DisabledState` | `disabled={false}` | "submit is disabled while busy" (`toBeDisabled`) | Killed |
-| `HiddenState` | `hidden={false}` | "region hidden until opened" (`toBeHidden`) | Killed |
-| `Role` | `role={undefined}` on the dialog | "opens the dialog" (`getByRole('dialog')`) | Killed |
-| `ChildExpression` | `{total}` -> `{null}` | "shows the total" (`getByTestId('total')` + `toHaveText`) | Killed |
-| `AriaState` | `aria-expanded={!open}` | "toggle reports expanded" (`getByRole('button', { expanded: true })`) | Killed |
+| Operator               | Mutant (lookup)                     | Killing test                                                           | Expected                       |
+| ---------------------- | ----------------------------------- | ---------------------------------------------------------------------- | ------------------------------ |
+| `TextContent`          | `<h1>Orders</h1>` emptied           | "shows the heading" (`getByRole('heading', { name: 'Orders' })`)       | Killed, `killedBy` = that test |
+| `AccessibleName`       | `aria-label=""` on the close button | "closes the dialog" (`getByRole('button', { name: 'Close' }).click()`) | Killed                         |
+| `EventHandler`         | `onClick={undefined}` on Show       | "reveals the status" (`click`, then `toBeVisible`)                     | Killed                         |
+| `ConditionalRendering` | `open && <Panel/>` forced           | "panel starts hidden" (`toBeHidden`)                                   | Killed                         |
+| `NavigationTarget`     | `href=""` on Done                   | "navigates to done" (`click`, `toHaveURL(/#\/done/)`)                  | Killed                         |
+| `DisabledState`        | `disabled={false}`                  | "submit is disabled while busy" (`toBeDisabled`)                       | Killed                         |
+| `HiddenState`          | `hidden={false}`                    | "region hidden until opened" (`toBeHidden`)                            | Killed                         |
+| `Role`                 | `role={undefined}` on the dialog    | "opens the dialog" (`getByRole('dialog')`)                             | Killed                         |
+| `ChildExpression`      | `{total}` -> `{null}`               | "shows the total" (`getByTestId('total')` + `toHaveText`)              | Killed                         |
+| `AriaState`            | `aria-expanded={!open}`             | "toggle reports expanded" (`getByRole('button', { expanded: true })`)  | Killed                         |
 
 Negative controls in the same file: each operator also gets one mutant that a selected test does not observe (for example `TextContent` on a footer note run against "shows the heading" only), which must be `Survived`, followed by the killing run of the same mutant in the same file, as `runner.test.ts` already does for its survivor case. This proves the kill comes from the observation and not from a broken page. A last test asserts that the dry run's per-test coverage credits the text mutant only to tests that render the page, as the existing per-test coverage test does.
 

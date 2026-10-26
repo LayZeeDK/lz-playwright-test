@@ -15,11 +15,11 @@ From the root of this repo:
 node oss/realworld-api/server.ts
 ```
 
-| Variable | Default | Effect |
-|----------|---------|--------|
-| `PORT` | `3100` | Listen port. API base is `http://localhost:<PORT>/api`. |
-| `STATE_FILE` | unset | Path to a JSON file. When set, state and the token secret are loaded from it on start (seed data if the file does not exist) and the whole state is rewritten after every successful non-GET request (temp file in the same directory, then rename). Users, tokens, articles, comments, favorites and follows survive a restart. Delete the file to reset. Unset: purely in-memory, state resets on every start. |
-| `DEBUG` | unset | Log one line per request. |
+| Variable     | Default | Effect                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`       | `3100`  | Listen port. API base is `http://localhost:<PORT>/api`.                                                                                                                                                                                                                                                                                                                                                          |
+| `STATE_FILE` | unset   | Path to a JSON file. When set, state and the token secret are loaded from it on start (seed data if the file does not exist) and the whole state is rewritten after every successful non-GET request (temp file in the same directory, then rename). Users, tokens, articles, comments, favorites and follows survive a restart. Delete the file to reset. Unset: purely in-memory, state resets on every start. |
+| `DEBUG`      | unset   | Log one line per request.                                                                                                                                                                                                                                                                                                                                                                                        |
 
 Check: `node --test oss/realworld-api/server.test.ts`
 

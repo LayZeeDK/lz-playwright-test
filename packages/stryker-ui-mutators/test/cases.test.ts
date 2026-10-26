@@ -21,22 +21,36 @@ function normalize(code: string): string {
 }
 
 const ours: ReadonlySet<string> = new Set(operatorNames);
-const files = cases.map((testCase) => ({ name: join(import.meta.dirname, 'out', `${testCase.id}.tsx`), content: source(testCase) }));
+const files = cases.map((testCase) => ({
+  name: join(import.meta.dirname, 'out', `${testCase.id}.tsx`),
+  content: source(testCase),
+}));
 const result = await instrumenter.instrument(files);
 
 for (const [index, testCase] of cases.entries()) {
   test(`${testCase.id}: ${testCase.title}`, () => {
     const file = files[index]!.name;
     const actual = result.mutants
-      .filter(({ fileName, mutatorName }) => fileName === file && ours.has(mutatorName))
-      .map(({ mutatorName, replacement }) => `${mutatorName} ${normalize(replacement)}`)
+      .filter(
+        ({ fileName, mutatorName }) =>
+          fileName === file && ours.has(mutatorName),
+      )
+      .map(
+        ({ mutatorName, replacement }) =>
+          `${mutatorName} ${normalize(replacement)}`,
+      )
       .sort();
-    const expected = testCase.expect.map(([operator, replacement]) => `${operator} ${normalize(replacement)}`).sort();
+    const expected = testCase.expect
+      .map(([operator, replacement]) => `${operator} ${normalize(replacement)}`)
+      .sort();
 
     assert.deepEqual(actual, expected, `origin ${testCase.origin}`);
 
     if (testCase.instrumented !== undefined) {
-      assert.ok(result.files[index]!.content.includes(testCase.instrumented), result.files[index]!.content);
+      assert.ok(
+        result.files[index]!.content.includes(testCase.instrumented),
+        result.files[index]!.content,
+      );
     }
   });
 }

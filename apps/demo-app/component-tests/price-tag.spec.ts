@@ -17,11 +17,18 @@ test('shows the discount percentage on sale', async ({ mount }) => {
 test('calls out half price', async ({ mount }) => {
   const component = await mount('app/price-tag/HalfPrice');
 
-  await expect(component.getByTestId('badge')).toHaveText('Half price or better');
+  await expect(component.getByTestId('badge')).toHaveText(
+    'Half price or better',
+  );
 });
 
-test('hides the badge when the compare-at price is not higher', async ({ mount }) => {
-  const component = await mount('app/price-tag/Configurable', { cents: 20_00, compareAtCents: 20_00 });
+test('hides the badge when the compare-at price is not higher', async ({
+  mount,
+}) => {
+  const component = await mount('app/price-tag/Configurable', {
+    cents: 20_00,
+    compareAtCents: 20_00,
+  });
 
   await expect(component.getByTestId('badge')).toHaveCount(0);
 });

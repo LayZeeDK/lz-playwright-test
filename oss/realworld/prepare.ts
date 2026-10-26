@@ -9,14 +9,19 @@ const copy = path.resolve(process.argv[2] ?? '');
 const heroku = 'https://real-world-app-39656dff2ddc.herokuapp.com/api';
 const api = 'http://localhost:3100/api';
 const appPort = 4260;
-const server = fileURLToPath(new URL('../realworld-api/server.ts', import.meta.url)).replaceAll('\\', '/');
+const server = fileURLToPath(
+  new URL('../realworld-api/server.ts', import.meta.url),
+).replaceAll('\\', '/');
 const serverDir = path.posix.dirname(server);
-const stateFile = path.join(copy, '.stryker-api-state.json').replaceAll('\\', '/');
+const stateFile = path
+  .join(copy, '.stryker-api-state.json')
+  .replaceAll('\\', '/');
 
 function edit(
   file: string,
   change: (source: string) => string,
-  applied = (source: string) => source.includes(api) || source.includes(serverDir),
+  applied = (source: string) =>
+    source.includes(api) || source.includes(serverDir),
 ) {
   const target = path.join(copy, file);
   const before = readFileSync(target, 'utf8');
@@ -64,15 +69,25 @@ edit('apps/conduit-e2e/playwright.config.ts', (source) =>
 edit('apps/conduit-e2e/playwright.config.ts', (source) =>
   source
     .replaceAll('http://localhost:4200', `http://localhost:${appPort}`)
-    .replace('npx nx run frontend:serve-static', `npx nx run conduit:serve --port=${appPort}`)
-    .replace('reuseExistingServer: !process.env.CI,', 'reuseExistingServer: false,\n    timeout: 180_000,'),
+    .replace(
+      'npx nx run frontend:serve-static',
+      `npx nx run conduit:serve --port=${appPort}`,
+    )
+    .replace(
+      'reuseExistingServer: !process.env.CI,',
+      'reuseExistingServer: false,\n    timeout: 180_000,',
+    ),
 );
 
 // Fails without Stryker too: it reads the text of the avatar-only link (docs/filings.md). Stryker
 // refuses a dry run with a failing test.
 edit(
   'apps/conduit-e2e/src/article-list/article-list.spec.ts',
-  (source) => source.replace(`test("View article's author"`, `test.fixme("View article's author"`),
+  (source) =>
+    source.replace(
+      `test("View article's author"`,
+      `test.fixme("View article's author"`,
+    ),
   (source) => source.includes(`test.fixme("View article's author"`),
 );
 
@@ -80,7 +95,11 @@ edit(
 // worker fails (docs/filings.md). The runner runs one Playwright worker.
 edit(
   'apps/conduit-e2e/src/auth/auth.spec.ts',
-  (source) => source.replace('test.beforeEach(async () => {', 'test.beforeAll(async () => {'),
+  (source) =>
+    source.replace(
+      'test.beforeEach(async () => {',
+      'test.beforeAll(async () => {',
+    ),
   (source) => source.includes('test.beforeAll(async () => {'),
 );
 

@@ -67,11 +67,17 @@ type Replacement = 'empty' | 'remove' | 'false' | 'negate' | 'flip';
 /** The part of Stryker's `NodeMutator` (instrumenter `mutators/node-mutator.ts`) that the adapter produces. */
 export interface NodeMutatorLike {
   readonly name: string;
-  mutate(path: NodePath, context: { isExpressionContext: boolean }): Iterable<types.Node>;
+  mutate(
+    path: NodePath,
+    context: { isExpressionContext: boolean },
+  ): Iterable<types.Node>;
 }
 
 /** Interprets one table row. Attribute rules: parse the site, run `skip`, read the value, build the replacement. */
-export function toNodeMutator(operator: Operator, t: BabelTypes): NodeMutatorLike {
+export function toNodeMutator(
+  operator: Operator,
+  t: BabelTypes,
+): NodeMutatorLike {
   return {
     name: operator.name,
     *mutate(path) {
@@ -98,21 +104,33 @@ export function toNodeMutator(operator: Operator, t: BabelTypes): NodeMutatorLik
 }
 
 /** Undefined unless `path` is a `JSXAttribute` with a plain name that `rule.attributes` matches and a value `readValue` accepts. */
-function attributeSite(path: NodePath, rule: AttributeRule, t: BabelTypes): AttributeSite | undefined {
+function attributeSite(
+  path: NodePath,
+  rule: AttributeRule,
+  t: BabelTypes,
+): AttributeSite | undefined {
   if (!path.isJSXAttribute() || !t.isJSXIdentifier(path.node.name)) {
     return undefined;
   }
 
   const name = path.node.name.name;
-  const matches = rule.attributes instanceof RegExp ? rule.attributes.test(name) : rule.attributes.includes(name);
+  const matches =
+    rule.attributes instanceof RegExp
+      ? rule.attributes.test(name)
+      : rule.attributes.includes(name);
   const value = matches ? readValue(path.node.value, t) : undefined;
   const element = value === undefined ? undefined : elementSite(path, t);
 
-  return value === undefined || element === undefined ? undefined : { name, value, element, path };
+  return value === undefined || element === undefined
+    ? undefined
+    : { name, value, element, path };
 }
 
 /** The element that carries `attribute`: JSXAttribute -> JSXOpeningElement -> JSXElement. */
-function elementSite(attribute: NodePath<types.JSXAttribute>, t: BabelTypes): ElementSite | undefined {
+function elementSite(
+  attribute: NodePath<types.JSXAttribute>,
+  t: BabelTypes,
+): ElementSite | undefined {
   const node = attribute.parentPath.parentPath?.node;
 
   if (!t.isJSXElement(node)) {
@@ -120,9 +138,17 @@ function elementSite(attribute: NodePath<types.JSXAttribute>, t: BabelTypes): El
   }
 
   const { name, attributes } = node.openingElement;
-  const names = attributes.flatMap((entry) => (t.isJSXAttribute(entry) && t.isJSXIdentifier(entry.name) ? [entry.name.name] : []));
+  const names = attributes.flatMap((entry) =>
+    t.isJSXAttribute(entry) && t.isJSXIdentifier(entry.name)
+      ? [entry.name.name]
+      : [],
+  );
 
-  return { name: t.isJSXIdentifier(name) ? name.name : undefined, attributes: new Set(names), node };
+  return {
+    name: t.isJSXIdentifier(name) ? name.name : undefined,
+    attributes: new Set(names),
+    node,
+  };
 }
 
 /**
@@ -131,7 +157,10 @@ function elementSite(attribute: NodePath<types.JSXAttribute>, t: BabelTypes): El
  * `Literal` alias) or a function -> undefined; any other expression -> expression. `JSXEmptyExpression` and a JSX
  * element as the value -> undefined.
  */
-function readValue(value: types.JSXAttribute['value'], t: BabelTypes): AttributeValue | undefined {
+function readValue(
+  value: types.JSXAttribute['value'],
+  t: BabelTypes,
+): AttributeValue | undefined {
   if (value === null || value === undefined) {
     return { kind: 'bare' };
   }
@@ -140,13 +169,18 @@ function readValue(value: types.JSXAttribute['value'], t: BabelTypes): Attribute
     return { kind: 'string', text: value.value };
   }
 
-  if (!t.isJSXExpressionContainer(value) || t.isJSXEmptyExpression(value.expression)) {
+  if (
+    !t.isJSXExpressionContainer(value) ||
+    t.isJSXEmptyExpression(value.expression)
+  ) {
     return undefined;
   }
 
   const { expression } = value;
 
-  return t.isLiteral(expression) || t.isFunction(expression) ? undefined : { kind: 'expression', expression };
+  return t.isLiteral(expression) || t.isFunction(expression)
+    ? undefined
+    : { kind: 'expression', expression };
 }
 
 /**
@@ -155,7 +189,11 @@ function readValue(value: types.JSXAttribute['value'], t: BabelTypes): Attribute
  * empty -> `name=""`; remove -> `name={undefined}`; false -> `name={false}`; negate -> `name={…}` from `negation`;
  * flip -> `name="false"` from `"true"`, else `name="true"`.
  */
-function* replaced(site: AttributeSite, replacement: Replacement, t: BabelTypes): Iterable<types.JSXAttribute> {
+function* replaced(
+  site: AttributeSite,
+  replacement: Replacement,
+  t: BabelTypes,
+): Iterable<types.JSXAttribute> {
   const name = t.jsxIdentifier(site.name);
   const { value } = site;
 
@@ -169,19 +207,26 @@ function* replaced(site: AttributeSite, replacement: Replacement, t: BabelTypes)
     }
 
     case 'remove': {
-      yield t.jsxAttribute(name, t.jsxExpressionContainer(t.identifier('undefined')));
+      yield t.jsxAttribute(
+        name,
+        t.jsxExpressionContainer(t.identifier('undefined')),
+      );
 
       return;
     }
 
     case 'false': {
-      yield t.jsxAttribute(name, t.jsxExpressionContainer(t.booleanLiteral(false)));
+      yield t.jsxAttribute(
+        name,
+        t.jsxExpressionContainer(t.booleanLiteral(false)),
+      );
 
       return;
     }
 
     case 'negate': {
-      const negated = value.kind === 'expression' ? negation(value.expression, t) : undefined;
+      const negated =
+        value.kind === 'expression' ? negation(value.expression, t) : undefined;
 
       if (negated !== undefined) {
         yield t.jsxAttribute(name, t.jsxExpressionContainer(negated));
@@ -192,7 +237,10 @@ function* replaced(site: AttributeSite, replacement: Replacement, t: BabelTypes)
 
     case 'flip': {
       if (value.kind === 'string') {
-        yield t.jsxAttribute(name, t.stringLiteral(value.text === 'true' ? 'false' : 'true'));
+        yield t.jsxAttribute(
+          name,
+          t.stringLiteral(value.text === 'true' ? 'false' : 'true'),
+        );
       }
 
       return;
@@ -207,7 +255,10 @@ function* replaced(site: AttributeSite, replacement: Replacement, t: BabelTypes)
  * branch flips; `undefined`, another literal, or a `String()` or `.toString()` call stays as it is (a conditional)
  * or gives no mutant (the whole value); anything else becomes `!(expr)`.
  */
-function negation(expression: types.Expression, t: BabelTypes): types.Expression | undefined {
+function negation(
+  expression: types.Expression,
+  t: BabelTypes,
+): types.Expression | undefined {
   if (t.isConditionalExpression(expression)) {
     const consequent = negation(expression.consequent, t);
     const alternate = negation(expression.alternate, t);
@@ -229,7 +280,11 @@ function negation(expression: types.Expression, t: BabelTypes): types.Expression
     return t.booleanLiteral(!expression.value);
   }
 
-  if (t.isLiteral(expression) || t.isIdentifier(expression, { name: 'undefined' }) || isStringCall(expression, t)) {
+  if (
+    t.isLiteral(expression) ||
+    t.isIdentifier(expression, { name: 'undefined' }) ||
+    isStringCall(expression, t)
+  ) {
     return undefined;
   }
 
@@ -243,10 +298,17 @@ function isStringCall(expression: types.Expression, t: BabelTypes): boolean {
 
   const { callee } = expression;
 
-  return t.isIdentifier(callee, { name: 'String' }) || (t.isMemberExpression(callee) && t.isIdentifier(callee.property, { name: 'toString' }));
+  return (
+    t.isIdentifier(callee, { name: 'String' }) ||
+    (t.isMemberExpression(callee) &&
+      t.isIdentifier(callee.property, { name: 'toString' }))
+  );
 }
 
 /** A node whose parent is a `JSXElement` or `JSXFragment`: a JSX child. Shared by the rules and the placer. */
 export function isJsxChild(path: NodePath): boolean {
-  return path.parentPath?.isJSXElement() === true || path.parentPath?.isJSXFragment() === true;
+  return (
+    path.parentPath?.isJSXElement() === true ||
+    path.parentPath?.isJSXFragment() === true
+  );
 }

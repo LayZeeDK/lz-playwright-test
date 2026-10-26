@@ -13,7 +13,10 @@ async function resolveStory(id: string) {
   const exportName = id.slice(id.lastIndexOf('/') + 1);
   const file = id.slice(0, id.lastIndexOf('/'));
   const matches = Object.keys(storyFiles).filter((key) =>
-    key.replace(/^\.\.\/\.\.\/src\//, '').replace(/\.story\.tsx$/, '').endsWith(file),
+    key
+      .replace(/^\.\.\/\.\.\/src\//, '')
+      .replace(/\.story\.tsx$/, '')
+      .endsWith(file),
   );
 
   if (matches.length !== 1) {
@@ -30,7 +33,13 @@ async function resolveStory(id: string) {
 }
 
 Object.assign(window, {
-  async mount({ story, props }: { story: string; props?: Record<string, unknown> }) {
+  async mount({
+    story,
+    props,
+  }: {
+    story: string;
+    props?: Record<string, unknown>;
+  }) {
     const Story = await resolveStory(story);
     root ??= createRoot(document.getElementById('root') as HTMLElement);
     flushSync(() => root!.render(<Story {...props} />));

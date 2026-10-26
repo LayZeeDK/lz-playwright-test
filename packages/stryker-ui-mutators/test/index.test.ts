@@ -24,7 +24,11 @@ describe('index.ts', () => {
     const { status, stdout, stderr } = runEntry(false);
 
     assert.equal(status, 0, stderr);
-    assert.deepEqual(JSON.parse(stdout), { registered: operatorNames, placerWrapped: true, ignorer: 'Ignore ui-mutators undefined' });
+    assert.deepEqual(JSON.parse(stdout), {
+      registered: operatorNames,
+      placerWrapped: true,
+      ignorer: 'Ignore ui-mutators undefined',
+    });
   });
 
   it("installs nothing in a worker, and the ignorer factory throws 'install did not run'", () => {
@@ -45,6 +49,9 @@ describe('index.ts', () => {
 
     assert.notEqual(status, 0);
     assert.equal(stdout, '');
-    assert.match(stderr, /stryker-ui-mutators: the instrumenter 10\.1\.1 in .+ made no mutants of TextLiteral from their samples/);
+    assert.match(
+      stderr,
+      /stryker-ui-mutators: the instrumenter 10\.1\.1 in .+ made no mutants of TextLiteral from their samples/,
+    );
   });
 });

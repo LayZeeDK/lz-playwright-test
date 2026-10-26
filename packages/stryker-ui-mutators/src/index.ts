@@ -28,4 +28,6 @@ function uiMutatorsIgnorer(): Ignorer {
 }
 uiMutatorsIgnorer.inject = [] as const;
 
-export const strykerPlugins = [declareFactoryPlugin(PluginKind.Ignore, 'ui-mutators', uiMutatorsIgnorer)];
+export const strykerPlugins = [
+  declareFactoryPlugin(PluginKind.Ignore, 'ui-mutators', uiMutatorsIgnorer),
+];

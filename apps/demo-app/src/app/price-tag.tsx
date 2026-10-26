@@ -14,7 +14,8 @@ export function percentOff(cents: number, compareAtCents: number): number {
 }
 
 export function PriceTag({ cents, compareAtCents }: PriceTagProps) {
-  const off = compareAtCents === undefined ? 0 : percentOff(cents, compareAtCents);
+  const off =
+    compareAtCents === undefined ? 0 : percentOff(cents, compareAtCents);
 
   return (
     <p>
@@ -23,7 +24,9 @@ export function PriceTag({ cents, compareAtCents }: PriceTagProps) {
         <>
           {' '}
           <s data-testid="compare-at">{formatPrice(compareAtCents!)}</s>{' '}
-          <strong data-testid="badge">{off >= 50 ? 'Half price or better' : `${off}% off`}</strong>
+          <strong data-testid="badge">
+            {off >= 50 ? 'Half price or better' : `${off}% off`}
+          </strong>
         </>
       )}
     </p>

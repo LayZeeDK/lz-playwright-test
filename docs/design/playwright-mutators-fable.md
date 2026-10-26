@@ -113,7 +113,7 @@ Each entry: AST pattern (Babel node types, from `@babel/types` 8.0.8 as nested i
 - **Before/after.** `<ul>{items.map((i) => <li key={i}>{i}</li>)}</ul>` -> `<ul>{items.slice(0, 1).map((i) => <li key={i}>{i}</li>)}</ul>`.
 - **Killed by.** `toHaveCount(n)` with n > 1, `getByRole('listitem').nth(1)`, `getByText` for a later item, any action on a non-first item.
 - **Built-in overlap avoided.** `ArrowFunction` already turns the callback into `() => undefined` (renders nothing: the "no items" mutant); `MethodExpression` has no entry for `map` (its table covers `filter`, `slice`, `sort`, ... [checked: `method-expression-mutator.ts:10-29`]). The "first item only" mutant is new and discriminates tests that only look at the first row.
-- **Equivalence risk.** Equivalent when every test renders the list with zero or one items, which the mutant then reports as survived: a fixture-design finding, not noise. The `slice` call is itself a `MethodExpression` target in the *mutated* branch only, and mutants are not generated from mutated branches (the mutator runs on the original tree, `babel-transformer.ts` enter phase [checked]), so no cascade.
+- **Equivalence risk.** Equivalent when every test renders the list with zero or one items, which the mutant then reports as survived: a fixture-design finding, not noise. The `slice` call is itself a `MethodExpression` target in the _mutated_ branch only, and mutants are not generated from mutated branches (the mutator runs on the original tree, `babel-transformer.ts` enter phase [checked]), so no cascade.
 - **Angular later.** `@for (i of items.slice(0, 1); ...)` (row 17).
 
 #### 10. `JsxButtonTypeSwap`
@@ -128,17 +128,17 @@ Each entry: AST pattern (Babel node types, from `@babel/types` 8.0.8 as nested i
 
 ### 2.2 Later
 
-| Operator (research row) | Why it waits |
-|---|---|
-| `JsxAriaStateFlip` (`aria-expanded`/`pressed`/`checked`/`selected`/`current`/`invalid`, row 11) | Same attribute machinery as 5 and 7, so cheap, but killed only by tests that pass the state option or use aria snapshots; shipping it first would inflate survivors with "your tests don't check ARIA state" findings before the ten above have proven the pipeline. Second release, level 2. |
-| `JsxTagSwap` (`button`/`a` -> `div`/`span`, row 8) | The tag name appears in opening and closing elements, so the mutant lives at the `JSXElement`; placing it duplicates the subtree per mutant and, for a child element, needs the F.1 container wrap. A `createElement`-style rewrite avoids duplication but needs the JSX runtime import. Needs its own placer design. |
-| `JsxInputTypeChange` (`checkbox` <-> `text`, row 15) | Most swaps keep the ARIA role (`email`/`text`/`search` are all `textbox`), so equivalence is high; only `checkbox`/`radio` <-> `text` is clearly observable. Fold into operator 10 once measured. |
-| `FocusCallRemoval`, `TabIndexChange` (rows 12, 13) | Keyboard and focus flows are rare in suites; high survival with low information until teams write keyboard tests. |
-| `DuplicateElement` (row 26) | Element-level placement (as `JsxTagSwap`), and the duplicated element also duplicates all nested mutants' switch sites. |
-| `EventTypeSwap`, `HistoryReplace` (rows 24, 25) | Need keyboard or Back-button tests to be killed; level 3. |
-| `ChildrenDrop` (row 18) | `{children}` -> `{null}` is killed by almost any test of a layout component; it inflates the score without saying much. Maybe as a component-test-only operator. |
-| `AwaitRemoval`, `DelayInflate` (rows 16, 23) | Kill by timeout under auto-retrying assertions; flaky verdicts. Not planned. |
-| Angular templates, Vue templates, CSS (routes d, e) | New parser/transformer/printer plus a runtime switch reachable from templates (#5156); several weeks each, each needs its own spike. The attribute tables in section 4 are written so a template port reuses them. |
+| Operator (research row)                                                                         | Why it waits                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `JsxAriaStateFlip` (`aria-expanded`/`pressed`/`checked`/`selected`/`current`/`invalid`, row 11) | Same attribute machinery as 5 and 7, so cheap, but killed only by tests that pass the state option or use aria snapshots; shipping it first would inflate survivors with "your tests don't check ARIA state" findings before the ten above have proven the pipeline. Second release, level 2.                         |
+| `JsxTagSwap` (`button`/`a` -> `div`/`span`, row 8)                                              | The tag name appears in opening and closing elements, so the mutant lives at the `JSXElement`; placing it duplicates the subtree per mutant and, for a child element, needs the F.1 container wrap. A `createElement`-style rewrite avoids duplication but needs the JSX runtime import. Needs its own placer design. |
+| `JsxInputTypeChange` (`checkbox` <-> `text`, row 15)                                            | Most swaps keep the ARIA role (`email`/`text`/`search` are all `textbox`), so equivalence is high; only `checkbox`/`radio` <-> `text` is clearly observable. Fold into operator 10 once measured.                                                                                                                     |
+| `FocusCallRemoval`, `TabIndexChange` (rows 12, 13)                                              | Keyboard and focus flows are rare in suites; high survival with low information until teams write keyboard tests.                                                                                                                                                                                                     |
+| `DuplicateElement` (row 26)                                                                     | Element-level placement (as `JsxTagSwap`), and the duplicated element also duplicates all nested mutants' switch sites.                                                                                                                                                                                               |
+| `EventTypeSwap`, `HistoryReplace` (rows 24, 25)                                                 | Need keyboard or Back-button tests to be killed; level 3.                                                                                                                                                                                                                                                             |
+| `ChildrenDrop` (row 18)                                                                         | `{children}` -> `{null}` is killed by almost any test of a layout component; it inflates the score without saying much. Maybe as a component-test-only operator.                                                                                                                                                      |
+| `AwaitRemoval`, `DelayInflate` (rows 16, 23)                                                    | Kill by timeout under auto-retrying assertions; flaky verdicts. Not planned.                                                                                                                                                                                                                                          |
+| Angular templates, Vue templates, CSS (routes d, e)                                             | New parser/transformer/printer plus a runtime switch reachable from templates (#5156); several weeks each, each needs its own spike. The attribute tables in section 4 are written so a template port reuses them.                                                                                                    |
 
 ## 3. Integration architecture
 
@@ -239,10 +239,7 @@ import type { NodePath, types as t } from '@babel/core';
 /** 1 = killed by locators and actions realistic suites already use; 2 = needs an explicit check of that aspect; 3 = visual or timing only. */
 export type OperatorLevel = 1 | 2 | 3;
 
-export type PlaywrightObservable =
-  | 'getByRole' | 'getByLabel' | 'getByText' | 'getByAltText' | 'getByPlaceholder'
-  | 'action' | 'toBeVisible' | 'toBeHidden' | 'toBeDisabled' | 'toBeEnabled'
-  | 'toHaveText' | 'toHaveCount' | 'toHaveURL' | 'toHaveRole' | 'toHaveValue' | 'toMatchAriaSnapshot';
+export type PlaywrightObservable = 'getByRole' | 'getByLabel' | 'getByText' | 'getByAltText' | 'getByPlaceholder' | 'action' | 'toBeVisible' | 'toBeHidden' | 'toBeDisabled' | 'toBeEnabled' | 'toHaveText' | 'toHaveCount' | 'toHaveURL' | 'toHaveRole' | 'toHaveValue' | 'toMatchAriaSnapshot';
 
 export type UiOperator = {
   /** Reported as mutatorName; letters only (Stryker directive syntax). */
@@ -259,9 +256,7 @@ export type UiOperator = {
 /** Shape of an attribute value, so the attribute operators branch on a table instead of on node types. */
 export type AttributeValueShape = 'bare' | 'string' | 'expression' | 'booleanLiteral' | 'negated' | 'stringExpression';
 
-export type AttributeOperatorName =
-  | 'JsxEventHandlerRemoval' | 'JsxAccessibleNameEmpty' | 'JsxDisabledFlip'
-  | 'JsxHiddenFlip' | 'JsxRoleRemoval' | 'JsxNavigationTarget' | 'JsxButtonTypeSwap';
+export type AttributeOperatorName = 'JsxEventHandlerRemoval' | 'JsxAccessibleNameEmpty' | 'JsxDisabledFlip' | 'JsxHiddenFlip' | 'JsxRoleRemoval' | 'JsxNavigationTarget' | 'JsxButtonTypeSwap';
 
 /** One row per attribute operator; `matches` and `replace` are the only code, the rest is data. */
 export type AttributeRule = {
@@ -400,18 +395,18 @@ Two test layers in `packages/stryker-ui-mutators/test/`, both `node --test` like
 - Fixture app: `test/fixture/` with `src/Dialog.tsx` (as above), `src/main.tsx` mounting `<Dialog open busy={false} items={['a', 'b']} onClose=... onSave=...>` with the state transitions the tests need (a trigger button that sets `open`, a save handler that writes "Saved" and navigates to `/done`), `index.html`, and a `vite.config.ts`. `before` instruments `Dialog.tsx` with the plugin registered, writes the instrumented file into `src/`, runs `vite.build()` programmatically into `public/`, then serves `public/` with the runner fixture's `serve.ts` approach and starts `PlaywrightTestRunner` with `fixture/playwright.config.ts` (`timeoutMS` at least twice the expect timeout, VERDICT).
 - Spec `tests/dialog.spec.ts`: one test per operator, titled after it, each using only the observable from section 2:
 
-| Test title | Playwright steps | Kills |
-|---|---|---|
-| `JsxEventHandlerRemoval` | `getByRole('button', { name: 'Close dialog' }).click()`; `expect(getByRole('dialog')).toBeHidden()` | `onClick={undefined}` |
-| `JsxConditionalRender` | `expect(getByRole('status')).toBeHidden()` before opening; `.toBeVisible()` after | `<p role="status">Opened</p>` and the ternary branches via `getByText('Idle')` |
-| `JsxTextEmpty` | `expect(getByRole('heading', { name: 'Edit items' })).toBeVisible()` | `""` on the h1 |
-| `JsxAccessibleNameEmpty` | `getByRole('button', { name: 'Close dialog' })` is found; `getByPlaceholder('Search').fill('x')` | `aria-label=""`, `placeholder=""` |
-| `JsxDisabledFlip` | `getByRole('button', { name: 'Save' }).click()`; `expect(getByText('Saved')).toBeVisible()` | `disabled={!busy}` (click times out) |
-| `JsxNavigationTarget` | `getByRole('link', { name: 'Help' }).click()`; `expect(page).toHaveURL(/\/help$/)` | `to="#"`, `href="#"` |
-| `JsxHiddenFlip` | `expect(getByText('Secret')).toBeHidden()` | `hidden={false}` |
-| `JsxRoleRemoval` | open, then `expect(getByRole('dialog')).toBeVisible()` | `role={undefined}` |
-| `JsxListTruncate` | `expect(getByRole('listitem')).toHaveCount(2)` | `items.slice(0, 1).map(...)` |
-| `JsxButtonTypeSwap` | Save click then `toHaveURL(/\/done$/)` | `type="button"` on Save (no submit) |
+| Test title               | Playwright steps                                                                                    | Kills                                                                          |
+| ------------------------ | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `JsxEventHandlerRemoval` | `getByRole('button', { name: 'Close dialog' }).click()`; `expect(getByRole('dialog')).toBeHidden()` | `onClick={undefined}`                                                          |
+| `JsxConditionalRender`   | `expect(getByRole('status')).toBeHidden()` before opening; `.toBeVisible()` after                   | `<p role="status">Opened</p>` and the ternary branches via `getByText('Idle')` |
+| `JsxTextEmpty`           | `expect(getByRole('heading', { name: 'Edit items' })).toBeVisible()`                                | `""` on the h1                                                                 |
+| `JsxAccessibleNameEmpty` | `getByRole('button', { name: 'Close dialog' })` is found; `getByPlaceholder('Search').fill('x')`    | `aria-label=""`, `placeholder=""`                                              |
+| `JsxDisabledFlip`        | `getByRole('button', { name: 'Save' }).click()`; `expect(getByText('Saved')).toBeVisible()`         | `disabled={!busy}` (click times out)                                           |
+| `JsxNavigationTarget`    | `getByRole('link', { name: 'Help' }).click()`; `expect(page).toHaveURL(/\/help$/)`                  | `to="#"`, `href="#"`                                                           |
+| `JsxHiddenFlip`          | `expect(getByText('Secret')).toBeHidden()`                                                          | `hidden={false}`                                                               |
+| `JsxRoleRemoval`         | open, then `expect(getByRole('dialog')).toBeVisible()`                                              | `role={undefined}`                                                             |
+| `JsxListTruncate`        | `expect(getByRole('listitem')).toHaveCount(2)`                                                      | `items.slice(0, 1).map(...)`                                                   |
+| `JsxButtonTypeSwap`      | Save click then `toHaveURL(/\/done$/)`                                                              | `type="button"` on Save (no submit)                                            |
 
 - Assertions per operator, in the runner test style: `mutantRun(mutant('JsxTextEmpty', '""'), { testFilter: [testId('JsxTextEmpty')] })` has `status === MutantRunStatus.Killed`; a control run of the same mutant with the `testFilter` set to an unrelated test (`JsxListTruncate`'s) is `Survived`, which proves the kill comes from the named observable and not from a crash. One dry-run test asserts all operator tests pass on the baseline and that `mutantCoverage.perTest` for each test includes its own mutant (the spread placement carries `stryCov` calls, 3.3).
 - Budget: about 20 mutant runs at roughly 3-5 s each (VERDICT: 2.7 s fixed plus the test, kills wait out the expect timeout) is under two minutes; run in CI, not on every save.

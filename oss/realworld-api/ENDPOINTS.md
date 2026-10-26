@@ -8,28 +8,28 @@ How the app authenticates: `libs/core/http-client/src/lib/api.service.ts` sends 
 `withCredentials: true`, so the real backend relies on a cookie. The double sets an `HttpOnly` cookie named `jwt` on register and login,
 clears it on logout, and accepts either that cookie or `Authorization: Token <jwt>` (also `Bearer`).
 
-| Method | Path | App caller | E2E exercise | Implemented |
-|--------|------|------------|--------------|-------------|
-| POST | `/users` | `libs/auth/data-access/src/services/auth.service.ts:28` | `helpers/register-user.ts:4` (called by `auth/auth.setup.ts:11`, `auth/auth.spec.ts:10`) | yes |
-| POST | `/users/login` | `auth.service.ts:20` | `helpers/login-user.ts:4` (`auth.setup.ts:12`); UI login in `auth/auth.spec.ts:13,24` (wrong password expects error text `message User not found`) | yes |
-| POST | `/users/logout` | `auth.service.ts:24` | `auth/logout.spec.ts:3` | yes |
-| GET | `/user` | `auth.service.ts:12` (called at app start and by `AuthGuard`) | every authenticated spec (guard for `/editor`, `/settings`) | yes |
-| PUT | `/user` | `auth.service.ts:16` | none | yes |
-| GET | `/profiles/:username` | `libs/profile/data-access/src/services/profile.service.ts:12` | `article-list/article-list.spec.ts:19` (author link) | yes |
-| POST | `/profiles/:username/follow` | `libs/articles/data-access/src/services/actions.service.ts:11` | none | yes |
-| DELETE | `/profiles/:username/follow` | `actions.service.ts:15` | none | yes |
-| GET | `/tags` | `libs/home/feature-home/src/home.service.ts:10` | `article-list/article-list.spec.ts:3` (home page load) | yes |
-| GET | `/articles` (query: `limit`, `offset`, `tag`, `author`, `favorited`) | `libs/articles/data-access/src/services/articles.service.ts:43` | `article-list/article-list.spec.ts:3-5` (global feed) | yes |
-| GET | `/articles/feed` (query: `limit`, `offset`) | `articles.service.ts:43` | none | yes |
-| GET | `/articles/:slug` | `articles.service.ts:20` | `article-list/article-list.spec.ts:8,19`, `article-list/new-article.spec.ts:16` | yes |
-| POST | `/articles/` | `articles.service.ts:49` | `article-list/new-article.spec.ts:7` | yes |
-| PUT | `/articles/:slug` | `articles.service.ts:53` | none | yes |
-| DELETE | `/articles/:slug` | `articles.service.ts:28` | none | yes |
-| POST | `/articles/:slug/favorite` | `actions.service.ts:19` | none | yes |
-| DELETE | `/articles/:slug/favorite` | `actions.service.ts:23` | none | yes |
-| GET | `/articles/:slug/comments` | `articles.service.ts:24` | `article-list/article-list.spec.ts:8,19` (article page load) | yes |
-| POST | `/articles/:slug/comments` | `articles.service.ts:36` | none | yes |
-| DELETE | `/articles/:slug/comments/:id` | `articles.service.ts:32` | none | yes |
+| Method | Path                                                                 | App caller                                                      | E2E exercise                                                                                                                                       | Implemented |
+| ------ | -------------------------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| POST   | `/users`                                                             | `libs/auth/data-access/src/services/auth.service.ts:28`         | `helpers/register-user.ts:4` (called by `auth/auth.setup.ts:11`, `auth/auth.spec.ts:10`)                                                           | yes         |
+| POST   | `/users/login`                                                       | `auth.service.ts:20`                                            | `helpers/login-user.ts:4` (`auth.setup.ts:12`); UI login in `auth/auth.spec.ts:13,24` (wrong password expects error text `message User not found`) | yes         |
+| POST   | `/users/logout`                                                      | `auth.service.ts:24`                                            | `auth/logout.spec.ts:3`                                                                                                                            | yes         |
+| GET    | `/user`                                                              | `auth.service.ts:12` (called at app start and by `AuthGuard`)   | every authenticated spec (guard for `/editor`, `/settings`)                                                                                        | yes         |
+| PUT    | `/user`                                                              | `auth.service.ts:16`                                            | none                                                                                                                                               | yes         |
+| GET    | `/profiles/:username`                                                | `libs/profile/data-access/src/services/profile.service.ts:12`   | `article-list/article-list.spec.ts:19` (author link)                                                                                               | yes         |
+| POST   | `/profiles/:username/follow`                                         | `libs/articles/data-access/src/services/actions.service.ts:11`  | none                                                                                                                                               | yes         |
+| DELETE | `/profiles/:username/follow`                                         | `actions.service.ts:15`                                         | none                                                                                                                                               | yes         |
+| GET    | `/tags`                                                              | `libs/home/feature-home/src/home.service.ts:10`                 | `article-list/article-list.spec.ts:3` (home page load)                                                                                             | yes         |
+| GET    | `/articles` (query: `limit`, `offset`, `tag`, `author`, `favorited`) | `libs/articles/data-access/src/services/articles.service.ts:43` | `article-list/article-list.spec.ts:3-5` (global feed)                                                                                              | yes         |
+| GET    | `/articles/feed` (query: `limit`, `offset`)                          | `articles.service.ts:43`                                        | none                                                                                                                                               | yes         |
+| GET    | `/articles/:slug`                                                    | `articles.service.ts:20`                                        | `article-list/article-list.spec.ts:8,19`, `article-list/new-article.spec.ts:16`                                                                    | yes         |
+| POST   | `/articles/`                                                         | `articles.service.ts:49`                                        | `article-list/new-article.spec.ts:7`                                                                                                               | yes         |
+| PUT    | `/articles/:slug`                                                    | `articles.service.ts:53`                                        | none                                                                                                                                               | yes         |
+| DELETE | `/articles/:slug`                                                    | `articles.service.ts:28`                                        | none                                                                                                                                               | yes         |
+| POST   | `/articles/:slug/favorite`                                           | `actions.service.ts:19`                                         | none                                                                                                                                               | yes         |
+| DELETE | `/articles/:slug/favorite`                                           | `actions.service.ts:23`                                         | none                                                                                                                                               | yes         |
+| GET    | `/articles/:slug/comments`                                           | `articles.service.ts:24`                                        | `article-list/article-list.spec.ts:8,19` (article page load)                                                                                       | yes         |
+| POST   | `/articles/:slug/comments`                                           | `articles.service.ts:36`                                        | none                                                                                                                                               | yes         |
+| DELETE | `/articles/:slug/comments/:id`                                       | `articles.service.ts:32`                                        | none                                                                                                                                               | yes         |
 
 ## Behaviour notes
 

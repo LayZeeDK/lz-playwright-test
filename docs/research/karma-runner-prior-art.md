@@ -105,56 +105,67 @@ Does not transfer:
 ## Lessons for the Playwright runner
 
 L1. Keep the browser alive across runs.
+
 - Prototype today: every `runTests` forks new workers and each launches a new browser; measured fixed cost about 2.7 s per run (config load 1.4 s, worker start 1.3 s). [checked `PW:playwright-test-runner.js:19-23,88-96`, numbers from `decisions.tsv` row `perf` 2026-10-24T20:34:21Z]
 - Karma: server and browser live for the whole Stryker worker; a run is a context reload. [checked section 1]
 - Recommendation: **adapt**. Launch one browser server in `init()` (`browserType.launchServer()`), point workers at it with `use.connectOptions.wsEndpoint`, and close it in `dispose()`. Playwright still makes a new context per test, so isolation holds. Measure first: it only pays off if browser launch is a large part of the 1.3 s worker start. Config load (1.4 s) is the larger cost and is outside this change; see whether the `TestRunner` can reuse the loaded config between `runTests` calls. [inferred]
 
 L2. After `stopTests()`, wait for the run to finish before returning `Timeout`.
+
 - Prototype today: on its own timer it calls `stopTests()` and returns at once, without awaiting the `runTests` promise. [checked `PW:playwright-test-runner.js:104-111`]
 - Karma: after a disconnect, the run is reported from `onBrowsersReady`, once the restarted browser is ready. [checked section 5]
 - Recommendation: **adopt**. Await `run` with a short bound (for example the 500 ms margin) after `stopTests()`; if that bound expires, throw so core recovers the process. Otherwise the next mutant run can start while the previous run's workers are still shutting down and still appending to NDJSON files. [inferred]
 
 L3. Turn a hang into `Timeout` before Stryker kills the process.
+
 - Prototype today: its own timer at `timeout - 500` ms, then `stopTests()`, so `webServer` survives. [checked `PW:playwright-test-runner.js:97-111`]
 - Karma: no own timer; relies on Karma's disconnect detection plus `launcher.restart`, otherwise core restarts the whole process. [checked section 5]
 - Recommendation: **keep the prototype's approach**; it is stronger than karma's. Add an integration test that an infinite loop in the page ends as `Timeout` and the next run passes, the same two-step shape as `KR:test/integration/timeout-on-infinite-loop.it.spec.ts:42-66`. [inferred]
 
 L4. Send only `hitCount` during mutant runs and honor `coverageAnalysis`.
+
 - Prototype today: every run reads `mutantCoverage` and `hitCount` from every frame and writes both; `dryRun` ignores `coverageAnalysis`. [checked `PW:worker-hook.cjs:29-40,52-63`; `PW:playwright-test-runner.js:63-78`]
 - Karma: coverage off in mutant runs; `'all'` and `'off'` handled. [checked section 3]
 - Recommendation: **adopt**. Pass a "collect coverage" flag via env; in mutant runs read only `hitCount`; for `'off'` skip coverage. This makes context close cheaper on every mutant run. [inferred]
 
 L5. Set `currentTestId` when a test starts, not when a context is created.
+
 - Prototype today: the test id is baked into the init script when the context is created. A context created in `beforeAll` or a worker-scoped fixture, then used by several tests, attributes all coverage to its first test, or to no test. [checked `PW:worker-hook.cjs:24-28`; misattribution inferred]
 - Karma: id set at `specStarted`/`beforeEach`, inside the running page. [checked section 3]
 - Recommendation: **adapt**. Also update `__stryker__.currentTestId` in existing pages at each test start (an auto fixture or a `test.beforeEach` from the hook that evaluates in every open page), and read and split coverage at test end for shared contexts. Lower priority if the target suites use the default per-test `page`. [inferred]
 
 L6. Force the settings that must hold under Stryker.
+
 - Prototype today: forces `workers` (default 1), `maxFailures`, `disableConfigReporters`; `runTests` already forces `retries: 0` and `repeatEach: 1`. [checked `PW:playwright-test-runner.js:89-96`; `docs/research/playwright-internals.md:57`]
 - Karma: forces and documents "non overridable" lifecycle settings and a deterministic test order. [checked sections 1 and 4]
 - Recommendation: **adopt the documentation part**. List the forced settings in the README. Note that `flaky` is mapped to `Success` (`PW:playwright-test-runner.js:17`); with retries forced to 0 it should not occur, so treat it as `Failed` or log it. [inferred]
 
 L7. Verify that the server under test serves the instrumented sandbox.
+
 - Prototype today: the demo `webServer` uses a fixed port with `reuseExistingServer: true`. If a developer's `nx dev` from the original workspace already runs on 4200, Playwright reuses it, pages run uninstrumented code, and every mutant survives with no error. [checked `apps/demo-app-e2e/playwright.config.mts`; failure mode inferred]
 - Karma: serves the files itself on a port it binds, so this cannot happen. [checked section 7]
 - Recommendation: **adopt as a fail-loud check**. After the dry run, if no frame in any test had `globalThis.__stryker__` (no coverage at all), fail with a message naming `webServer`/`reuseExistingServer`. [inferred]
 
 L8. Concurrency and ports.
+
 - Prototype today: every Stryker worker runs `runGlobalSetup`, so with `concurrency > 1` all workers start the same `webServer` on the same port. With `reuseExistingServer: true` they share the first worker's server, which dies if core restarts that worker. Without it, they fail on the busy port. The demo uses `concurrency: 1`. [checked `PW:playwright-test-runner.js:51-56`; `stryker.e2e.config.mjs`; failure modes inferred]
 - Karma: one server per worker, free port found by Karma and read back. [checked section 7]
 - Recommendation: **adapt**. Because mutant activation happens per page, one shared server is correct for every worker. Either document "start the server outside Stryker and set `reuseExistingServer`", or give each worker its own port (for example base port + `STRYKER_MUTATOR_WORKER`, exposed as an env var the user's config reads). Pick one before supporting `concurrency > 1`. [inferred]
 
 L9. Ignore `reloadEnvironment`, as karma does.
+
 - Prototype today: claims `reloadEnvironment: true` and does not read the option; each run gets new workers, a new browser and new page loads, so static mutants see `activeMutant` from the init script before app code. [checked `PW:playwright-test-runner.js:34-36`; `PW:worker-hook.cjs:67-74`]
 - Karma: same claim, same reason (context reload per run). [checked section 1]
 - Recommendation: **keep**. If L1 adds browser reuse, this still holds because every test opens a new context. Code that runs in the `webServer` process (SSR, API) never sees `activeMutant`; keep it out of `mutate`, as karma only ever mutates browser code. [inferred]
 
 L10. Test selection and ids.
+
 - Prototype today: Playwright's hash ids and `testIds`. [checked `PW:playwright-test-runner.js:89-92,139`]
 - Karma: positional Jasmine ids, forced order, an unanchored Mocha regex. [checked section 4]
 - Recommendation: **ignore** karma's approach; the prototype's is better. [inferred]
 
 L11. Riding on a host tool's internals breaks with its minor releases.
+
 - Prototype today: depends on undocumented `playwright/lib/runner` and `playwright-core`'s `_instrumentation`. [checked `PW:playwright-test-runner.js:19-23,41-42`; `PW:worker-hook.cjs:16`]
 - Karma: depends on Angular's builder keeping Karma's `run` API working; Angular 20.3 broke it (#5516). [checked]
 - Recommendation: **adopt** a version guard like `MIN_KARMA_VERSION` (`KR:src/karma-test-runner.ts:46,86-91`): check the Playwright version in `init()` and fail with a clear message outside the tested range. Run the integration suite against each new Playwright minor. [inferred]

@@ -3,7 +3,11 @@ import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 export default {
   plugins: ['@layzee/stryker-playwright-runner'],
   testRunner: 'playwright',
-  playwright: { configFile: 'apps/ngx-yeti-e2e/playwright.config.mts', projects: ['chromium'], workers: 2 },
+  playwright: {
+    configFile: 'apps/ngx-yeti-e2e/playwright.config.mts',
+    projects: ['chromium'],
+    workers: 2,
+  },
   dryRunTimeoutMinutes: 20,
   mutate: ['packages/ngx-yeti/cluster/src/cluster.ts'],
   ignorers: ['angular'],

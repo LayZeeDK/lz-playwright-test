@@ -21,7 +21,9 @@ try {
 
 console.log(
   JSON.stringify({
-    registered: instrumenter.allMutators.filter((mutator) => own in mutator).map(({ name }) => name),
+    registered: instrumenter.allMutators
+      .filter((mutator) => own in mutator)
+      .map(({ name }) => name),
     placerWrapped: own in instrumenter.expressionPlacer,
     ignorer,
   }),

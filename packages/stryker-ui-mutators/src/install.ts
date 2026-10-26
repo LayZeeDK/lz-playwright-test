@@ -8,7 +8,12 @@ import { pathToFileURL } from 'node:url';
 
 import type { Mutant } from '@stryker-mutator/api/core';
 
-import { toNodeMutator, type BabelTypes, type NodeMutatorLike, type Operator } from './mutator.ts';
+import {
+  toNodeMutator,
+  type BabelTypes,
+  type NodeMutatorLike,
+  type Operator,
+} from './mutator.ts';
 import { withJsxPlacement, type MutantPlacerLike } from './placer.ts';
 
 const TESTED_VERSION = '10.1.1';
@@ -33,7 +38,10 @@ export interface SourceFile {
   readonly content: string;
 }
 
-export type InstrumentedMutant = Pick<Mutant, 'id' | 'fileName' | 'mutatorName' | 'replacement' | 'location' | 'status'>;
+export type InstrumentedMutant = Pick<
+  Mutant,
+  'id' | 'fileName' | 'mutatorName' | 'replacement' | 'location' | 'status'
+>;
 
 export interface InstrumentResult {
   readonly files: readonly SourceFile[];
@@ -51,7 +59,10 @@ export interface Instrumenter {
   /** First entry of the frozen `allMutantPlacers`; the array is frozen, this object is not (`mutant-placers/index.js:6`). */
   readonly expressionPlacer: MutantPlacerLike;
   /** Instruments with the live lists, as core does; `excludedMutations` as in Stryker's `mutator` option. */
-  instrument(files: readonly SourceFile[], excludedMutations?: readonly string[]): Promise<InstrumentResult>;
+  instrument(
+    files: readonly SourceFile[],
+    excludedMutations?: readonly string[],
+  ): Promise<InstrumentResult>;
 }
 
 /**
@@ -81,7 +92,10 @@ export async function install(
 }
 
 /** Letters only; no two equal ignoring case among `operators` and the mutators not marked as this package's. */
-function checkNames(operators: readonly Operator[], present: readonly NodeMutatorLike[]): void {
+function checkNames(
+  operators: readonly Operator[],
+  present: readonly NodeMutatorLike[],
+): void {
   const names = operators.map(({ name }) => name);
   const invalid = names.filter((name) => !NAME.test(name));
 
@@ -94,25 +108,43 @@ function checkNames(operators: readonly Operator[], present: readonly NodeMutato
 
   // Stryker's directives match mutator names ignoring case (directive-bookkeeper.ts:63, :73).
   const keys = names.map((name) => name.toLowerCase());
-  const others = new Set(present.filter((mutator) => !(OWN in mutator)).map(({ name }) => name.toLowerCase()));
-  const taken = names.filter((_name, index) => keys.indexOf(keys[index]!) !== index || others.has(keys[index]!));
+  const others = new Set(
+    present
+      .filter((mutator) => !(OWN in mutator))
+      .map(({ name }) => name.toLowerCase()),
+  );
+  const taken = names.filter(
+    (_name, index) =>
+      keys.indexOf(keys[index]!) !== index || others.has(keys[index]!),
+  );
 
   if (taken.length > 0) {
-    throw new Error(`stryker-ui-mutators: another mutator already has the name ${taken.join(', ')}.`);
+    throw new Error(
+      `stryker-ui-mutators: another mutator already has the name ${taken.join(', ')}.`,
+    );
   }
 }
 
 /** Pushes each operator whose name no marked mutator has yet, and wraps the placer unless it is marked. */
-function register(instrumenter: Instrumenter, operators: readonly Operator[]): void {
+function register(
+  instrumenter: Instrumenter,
+  operators: readonly Operator[],
+): void {
   const { allMutators, expressionPlacer, types } = instrumenter;
-  const registered = new Set(allMutators.filter((mutator) => OWN in mutator).map(({ name }) => name));
+  const registered = new Set(
+    allMutators.filter((mutator) => OWN in mutator).map(({ name }) => name),
+  );
 
   allMutators.push(
-    ...operators.filter(({ name }) => !registered.has(name)).map((operator) => ({ ...toNodeMutator(operator, types), [OWN]: true })),
+    ...operators
+      .filter(({ name }) => !registered.has(name))
+      .map((operator) => ({ ...toNodeMutator(operator, types), [OWN]: true })),
   );
 
   if (!(OWN in expressionPlacer)) {
-    Object.assign(expressionPlacer, withJsxPlacement(expressionPlacer, types), { [OWN]: true });
+    Object.assign(expressionPlacer, withJsxPlacement(expressionPlacer, types), {
+      [OWN]: true,
+    });
   }
 }
 
@@ -121,11 +153,23 @@ function register(instrumenter: Instrumenter, operators: readonly Operator[]): v
  * gives a mutant of its own operator in its own file. Names the instrumenter's dir and version in the error, since a
  * bundled or second instrumenter copy is the likely cause.
  */
-async function selfCheck(instrumenter: Instrumenter, operators: readonly Operator[]): Promise<void> {
+async function selfCheck(
+  instrumenter: Instrumenter,
+  operators: readonly Operator[],
+): Promise<void> {
   const fileOf = (name: string): string => `${name}.self-check.tsx`;
-  const { mutants } = await instrumenter.instrument(operators.map(({ name, sample }) => ({ name: fileOf(name), content: sample })));
-  const made = new Set(mutants.map(({ fileName, mutatorName }) => `${fileName}\n${mutatorName}`));
-  const silent = operators.map(({ name }) => name).filter((name) => !made.has(`${fileOf(name)}\n${name}`));
+  const { mutants } = await instrumenter.instrument(
+    operators.map(({ name, sample }) => ({
+      name: fileOf(name),
+      content: sample,
+    })),
+  );
+  const made = new Set(
+    mutants.map(({ fileName, mutatorName }) => `${fileName}\n${mutatorName}`),
+  );
+  const silent = operators
+    .map(({ name }) => name)
+    .filter((name) => !made.has(`${fileOf(name)}\n${name}`));
 
   if (silent.length > 0) {
     throw new Error(
@@ -143,7 +187,8 @@ async function selfCheck(instrumenter: Instrumenter, operators: readonly Operato
 export function corePackageJson(
   argv1: string | undefined = process.argv[1],
   realpath: (path: string) => string = realpathSync,
-  resolveHere: (specifier: string) => string = createRequire(import.meta.url).resolve,
+  resolveHere: (specifier: string) => string = createRequire(import.meta.url)
+    .resolve,
 ): string {
   let bin: string | undefined;
 
@@ -153,14 +198,20 @@ export function corePackageJson(
     // `node --eval` and the REPL run no script file.
   }
 
-  return bin !== undefined && CORE_BIN.test(bin) ? join(bin, '..', '..', 'package.json') : resolveHere('@stryker-mutator/core/package.json');
+  return bin !== undefined && CORE_BIN.test(bin)
+    ? join(bin, '..', '..', 'package.json')
+    : resolveHere('@stryker-mutator/core/package.json');
 }
 
 interface InstrumenterModule {
   Instrumenter: new (logger: typeof SILENT) => {
     instrument(
       files: readonly (SourceFile & { mutate: true })[],
-      options: { plugins: null; excludedMutations: readonly string[]; ignorers: readonly string[] },
+      options: {
+        plugins: null;
+        excludedMutations: readonly string[];
+        ignorers: readonly string[];
+      },
     ): Promise<{ files: readonly SourceFile[]; mutants: readonly Mutant[] }>;
   };
 }
@@ -170,9 +221,13 @@ interface InstrumenterModule {
  * (`allMutators`), `dist/src/mutant-placers/index.js` (`allMutantPlacers`, of which it takes the one named
  * `expressionMutantPlacer`), `dist/src/index.js` (`Instrumenter`) and the instrumenter's own `@babel/core`.
  */
-export async function resolveFromCore(corePackage: string = corePackageJson()): Promise<Instrumenter> {
+export async function resolveFromCore(
+  corePackage: string = corePackageJson(),
+): Promise<Instrumenter> {
   const fromCore = createRequire(corePackage);
-  const packageJson = fromCore.resolve('@stryker-mutator/instrumenter/package.json');
+  const packageJson = fromCore.resolve(
+    '@stryker-mutator/instrumenter/package.json',
+  );
   const dir = dirname(packageJson);
   const [{ allMutators }, { allMutantPlacers }, { Instrumenter }, { types }]: [
     { allMutators: NodeMutatorLike[] },
@@ -185,10 +240,14 @@ export async function resolveFromCore(corePackage: string = corePackageJson()): 
     importFile(join(dir, 'dist', 'src', 'index.js')),
     importFile(createRequire(packageJson).resolve('@babel/core')),
   ]);
-  const expressionPlacer = allMutantPlacers.find(({ name }) => name === 'expressionMutantPlacer');
+  const expressionPlacer = allMutantPlacers.find(
+    ({ name }) => name === 'expressionMutantPlacer',
+  );
 
   if (expressionPlacer === undefined) {
-    throw new Error(`stryker-ui-mutators: the instrumenter in ${dir} has no expressionMutantPlacer.`);
+    throw new Error(
+      `stryker-ui-mutators: the instrumenter in ${dir} has no expressionMutantPlacer.`,
+    );
   }
 
   return {

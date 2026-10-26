@@ -20,7 +20,9 @@ function Cart() {
 
   const setQuantity = (name: string, quantity: number) =>
     setLines((current) =>
-      current.map((line) => (line.name === name ? { ...line, quantity } : line)),
+      current.map((line) =>
+        line.name === name ? { ...line, quantity } : line,
+      ),
     );
 
   return (

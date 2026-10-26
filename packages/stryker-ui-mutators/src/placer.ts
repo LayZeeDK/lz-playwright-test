@@ -26,29 +26,49 @@ export type PlacerMethods = Pick<MutantPlacerLike, 'canPlace' | 'place'>;
  *   and built-in mutants inside an attribute's expression find that expression as their nearest site first, so
  *   their placement does not change (test/placement.test.ts proves it on a corpus).
  */
-export function withJsxPlacement(original: PlacerMethods, t: BabelTypes): PlacerMethods {
+export function withJsxPlacement(
+  original: PlacerMethods,
+  t: BabelTypes,
+): PlacerMethods {
   const canPlace = original.canPlace.bind(original);
   const place = original.place.bind(original);
 
   return {
-    canPlace: (path) => canPlace(path) || path.isJSXAttribute() || path.isJSXText(),
+    canPlace: (path) =>
+      canPlace(path) || path.isJSXAttribute() || path.isJSXText(),
     place(path, appliedMutants) {
       if (path.isJSXAttribute()) {
-        path.node.value = t.jsxExpressionContainer(valueExpression(path.node.value, t));
-        place(path.get('value.expression') as NodePath, remap(appliedMutants, (node) => valueExpression((node as types.JSXAttribute).value, t)));
+        path.node.value = t.jsxExpressionContainer(
+          valueExpression(path.node.value, t),
+        );
+        place(
+          path.get('value.expression') as NodePath,
+          remap(appliedMutants, (node) =>
+            valueExpression((node as types.JSXAttribute).value, t),
+          ),
+        );
 
         return;
       }
 
       if (path.isJSXText()) {
-        const [container] = path.replaceWith(t.jsxExpressionContainer(cleanedText(path.node, t)));
-        place(container.get('expression') as NodePath, remap(appliedMutants, (node) => cleanedText(node as types.JSXText, t)));
+        const [container] = path.replaceWith(
+          t.jsxExpressionContainer(cleanedText(path.node, t)),
+        );
+        place(
+          container.get('expression') as NodePath,
+          remap(appliedMutants, (node) =>
+            cleanedText(node as types.JSXText, t),
+          ),
+        );
 
         return;
       }
 
       if (isJsxChild(path)) {
-        const [container] = path.replaceWith(t.jsxExpressionContainer(path.node as types.Expression));
+        const [container] = path.replaceWith(
+          t.jsxExpressionContainer(path.node as types.Expression),
+        );
         place(container.get('expression') as NodePath, appliedMutants);
 
         return;
@@ -59,11 +79,19 @@ export function withJsxPlacement(original: PlacerMethods, t: BabelTypes): Placer
   };
 }
 
-function remap(applied: Map<unknown, types.Node>, to: (node: types.Node) => types.Expression): Map<unknown, types.Node> {
-  return new Map([...applied].map(([mutant, node]) => [mutant, to(node)] as const));
+function remap(
+  applied: Map<unknown, types.Node>,
+  to: (node: types.Node) => types.Expression,
+): Map<unknown, types.Node> {
+  return new Map(
+    [...applied].map(([mutant, node]) => [mutant, to(node)] as const),
+  );
 }
 
-function valueExpression(value: types.JSXAttribute['value'], t: BabelTypes): types.Expression {
+function valueExpression(
+  value: types.JSXAttribute['value'],
+  t: BabelTypes,
+): types.Expression {
   if (value === null || value === undefined) {
     return t.booleanLiteral(true);
   }
@@ -77,8 +105,14 @@ function valueExpression(value: types.JSXAttribute['value'], t: BabelTypes): typ
 }
 
 function cleanedText(node: types.JSXText, t: BabelTypes): types.Expression {
-  const element = t.jsxElement(t.jsxOpeningElement(t.jsxIdentifier('x'), []), t.jsxClosingElement(t.jsxIdentifier('x')), [node]);
+  const element = t.jsxElement(
+    t.jsxOpeningElement(t.jsxIdentifier('x'), []),
+    t.jsxClosingElement(t.jsxIdentifier('x')),
+    [node],
+  );
   const [child] = t.react.buildChildren(element);
 
-  return t.isStringLiteral(child) ? t.stringLiteral(child.value) : t.nullLiteral();
+  return t.isStringLiteral(child)
+    ? t.stringLiteral(child.value)
+    : t.nullLiteral();
 }

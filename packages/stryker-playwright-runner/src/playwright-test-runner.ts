@@ -63,7 +63,10 @@ interface ServerCheck {
 type IsUrlAvailable = CoreBundleModule['utils']['isURLAvailable'];
 
 // `.ts` when this module runs from source, `.js` when it runs from the build.
-const HOOK = new URL(`./worker-hook${path.extname(import.meta.filename)}`, import.meta.url).href;
+const HOOK = new URL(
+  `./worker-hook${path.extname(import.meta.filename)}`,
+  import.meta.url,
+).href;
 const MIN_PLAYWRIGHT = { major: 1, minor: 63 };
 // Config load and worker start before the first test, measured at about 2.7 s.
 const RUN_START_MS = 3000;

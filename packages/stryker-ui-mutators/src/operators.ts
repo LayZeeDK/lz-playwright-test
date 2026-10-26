@@ -2,11 +2,26 @@
 // exactly one row (or, for the value kinds and the empty value, in mutator.ts's readValue and replaced).
 import type { NodePath, types } from '@babel/core';
 
-import { isJsxChild, type AttributeSite, type BabelTypes, type ElementSite, type Operator } from './mutator.ts';
+import {
+  isJsxChild,
+  type AttributeSite,
+  type BabelTypes,
+  type ElementSite,
+  type Operator,
+} from './mutator.ts';
 
 const HAS_WORD = /[\p{L}\p{N}]/u;
 /** Built-in ConditionalExpression already forces `true`/`false` on a test of these shapes. */
-const COMPARISON: ReadonlySet<string> = new Set(['==', '!=', '===', '!==', '<', '<=', '>', '>=']);
+const COMPARISON: ReadonlySet<string> = new Set([
+  '==',
+  '!=',
+  '===',
+  '!==',
+  '<',
+  '<=',
+  '>',
+  '>=',
+]);
 /** Calls that render a list; the later ListExpression owns them. */
 const LIST_METHODS: ReadonlySet<string> = new Set(['map', 'filter', 'flatMap']);
 /** Their text is CSS or code, not rendered text. */
@@ -85,7 +100,11 @@ export const operators = [
       {
         kind: 'node',
         *mutate(path, t) {
-          if (path.isJSXText() && HAS_WORD.test(path.node.value) && !UNRENDERED_TEXT.has(elementName(path.parentPath, t) ?? '')) {
+          if (
+            path.isJSXText() &&
+            HAS_WORD.test(path.node.value) &&
+            !UNRENDERED_TEXT.has(elementName(path.parentPath, t) ?? '')
+          ) {
             yield t.jsxText('');
           }
         },
@@ -98,9 +117,19 @@ export const operators = [
     rules: [
       {
         kind: 'attribute',
-        attributes: ['aria-label', 'aria-labelledby', 'alt', 'title', 'placeholder', 'htmlFor'],
+        attributes: [
+          'aria-label',
+          'aria-labelledby',
+          'alt',
+          'title',
+          'placeholder',
+          'htmlFor',
+        ],
         on: { string: 'empty', expression: 'empty' },
-        skip: (site) => site.name === 'htmlFor' && site.element.name === 'label' && wrapsControl(site.element),
+        skip: (site) =>
+          site.name === 'htmlFor' &&
+          site.element.name === 'label' &&
+          wrapsControl(site.element),
       },
     ],
   },
@@ -138,7 +167,8 @@ export const operators = [
             path.isConditionalExpression() &&
             path.parentPath.isJSXExpressionContainer() &&
             isJsxChild(path.parentPath) &&
-            (isJsxBranch(path.node.consequent, t) || isJsxBranch(path.node.alternate, t)) &&
+            (isJsxBranch(path.node.consequent, t) ||
+              isJsxBranch(path.node.alternate, t)) &&
             !builtInForces(path.node.test, t)
           ) {
             yield t.cloneNode(path.node.consequent, true);
@@ -151,7 +181,13 @@ export const operators = [
   {
     name: 'UrlAttribute',
     sample: 'export const a = <a href="/about">About</a>;\n',
-    rules: [{ kind: 'attribute', attributes: ['href', 'to', 'action'], on: { string: 'empty', expression: 'empty' } }],
+    rules: [
+      {
+        kind: 'attribute',
+        attributes: ['href', 'to', 'action'],
+        on: { string: 'empty', expression: 'empty' },
+      },
+    ],
   },
   {
     name: 'DisabledAttribute',
@@ -172,7 +208,9 @@ export const operators = [
         kind: 'attribute',
         attributes: ['hidden', 'aria-hidden'],
         on: { bare: 'remove', string: 'remove', expression: 'false' },
-        skip: (site) => site.name === 'aria-hidden' && DECORATIVE.has(site.element.name ?? ''),
+        skip: (site) =>
+          site.name === 'aria-hidden' &&
+          DECORATIVE.has(site.element.name ?? ''),
       },
     ],
   },
@@ -185,7 +223,9 @@ export const operators = [
         kind: 'attribute',
         attributes: ['role'],
         on: { string: 'remove' },
-        skip: (site) => site.value.kind === 'string' && implicitRole(site.element) === site.value.text,
+        skip: (site) =>
+          site.value.kind === 'string' &&
+          implicitRole(site.element) === site.value.text,
       },
       {
         // ElementToSpan: `button` always; `a` only with `href`, as an `a` without one has no link role.
@@ -197,9 +237,15 @@ export const operators = [
 
           const span = t.cloneNode(path.node, true);
           span.openingElement.name = t.jsxIdentifier('span');
-          span.openingElement.attributes = span.openingElement.attributes.filter(
-            (attribute) => !(t.isJSXAttribute(attribute) && t.isJSXIdentifier(attribute.name) && NOT_ON_SPAN.has(attribute.name.name)),
-          );
+          span.openingElement.attributes =
+            span.openingElement.attributes.filter(
+              (attribute) =>
+                !(
+                  t.isJSXAttribute(attribute) &&
+                  t.isJSXIdentifier(attribute.name) &&
+                  NOT_ON_SPAN.has(attribute.name.name)
+                ),
+            );
 
           if (span.closingElement) {
             span.closingElement.name = t.jsxIdentifier('span');
@@ -219,7 +265,11 @@ export const operators = [
         *mutate(path, t) {
           const container = path.parentPath;
 
-          if (container?.isJSXExpressionContainer() && isJsxChild(container) && isRenderedValue(path.node, t)) {
+          if (
+            container?.isJSXExpressionContainer() &&
+            isJsxChild(container) &&
+            isRenderedValue(path.node, t)
+          ) {
             yield t.nullLiteral();
           }
         },
@@ -228,11 +278,17 @@ export const operators = [
   },
   {
     name: 'StateAttribute',
-    sample: 'export const a = (open: boolean) => <button aria-expanded={open} />;\n',
+    sample:
+      'export const a = (open: boolean) => <button aria-expanded={open} />;\n',
     rules: [
       {
         kind: 'attribute',
-        attributes: ['aria-expanded', 'aria-pressed', 'aria-checked', 'aria-selected'],
+        attributes: [
+          'aria-expanded',
+          'aria-pressed',
+          'aria-checked',
+          'aria-selected',
+        ],
         on: { string: 'flip', expression: 'negate' },
       },
     ],
@@ -242,10 +298,15 @@ export const operators = [
 /** Derived from the table; the cases harness types its expectations with it, so no second list of names exists. */
 export type OperatorName = (typeof operators)[number]['name'];
 
-export const operatorNames: readonly OperatorName[] = operators.map(({ name }) => name);
+export const operatorNames: readonly OperatorName[] = operators.map(
+  ({ name }) => name,
+);
 
 function elementName(path: NodePath | null, t: BabelTypes): string | undefined {
-  return path?.isJSXElement() && t.isJSXIdentifier(path.node.openingElement.name) ? path.node.openingElement.name.name : undefined;
+  return path?.isJSXElement() &&
+    t.isJSXIdentifier(path.node.openingElement.name)
+    ? path.node.openingElement.name.name
+    : undefined;
 }
 
 function isJsxBranch(node: types.Node, t: BabelTypes): boolean {
@@ -254,7 +315,10 @@ function isJsxBranch(node: types.Node, t: BabelTypes): boolean {
 
 /** A comparison, or `&&`/`||`: built-in ConditionalExpression already makes the same mutants for this test. */
 function builtInForces(test: types.Node, t: BabelTypes): boolean {
-  return (t.isBinaryExpression(test) && COMPARISON.has(test.operator)) || (t.isLogicalExpression(test) && test.operator !== '??');
+  return (
+    (t.isBinaryExpression(test) && COMPARISON.has(test.operator)) ||
+    (t.isLogicalExpression(test) && test.operator !== '??')
+  );
 }
 
 function swapsToSpan(element: types.JSXElement, t: BabelTypes): boolean {
@@ -266,7 +330,12 @@ function swapsToSpan(element: types.JSXElement, t: BabelTypes): boolean {
 
   return (
     name.name === 'button' ||
-    (name.name === 'a' && attributes.some((attribute) => t.isJSXAttribute(attribute) && t.isJSXIdentifier(attribute.name, { name: 'href' })))
+    (name.name === 'a' &&
+      attributes.some(
+        (attribute) =>
+          t.isJSXAttribute(attribute) &&
+          t.isJSXIdentifier(attribute.name, { name: 'href' }),
+      ))
   );
 }
 
@@ -284,7 +353,8 @@ function wrapsControl(label: ElementSite): boolean {
     children.some(
       (child) =>
         (child.type === 'JSXElement' &&
-          ((child.openingElement.name.type === 'JSXIdentifier' && LABELABLE.has(child.openingElement.name.name)) ||
+          ((child.openingElement.name.type === 'JSXIdentifier' &&
+            LABELABLE.has(child.openingElement.name.name)) ||
             holds(child.children))) ||
         (child.type === 'JSXFragment' && holds(child.children)),
     );
@@ -297,10 +367,18 @@ function isRenderedValue(node: types.Node, t: BabelTypes): boolean {
   if (t.isCallExpression(node)) {
     const { callee } = node;
 
-    return !(t.isMemberExpression(callee) && t.isIdentifier(callee.property) && LIST_METHODS.has(callee.property.name));
+    return !(
+      t.isMemberExpression(callee) &&
+      t.isIdentifier(callee.property) &&
+      LIST_METHODS.has(callee.property.name)
+    );
   }
 
-  return t.isIdentifier(node) || t.isMemberExpression(node) || t.isOptionalMemberExpression(node);
+  return (
+    t.isIdentifier(node) ||
+    t.isMemberExpression(node) ||
+    t.isOptionalMemberExpression(node)
+  );
 }
 
 /**
@@ -308,7 +386,10 @@ function isRenderedValue(node: types.Node, t: BabelTypes): boolean {
  * function or an arrow, and this attribute is its only reference: built-in BlockStatement already empties it.
  */
 function isOnlyReferenceOfLocalFunction(site: AttributeSite): boolean {
-  if (site.value.kind !== 'expression' || site.value.expression.type !== 'Identifier') {
+  if (
+    site.value.kind !== 'expression' ||
+    site.value.expression.type !== 'Identifier'
+  ) {
     return false;
   }
 
@@ -324,6 +405,7 @@ function isOnlyReferenceOfLocalFunction(site: AttributeSite): boolean {
     declaration.isFunctionDeclaration() ||
     (binding.kind === 'const' &&
       declaration.isVariableDeclarator() &&
-      (declaration.node.init?.type === 'ArrowFunctionExpression' || declaration.node.init?.type === 'FunctionExpression'))
+      (declaration.node.init?.type === 'ArrowFunctionExpression' ||
+        declaration.node.init?.type === 'FunctionExpression'))
   );
 }

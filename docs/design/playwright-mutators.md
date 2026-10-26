@@ -24,16 +24,16 @@ route. Two independent designs that agree count for more than either draft alone
 Opus draft as the base. From the Fable draft it takes the three rows marked Fable below and its upstream
 fix, and it keeps the Fable `ListExpression` for Later.
 
-| Question | Opus draft | Fable draft | Taken |
-|---|---|---|---|
-| Attribute placement | switch inside the attribute value: `aria-label={c ? "" : "Close"}` | the attribute becomes a spread object `{...c ? {...} : {...}}` | Opus: smaller output, React sees the same props, no `key`/`ref` exception, handles `&amp;` |
-| Emptied text | `null`, identical render to the original | `""` | Opus |
-| Element-level mutants (tag swap) | yes, with the JSX child wrap | none in v1 | Opus (`ElementRole` can swap a tag) |
-| Conditional with a comparison or logical test | no skip, so it repeats the built-in `ConditionalExpression` mutants | skips the test shapes that `ConditionalExpression` already forces (`builtInForcesTrue`) | Fable |
-| Silent plugin failure | warning only | import-time self-check that throws | Fable, moved to an `Ignore` plugin factory (see Integration) |
-| Version drift | peer pinned to `10.1.1` exactly | peer `~10.1.0` plus a runtime warning | Fable |
-| Upstream fixes found | JSX comment directives are ignored for every mutator | built-in `ConditionalExpression` makes a duplicate `true` mutant for JSX `&&` | both |
-| Names | framework-neutral (`TextContent`) | `Jsx` prefix | neither: renamed to the StrykerJS convention, still framework-neutral (see Names) |
+| Question                                      | Opus draft                                                          | Fable draft                                                                             | Taken                                                                                      |
+| --------------------------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Attribute placement                           | switch inside the attribute value: `aria-label={c ? "" : "Close"}`  | the attribute becomes a spread object `{...c ? {...} : {...}}`                          | Opus: smaller output, React sees the same props, no `key`/`ref` exception, handles `&amp;` |
+| Emptied text                                  | `null`, identical render to the original                            | `""`                                                                                    | Opus                                                                                       |
+| Element-level mutants (tag swap)              | yes, with the JSX child wrap                                        | none in v1                                                                              | Opus (`ElementRole` can swap a tag)                                                        |
+| Conditional with a comparison or logical test | no skip, so it repeats the built-in `ConditionalExpression` mutants | skips the test shapes that `ConditionalExpression` already forces (`builtInForcesTrue`) | Fable                                                                                      |
+| Silent plugin failure                         | warning only                                                        | import-time self-check that throws                                                      | Fable, moved to an `Ignore` plugin factory (see Integration)                               |
+| Version drift                                 | peer pinned to `10.1.1` exactly                                     | peer `~10.1.0` plus a runtime warning                                                   | Fable                                                                                      |
+| Upstream fixes found                          | JSX comment directives are ignored for every mutator                | built-in `ConditionalExpression` makes a duplicate `true` mutant for JSX `&&`           | both                                                                                       |
+| Names                                         | framework-neutral (`TextContent`)                                   | `Jsx` prefix                                                                            | neither: renamed to the StrykerJS convention, still framework-neutral (see Names)          |
 
 ## Operators in the first release
 
@@ -88,19 +88,19 @@ and stryker4s (`modules/core/src/main/scala/stryker4s/mutation/`), both at their
   appear in docs, tests and the operator table that upstreaming would add (see Upstream path), not in
   `mutatorName`.
 
-| Operator | Mutations | Earlier name (drafts, spike) |
-|---|---|---|
-| `TextLiteral` | `TextRemoval` | `TextContent` |
-| `LabelAttribute` | `LabelRemoval` | `AccessibleName` |
-| `EventHandler` | `EventHandlerRemoval` | `EventHandler` |
-| `ConditionalElement` | `ConditionalGuardRemoval` (`x && <A/>` to `<A/>`), `ConditionalToConsequent`, `ConditionalToAlternate` | `ConditionalRendering` |
-| `UrlAttribute` | `UrlRemoval` | `NavigationTarget` |
-| `DisabledAttribute` | `DisabledRemoval` | `DisabledState` |
-| `HiddenAttribute` | `HiddenRemoval` | `HiddenState` |
-| `ElementRole` | `RoleRemoval`, `ElementToSpan` | `Role` |
-| `ChildExpression` | `ChildExpressionRemoval` | `ChildExpression` |
-| `StateAttribute` | `StateNegation` | `AriaState` |
-| `ListExpression` (later) | `ListTruncation` | `ListTruncate` |
+| Operator                 | Mutations                                                                                              | Earlier name (drafts, spike) |
+| ------------------------ | ------------------------------------------------------------------------------------------------------ | ---------------------------- |
+| `TextLiteral`            | `TextRemoval`                                                                                          | `TextContent`                |
+| `LabelAttribute`         | `LabelRemoval`                                                                                         | `AccessibleName`             |
+| `EventHandler`           | `EventHandlerRemoval`                                                                                  | `EventHandler`               |
+| `ConditionalElement`     | `ConditionalGuardRemoval` (`x && <A/>` to `<A/>`), `ConditionalToConsequent`, `ConditionalToAlternate` | `ConditionalRendering`       |
+| `UrlAttribute`           | `UrlRemoval`                                                                                           | `NavigationTarget`           |
+| `DisabledAttribute`      | `DisabledRemoval`                                                                                      | `DisabledState`              |
+| `HiddenAttribute`        | `HiddenRemoval`                                                                                        | `HiddenState`                |
+| `ElementRole`            | `RoleRemoval`, `ElementToSpan`                                                                         | `Role`                       |
+| `ChildExpression`        | `ChildExpressionRemoval`                                                                               | `ChildExpression`            |
+| `StateAttribute`         | `StateNegation`                                                                                        | `AriaState`                  |
+| `ListExpression` (later) | `ListTruncation`                                                                                       | `ListTruncate`               |
 
 Every name is letters only, because a `// Stryker disable` comment accepts only letters in mutator names,
 and StrykerJS matches those names against every registered mutator ignoring case
