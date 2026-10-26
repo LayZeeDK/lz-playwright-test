@@ -42,6 +42,7 @@ import {
   runPlan,
 } from '../src/run-request.ts';
 import {
+  attemptSummary,
   coverageGaps,
   dryRunResult,
   mayHaveLostItsServer,
@@ -303,12 +304,24 @@ test('a failed or retried-then-failed attempt counts as failed, a skipped one do
   attempt(reporter, 'a', 'expected', 'passed');
   attempt(reporter, 'b', 'skipped', 'skipped');
 
-  assert.equal(reporter.anyAttemptFailed(), false);
+  assert.equal(attemptSummary(reporter.testCases.values()).anyFailed, false);
 
   attempt(reporter, 'c', 'unexpected', 'failed');
   attempt(reporter, 'c', 'flaky', 'passed');
 
-  assert.equal(reporter.anyAttemptFailed(), true);
+  assert.equal(attemptSummary(reporter.testCases.values()).anyFailed, true);
+});
+
+test('a timed-out or interrupted attempt failed but killed nothing', () => {
+  const reporter = new CollectingReporter();
+  attempt(reporter, 'a', 'unexpected', 'timedOut');
+  attempt(reporter, 'b', 'unexpected', 'interrupted');
+
+  assert.deepEqual(attemptSummary(reporter.testCases.values()), {
+    anyFailed: true,
+    killed: false,
+    timedOut: true,
+  });
 });
 
 test('an unfiltered dry run without tests completes empty, so Stryker applies allowEmpty', () => {

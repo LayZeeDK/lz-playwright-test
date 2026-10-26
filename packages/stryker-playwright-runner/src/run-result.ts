@@ -48,8 +48,42 @@ const OUTCOME: Record<ReturnType<TestCase['outcome']>, TestStatus> = {
   skipped: TestStatus.Skipped,
 };
 
+export interface AttemptSummary {
+  /** An attempt ended other than expected, skipped aside: timed out and interrupted count. */
+  readonly anyFailed: boolean;
+  /**
+   * An attempt failed or passed against its expectation. A timed-out, interrupted or skipped attempt
+   * kills no mutant; the test a deadline stop interrupts ends as skipped.
+   */
+  readonly killed: boolean;
+  readonly timedOut: boolean;
+}
+
+export function attemptSummary(testCases: Iterable<TestCase>): AttemptSummary {
+  const attempts = [...testCases].flatMap((test) =>
+    test.results.map(({ status }) => ({
+      status,
+      unexpected: status !== test.expectedStatus,
+    })),
+  );
+
+  return {
+    anyFailed: attempts.some(
+      ({ status, unexpected }) => unexpected && status !== 'skipped',
+    ),
+    killed: attempts.some(
+      ({ status, unexpected }) =>
+        unexpected && (status === 'failed' || status === 'passed'),
+    ),
+    timedOut: attempts.some(({ status }) => status === 'timedOut'),
+  };
+}
+
 export function mayHaveLostItsServer(output: RunOutput): boolean {
-  return output.status !== 'deadline' && output.reporter.anyAttemptFailed();
+  return (
+    output.status !== 'deadline' &&
+    attemptSummary(output.reporter.testCases.values()).anyFailed
+  );
 }
 
 export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
@@ -57,19 +91,11 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
   const isMutantRun = request.kind === 'mutant';
   const testCases = [...reporter.testCases.values()];
   const tests = testCases.map((test) => toTestResult(test, isMutantRun));
-  // The test a deadline stop interrupts ends as skipped, so it is no kill.
+  const { killed, timedOut } = attemptSummary(testCases);
   const reason = timeoutReason({
     mutantRun: isMutantRun,
-    killed: testCases.some((test) =>
-      test.results.some(
-        (result) =>
-          result.status !== test.expectedStatus &&
-          (result.status === 'failed' || result.status === 'passed'),
-      ),
-    ),
-    testTimedOut: testCases.some((test) =>
-      test.results.some((result) => result.status === 'timedOut'),
-    ),
+    killed,
+    testTimedOut: timedOut,
     stoppedAtDeadline: status === 'deadline',
   });
 

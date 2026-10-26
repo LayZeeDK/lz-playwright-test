@@ -19,15 +19,6 @@ export class CollectingReporter {
     return this.suite?.allTests() ?? [];
   }
 
-  anyAttemptFailed(): boolean {
-    return [...this.testCases.values()].some((test) =>
-      test.results.some(
-        (result) =>
-          result.status !== test.expectedStatus && result.status !== 'skipped',
-      ),
-    );
-  }
-
   onTestEnd(test: TestCase) {
     this.testCases.set(test.id, test);
   }
