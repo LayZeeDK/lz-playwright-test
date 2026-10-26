@@ -16,7 +16,6 @@ import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import type { Mutant, StrykerOptions } from '@stryker-mutator/api/core';
-import type { Logger } from '@stryker-mutator/api/logging';
 import {
   type CompleteDryRunResult,
   DryRunStatus,
@@ -31,15 +30,17 @@ import {
   acceptsConnections,
   PlaywrightTestRunner,
 } from '../../src/playwright-test-runner.ts';
+import type { SerialGroups } from '../../src/serial-groups.ts';
 import { STOP_HEADROOM_MS } from '../../src/timeouts.ts';
+import { logger } from '../support/doubles.ts';
 
-// The runner's private state, which one test checks directly.
-function session() {
-  return (
-    runner as unknown as {
-      session: { serialGroups: Map<string, string[]> };
-    }
-  ).session;
+// The runner's private state, which one test checks directly. TypeScript type-checks a private
+// member read by its quoted name.
+function serialGroupsOfSession(): SerialGroups {
+  const session = runner['session'];
+  assert.ok(session, 'init ran');
+
+  return session.serialGroups;
 }
 
 // A pid that ran and exited, so no process owns it now.
@@ -53,29 +54,20 @@ const fixture = (file: string) =>
 const verbose = process.env.RUNNER_TEST_LOG !== undefined;
 const start = Date.now();
 // Every line the runner logged, at any level.
-const logged: string[] = [];
-const log = {
-  ...Object.fromEntries(
-    ['trace', 'debug', 'info', 'warn', 'error', 'fatal'].map((level) => [
-      level,
-      (...args: unknown[]) => {
-        logged.push(args.join(' '));
-
-        if (verbose) {
-          console.log(((Date.now() - start) / 1000).toFixed(1), level, ...args);
-        }
-      },
-    ]),
-  ),
-  isDebugEnabled: () => verbose,
-} as unknown as Logger;
+const { log, lines: logged } = logger({
+  debug: verbose,
+  onLine: verbose
+    ? (level, ...args) =>
+        console.log(((Date.now() - start) / 1000).toFixed(1), level, ...args)
+    : undefined,
+});
 
 /** How long a deadline stop logged since `from` took, or undefined when the deadline never fired. */
 function deadlineStopTook(from: number): number | undefined {
   const [, took] =
     logged
       .slice(from)
-      .map((line) => /^deadline stop took (\d+) ms$/.exec(line))
+      .map(([, line]) => /^deadline stop took (\d+) ms$/.exec(line))
       .find((match) => match !== null) ?? [];
 
   return took === undefined ? undefined : Number(took);
@@ -238,7 +230,7 @@ test('the hook stays out of worker threads that a test starts', () => {
 });
 
 test('init finds the describe.serial groups', () => {
-  const { serialGroups } = session();
+  const serialGroups = serialGroupsOfSession();
 
   assert.deepEqual(serialGroups.get(testId('second user of the shared page')), [
     testId('first user of the shared page'),

@@ -60,14 +60,23 @@ export function finishedTest(
   return testCase;
 }
 
-export function logger() {
+export function logger({
+  debug = false,
+  onLine,
+}: {
+  debug?: boolean;
+  onLine?: (level: string, ...args: unknown[]) => void;
+} = {}) {
   const lines: [string, string][] = [];
-  const record = (level: string) => (message: string) => {
-    lines.push([level, message]);
-  };
+  const record =
+    (level: string) =>
+    (message: string, ...args: unknown[]) => {
+      lines.push([level, message]);
+      onLine?.(level, message, ...args);
+    };
   const log: Logger = {
     isTraceEnabled: () => false,
-    isDebugEnabled: () => false,
+    isDebugEnabled: () => debug,
     isInfoEnabled: () => false,
     isWarnEnabled: () => false,
     isErrorEnabled: () => false,
