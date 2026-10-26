@@ -3,6 +3,13 @@
 Drafts of upstream issues found while validating the runner. Lars files from here when he chooses;
 nothing in this file has been filed.
 
+## LayZeeDK/lz-engineering-claude-plugins: lz-tdd findings from first real use
+
+Status: open ledger, nothing filed (started 2026-10-26). The `lz-tdd` plugin (0.0.3; skills `lz-red`, `lz-tpp`,
+`lz-refactor`) runs here for the first time outside its evals, in the production hardening of both packages. Each
+entry gets the skill and version, what it was asked, what it did, what was expected, and the transcript or file
+that shows it. No entries yet.
+
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
 Status: draft, not filed (2026-10-25).
