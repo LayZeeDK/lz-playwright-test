@@ -3,9 +3,11 @@ import base from './stryker.base.ts';
 
 export default {
   ...base,
-  plugins: ['@layzee/stryker-playwright-runner'],
-  testRunner: 'playwright',
-  playwright: { configFile: 'apps/demo-app-e2e/playwright.config.mts' },
+  plugins: ['@layzee/lz-stryker-playwright-runner'],
+  testRunner: 'lz-stryker-playwright',
+  lzStrykerPlaywright: {
+    configFile: 'apps/demo-app-e2e/playwright.config.mts',
+  },
   mutate: ['apps/demo-app/src/app/cart.ts'],
   coverageAnalysis: 'perTest',
   timeoutMS: 10_000,

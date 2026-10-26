@@ -8,4 +8,4 @@ package-lock.json
 /spikes
 # Instrumented bundles that runner.test.ts and ui-mutators.test.ts write before each run. Prettier reads
 # only the root ignore files, so the fixtures' own ignore files do not cover them.
-/packages/stryker-playwright-runner/test/**/public/*.js
+/packages/lz-stryker-playwright-runner/test/**/public/*.js

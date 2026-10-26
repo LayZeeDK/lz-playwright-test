@@ -121,9 +121,9 @@ writeFileSync(
   `import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 
 export default {
-  plugins: ['@layzee/stryker-playwright-runner'],
-  testRunner: 'playwright',
-  playwright: { configFile: 'apps/conduit-e2e/playwright.config.ts' },
+  plugins: ['@layzee/lz-stryker-playwright-runner'],
+  testRunner: 'lz-stryker-playwright',
+  lzStrykerPlaywright: { configFile: 'apps/conduit-e2e/playwright.config.ts' },
   mutate: ['libs/auth/data-access/src/auth.store.ts'],
   ignorers: ['angular'],
   coverageAnalysis: 'perTest',

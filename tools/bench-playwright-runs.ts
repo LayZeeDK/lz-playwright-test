@@ -11,7 +11,7 @@ import type {
   CommonModule,
   RunnerModule,
   RunTestsParams,
-} from '../packages/stryker-playwright-runner/src/playwright-internals.ts';
+} from '../packages/lz-stryker-playwright-runner/src/playwright-internals.ts';
 
 const [configArg, runsArg = '3', ...testIds] = process.argv.slice(2);
 const configFile = path.resolve(configArg);

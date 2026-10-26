@@ -47,7 +47,7 @@ export default [
       '**/vite.config.*.timestamp*',
       '**/test-output',
       // Instrumented bundles that runner.test.ts and ui-mutators.test.ts write before each run.
-      'packages/stryker-playwright-runner/test/**/public/*.js',
+      'packages/lz-stryker-playwright-runner/test/**/public/*.js',
     ],
   },
   {
@@ -128,7 +128,7 @@ export default [
     },
   },
   {
-    files: ['packages/stryker-ui-mutators/package.json'],
+    files: ['packages/lz-stryker-ui-mutators/package.json'],
     rules: {
       // The operators import Babel for types only.
       '@nx/dependency-checks': dependencyChecks([

@@ -1,8 +1,8 @@
 import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 
 export default {
-  plugins: ['@layzee/stryker-playwright-runner'],
-  testRunner: 'playwright',
+  plugins: ['@layzee/lz-stryker-playwright-runner'],
+  testRunner: 'lz-stryker-playwright',
   mutate: ['src/**/*.js'],
   coverageAnalysis: 'perTest',
   timeoutMS: 10_000,

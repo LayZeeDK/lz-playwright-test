@@ -2,13 +2,13 @@ import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 
 export default {
   plugins: [
-    '@layzee/stryker-playwright-runner',
-    '@layzee/stryker-ui-mutators',
+    '@layzee/lz-stryker-playwright-runner',
+    '@layzee/lz-stryker-ui-mutators',
     '@stryker-mutator/typescript-checker',
   ],
-  ignorers: ['ui-mutators'],
-  testRunner: 'playwright',
-  playwright: { configFile: 'playwright.config.ts' },
+  ignorers: ['lz-stryker-ui-mutators'],
+  testRunner: 'lz-stryker-playwright',
+  lzStrykerPlaywright: { configFile: 'playwright.config.ts' },
   checkers: ['typescript'],
   tsconfigFile: 'tsconfig.json',
   mutate: [

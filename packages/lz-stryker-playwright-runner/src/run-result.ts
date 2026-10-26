@@ -1,0 +1,322 @@
+import type { FullResult, TestCase } from '@playwright/test/reporter';
+import type { MutantCoverage } from '@stryker-mutator/api/core';
+import {
+  determineHitLimitReached,
+  type DryRunResult,
+  DryRunStatus,
+  type MutantRunResult,
+  type TestResult,
+  TestStatus,
+  toMutantRunResult,
+} from '@stryker-mutator/api/test-runner';
+
+import type { Snapshot } from './protocol.ts';
+import { type LzStrykerCollectingReporter, errorText } from './reporter.ts';
+import type {
+  DryRunRequest,
+  MutantRunRequest,
+  RunRequest,
+} from './run-request.ts';
+import { timeoutReason } from './timeouts.ts';
+
+export type RunResult =
+  | {
+      status: DryRunStatus.Complete;
+      tests: TestResult[];
+      snapshots: Snapshot[];
+    }
+  | Exclude<DryRunResult, { status: DryRunStatus.Complete }>;
+
+export type RunStatus = FullResult['status'] | 'deadline';
+
+export interface RunOutput {
+  readonly status: RunStatus;
+  readonly reporter: LzStrykerCollectingReporter;
+  readonly snapshots: Snapshot[];
+  readonly hookInstalled: boolean;
+}
+
+export interface CoverageGaps {
+  readonly lostFrames: number;
+  readonly sharedFrames: number;
+}
+
+const OUTCOME: Record<ReturnType<TestCase['outcome']>, TestStatus> = {
+  expected: TestStatus.Success,
+  flaky: TestStatus.Success,
+  unexpected: TestStatus.Failed,
+  skipped: TestStatus.Skipped,
+};
+
+export interface AttemptSummary {
+  /** An attempt ended other than expected, skipped aside: timed out and interrupted count. */
+  readonly anyFailed: boolean;
+  /**
+   * An attempt failed or passed against its expectation. A timed-out, interrupted or skipped attempt
+   * kills no mutant; the test a deadline stop interrupts ends as skipped.
+   */
+  readonly killed: boolean;
+  readonly timedOut: boolean;
+}
+
+export function attemptSummary(testCases: Iterable<TestCase>): AttemptSummary {
+  const attempts = [...testCases].flatMap((test) =>
+    test.results.map(({ status }) => ({
+      status,
+      unexpected: status !== test.expectedStatus,
+    })),
+  );
+
+  return {
+    anyFailed: attempts.some(
+      ({ status, unexpected }) => unexpected && status !== 'skipped',
+    ),
+    killed: attempts.some(
+      ({ status, unexpected }) =>
+        unexpected && (status === 'failed' || status === 'passed'),
+    ),
+    timedOut: attempts.some(({ status }) => status === 'timedOut'),
+  };
+}
+
+export function mayHaveLostItsServer(output: RunOutput): boolean {
+  return (
+    output.status !== 'deadline' &&
+    attemptSummary(output.reporter.testCases.values()).anyFailed
+  );
+}
+
+export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
+  const { status, reporter, snapshots, hookInstalled } = output;
+  const isMutantRun = request.kind === 'mutant';
+  const testCases = [...reporter.testCases.values()];
+  const tests = testCases.map((test) => toTestResult(test, isMutantRun));
+  const { killed, timedOut } = attemptSummary(testCases);
+  const reason = timeoutReason({
+    mutantRun: isMutantRun,
+    killed,
+    testTimedOut: timedOut,
+    stoppedAtDeadline: status === 'deadline',
+  });
+
+  if (status === 'interrupted') {
+    return {
+      status: DryRunStatus.Error,
+      errorMessage: 'The Playwright run was interrupted',
+    };
+  }
+
+  // Before the empty-run rules: a stop during the config load leaves no tests at all.
+  if (status === 'deadline' && reason) {
+    return { status: DryRunStatus.Timeout, reason };
+  }
+
+  const failed = tests.some((test) => test.status === TestStatus.Failed);
+
+  if (reporter.errors.length && !failed) {
+    return {
+      status: DryRunStatus.Error,
+      errorMessage: reporter.errors.join('\n'),
+    };
+  }
+
+  // Playwright catches its own internal errors, prints them, and fails the run without reporting them.
+  if (status === 'failed' && tests.length === 0) {
+    return {
+      status: DryRunStatus.Error,
+      errorMessage:
+        'Playwright failed without running a test; rerun Stryker with --logLevel trace to see its error.',
+    };
+  }
+
+  if (tests.length === 0) {
+    return emptyRunResult(request);
+  }
+
+  if (
+    !hookInstalled &&
+    tests.some((test) => test.status !== TestStatus.Skipped)
+  ) {
+    return {
+      status: DryRunStatus.Error,
+      errorMessage:
+        'Tests ran but the Stryker worker hook did not install in any Playwright worker; this Playwright version may have changed its worker entry point.',
+    };
+  }
+
+  if (reason) {
+    return { status: DryRunStatus.Timeout, reason };
+  }
+
+  return { status: DryRunStatus.Complete, tests, snapshots };
+}
+
+export function missingCoverageError(
+  tests: readonly TestResult[],
+  snapshots: readonly Snapshot[],
+): string | undefined {
+  const ran = tests.some((test) => test.status !== TestStatus.Skipped);
+  const failed = tests.some((test) => test.status === TestStatus.Failed);
+
+  if (!ran || failed || snapshots.some((snapshot) => snapshot.coverage)) {
+    return undefined;
+  }
+
+  if (snapshots.length === 0) {
+    return 'Tests ran, but no instrumented code ran, neither in a page nor in a Playwright worker. The dry run needs at least one test that runs the app code, in a page or by importing it.';
+  }
+
+  const lost = snapshots.filter((snapshot) => snapshot.lost).length;
+
+  if (lost === snapshots.length) {
+    return `No page reported coverage: all ${lost} frame(s) did not answer before their context closed.`;
+  }
+
+  return 'No page loaded instrumented code. Is the webServer serving the Stryker sandbox? A server that was already running (reuseExistingServer) serves the original sources.';
+}
+
+// The output maps have no prototype, so a test id such as __proto__ from a page stays an own key.
+export function mergeCoverage(snapshots: readonly Snapshot[]): MutantCoverage {
+  const merged: MutantCoverage = {
+    static: Object.create(null),
+    perTest: Object.create(null),
+  };
+  const add = (
+    target: Record<string, number>,
+    hits: Record<string, number>,
+  ) => {
+    for (const [mutantId, count] of Object.entries(hits)) {
+      target[mutantId] = (target[mutantId] ?? 0) + count;
+    }
+  };
+
+  for (const { coverage, outlivedItsTest } of snapshots) {
+    if (!coverage) {
+      continue;
+    }
+
+    add(merged.static, coverage.static);
+
+    for (const [testId, hits] of Object.entries(coverage.perTest)) {
+      add(
+        outlivedItsTest
+          ? merged.static
+          : (merged.perTest[testId] ??= Object.create(null)),
+        hits,
+      );
+    }
+  }
+
+  return merged;
+}
+
+export function coverageGaps(snapshots: readonly Snapshot[]): CoverageGaps {
+  return {
+    lostFrames: snapshots.filter((snapshot) => snapshot.lost).length,
+    sharedFrames: snapshots.filter(
+      (snapshot) => snapshot.outlivedItsTest && snapshot.coverage,
+    ).length,
+  };
+}
+
+export function sumHitCounts(snapshots: readonly Snapshot[]): number {
+  return snapshots.reduce((sum, { hitCount }) => sum + hitCount, 0);
+}
+
+export function dryRunResult(
+  output: RunOutput,
+  request: DryRunRequest,
+): { result: DryRunResult; gaps: CoverageGaps | undefined } {
+  const run = toRunResult(output, request);
+
+  if (run.status !== DryRunStatus.Complete) {
+    return { result: run, gaps: undefined };
+  }
+
+  const { status, tests, snapshots } = run;
+  const errorMessage = missingCoverageError(tests, snapshots);
+
+  if (errorMessage) {
+    return {
+      result: { status: DryRunStatus.Error, errorMessage },
+      gaps: undefined,
+    };
+  }
+
+  if (request.coverageAnalysis === 'off') {
+    return { result: { status, tests }, gaps: undefined };
+  }
+
+  return {
+    result: { status, tests, mutantCoverage: mergeCoverage(snapshots) },
+    gaps: coverageGaps(snapshots),
+  };
+}
+
+export function mutantRunResult(
+  output: RunOutput,
+  request: MutantRunRequest,
+): { result: MutantRunResult; hitCount: number } {
+  const hitCount = sumHitCounts(output.snapshots);
+
+  return {
+    result: toMutantRunResult(
+      determineHitLimitReached(hitCount, request.hitLimit) ??
+        toRunResult(output, request),
+    ),
+    hitCount,
+  };
+}
+
+function emptyRunResult(request: RunRequest): RunResult {
+  // Stryker fails an empty dry run itself unless allowEmpty is set.
+  if (request.kind === 'dry') {
+    return { status: DryRunStatus.Complete, tests: [], snapshots: [] };
+  }
+
+  if (request.testFilter?.length) {
+    return {
+      status: DryRunStatus.Error,
+      errorMessage: `None of the ${request.testFilter.length} selected tests ran; their Playwright test ids no longer match.`,
+    };
+  }
+
+  return {
+    status: DryRunStatus.Error,
+    errorMessage: 'Playwright ran no tests.',
+  };
+}
+
+function toTestResult(test: TestCase, isMutantRun: boolean): TestResult {
+  // The root suite's title is the empty first one.
+  const titles = test.titlePath().filter(Boolean);
+  const last = test.results.at(-1);
+  const outcome = test.outcome();
+  // A test that passes only on a retry still failed against the mutant. Retries reach mutant runs
+  // through describe.configure({ retries }), which outranks the retries: 0 that Playwright's
+  // runTests sets.
+  const status =
+    outcome === 'flaky' && isMutantRun ? TestStatus.Failed : OUTCOME[outcome];
+  const base = {
+    id: test.id,
+    name: `[${titles[0]}] › ${titles.slice(1).join(' › ')}`,
+    timeSpentMs: last?.duration ?? 0,
+    fileName: test.location.file,
+    startPosition: {
+      line: test.location.line - 1,
+      column: test.location.column - 1,
+    },
+  };
+
+  if (status !== TestStatus.Failed) {
+    return { ...base, status };
+  }
+
+  return {
+    ...base,
+    status,
+    failureMessage: errorText(
+      test.results.findLast((result) => result.error)?.error,
+    ),
+  };
+}

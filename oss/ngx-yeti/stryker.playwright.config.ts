@@ -1,9 +1,9 @@
 import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 
 export default {
-  plugins: ['@layzee/stryker-playwright-runner'],
-  testRunner: 'playwright',
-  playwright: {
+  plugins: ['@layzee/lz-stryker-playwright-runner'],
+  testRunner: 'lz-stryker-playwright',
+  lzStrykerPlaywright: {
     configFile: 'apps/ngx-yeti-e2e/playwright.config.mts',
     projects: ['chromium'],
     workers: 2,

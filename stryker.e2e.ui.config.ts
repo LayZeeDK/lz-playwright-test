@@ -3,10 +3,15 @@ import base from './stryker.base.ts';
 
 export default {
   ...base,
-  plugins: ['@layzee/stryker-playwright-runner', '@layzee/stryker-ui-mutators'],
-  ignorers: ['ui-mutators'],
-  testRunner: 'playwright',
-  playwright: { configFile: 'apps/demo-app-e2e/playwright.config.mts' },
+  plugins: [
+    '@layzee/lz-stryker-playwright-runner',
+    '@layzee/lz-stryker-ui-mutators',
+  ],
+  ignorers: ['lz-stryker-ui-mutators'],
+  testRunner: 'lz-stryker-playwright',
+  lzStrykerPlaywright: {
+    configFile: 'apps/demo-app-e2e/playwright.config.mts',
+  },
   mutate: [
     'apps/demo-app/src/app/app.tsx',
     'apps/demo-app/src/app/price-tag.tsx',
