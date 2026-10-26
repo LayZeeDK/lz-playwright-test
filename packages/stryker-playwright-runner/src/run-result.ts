@@ -15,6 +15,7 @@ import {
 
 import { parallelModeOf, type TestRunner } from './playwright-internals.ts';
 import type { Snapshot } from './protocol.ts';
+import { timeoutReason } from './timeouts.ts';
 
 type CoverageAnalysis = DryRunOptions['coverageAnalysis'];
 
@@ -231,23 +232,23 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
   }
 
   // An attempt that failed on its own kills the mutant even when another attempt, or another test,
-  // timed out. The dry run reports a timed-out test as the failure it is.
-  const killed = testCases.some((test) =>
-    test.results.some(
-      (result) =>
-        result.status !== test.expectedStatus &&
-        (result.status === 'failed' || result.status === 'passed'),
+  // timed out.
+  const reason = timeoutReason({
+    mutantRun: isMutantRun,
+    killed: testCases.some((test) =>
+      test.results.some(
+        (result) =>
+          result.status !== test.expectedStatus &&
+          (result.status === 'failed' || result.status === 'passed'),
+      ),
     ),
-  );
-  const timedOut = testCases.some((test) =>
-    test.results.some((result) => result.status === 'timedOut'),
-  );
+    testTimedOut: testCases.some((test) =>
+      test.results.some((result) => result.status === 'timedOut'),
+    ),
+  });
 
-  if (isMutantRun && timedOut && !killed) {
-    return {
-      status: DryRunStatus.Timeout,
-      reason: 'A test hit its timeout',
-    };
+  if (reason) {
+    return { status: DryRunStatus.Timeout, reason };
   }
 
   return { status: DryRunStatus.Complete, tests, snapshots };

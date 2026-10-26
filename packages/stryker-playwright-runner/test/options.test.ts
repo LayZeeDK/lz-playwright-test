@@ -6,6 +6,10 @@ import { test } from 'node:test';
 import type { StrykerOptions } from '@stryker-mutator/api/core';
 
 import { OPTION_PROPERTIES, readRunnerOptions } from '../src/options.ts';
+import {
+  MIN_TEST_TIMEOUT_MS,
+  TEST_TIMEOUT_HEADROOM_MS,
+} from '../src/timeouts.ts';
 
 const readmeOptions = readFileSync(
   new URL('../../../README.md', import.meta.url),
@@ -58,4 +62,12 @@ test('the README lists exactly the options the schema has', () => {
   );
 
   assert.deepEqual(listed, Object.keys(OPTION_PROPERTIES));
+});
+
+test('the README states the per-test timeout the runner sets', () => {
+  const [, headroom, floor] =
+    /less (\d+) s but at least (\d+) s/.exec(readmeOptions ?? '') ?? [];
+
+  assert.equal(Number(headroom) * 1000, TEST_TIMEOUT_HEADROOM_MS);
+  assert.equal(Number(floor) * 1000, MIN_TEST_TIMEOUT_MS);
 });

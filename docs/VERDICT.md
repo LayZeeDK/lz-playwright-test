@@ -62,7 +62,7 @@ tests cover all ten. The plugin patches StrykerJS internals, so it supports Stry
   about the first 3 s of the run and does not raise its own timeout, an infinite loop with no hit limit
   ends inside Playwright, and the worker and `webServer` stay up. The 5 s is a 3 s budget for the run
   to start plus 2 s for reading coverage from the hung page, so a test that starts later runs past
-  Stryker's timer (inferred from the constants in `playwright-test-runner.ts`). Stryker's own timer
+  Stryker's timer (inferred from the constants in `timeouts.ts`). Stryker's own timer
   still applies. When it fires, the runner stops the Playwright run, Stryker kills the worker's process
   tree, and a fresh worker starts.
 - Every run turns off the page snapshot that Playwright takes of a failed test for its error prompt

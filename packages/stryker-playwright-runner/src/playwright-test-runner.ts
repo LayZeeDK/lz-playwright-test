@@ -28,7 +28,6 @@ import {
   type TestRunner,
 } from './playwright-internals.ts';
 import {
-  FRAME_READ_TIMEOUT_MS,
   RUN_SETTINGS,
   type RunSettings,
   SNAPSHOT_SUFFIX,
@@ -47,6 +46,12 @@ import {
   toRunResult,
   withSerialGroups,
 } from './run-result.ts';
+import {
+  assertionTimeoutWarning,
+  type ConfigTimeouts,
+  configTimeouts,
+  mutantRunBudget,
+} from './timeouts.ts';
 
 interface ServerCheck {
   name: string;
@@ -58,13 +63,6 @@ const HOOK = new URL(
   `./worker-hook${path.extname(import.meta.filename)}`,
   import.meta.url,
 ).href;
-// Config load and worker start before the first test, measured at about 2.7 s.
-const RUN_START_MS = 3000;
-// Leaves room to end a timed-out test before Stryker's own timer kills the worker: the run's start,
-// the hook's read of the hung page, and the context close (the last few hundred ms).
-const TIMEOUT_HEADROOM_MS = RUN_START_MS + FRAME_READ_TIMEOUT_MS;
-// Below this, real tests cannot finish, so Stryker's own timer ends the run instead.
-const MIN_TEST_TIMEOUT_MS = 2000;
 
 /**
  * Hosts Playwright Test in-process through its undocumented TestRunner, which
@@ -83,7 +81,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   private runsDir?: string;
   private servers: ServerCheck[] = [];
   private serialGroups = new Map<string, string[]>();
-  private configTestTimeout = Infinity;
+  private timeouts?: ConfigTimeouts;
   private runCounter = 0;
 
   constructor(options: StrykerOptions, log: Logger) {
@@ -120,13 +118,16 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     this.servers = config.webServers.flatMap((server) =>
       serverCheck(server, pw.isURLAvailable),
     );
-    this.warnAboutAssertionTimeouts(config, options.strykerTimeoutMS);
-    // Every project, setup dependencies included: the one timeout override applies to all that run.
-    const timeouts = config.projects.map(({ project }) => project.timeout);
-    this.configTestTimeout =
-      timeouts.length === 0 || timeouts.includes(0)
-        ? Infinity
-        : Math.max(...timeouts);
+    this.timeouts = configTimeouts(config.projects);
+    const warning = assertionTimeoutWarning(
+      this.timeouts,
+      options.strykerTimeoutMS,
+    );
+
+    if (warning) {
+      this.log.warn(warning);
+    }
+
     await this.runGlobalSetup(this.playwright);
     // Every Stryker test runner process needs the groups, and only one of them runs the dry run. Listed
     // after global setup, like Playwright's own CLI, because test files may read what it creates.
@@ -134,23 +135,6 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
       this.playwright,
       projectsThatRun(options.projects, config.projects),
     );
-  }
-
-  private warnAboutAssertionTimeouts(
-    config: Awaited<ReturnType<TestRunner['loadConfig']>>,
-    timeoutMS: number,
-  ) {
-    // A killed test fails only after its auto-waiting assertion gives up, but Stryker sizes its timeout
-    // from passing tests, so a short timeoutMS turns kills into timeouts.
-    const expectTimeout = Math.max(
-      ...config.projects.map((project) => project.expect?.timeout ?? 5000),
-    );
-
-    if (timeoutMS < expectTimeout * 2) {
-      this.log.warn(
-        `timeoutMS (${timeoutMS}) is below twice the Playwright expect timeout (${expectTimeout}); killed mutants may be reported as timeouts. Set timeoutMS to at least ${expectTimeout * 2}.`,
-      );
-    }
   }
 
   async dispose(): Promise<void> {
@@ -219,16 +203,12 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     disableBail,
     timeout,
   }: MutantRunOptions): Promise<MutantRunResult> {
-    const testTimeout = Math.max(
-      timeout - TIMEOUT_HEADROOM_MS,
-      MIN_TEST_TIMEOUT_MS,
-    );
     const run = await this.run({
       activeMutant: activeMutant.id,
       testFilter: withSerialGroups(testFilter, this.serialGroups),
       hitLimit,
       disableBail,
-      testTimeout: Math.min(testTimeout, this.configTestTimeout),
+      testTimeout: mutantRunBudget(timeout, this.timeouts!).testTimeout,
     });
     const hitCount =
       run.status === DryRunStatus.Complete
