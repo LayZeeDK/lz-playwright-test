@@ -8,7 +8,37 @@ nothing in this file has been filed.
 Status: open ledger, nothing filed (started 2026-10-26). The `lz-tdd` plugin (0.0.3; skills `lz-red`, `lz-tpp`,
 `lz-refactor`) runs here for the first time outside its evals, in the production hardening of both packages. Each
 entry gets the skill and version, what it was asked, what it did, what was expected, and the transcript or file
-that shows it. No entries yet.
+that shows it. No defects so far; four gaps, all about agentic use.
+
+**1. `lz-red` gives no guidance for tests driven by mutation testing.** The ui-mutators worker asked `lz-red` to
+drive tests that kill surviving mutants. Step 5 of its procedure calls a test that passes on its first run while it
+drives new behaviour a false green, and exempts only characterization tests. A test written to kill a mutant passes
+on the original code by design; its red is the mutant. Expected: a case for "the red is the mutant", for example
+"apply the mutant, see the test fail, revert". Evidence: `lz-red` SKILL.md step 5, which never names mutation
+testing; the worker's red for each such test was the next Stryker run's `killedBy`.
+
+**2. `lz-red` and `lz-tpp` assume one red test at a time.** The runner worker had a test list fixed up front by an
+agreed design (7 to 13 tests per contract) and wrote it in one go, then showed the tests red together. `lz-red`
+coaches one test per step (Law 2, "one small step"), and `lz-tpp` step 1 requires "exactly one new failing (red)
+test", so it gives no order across several red tests. Expected: a batch mode for a test list a design fixes, or an
+explicit note that batching is a reasoned deviation. Evidence: `lz-red` SKILL.md step 2 and its Three Laws leaf;
+`lz-tpp` SKILL.md "Coach decision procedure" step 1.
+
+**3. `lz-tpp` step 7 conflicts with an implementation brief.** Step 7 says "never edit the developer's code or run
+the tests unless explicitly asked". An agent whose brief tells it to implement was not "asked" in the invocation
+arguments, so by the skill's own rule it should only coach. Expected: a note that an explicit implementation brief
+counts as being asked. Evidence: `lz-tpp` SKILL.md "Coach decision procedure" step 7.
+
+**4. The catalogues are about production code.** `lz-refactor` handled moving top-level test setup into `before`
+hooks without wrong advice, but has no entry for test fixture setup or for "fails at load versus fails in a
+test", which was the point of that change. On a plain Extract Class, its APPLY/DECLINE count (defined for
+patterns) had to be improvised. `lz-red`'s mechanics reference is Vitest-only
+(`references/vitest-typescript-mechanics.md`), and this repository uses `node:test`; its "match the house idiom"
+step covered the difference.
+
+What worked: `lz-refactor`'s step-1 classification caught a behaviour change inside a refactor commit; `lz-red`'s
+"a not-implemented stub is a valid red, an import failure is not" rule made 13 new tests red without a load
+failure; its "assert observable behaviour" step fit the cases-table test style.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
