@@ -1012,4 +1012,12 @@ export const cases: readonly Case[] = [
     jsx: '<form onSubmit={save}></form>',
     expect: [['EventHandler', 'onSubmit={undefined}']],
   },
+  {
+    id: 'design-13',
+    title: 'a let handler referenced once keeps its handler mutant, as only a const or a declaration is skipped',
+    origin: 'design:Operators in the first release, EventHandler',
+    setup: 'let save = () => {};',
+    jsx: '<form onSubmit={save}></form>',
+    expect: [['EventHandler', 'onSubmit={undefined}']],
+  },
 ];

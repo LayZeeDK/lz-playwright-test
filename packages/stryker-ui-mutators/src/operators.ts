@@ -268,8 +268,8 @@ function isRenderedValue(node: types.Node, t: BabelTypes): boolean {
 }
 
 /**
- * The handler is an Identifier bound in this file to a function declaration, or to a declarator whose initializer is
- * a function or an arrow, and this attribute is its only reference: built-in BlockStatement already empties it.
+ * The handler is an Identifier bound in this file to a function declaration, or to a `const` whose initializer is a
+ * function or an arrow, and this attribute is its only reference: built-in BlockStatement already empties it.
  */
 function isOnlyReferenceOfLocalFunction(site: AttributeSite): boolean {
   if (site.value.kind !== 'expression' || site.value.expression.type !== 'Identifier') {
@@ -286,7 +286,8 @@ function isOnlyReferenceOfLocalFunction(site: AttributeSite): boolean {
 
   return (
     declaration.isFunctionDeclaration() ||
-    (declaration.isVariableDeclarator() &&
+    (binding.kind === 'const' &&
+      declaration.isVariableDeclarator() &&
       (declaration.node.init?.type === 'ArrowFunctionExpression' || declaration.node.init?.type === 'FunctionExpression'))
   );
 }
