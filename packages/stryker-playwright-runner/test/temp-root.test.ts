@@ -38,6 +38,31 @@ test('names of the old scheme and other folders give no pid', () => {
   assert.equal(rootPid('stryker-playwright-x12-a1B2c3'), undefined);
   assert.equal(rootPid('stryker-playwright-'), undefined);
   assert.equal(rootPid('other-4242-a1B2c3'), undefined);
+  // As long as the prefix, so only the prefix check keeps it out.
+  assert.equal(rootPid('not-a-stryker-root-42-a1B2c3'), undefined);
+});
+
+test('a name gives a pid only in the shape mkdtemp makes, six letters or digits after the pid', () => {
+  assert.equal(rootPid('stryker-playwright-42-AZaz09'), 42);
+  assert.equal(rootPid('stryker-playwright-2024-reports'), undefined);
+  assert.equal(rootPid('stryker-playwright-1-a1B2c'), undefined);
+  assert.equal(rootPid('stryker-playwright-1-a1B_c3'), undefined);
+  assert.equal(rootPid('stryker-playwright-1-a1B2c3-old'), undefined);
+});
+
+test('a pid too large to be a safe integer is no pid', () => {
+  assert.equal(
+    rootPid('stryker-playwright-9007199254740991-a1B2c3'),
+    2 ** 53 - 1,
+  );
+  assert.equal(
+    rootPid('stryker-playwright-9007199254740992-a1B2c3'),
+    undefined,
+  );
+  assert.equal(
+    rootPid('stryker-playwright-12345678901234567890-a1B2c3'),
+    undefined,
+  );
 });
 
 test('a process that answers signal 0 runs', () => {
@@ -97,10 +122,10 @@ function tmpWith(names: string[]) {
 
 test('only the roots of dead runners of this user are removed, and named', () => {
   const { tmp, removed, cleanup } = tmpWith([
-    'stryker-playwright-100-dead',
-    'stryker-playwright-200-live',
-    'stryker-playwright-300-own',
-    'stryker-playwright-400-other',
+    'stryker-playwright-100-dead00',
+    'stryker-playwright-200-live00',
+    'stryker-playwright-300-own000',
+    'stryker-playwright-400-other0',
     'stryker-pw-0-old',
     'unrelated-100-x',
   ]);
@@ -113,8 +138,8 @@ test('only the roots of dead runners of this user are removed, and named', () =>
       ownPid: 300,
     });
 
-    assert.deepEqual(result, ['stryker-playwright-100-dead']);
-    assert.deepEqual(removed, ['stryker-playwright-100-dead']);
+    assert.deepEqual(result, ['stryker-playwright-100-dead00']);
+    assert.deepEqual(removed, ['stryker-playwright-100-dead00']);
   } finally {
     cleanup();
   }
@@ -122,8 +147,8 @@ test('only the roots of dead runners of this user are removed, and named', () =>
 
 test('a root that cannot be removed now is skipped without an error', () => {
   const { tmp, cleanup } = tmpWith([
-    'stryker-playwright-100-a',
-    'stryker-playwright-101-b',
+    'stryker-playwright-100-aaaaaa',
+    'stryker-playwright-101-bbbbbb',
   ]);
 
   try {
@@ -131,14 +156,14 @@ test('a root that cannot be removed now is skipped without an error', () => {
       running: () => false,
       owned: () => true,
       remove: (dir) => {
-        if (dir.endsWith('-a')) {
+        if (dir.endsWith('-aaaaaa')) {
           throw new Error('EBUSY');
         }
       },
       ownPid: 1,
     });
 
-    assert.deepEqual(result, ['stryker-playwright-101-b']);
+    assert.deepEqual(result, ['stryker-playwright-101-bbbbbb']);
   } finally {
     cleanup();
   }

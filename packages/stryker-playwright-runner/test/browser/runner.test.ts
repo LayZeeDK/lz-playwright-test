@@ -45,7 +45,7 @@ function serialGroupsOfSession(): SerialGroups {
 
 // A pid that ran and exited, so no process owns it now.
 const deadPid = spawnSync(process.execPath, ['-e', '']).pid;
-const deadRoot = path.join(tmpdir(), `stryker-playwright-${deadPid}-left`);
+const deadRoot = path.join(tmpdir(), `stryker-playwright-${deadPid}-left00`);
 const oldSchemeRoot = path.join(tmpdir(), 'stryker-pw-0-runner-test');
 
 const fixture = (file: string) =>

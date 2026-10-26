@@ -16,12 +16,13 @@ export interface TempRoot {
 
 export const ROOT_PREFIX = 'stryker-playwright-';
 
+// mkdtemp appends six letters or digits.
 export function rootPid(name: string): number | undefined {
   const pid = name.startsWith(ROOT_PREFIX)
-    ? /^(\d+)-/.exec(name.slice(ROOT_PREFIX.length))?.[1]
+    ? Number(/^(\d+)-[A-Za-z0-9]{6}$/.exec(name.slice(ROOT_PREFIX.length))?.[1])
     : undefined;
 
-  return pid === undefined ? undefined : Number(pid);
+  return Number.isSafeInteger(pid) ? pid : undefined;
 }
 
 /** EPERM means the process exists but belongs to someone else, so it counts as running. */
