@@ -4,7 +4,6 @@ import { FRAME_READ_TIMEOUT_MS } from './protocol.ts';
 export const RUN_START_MS = 3000;
 // A deadline stop measured 2078-2096 ms in 8 of 9 runs: the hung frame's read plus context close and worker exit.
 export const STOP_HEADROOM_MS = FRAME_READ_TIMEOUT_MS + 600;
-export const TEST_TIMEOUT_HEADROOM_MS = RUN_START_MS + STOP_HEADROOM_MS;
 export const MIN_TEST_TIMEOUT_MS = 2000;
 export const STOP_RETRY_MS = 100;
 // Playwright's default expect.timeout.
@@ -63,14 +62,14 @@ export function mutantRunBudget(
   config: ConfigTimeouts,
 ): RunBudget {
   const deadlineMs = strykerTimeout - STOP_HEADROOM_MS;
+  const testRoomMs = deadlineMs - RUN_START_MS;
 
   return {
     testTimeout: Math.min(
-      Math.max(strykerTimeout - TEST_TIMEOUT_HEADROOM_MS, MIN_TEST_TIMEOUT_MS),
+      Math.max(testRoomMs, MIN_TEST_TIMEOUT_MS),
       config.testTimeoutCap,
     ),
-    deadlineMs:
-      deadlineMs < RUN_START_MS + MIN_TEST_TIMEOUT_MS ? undefined : deadlineMs,
+    deadlineMs: testRoomMs < MIN_TEST_TIMEOUT_MS ? undefined : deadlineMs,
   };
 }
 

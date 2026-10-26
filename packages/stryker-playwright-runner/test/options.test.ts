@@ -12,8 +12,8 @@ import {
 } from '../src/options.ts';
 import {
   MIN_TEST_TIMEOUT_MS,
+  RUN_START_MS,
   STOP_HEADROOM_MS,
-  TEST_TIMEOUT_HEADROOM_MS,
 } from '../src/timeouts.ts';
 import { strykerOptions } from './support/doubles.ts';
 
@@ -145,7 +145,7 @@ test('the README states the per-test timeout the runner sets', () => {
   const [, headroom, floor] =
     /less ([\d.]+) s but at least ([\d.]+) s/.exec(readmeOptions ?? '') ?? [];
 
-  assert.equal(Number(headroom) * 1000, TEST_TIMEOUT_HEADROOM_MS);
+  assert.equal(Number(headroom) * 1000, RUN_START_MS + STOP_HEADROOM_MS);
   assert.equal(Number(floor) * 1000, MIN_TEST_TIMEOUT_MS);
 });
 
