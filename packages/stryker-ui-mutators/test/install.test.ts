@@ -436,9 +436,13 @@ describe('resolveFromCore against a fake instrumenter', () => {
 
   /**
    * A core, an instrumenter whose `Instrumenter.instrument` returns the logger and options it got, and a Babel core,
-   * as node_modules under a fresh directory. Returns core's package.json and the instrumenter's dir.
+   * as node_modules under a fresh directory; `replace` swaps the content of any of those files. Returns core's
+   * package.json and the instrumenter's dir.
    */
-  function fakeCore(placers: readonly string[]) {
+  function fakeCore(
+    placers: readonly string[],
+    replace: Readonly<Record<string, string>> = {},
+  ) {
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'ui-mutators-core-')));
     roots.push(root);
     const modules = join(root, 'node_modules');
@@ -460,7 +464,9 @@ describe('resolveFromCore against a fake instrumenter', () => {
         '}',
       '@babel/core/package.json':
         '{ "name": "@babel/core", "type": "module", "main": "index.js" }',
-      '@babel/core/index.js': "export const types = { fake: 'babel types' };",
+      '@babel/core/index.js':
+        "export const types = { fake: 'babel types', isJSXText: () => true };",
+      ...replace,
     };
 
     for (const [name, content] of Object.entries(files)) {
@@ -475,13 +481,47 @@ describe('resolveFromCore against a fake instrumenter', () => {
     };
   }
 
-  it('throws, naming the dir, when the instrumenter has no expressionMutantPlacer', async () => {
+  it('throws, naming the version and dir, when the instrumenter has no expressionMutantPlacer', async () => {
     const { corePackage, dir } = fakeCore(['otherPlacer']);
 
     await assert.rejects(resolveFromCore(corePackage), {
-      message: `stryker-ui-mutators: the instrumenter in ${dir} has no expressionMutantPlacer.`,
+      message: `stryker-ui-mutators: the instrumenter 9.9.8 in ${dir} has no expressionMutantPlacer.`,
     });
   });
+
+  for (const [missing, file, content] of [
+    [
+      'allMutators',
+      '@stryker-mutator/instrumenter/dist/src/mutators/mutate.js',
+      'export const allMutators = {};',
+    ],
+    [
+      'allMutantPlacers',
+      '@stryker-mutator/instrumenter/dist/src/mutant-placers/index.js',
+      'export const placers = [];',
+    ],
+    [
+      'Instrumenter',
+      '@stryker-mutator/instrumenter/dist/src/index.js',
+      'export const Instrumenter = {};',
+    ],
+    [
+      'Babel types',
+      '@babel/core/index.js',
+      "export const types = { fake: 'babel types' };",
+    ],
+    ['Babel types', '@babel/core/index.js', 'export const other = {};'],
+  ] as const) {
+    it(`throws, naming the version and dir, when the instrumenter has no ${missing} (${content})`, async () => {
+      const { corePackage, dir } = fakeCore(['expressionMutantPlacer'], {
+        [file]: content,
+      });
+
+      await assert.rejects(resolveFromCore(corePackage), {
+        message: `stryker-ui-mutators: the instrumenter 9.9.8 in ${dir} has no ${missing}.`,
+      });
+    });
+  }
 
   it("takes the placer named expressionMutantPlacer, the instrumenter's version and its Babel's types", async () => {
     const { corePackage, dir } = fakeCore([
@@ -495,13 +535,13 @@ describe('resolveFromCore against a fake instrumenter', () => {
       {
         dir: instrumenter.dir,
         version: instrumenter.version,
-        types: instrumenter.types,
+        types: Object.keys(instrumenter.types),
         placer: instrumenter.expressionPlacer,
       },
       {
         dir,
         version: '9.9.8',
-        types: { fake: 'babel types' },
+        types: ['fake', 'isJSXText'],
         placer: { name: 'expressionMutantPlacer' },
       },
     );

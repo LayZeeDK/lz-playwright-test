@@ -180,19 +180,6 @@ export function corePackageJson(
     : resolveHere('@stryker-mutator/core/package.json');
 }
 
-interface InstrumenterModule {
-  Instrumenter: new (logger: typeof SILENT) => {
-    instrument(
-      files: readonly (SourceFile & { mutate: true })[],
-      options: {
-        plugins: null;
-        excludedMutations: readonly string[];
-        ignorers: readonly string[];
-      },
-    ): Promise<{ files: readonly SourceFile[]; mutants: readonly Mutant[] }>;
-  };
-}
-
 export async function resolveFromCore(
   corePackage: string = corePackageJson(),
 ): Promise<Instrumenter> {
@@ -201,30 +188,47 @@ export async function resolveFromCore(
     '@stryker-mutator/instrumenter/package.json',
   );
   const dir = dirname(packageJson);
-  const [{ allMutators }, { allMutantPlacers }, { Instrumenter }, { types }]: [
-    { allMutators: NodeMutatorLike[] },
-    { allMutantPlacers: readonly MutantPlacerLike[] },
-    InstrumenterModule,
-    { types: BabelTypes },
-  ] = await Promise.all([
-    importFile(join(dir, 'dist', 'src', 'mutators', 'mutate.js')),
-    importFile(join(dir, 'dist', 'src', 'mutant-placers', 'index.js')),
-    importFile(join(dir, 'dist', 'src', 'index.js')),
-    importFile(createRequire(packageJson).resolve('@babel/core')),
-  ]);
+  const version = String(fromCore(packageJson).version);
+  // `import()` types each namespace as `any`; these checks are what this module relies on in each one.
+  const [{ allMutators }, { allMutantPlacers }, { Instrumenter }, { types }] =
+    await Promise.all([
+      importFile(join(dir, 'dist', 'src', 'mutators', 'mutate.js')),
+      importFile(join(dir, 'dist', 'src', 'mutant-placers', 'index.js')),
+      importFile(join(dir, 'dist', 'src', 'index.js')),
+      importFile(createRequire(packageJson).resolve('@babel/core')),
+    ]);
+  const missing = (name: string): Error =>
+    new Error(
+      `stryker-ui-mutators: the instrumenter ${version} in ${dir} has no ${name}.`,
+    );
+
+  if (!Array.isArray(allMutators)) {
+    throw missing('allMutators');
+  }
+
+  if (!Array.isArray(allMutantPlacers)) {
+    throw missing('allMutantPlacers');
+  }
+
+  if (typeof Instrumenter !== 'function') {
+    throw missing('Instrumenter');
+  }
+
+  if (typeof types?.isJSXText !== 'function') {
+    throw missing('Babel types');
+  }
+
   const expressionPlacer = allMutantPlacers.find(
     ({ name }) => name === 'expressionMutantPlacer',
   );
 
   if (expressionPlacer === undefined) {
-    throw new Error(
-      `stryker-ui-mutators: the instrumenter in ${dir} has no expressionMutantPlacer.`,
-    );
+    throw missing('expressionMutantPlacer');
   }
 
   return {
     dir,
-    version: String(fromCore(packageJson).version),
+    version,
     types,
     allMutators,
     expressionPlacer,
