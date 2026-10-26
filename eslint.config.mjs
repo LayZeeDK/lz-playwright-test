@@ -23,6 +23,19 @@ const playwrightRecommendedAsErrors = Object.fromEntries(
   ]),
 );
 
+function dependencyChecks(ignoredDependencies) {
+  return [
+    'error',
+    {
+      ignoredDependencies,
+      ignoredFiles: [
+        '{projectRoot}/test/**',
+        '{projectRoot}/eslint.config.{js,cjs,mjs,ts,cts,mts}',
+      ],
+    },
+  ];
+}
+
 export default [
   ...nx.configs['flat/base'],
   ...nx.configs['flat/typescript'],
@@ -110,17 +123,18 @@ export default [
     files: ['packages/*/package.json'],
     languageOptions: { parser: jsoncParser },
     rules: {
-      '@nx/dependency-checks': [
-        'error',
-        {
-          // Core is the plugin host, resolved at run time rather than imported; Babel is imported for types only.
-          ignoredDependencies: ['@stryker-mutator/core', '@babel/core'],
-          ignoredFiles: [
-            '{projectRoot}/test/**',
-            '{projectRoot}/eslint.config.{js,cjs,mjs,ts,cts,mts}',
-          ],
-        },
-      ],
+      // Core is the plugin host, resolved at run time rather than imported.
+      '@nx/dependency-checks': dependencyChecks(['@stryker-mutator/core']),
+    },
+  },
+  {
+    files: ['packages/stryker-ui-mutators/package.json'],
+    rules: {
+      // The operators import Babel for types only.
+      '@nx/dependency-checks': dependencyChecks([
+        '@stryker-mutator/core',
+        '@babel/core',
+      ]),
     },
   },
 ];
