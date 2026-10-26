@@ -1212,6 +1212,88 @@ export const cases: readonly Case[] = [
     expect: [['ConditionalElement', '<p />']],
   },
   {
+    id: 'design-35',
+    title:
+      'a label other than htmlFor, and htmlFor on an element other than label, are emptied though a control is inside',
+    origin: 'design:Operators in the first release, LabelAttribute',
+    jsx: '<div><div aria-label="Search"><input /></div><output htmlFor="a"><input /></output></div>',
+    expect: [
+      ['LabelAttribute', 'aria-label=""'],
+      ['LabelAttribute', 'htmlFor=""'],
+    ],
+  },
+  {
+    id: 'design-36',
+    title:
+      'an attribute with on inside its name, not at its start, is no handler',
+    origin: 'design:Operators in the first release, EventHandler',
+    jsx: '<Card buttonColor={color} />',
+    expect: [],
+  },
+  {
+    id: 'design-37',
+    title: 'an || fallback is not a guard',
+    origin: 'design:Operators in the first release, ConditionalElement',
+    jsx: '<div>{fallback || <p />}</div>',
+    expect: [],
+  },
+  {
+    id: 'design-38',
+    title: 'a ternary with one JSX branch switches to either branch',
+    origin: 'design:Operators in the first release, ConditionalElement',
+    jsx: "<div>{open ? <p /> : 'none'}</div>",
+    expect: [
+      ['ConditionalElement', '<p />'],
+      ['ConditionalElement', "'none'"],
+    ],
+  },
+  {
+    id: 'design-39',
+    title:
+      'a removed guard holds no built-in mutant of its element in the instrumented file',
+    origin: 'design:Operators in the first release, ConditionalElement',
+    jsx: '<div>{open && <p>{a + b}</p>}</div>',
+    expect: [['ConditionalElement', '<p>{a + b}</p>']],
+    instrumented: '? <p>{a + b}</p> : stryMutAct_9fa48(',
+  },
+  {
+    id: 'design-40',
+    title:
+      'a ternary switched to its consequent holds no built-in mutant of it in the instrumented file',
+    origin: 'design:Operators in the first release, ConditionalElement',
+    jsx: '<div>{open ? <i>{c + d}</i> : <b />}</div>',
+    expect: [
+      ['ConditionalElement', '<i>{c + d}</i>'],
+      ['ConditionalElement', '<b />'],
+    ],
+    instrumented: '? <i>{c + d}</i> : (stryCov_9fa48(',
+  },
+  {
+    id: 'design-41',
+    title:
+      'a ternary switched to its alternate holds no built-in mutant of it in the instrumented file',
+    origin: 'design:Operators in the first release, ConditionalElement',
+    jsx: '<div>{open ? <i /> : <b>{e + f}</b>}</div>',
+    expect: [
+      ['ConditionalElement', '<i />'],
+      ['ConditionalElement', '<b>{e + f}</b>'],
+    ],
+    instrumented: '? <b>{e + f}</b> : stryMutAct_9fa48(',
+  },
+  {
+    id: 'design-42',
+    title:
+      'action, readOnly and an aria-hidden expression are mutated; aria-hidden on a member-named element is not skipped',
+    origin: 'design:Operators in the first release',
+    jsx: '<form action="/save"><input readOnly /><div aria-hidden={hide} /><UI.Icon aria-hidden="true" /></form>',
+    expect: [
+      ['UrlAttribute', 'action=""'],
+      ['DisabledAttribute', 'readOnly={undefined}'],
+      ['HiddenAttribute', 'aria-hidden={false}'],
+      ['HiddenAttribute', 'aria-hidden={undefined}'],
+    ],
+  },
+  {
     id: 'design-26',
     title:
       'a guard or a ternary whose branches are not JSX gives no ConditionalElement mutant',
