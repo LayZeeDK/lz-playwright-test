@@ -262,7 +262,10 @@ function nodeTestId(test: Test): string | undefined {
     : undefined;
 }
 
-/** The test a context opened or closed now belongs to: a test's own fixtures open its context. */
+/**
+ * The test a context opened or closed now belongs to: none in a beforeAll or afterAll hook. A fixture's
+ * context, a worker fixture's too, gets the current test until it outlives that test.
+ */
 function contextTestId(test: Test): string | undefined {
   const info = testInfoOf(test);
   const type = info && runningSlotOf(info, info.config.version)?.type;
