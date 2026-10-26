@@ -9,7 +9,7 @@ import type {
   TestCase,
   TestResult,
 } from '@playwright/test/reporter';
-import type { StrykerOptions } from '@stryker-mutator/api/core';
+import type { MutantCoverage, StrykerOptions } from '@stryker-mutator/api/core';
 import type { Logger } from '@stryker-mutator/api/logging';
 import { DryRunStatus, TestStatus } from '@stryker-mutator/api/test-runner';
 
@@ -437,6 +437,70 @@ test('coverage merging drops counts that are not hit counts and sums the rest', 
 
   assert.deepEqual({ ...coverage.static }, { '1': 3 });
   assert.deepEqual({ ...coverage.perTest['a'] }, { '1': 2 });
+});
+
+// mergeCoverage builds null-prototype maps, which deepEqual tells apart from object literals.
+function plain(coverage: MutantCoverage): MutantCoverage {
+  return JSON.parse(JSON.stringify(coverage)) as MutantCoverage;
+}
+
+test('a page frame puts its per-test coverage under its test and its static coverage in static', () => {
+  const coverage = mergeCoverage([
+    {
+      outlivedItsTest: false,
+      mutantCoverage: { static: { '3': 1 }, perTest: { a: { '1': 2 } } },
+    },
+  ]);
+
+  assert.deepEqual(plain(coverage), {
+    static: { '3': 1 },
+    perTest: { a: { '1': 2 } },
+  });
+});
+
+test('a frame of a shared context puts all its coverage in static', () => {
+  const coverage = mergeCoverage([
+    {
+      outlivedItsTest: true,
+      mutantCoverage: { static: { '3': 1 }, perTest: { b: { '2': 1 } } },
+    },
+  ]);
+
+  assert.deepEqual(plain(coverage), {
+    static: { '2': 1, '3': 1 },
+    perTest: {},
+  });
+});
+
+test('two frames of one test sum their counts', () => {
+  const frame = {
+    outlivedItsTest: false,
+    mutantCoverage: { static: {}, perTest: { a: { '1': 1, '2': 1 } } },
+  };
+  const other = {
+    outlivedItsTest: false,
+    mutantCoverage: { static: {}, perTest: { a: { '1': 2 } } },
+  };
+
+  assert.deepEqual(plain(mergeCoverage([frame, other])), {
+    static: {},
+    perTest: { a: { '1': 3, '2': 1 } },
+  });
+});
+
+test('a worker line with coverage and no flags merges like a page frame', () => {
+  const page = {
+    outlivedItsTest: false,
+    mutantCoverage: { static: {}, perTest: { a: { '1': 1 } } },
+  };
+  const worker = {
+    mutantCoverage: { static: { '4': 5 }, perTest: { a: { '1': 2 } } },
+  };
+
+  assert.deepEqual(plain(mergeCoverage([page, worker])), {
+    static: { '4': 5 },
+    perTest: { a: { '1': 3 } },
+  });
 });
 
 test('coverage from a context that outlived its test counts as static', () => {

@@ -65,6 +65,33 @@ function testId(title: string): string {
   return found.id;
 }
 
+// The ids of the fixture's mutants that a page load reaches when a test also calls `called`: the code
+// outside the app's functions, plus the bodies of the called functions. Lines are 0-based, as in
+// Stryker's mutant locations.
+function mutantsReached(called: string[]): string[] {
+  const source = readFileSync(fixture('src/app.js'), 'utf8').split('\n');
+  const lines = (name: string) => {
+    const first = source.findIndex((line) =>
+      line.startsWith(`export function ${name}(`),
+    );
+
+    return { first, last: source.indexOf('}', first) };
+  };
+  const all = ['add', 'countTo', 'double', 'half'].map(lines);
+  const reached = called.map(lines);
+  const within = (line: number) => (range: { first: number; last: number }) =>
+    line >= range.first && line <= range.last;
+
+  return mutants
+    .filter(({ location }) => {
+      const line = location.start.line;
+
+      return !all.some(within(line)) || reached.some(within(line));
+    })
+    .map(({ id }) => id)
+    .sort();
+}
+
 function listening(port: number): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = connect({ host: 'localhost', port });
@@ -182,6 +209,19 @@ test('per-test coverage separates tests that reach different code', () => {
     'the greeting test never calls countTo',
   );
   assert.ok(counting[loopMutant], 'the counting test covers the loop');
+});
+
+test('per-test coverage holds exactly the mutants each test reaches, with their hit counts', () => {
+  const { perTest } = dryRun.mutantCoverage!;
+  const greeting = perTest[testId('shows the greeting')];
+  const counting = perTest[testId('counts to three')];
+
+  assert.deepEqual(Object.keys(greeting).sort(), mutantsReached(['add']));
+  assert.deepEqual(
+    Object.keys(counting).sort(),
+    mutantsReached(['add', 'countTo']),
+  );
+  assert.equal(counting[mutant('UpdateOperator', 'i--').id], 3);
 });
 
 test('a page shared from beforeAll reports its coverage as static', () => {
