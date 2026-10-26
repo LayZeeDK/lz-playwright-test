@@ -69,33 +69,20 @@ export interface RunPlan {
 }
 
 export function runPlan(request: RunRequest, outDir: string): RunPlan {
-  const { settings, activeMutant, testIds } =
-    request.kind === 'dry'
-      ? {
-          settings: {
-            outDir,
-            perTest: request.coverageAnalysis === 'perTest',
-          } satisfies RunSettings,
-          activeMutant: undefined,
-          testIds: undefined,
-        }
-      : {
-          settings: {
-            outDir,
-            perTest: false,
-            hitLimit: request.hitLimit,
-          } satisfies RunSettings,
-          activeMutant: request.activeMutant,
-          testIds: request.testFilter,
-        };
+  const mutant = request.kind === 'mutant' ? request : undefined;
+  const settings: RunSettings = {
+    outDir,
+    perTest: request.kind === 'dry' && request.coverageAnalysis === 'perTest',
+    hitLimit: mutant?.hitLimit,
+  };
 
   return {
     env: {
       [RUN_SETTINGS]: JSON.stringify(settings),
-      [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: activeMutant,
+      [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: mutant?.activeMutant,
     },
     params: {
-      testIds,
+      testIds: mutant?.testFilter,
       maxFailures: request.disableBail ? undefined : 1,
       timeout: request.budget.testTimeout,
     },
