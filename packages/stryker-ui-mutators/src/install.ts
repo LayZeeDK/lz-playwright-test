@@ -99,10 +99,11 @@ function checkNames(
       .filter((mutator) => !(OWN in mutator))
       .map(({ name }) => name.toLowerCase()),
   );
-  const taken = names.filter(
-    (_name, index) =>
-      keys.indexOf(keys[index]!) !== index || others.has(keys[index]!),
-  );
+  const taken = names.filter((name, index) => {
+    const key = name.toLowerCase();
+
+    return keys.indexOf(key) !== index || others.has(key);
+  });
 
   if (taken.length > 0) {
     throw new Error(
