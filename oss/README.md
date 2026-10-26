@@ -11,8 +11,8 @@ Every Stryker config here loads the runner by its package name, `@layzee/stryker
 npm install -D @stryker-mutator/core@^10.1.1 file:<this repo>/packages/stryker-playwright-runner
 ```
 
-The runner needs `@playwright/test` 1.63 or a later 1.x release. If the copy has an older one or none, also install
-`@playwright/test@^1.64.1`. ngx-yeti ran on its own `@playwright/test` 1.63.0.
+The runner needs `@playwright/test` 1.63 or a later 1.x release. If the copy has an older one or none,
+also install `@playwright/test@^1.64.1`. ngx-yeti ran on its own `@playwright/test` 1.63.0.
 
 ## realworld: stefanoslig/angular-ngrx-nx-realworld-example-app at bc7158d
 
@@ -43,8 +43,9 @@ it uses is `oss/realworld-api`. Then run `npx stryker run stryker.playwright.con
 
 1. Install with pnpm, not the npm line above:
    `pnpm add -D @stryker-mutator/core@10.1.1 @playwright/test@^1.64.1`. The copy's own
-   `@playwright/test` is `^1.58.2`, below the runner's 1.63 floor; the copy's `package.json` diff after the run showed both versions. Then link the runner as a
-   junction at `node_modules/@layzee/stryker-playwright-runner`, the name that
+   `@playwright/test` is `^1.58.2`, below the runner's 1.63 floor; the copy's `package.json` diff
+   after the run showed both versions. Then link the runner as a junction at
+   `node_modules/@layzee/stryker-playwright-runner`, the name that
    `analog/stryker.playwright.config.ts` loads.
 2. Apply `analog/copy.patch` and copy `analog/stryker.playwright.config.ts` into the copy. The patch:
    - starts the built SSR server instead of `nx serve-nitro`, whose `PORT=3000 node ...` cannot run

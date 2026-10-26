@@ -193,9 +193,9 @@ repos and the design, each with the exact UI mutants it must give (0 todo); inst
 name refusal, a second install, the self-check, and core resolution; an in-process check that the
 JSX placement leaves the built-in mutants of five files unchanged, with a negative control; and a
 render check that every mutant of the design spike's sample renders like the same edit made by hand.
-`packages/stryker-playwright-runner/test/browser/ui-mutators.test.ts` runs the runner on a page instrumented
-with the UI operators: for each of the ten operators a Playwright test kills one of its mutants, and a
-test that does not observe that mutant lets it survive. `spikes/fail-loud/` runs `stryker run` with
+`packages/stryker-playwright-runner/test/browser/ui-mutators.test.ts` runs the runner on a page
+instrumented with the UI operators: for each of the ten operators a Playwright test kills one of its
+mutants, and a test that does not observe that mutant lets it survive. `spikes/fail-loud/` runs `stryker run` with
 the plugin listed in `plugins` and with the plugin imported from the config. Both report UI mutants,
 and with one operator's sample broken on purpose both exit 1 and name that operator.
 
@@ -448,11 +448,12 @@ npx nx run @layzee/stryker-ui-mutators:test
 npx nx run @layzee/demo-app-e2e:mutate-e2e
 npx nx run @layzee/demo-app-e2e:mutate-e2e-ui
 npx nx run @layzee/demo-app:mutate-ct
+# The command runner baselines load neither package.
+STRYKER_BASELINE=define npx stryker run stryker.e2e.command.config.ts
+STRYKER_BASELINE=off npx stryker run stryker.e2e.command.config.ts
 # The lines below load the packages' dist folders too, so they need the build above.
 npx stryker run stryker.e2e.config.ts --concurrency 2
 npx stryker run stryker.ct.config.ts --concurrency 2
-STRYKER_BASELINE=define npx stryker run stryker.e2e.command.config.ts
-STRYKER_BASELINE=off npx stryker run stryker.e2e.command.config.ts
 npx stryker run stryker.e2e.config.ts --mutate apps/demo-app/src/app/cart.ts:11-17 --timeoutMS 1 --timeoutFactor 0
 node tools/bench-playwright-runs.ts apps/demo-app-e2e/playwright.config.mts 3
 BENCH_SHARED_BROWSER=1 node tools/bench-playwright-runs.ts apps/demo-app-e2e/playwright.config.mts 3

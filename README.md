@@ -10,8 +10,8 @@ The answer to whether this works, the evidence, and the limits are in `docs/VERD
 
 ## Requirements
 
-- Playwright 1.63 or a later 1.x release, tested on 1.63.0 and 1.64.1. The runner calls Playwright internals that a
-  release can change. The Limits section of `docs/VERDICT.md` lists them.
+- Playwright 1.63 or a later 1.x release, tested on 1.63.0 and 1.64.1. The runner calls Playwright
+  internals that a release can change. The Limits section of `docs/VERDICT.md` lists them.
 - StrykerJS 10, tested on 10.1.1.
 - A Node.js version that strips TypeScript types by default, tested on 24.22.0. The package ships its
   TypeScript source, and Node does not strip types under `node_modules`. Reach the runner through a
@@ -27,6 +27,7 @@ The answer to whether this works, the evidence, and the limits are in `docs/VERD
 - `apps/demo-app-e2e`: the demo app's Playwright e2e tests.
 - `stryker.e2e.config.ts`, `stryker.ct.config.ts`: Stryker configs for the demo.
   `stryker.e2e.ui.config.ts` adds the UI mutation operators to the e2e run.
+- `stryker.base.ts`: the settings that all four Stryker configs share.
 - `stryker.e2e.command.config.ts`: the demo baselines on Stryker's `command` runner, selected with
   `STRYKER_BASELINE=define` or `STRYKER_BASELINE=off`.
 - `oss/`: the configs, patches, and scripts that copies of four open-source repos needed for a Stryker
@@ -107,8 +108,8 @@ npx nx run @layzee/stryker-playwright-runner:test
 npx nx run @layzee/stryker-playwright-runner:test-browser
 ```
 
-`test/browser/ui-mutators.test.ts` runs the runner against a page instrumented with the UI operators and checks that a
-Playwright test kills each operator's mutant.
+`test/browser/ui-mutators.test.ts` runs the runner against a page instrumented with the UI operators
+and checks that a Playwright test kills each operator's mutant.
 
 The UI operators' tests need no browser:
 
@@ -117,9 +118,8 @@ npx nx run @layzee/stryker-ui-mutators:test
 ```
 
 To run Stryker on the demo app, use `npx nx run @layzee/demo-app-e2e:mutate-e2e`,
-`npx nx run @layzee/demo-app-e2e:mutate-e2e-ui`, or `npx nx run @layzee/demo-app:mutate-ct`. Each target builds
-both packages first, because Stryker loads them from their `dist` folders. `stryker.e2e.command.config.ts`
-has no target: it loads neither package, so it needs no build, and it runs once per `STRYKER_BASELINE`
-value. The Rerun section of
-`docs/VERDICT.md` lists the commands for the measured rows, and `oss/README.md` gives the steps for the
-open-source copies.
+`npx nx run @layzee/demo-app-e2e:mutate-e2e-ui`, or `npx nx run @layzee/demo-app:mutate-ct`. Each
+target builds both packages first, because Stryker loads them from their `dist` folders.
+`stryker.e2e.command.config.ts` has no target: it loads neither package, so it needs no build, and it
+runs once per `STRYKER_BASELINE` value. The Rerun section of `docs/VERDICT.md` lists the commands for
+the measured rows, and `oss/README.md` gives the steps for the open-source copies.
