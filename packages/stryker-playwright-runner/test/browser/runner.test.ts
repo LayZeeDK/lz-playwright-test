@@ -1,5 +1,5 @@
 // Drives PlaywrightTestRunner directly against a fixture instrumented by Stryker's own instrumenter.
-// Run: node --test packages/stryker-playwright-runner/test/runner.test.ts
+// Run: npx nx run @layzee/stryker-playwright-runner:test-browser
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
@@ -30,8 +30,8 @@ import ts from 'typescript';
 import {
   acceptsConnections,
   PlaywrightTestRunner,
-} from '../src/playwright-test-runner.ts';
-import { STOP_HEADROOM_MS } from '../src/timeouts.ts';
+} from '../../src/playwright-test-runner.ts';
+import { STOP_HEADROOM_MS } from '../../src/timeouts.ts';
 
 // The runner's private state, which one test checks directly.
 function session() {

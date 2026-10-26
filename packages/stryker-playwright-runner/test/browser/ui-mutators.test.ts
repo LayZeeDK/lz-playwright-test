@@ -1,6 +1,6 @@
 // Drives PlaywrightTestRunner against a TSX fixture instrumented with the UI operators of @layzee/stryker-ui-mutators:
 // for each operator, a Playwright test kills its mutant and a test that does not observe it lets it survive.
-// Run: node --test packages/stryker-playwright-runner/test/ui-mutators.test.ts
+// Run: npx nx run @layzee/stryker-playwright-runner:test-browser
 import '@layzee/stryker-ui-mutators';
 
 import assert from 'node:assert/strict';
@@ -24,7 +24,7 @@ import {
 import { Instrumenter } from '@stryker-mutator/instrumenter';
 import ts from 'typescript';
 
-import { PlaywrightTestRunner } from '../src/playwright-test-runner.ts';
+import { PlaywrightTestRunner } from '../../src/playwright-test-runner.ts';
 
 const fixture = (file: string) =>
   fileURLToPath(new URL(`./ui-fixture/${file}`, import.meta.url));

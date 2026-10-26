@@ -96,16 +96,18 @@ the names of those that do not. Exclude an operator by name with `mutator.exclud
 
 ## Type-check and test the runner
 
-Run these from the repo root. The tests start a browser, so install Chromium first.
+Run these from the repo root. The `test` target needs no browser; `test-browser` starts Chromium, so
+install it first.
 
 ```sh
 npm install
 npx playwright install chromium
 npx nx run-many -t typecheck build
 npx nx run @layzee/stryker-playwright-runner:test
+npx nx run @layzee/stryker-playwright-runner:test-browser
 ```
 
-`ui-mutators.test.ts` runs the runner against a page instrumented with the UI operators and checks that a
+`test/browser/ui-mutators.test.ts` runs the runner against a page instrumented with the UI operators and checks that a
 Playwright test kills each operator's mutant.
 
 The UI operators' tests need no browser:

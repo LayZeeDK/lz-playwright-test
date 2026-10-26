@@ -193,13 +193,13 @@ repos and the design, each with the exact UI mutants it must give (0 todo); inst
 name refusal, a second install, the self-check, and core resolution; an in-process check that the
 JSX placement leaves the built-in mutants of five files unchanged, with a negative control; and a
 render check that every mutant of the design spike's sample renders like the same edit made by hand.
-`packages/stryker-playwright-runner/test/ui-mutators.test.ts` runs the runner on a page instrumented
+`packages/stryker-playwright-runner/test/browser/ui-mutators.test.ts` runs the runner on a page instrumented
 with the UI operators: for each of the ten operators a Playwright test kills one of its mutants, and a
 test that does not observe that mutant lets it survive. `spikes/fail-loud/` runs `stryker run` with
 the plugin listed in `plugins` and with the plugin imported from the config. Both report UI mutants,
 and with one operator's sample broken on purpose both exit 1 and name that operator.
 
-`packages/stryker-playwright-runner/test/runner.test.ts` checks the runner against a fixture
+`packages/stryker-playwright-runner/test/browser/runner.test.ts` checks the runner against a fixture
 instrumented by Stryker's own instrumenter. It checks that per-test coverage separates a test that
 reaches a function from one that does not, coverage across a navigation to a page without the app,
 static coverage for a shared `beforeAll` page and for a page the worker closes, per-test coverage for a
@@ -438,6 +438,7 @@ npm install
 npx playwright install chromium
 npx nx run-many -t typecheck build
 npx nx run @layzee/stryker-playwright-runner:test
+npx nx run @layzee/stryker-playwright-runner:test-browser
 npx nx run @layzee/stryker-ui-mutators:test
 npx nx run @layzee/demo-app-e2e:mutate-e2e
 npx nx run @layzee/demo-app-e2e:mutate-e2e-ui
