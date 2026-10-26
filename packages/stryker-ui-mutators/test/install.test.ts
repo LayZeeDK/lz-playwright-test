@@ -1,8 +1,18 @@
 // install() against a fake Instrumenter whose placer records nothing but its methods, corePackageJson with injected
-// realpath and resolve, and resolveFromCore against the installed instrumenter.
+// realpath and resolve, and resolveFromCore against the installed instrumenter and against a fake one on disk.
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
-import { describe, it } from 'node:test';
+import { spawnSync } from 'node:child_process';
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { after, describe, it } from 'node:test';
+import { pathToFileURL } from 'node:url';
 
 import {
   corePackageJson,
@@ -301,14 +311,12 @@ describe('corePackageJson', () => {
     'package.json',
   );
 
-  function coreFor(
-    argv1: string | undefined,
-    real: string | undefined,
-  ): string {
-    return corePackageJson(
+  function coreFor(argv1: string, real: string | undefined): string {
+    const realpaths: string[] = [];
+    const core = corePackageJson(
       argv1,
       (path) => {
-        assert.equal(path, argv1);
+        realpaths.push(path);
 
         if (real === undefined) {
           throw new Error(
@@ -324,6 +332,10 @@ describe('corePackageJson', () => {
         return HERE;
       },
     );
+
+    assert.deepEqual(realpaths, [argv1]);
+
+    return core;
   }
 
   it("takes the core whose bin started the process, through the bin's links", () => {
@@ -353,12 +365,29 @@ describe('corePackageJson', () => {
       ),
     ],
     ['a script path that does not resolve', '/missing', undefined],
-    ['no script', undefined, undefined],
   ] as const) {
     it(`takes the core this module resolves when the process runs ${title}`, () => {
       assert.equal(coreFor(argv1, real), HERE);
     });
   }
+
+  // `undefined` passed in takes the default, process.argv[1], so only a process that runs no script has none.
+  it('takes the core this module resolves, without a realpath, under node --eval', () => {
+    const script =
+      `import { corePackageJson } from ${JSON.stringify(pathToFileURL(join(import.meta.dirname, '..', 'src', 'install.ts')).href)};\n` +
+      'const realpaths = [];\n' +
+      "const core = corePackageJson(undefined, (path) => { realpaths.push(path); return path; }, () => 'here');\n" +
+      'console.log(JSON.stringify({ core, realpaths }));\n';
+
+    const child = spawnSync(
+      process.execPath,
+      ['--input-type=module', '--eval', script],
+      { encoding: 'utf8' },
+    );
+
+    assert.equal(child.status, 0, child.stderr);
+    assert.deepEqual(JSON.parse(child.stdout), { core: 'here', realpaths: [] });
+  });
 });
 
 describe('resolveFromCore', () => {
@@ -392,6 +421,124 @@ describe('resolveFromCore', () => {
     assert.deepEqual(
       [await statuses(), await statuses(['StringLiteral'])],
       [['StringLiteral placed'], ['StringLiteral Ignored']],
+    );
+  });
+});
+
+describe('resolveFromCore against a fake instrumenter', () => {
+  const roots: string[] = [];
+
+  after(() => {
+    for (const root of roots) {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  /**
+   * A core, an instrumenter whose `Instrumenter.instrument` returns the logger and options it got, and a Babel core,
+   * as node_modules under a fresh directory. Returns core's package.json and the instrumenter's dir.
+   */
+  function fakeCore(placers: readonly string[]) {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'ui-mutators-core-')));
+    roots.push(root);
+    const modules = join(root, 'node_modules');
+    const dir = join(modules, '@stryker-mutator', 'instrumenter');
+    const files: Record<string, string> = {
+      '@stryker-mutator/core/package.json':
+        '{ "name": "@stryker-mutator/core", "version": "9.9.9" }',
+      '@stryker-mutator/instrumenter/package.json':
+        '{ "name": "@stryker-mutator/instrumenter", "version": "9.9.8", "type": "module" }',
+      '@stryker-mutator/instrumenter/dist/src/mutators/mutate.js':
+        'export const allMutators = [];',
+      '@stryker-mutator/instrumenter/dist/src/mutant-placers/index.js': `export const allMutantPlacers = ${JSON.stringify(
+        placers.map((name) => ({ name })),
+      )};`,
+      '@stryker-mutator/instrumenter/dist/src/index.js':
+        'export class Instrumenter {\n' +
+        '  constructor(logger) { this.logger = logger; }\n' +
+        '  async instrument(files, options) { return { files, mutants: [], logger: this.logger, options }; }\n' +
+        '}',
+      '@babel/core/package.json':
+        '{ "name": "@babel/core", "type": "module", "main": "index.js" }',
+      '@babel/core/index.js': "export const types = { fake: 'babel types' };",
+    };
+
+    for (const [name, content] of Object.entries(files)) {
+      const path = join(modules, name);
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, content);
+    }
+
+    return {
+      corePackage: join(modules, '@stryker-mutator', 'core', 'package.json'),
+      dir,
+    };
+  }
+
+  it('throws, naming the dir, when the instrumenter has no expressionMutantPlacer', async () => {
+    const { corePackage, dir } = fakeCore(['otherPlacer']);
+
+    await assert.rejects(resolveFromCore(corePackage), {
+      message: `stryker-ui-mutators: the instrumenter in ${dir} has no expressionMutantPlacer.`,
+    });
+  });
+
+  it("takes the placer named expressionMutantPlacer, the instrumenter's version and its Babel's types", async () => {
+    const { corePackage, dir } = fakeCore([
+      'otherPlacer',
+      'expressionMutantPlacer',
+    ]);
+
+    const instrumenter = await resolveFromCore(corePackage);
+
+    assert.deepEqual(
+      {
+        dir: instrumenter.dir,
+        version: instrumenter.version,
+        types: instrumenter.types,
+        placer: instrumenter.expressionPlacer,
+      },
+      {
+        dir,
+        version: '9.9.8',
+        types: { fake: 'babel types' },
+        placer: { name: 'expressionMutantPlacer' },
+      },
+    );
+  });
+
+  it('instruments every file with mutate set, no plugins, no ignorers and no exclusions, through a silent logger', async () => {
+    const { corePackage } = fakeCore(['expressionMutantPlacer']);
+    const instrumenter = await resolveFromCore(corePackage);
+
+    const result = (await instrumenter.instrument([
+      { name: 'a.tsx', content: 'x' },
+    ])) as unknown as {
+      files: unknown;
+      options: unknown;
+      logger: Record<string, () => unknown>;
+    };
+
+    assert.deepEqual(result.files, [
+      { name: 'a.tsx', content: 'x', mutate: true },
+    ]);
+    assert.deepEqual(result.options, {
+      plugins: null,
+      excludedMutations: [],
+      ignorers: [],
+    });
+    assert.deepEqual(
+      Object.entries(result.logger).map(([name, method]) => [name, method()]),
+      [
+        ['debug', undefined],
+        ['info', undefined],
+        ['warn', undefined],
+        ['error', undefined],
+        ['trace', undefined],
+        ['fatal', undefined],
+        ['isDebugEnabled', false],
+        ['isTraceEnabled', false],
+      ],
     );
   });
 });
