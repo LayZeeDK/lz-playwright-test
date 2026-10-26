@@ -24,8 +24,8 @@ function operator(name: string): Operator {
 
 /** A fake instrumenter: each marked mutator not in `silent` makes one mutant in its own self-check file. */
 function setup({ builtIns = ['StringLiteral', 'BooleanLiteral'], silent = [] as string[], version = '10.1.1' } = {}) {
-  const allMutators: NodeMutatorLike[] = builtIns.map((name) => ({ name, *mutate() {} }));
-  const expressionPlacer: MutantPlacerLike = { name: 'expressionMutantPlacer', canPlace: () => false, place() {} };
+  const allMutators: NodeMutatorLike[] = builtIns.map((name) => ({ name, mutate: () => [] }));
+  const expressionPlacer: MutantPlacerLike = { name: 'expressionMutantPlacer', canPlace: () => false, place: () => undefined };
   const instrumented: SourceFile[][] = [];
   const warnings: string[] = [];
   const instrumenter: Instrumenter = {

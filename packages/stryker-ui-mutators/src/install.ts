@@ -16,7 +16,7 @@ const CORE_BIN = /[\\/]@stryker-mutator[\\/]core[\\/]bin[\\/]stryker\.js$/;
 const NAME = /^[A-Za-z]+$/;
 /** Marks what this package put into the instrumenter; `Symbol.for`, so every copy of the package sees one key. */
 const OWN: unique symbol = Symbol.for('@layzee/stryker-ui-mutators');
-const nothing = (): void => {};
+const nothing = (): undefined => undefined;
 const SILENT = {
   debug: nothing,
   info: nothing,

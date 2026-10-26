@@ -89,7 +89,7 @@ function serialize(node: unknown): string {
   return `<${String(type)} ${attributes}>${serialize(children)}</${String(type)}>`;
 }
 
-const noop = (): void => {};
+const noop = (): undefined => undefined;
 const scenarios = [
   {
     open: true,
