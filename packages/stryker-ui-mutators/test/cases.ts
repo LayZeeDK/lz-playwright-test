@@ -1216,10 +1216,11 @@ export const cases: readonly Case[] = [
     title:
       'a label other than htmlFor, and htmlFor on an element other than label, are emptied though a control is inside',
     origin: 'design:Operators in the first release, LabelAttribute',
-    jsx: '<div><div aria-label="Search"><input /></div><output htmlFor="a"><input /></output></div>',
+    jsx: '<div><div aria-label="Search"><input /></div><output htmlFor="a"><input /></output><label title="Name"><input /></label></div>',
     expect: [
       ['LabelAttribute', 'aria-label=""'],
       ['LabelAttribute', 'htmlFor=""'],
+      ['LabelAttribute', 'title=""'],
     ],
   },
   {
