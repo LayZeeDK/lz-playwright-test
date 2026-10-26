@@ -86,8 +86,9 @@ tests cover all ten. The plugin patches StrykerJS internals, so it supports Stry
 - The runner fails loudly instead of reporting survivors when the internals it calls are missing, when
   tests ran but the hook never installed, when a mutant run produced no test results, when Playwright
   failed without running a test, or when the Playwright run was interrupted. The dry run also fails
-  when tests ran but no page loaded instrumented code, whatever the `coverageAnalysis` setting. That
-  error asks whether the `webServer` serves the Stryker sandbox, with two exceptions. When no
+  when tests ran, none failed, and no instrumented code reported coverage, in a page or in a Playwright
+  worker, whatever the `coverageAnalysis` setting. That error asks whether the `webServer` serves the
+  Stryker sandbox, with two exceptions. When no
   instrumented code ran at all, neither in a page nor in a Playwright worker, it says so. When every
   frame failed to answer in time, it says that instead. A dry run that
   finds no tests and does not fail comes back empty, so Stryker's own `allowEmpty` decides.
@@ -241,7 +242,7 @@ the shell's elapsed time for the whole command instead, which ran 1 to 3 s above
 logs.
 
 In both forced-timeout runs on the demo app (53a5aa6 and 905b030), Stryker killed and restarted the
-worker for every mutant. Afterwards no `stryker-pw` temp folder of the runner was left in the system
+worker for every mutant. Afterwards no `stryker-pw` temp folder (the runner's prefix then) was left in the system
 temp folder, no extra Node process was running, and no port was left open. Those checks were made by
 hand after each run.
 Before a fix in `dispose` (fca053d), each kill left Playwright's output directory behind.
@@ -320,7 +321,7 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   reaches Stryker's own timer, and costs a full init per such mutant.
 - The runner refuses Stryker's `--testFiles` option and fails at startup with "The Playwright test runner
   does not support the --testFiles option."
-- Only code that runs in the page is activated. Server-side code (SSR, API routes) runs in the
+- Only code that runs in the page or in a Playwright test worker is activated. Server-side code (SSR, API routes) runs in the
   `webServer` process, which starts once without an active mutant and reports no coverage. With
   coverage analysis on, those mutants show as NoCoverage. With `coverageAnalysis: 'off'`, every test
   runs against them and they survive, because the server never sees the active mutant. Code that runs
@@ -431,13 +432,13 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
 ```sh
 npm install
 npx playwright install chromium
-npx tsc -p packages/stryker-playwright-runner/tsconfig.json
-node --test "packages/stryker-playwright-runner/test/*.test.ts"
-npx tsc -p packages/stryker-ui-mutators/tsconfig.json
-node --test packages/stryker-ui-mutators/test/*.test.ts
-npx stryker run stryker.e2e.config.ts
-npx stryker run stryker.e2e.ui.config.ts
-npx stryker run stryker.ct.config.ts
+npx nx run-many -t typecheck build
+npx nx run @layzee/stryker-playwright-runner:test
+npx nx run @layzee/stryker-ui-mutators:test
+npx nx run @layzee/demo-app-e2e:mutate-e2e
+npx nx run @layzee/demo-app-e2e:mutate-e2e-ui
+npx nx run @layzee/demo-app:mutate-ct
+# The lines below load the packages' dist folders too, so they need the build above.
 npx stryker run stryker.e2e.config.ts --concurrency 2
 npx stryker run stryker.ct.config.ts --concurrency 2
 STRYKER_BASELINE=define npx stryker run stryker.e2e.command.config.ts

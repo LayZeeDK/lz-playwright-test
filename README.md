@@ -101,8 +101,8 @@ Run these from the repo root. The tests start a browser, so install Chromium fir
 ```sh
 npm install
 npx playwright install chromium
-npx tsc -p packages/stryker-playwright-runner/tsconfig.json
-node --test "packages/stryker-playwright-runner/test/*.test.ts"
+npx nx run-many -t typecheck build
+npx nx run @layzee/stryker-playwright-runner:test
 ```
 
 `ui-mutators.test.ts` runs the runner against a page instrumented with the UI operators and checks that a
@@ -111,10 +111,11 @@ Playwright test kills each operator's mutant.
 The UI operators' tests need no browser:
 
 ```sh
-npx tsc -p packages/stryker-ui-mutators/tsconfig.json
-node --test packages/stryker-ui-mutators/test/*.test.ts
+npx nx run @layzee/stryker-ui-mutators:test
 ```
 
-To run Stryker on the demo app, use `npx stryker run stryker.e2e.config.ts`,
-`npx stryker run stryker.e2e.ui.config.ts`, or `npx stryker run stryker.ct.config.ts`. The Rerun section of `docs/VERDICT.md` lists the commands for
-the measured rows, and `oss/README.md` gives the steps for the open-source copies.
+To run Stryker on the demo app, use `npx nx run @layzee/demo-app-e2e:mutate-e2e`,
+`npx nx run @layzee/demo-app-e2e:mutate-e2e-ui`, or `npx nx run @layzee/demo-app:mutate-ct`. Each target builds
+both packages first, because Stryker loads them from their `dist` folders. The Rerun section of
+`docs/VERDICT.md` lists the commands for the measured rows, and `oss/README.md` gives the steps for the
+open-source copies.
