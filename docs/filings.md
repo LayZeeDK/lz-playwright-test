@@ -5,40 +5,74 @@ nothing in this file has been filed.
 
 ## LayZeeDK/lz-engineering-claude-plugins: lz-tdd findings from first real use
 
-Status: open ledger, nothing filed (started 2026-10-26). The `lz-tdd` plugin (0.0.3; skills `lz-red`, `lz-tpp`,
-`lz-refactor`) runs here for the first time outside its evals, in the production hardening of both packages. Each
-entry gets the skill and version, what it was asked, what it did, what was expected, and the transcript or file
-that shows it. No defects so far; four gaps, all about agentic use.
+Status: open ledger, nothing filed (started 2026-10-26, last updated 2026-10-26). Plugin: `lz-tdd` 0.0.3
+(`lz-red`, `lz-tpp`, `lz-refactor`), in its first real use outside its evals: the production hardening of
+`@layzee/stryker-playwright-runner` and `@layzee/stryker-ui-mutators` by four agent workers (Opus 5.5), each
+following an implementation brief. Workers record findings in their progress files
+(`.audit/prod/mutation/*-progress.md`, `.audit/prod/arch/impl-progress.md`; local, gitignored); Claude sorts them
+into the three lists below. A finding is a bug report only when it comes with a minimal reproducible example: the
+skill, its version, the exact prompt or invocation, the input files, what the skill did, and what it should have
+done. Without one it stays an observation.
 
-**1. `lz-red` gives no guidance for tests driven by mutation testing.** The ui-mutators worker asked `lz-red` to
-drive tests that kill surviving mutants. Step 5 of its procedure calls a test that passes on its first run while it
-drives new behaviour a false green, and exempts only characterization tests. A test written to kill a mutant passes
-on the original code by design; its red is the mutant. Expected: a case for "the red is the mutant", for example
-"apply the mutant, see the test fail, revert". Evidence: `lz-red` SKILL.md step 5, which never names mutation
-testing; the worker's red for each such test was the next Stryker run's `killedBy`.
+### Bug reports
 
-**2. `lz-red` and `lz-tpp` assume one red test at a time.** The runner worker had a test list fixed up front by an
-agreed design (7 to 13 tests per contract) and wrote it in one go, then showed the tests red together. `lz-red`
-coaches one test per step (Law 2, "one small step"), and `lz-tpp` step 1 requires "exactly one new failing (red)
-test", so it gives no order across several red tests. Expected: a batch mode for a test list a design fixes, or an
-explicit note that batching is a reasoned deviation. Evidence: `lz-red` SKILL.md step 2 and its Three Laws leaf;
-`lz-tpp` SKILL.md "Coach decision procedure" step 1.
+None so far. No skill gave advice that was wrong for the case in front of it.
 
-**3. `lz-tpp` step 7 conflicts with an implementation brief.** Step 7 says "never edit the developer's code or run
-the tests unless explicitly asked". An agent whose brief tells it to implement was not "asked" in the invocation
-arguments, so by the skill's own rule it should only coach. Expected: a note that an explicit implementation brief
-counts as being asked. Evidence: `lz-tpp` SKILL.md "Coach decision procedure" step 7.
+### Observations
 
-**4. The catalogues are about production code.** `lz-refactor` handled moving top-level test setup into `before`
-hooks without wrong advice, but has no entry for test fixture setup or for "fails at load versus fails in a
-test", which was the point of that change. On a plain Extract Class, its APPLY/DECLINE count (defined for
-patterns) had to be improvised. `lz-red`'s mechanics reference is Vitest-only
-(`references/vitest-typescript-mechanics.md`), and this repository uses `node:test`; its "match the house idiom"
-step covered the difference.
+**O1. Guard tests have no red in `lz-red`.** Asked to drive tests that kill surviving mutants (ui-mutators worker)
+or that fail when an existing feature is removed (runner units A and B), `lz-red` step 5 offered two kinds: a
+driver, whose red is missing behaviour, and a characterization pin, "green by construction". Both kinds of guard
+test are neither: they pass on the current code, and their red comes from applying the mutant or reverting the
+feature by hand. The workers treated them as pins and showed red by hand. Cost: one gate test first passed against
+the broken gate (an `eval` thread has no entry argv); only the hand revert exposed it. Evidence: `lz-red` SKILL.md
+"Coach decision procedure" step 5; runner progress file, unit B log.
 
-What worked: `lz-refactor`'s step-1 classification caught a behaviour change inside a refactor commit; `lz-red`'s
-"a not-implemented stub is a valid red, an import failure is not" rule made 13 new tests red without a load
-failure; its "assert observable behaviour" step fit the cases-table test style.
+**O2. One red test at a time.** The runner refactor worker had a test list fixed up front by an agreed design (7 to
+13 tests per contract), wrote it in one go and showed the tests red together. `lz-red` coaches one test per step
+(step 2, "one small step"), and `lz-tpp` step 1 requires "Exactly one new failing (red) test", so neither gives an
+order across several red tests. Evidence: `lz-red` step 2 and `references/three-laws-and-test-selection.md`;
+`lz-tpp` "Coach decision procedure" step 1.
+
+**O3. Coach-only defaults conflict with an implementation brief.** `lz-tpp` step 7 says "Never edit the developer's
+code or run the tests" unless asked, and `lz-red` step 5 says "do not run the suite unprompted". An agent whose
+brief tells it to implement and verify was not asked in the skill's invocation arguments, so by the skills' own
+rules it should only coach. The workers followed their briefs. Evidence: `lz-tpp` step 7; `lz-red` step 5.
+
+**O4. Unit-test scope.** `lz-red` is about "the next FAILING (red) unit test"; two of the three feature tests unit A
+sharpened are browser integration tests (real Playwright and Chromium), and the skill has nothing on them. Its
+red-bar mechanics reference is Vitest-only (`references/vitest-typescript-mechanics.md`); this repository uses
+`node:test`, and step 3's "match the house idiom" covered the difference each time.
+
+**O5. `lz-refactor`'s catalogue is about production code.** It handled moving top-level test setup into `before`
+hooks, and declaration annotations that replace `as` expressions so Stryker mutates the code inside (StrykerJS
+10.1.1 mutates nothing inside `expr as Type`), without wrong advice. Neither has a catalogue entry: no test-fixture
+setup, no "fails at load versus fails in a test", no refactoring around a tool's blind spot. On a plain Extract
+Class its APPLY/DECLINE count, defined for patterns, had to be improvised.
+
+**O6. What worked.** `lz-refactor` step 1 caught a behaviour change inside a refactor commit (a lock release on a
+failed init). `lz-red` step 5's "a not-implemented throw ... is a valid but blunter red" let 13 new tests go red
+without a module-load failure, and its "the failure must originate in the code under test" kept a child-process
+test's red on the hook's own TypeError rather than on a spawn failure. Step 3's message-matrix route fitted a shell
+whose outgoing calls are what to assert. Step 4's "assert observable behaviour" fitted the cases-table style.
+
+### Suggestions
+
+**S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
+code, and its red is shown by applying the mutant or reverting the feature, running it, and reverting back.
+Mutation testing is the common source of such tests.
+
+**S2 (from O2).** Say what to do with a test list a design fixes up front: either order the reds and hand them
+forward one at a time, or allow a batch with the reason stated.
+
+**S3 (from O3).** State that an explicit instruction to implement and run tests, in the invocation or in the brief
+the agent works under, counts as being asked.
+
+**S4 (from O4).** Either say the skills are unit-test scoped and what to do for integration tests, or add an
+integration-test note; add a `node:test` mechanics leaf beside the Vitest one.
+
+**S5 (from O5).** Add `lz-refactor` entries for test-setup refactors and for refactoring so a tool (a mutation
+tester, a coverage tool) can see the code.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
