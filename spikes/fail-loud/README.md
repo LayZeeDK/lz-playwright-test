@@ -7,9 +7,10 @@ imports run before core loads `plugins`, so the real `@layzee/lz-stryker-ui-muta
 broken table on both routes. With `SPIKE_BROKEN=0` the same runs are the control, and their JSON reports show
 whether the UI operators reach a real run (the gate under "Risks that remain").
 
-The package name resolves to the built `dist`, so `break.ts` breaks `dist`'s operator table, and it throws
-when the name loads anything else (a `--conditions=@layzee/source` run, for one), because a break of another
-copy would leave the broken runs green.
+`break.ts` imports `operators.js` from beside the entry that the package name resolves to, the built
+`dist`, so it breaks the same copy of the table that the plugin installs. A break of another copy would leave
+the broken runs green. Under `--conditions=@layzee/source` the name resolves to `src/index.ts`, which has no
+`operators.js` beside it, so every run stops with `ERR_MODULE_NOT_FOUND`.
 
 Run from this folder, after `npm install` has linked the workspace package and
 `npx nx run @layzee/lz-stryker-ui-mutators:build` has built it:
