@@ -32,9 +32,12 @@ A second plugin, `@layzee/stryker-ui-mutators`, adds ten mutation operators for 
 tests look at, such as text, labels, links, and disabled or hidden state. StrykerJS 10.1.1 leaves those
 parts of a component unmutated (`docs/design/playwright-mutators.md`). On the demo app's e2e suite they
 add 17 mutants to 48 built-in ones: 11 killed, 4 survived because of gaps in the tests, and 2 in a
-component no e2e page renders. That is one small app with sites for three of the ten operators. Tests
-cover the other seven, and no open-source repo has been run with the operators yet. The plugin patches
-StrykerJS internals, so it supports StrykerJS 10.1 only.
+component no e2e page renders. On a copy of epic-stack, a server-rendered React Router app, they add 45
+mutants to 199 built-in ones in four route files: 22 killed, 16 survived, 7 uncovered, no compile
+errors under Stryker's TypeScript checker, and 1 equivalent mutant. But 8 of those 22 kills are side
+effects of server rendering, and server rendering hides attribute mutants (Limits), so on such an app
+the kill count overstates what the tests check. Seven of the ten operators had sites in the two apps;
+tests cover all ten. The plugin patches StrykerJS internals, so it supports StrykerJS 10.1 only.
 
 ## How it works
 
@@ -147,6 +150,7 @@ the shell's elapsed time for the whole command.
 | Same, with `use.actionTimeout: 5000` added to the copy's Playwright config | this runner, `timeoutMS` 10000 | ff95b44 | 26 killed, 10 survived, 12 no coverage | 4m46s |
 | ngx-yeti (Angular, Nx, Playwright 1.63.0, static Storybook), 2 mutants in `cluster.ts`, 234 e2e tests | this runner, `playwright.workers` 2, `dryRunTimeoutMinutes` 20 | ff95b44 | 2 killed | 3m03s (dry run 2m20s) |
 | Analog 2.8.0 `beta` (Angular 22.2, Nx 23.2, SSR), 8 mutants in `(home).page.ts`, 11 e2e tests against the built SSR server | this runner, `disableTypeChecking: true` in the copy's Vite config | ff95b44 | 4 killed, 4 survived | 2m01s |
+| epic-stack at 893610d (React 19, React Router 7, SSR), 244 mutants in four files under `app/routes/users/` and `app/components/`, 26 e2e tests against the dev server | this runner and `@layzee/stryker-ui-mutators`, TypeScript checker, `use.actionTimeout: 5000` | cda2f95 (packages as at ff95b44) | UI: 22 killed, 16 survived, 7 no coverage. Built-in: 17 killed, 53 survived, 49 no coverage, 80 compile errors | 27m59s |
 
 The UI operator rows match the statuses Claude wrote down before the first run, except that the
 three UI timeouts were predicted as kills. Each is a test that clicks or fills an element the mutant
@@ -158,6 +162,18 @@ label text. The two uncovered mutants are in `price-tag.tsx`, which no e2e page 
 was equivalent, and none was a compile or runtime error. The demo app has sites for only three of the
 ten operators (`TextLiteral`, `ChildExpression`, `UrlAttribute`). The other seven have evidence from
 tests only, below.
+
+On epic-stack, the worker that ran it predicted each of the 45 UI mutants before the run; 36 matched.
+Of the 22 kills, 14 come from a test step that reads or follows the mutated element, and 8 from a later,
+unrelated step on a server-rendered page whose hydration the mutant broke (Limits). Of the 16
+survivors, 14 are gaps in the tests, 1 is equivalent (`ConditionalElement` forcing a span that renders
+empty), and 1 is a `UrlAttribute` mutant of a form `action` that server rendering kept out of the DOM.
+Two `LabelAttribute` survivors on the search input, its `htmlFor` and its `placeholder`, leave the
+input named by the other one for role queries; `getByLabel` and `getByPlaceholder` would kill them,
+so they count as gaps. The one `ElementRole` tag swap, `<a href>` to `<span>` without the `href`,
+compiled. The 80 built-in compile errors are real type errors, mostly emptied object and string
+literals. epic-stack needed a Prisma engine that runs on Windows arm64, a fixed port, a longer test
+timeout, and one upstream test marked `fixme`; `oss/README.md` lists each change.
 
 The UI operators have three more layers of evidence, all at or after 107505c.
 `packages/stryker-ui-mutators/test/` runs without a browser: 107 synthetic cases from the open-source
@@ -298,8 +314,14 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   `webServer` process, which starts once without an active mutant and reports no coverage. With
   coverage analysis on, those mutants show as NoCoverage. With `coverageAnalysis: 'off'`, every test
   runs against them and they survive, because the server never sees the active mutant. Code that runs
-  on both sides (SSR plus hydration) is activated only in the page. A mutated client against an
-  unmutated server render can fail hydration, and the mutant then counts as Killed.
+  on both sides (SSR plus hydration) is activated only in the page. On epic-stack this did two things
+  (measured, and reproduced without Stryker by making two sites render differently on the server and
+  in the browser). A mutant that changes text or an element on a server-rendered page breaks
+  hydration, and a later, unrelated step of the test fails, so the mutant counts as Killed whether or
+  not any test checks the element: 8 of 22 UI kills there. A mutant that changes an attribute never
+  reaches the DOM, because hydration keeps the server's attribute value, so it survives even when a
+  test uses the attribute: a form `action` the search test submits. On a server-rendered app, read the
+  kill count with both effects in mind.
 - Dependency projects (a `setup` project that logs in) run unfiltered, with the mutant active, on every
   mutant run, because Playwright adds them whenever a dependent test is selected. They add their time
   to every mutant, and a mutant that breaks the setup flow is killed by the setup test. Login in
@@ -388,7 +410,10 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   demo configs derive it from `STRYKER_MUTATOR_WORKER` and turn off `reuseExistingServer` under
   Stryker, so a server already on the default port is never reused. Under Stryker the e2e config also
   starts the dev server in CI, because a `preview` server builds first and every worker would rebuild
-  the sandbox's one `dist` folder.
+  the sandbox's one `dist` folder. A Stryker checker counts here too: when checking ends, Stryker starts
+  one more test runner, even at `concurrency` 1. On epic-stack, with a fixed port and
+  `reuseExistingServer: false`, that runner's `webServer` found the port taken and the run failed at
+  mutant 140 of 244. With `reuseExistingServer: true` both runners shared the sandbox's dev server.
 
 ## Rerun
 
@@ -422,7 +447,7 @@ For the second UI operator row, add `actionTimeout: 5000` to the top-level `use`
 `apps/demo-app-e2e/playwright.config.mts` for that run only. `spikes/fail-loud/README.md` gives the
 fail-loud commands. For the RealWorld row with `use.actionTimeout: 5000`, add `actionTimeout: 5000` to the top-level `use` block of
 the copy's `apps/conduit-e2e/playwright.config.ts` after `prepare.ts` has run. `prepare.ts` does not
-add it. `oss/README.md` gives the steps for the hello-world forced-timeout row, ngx-yeti, and Analog.
+add it. `oss/README.md` gives the steps for the hello-world forced-timeout row, ngx-yeti, Analog, and epic-stack.
 
 Versions: StrykerJS 10.1.1, Playwright 1.64.1, Nx 24.0.1, Vite 8.3.5, Node 24.22.0.
 

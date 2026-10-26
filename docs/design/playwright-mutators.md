@@ -302,14 +302,14 @@ level is a new concept in the StrykerJS schema that every built-in would need a 
 
 ## Risks that remain
 
-Nothing in this design has gone through `stryker run` with a browser yet. The Opus spike is the only
-evidence for the chosen placement: 61 mutants, 48 of them from UI operators, re-parse and render in
-React like the hand-made mutation, with an equal baseline. The Fable spike shows that UI operators
-change the render (26 of 26), but it used the rejected spread placement and a different operator set,
-so it supports the operators and not the placement. Neither spike proves that Vite builds the
-instrumented TSX or that a Playwright test kills its mutants. The first build step is the verification
-plan in the Opus draft, section 6: a fixture per operator through
-`packages/stryker-playwright-runner/test/runner.test.ts`, then the demo app.
+The built package has gone through `stryker run` with a browser on the demo app and on a copy of
+epic-stack, and a Playwright test kills a mutant of every operator in
+`packages/stryker-playwright-runner/test/ui-mutators.test.ts`. `docs/VERDICT.md` (Evidence) has the
+counts. Two risks remain from those runs. On a server-rendered app the runner activates the mutant in
+the browser only, so a text or element mutant breaks hydration and is killed by an unrelated step,
+and an attribute mutant never reaches the DOM (VERDICT, Limits). And three operators,
+`EventHandler`, `HiddenAttribute`, and `StateAttribute`, have had no site in a real app yet, only in
+the test fixture.
 
 The self-check instruments through the instrumenter the plugin resolved and imported itself. That is the
 plugin's own module instance, so the check cannot see a mismatch with the instance that core imports.
@@ -320,9 +320,10 @@ it before calling the self-check enough, and on every StrykerJS bump. `spikes/fa
 the negative control below: on StrykerJS 10.1.1 both routes report 12 UI mutants from seven operators, and
 with one broken sample both exit 1 with that operator's name.
 
-The `ElementToSpan` rule rests on `tsc` output for three hand-written elements, not on a Stryker run.
-The run for the Opus draft's risk 7 (`@stryker-mutator/typescript-checker` on the demo app) tests it: no `ElementToSpan`
-mutant may report CompileError.
+The `ElementToSpan` rule rests on `tsc` output for three hand-written elements and on one Stryker run:
+on epic-stack, with `@stryker-mutator/typescript-checker`, its one mutant (`<a href>` to a `<span>`
+without the `href`) compiled, and no UI mutant reported CompileError. One mutant is thin evidence for
+the `button` swap, which no real app run has produced yet.
 
 ## What the verification plan adds
 
@@ -345,6 +346,15 @@ decides each operator.
      is a starting value, not a measured one. Tune it against the real ratios once the first operators
      have been classified by hand.
    - A Playwright test written for the behaviour kills at least one of its mutants.
+
+   Measured on 2026-10-26 (`docs/VERDICT.md`, Evidence): every operator meets the bar. The corpus diff
+   is the placement test in `packages/stryker-ui-mutators/test/`. On the demo app, with
+   `actionTimeout` set, none of the 17 UI mutants is equivalent or an error, and without it 3 kills
+   show as Timeout. In `packages/stryker-playwright-runner/test/ui-mutators.test.ts` a written test
+   kills a mutant of each operator. A copy of epic-stack, outside the bar's scope, adds the first real
+   ratios: 1 equivalent and 0 errors among 45 UI mutants, the equivalent one a `ConditionalElement`
+   (1 of 8 for that operator). Three operators have had no site in a real app yet, so the limit stays
+   a starting value.
 
 ## Rerun the evidence
 
