@@ -97,6 +97,24 @@ the candidates were Replace Primitive with Object and Replace Type Code with Sub
 the fallback "a discriminated union" (here a string-literal union parsed at the boundary) was the right answer.
 The decision came from the fallback, not from a listed candidate. Evidence: `fix-R2-progress.md`, A1.
 
+**O12. `lz-refactor` has no route for a preparatory refactoring.** In the security fix round, a worker extracted
+a test's setup into a helper before writing the two tests that would repeat it. Step 1 wants passing code that has
+a smell now, and step 4 counts what the refactoring removes now; here the two copies it removes did not exist yet,
+so the worker counted future copies. Beck's "make the change easy, then make the easy change" has no entry.
+Evidence: `lz-refactor` SKILL.md steps 1, 2 and 4; `.audit/prod/review/fix-S-progress.md`, S3 (local,
+gitignored).
+
+**O13. A mutation-score rule shapes the green step, and the skills say nothing about it.** Under "Mutation score:
+100%", the same worker wrote each green so it leaves no equivalent mutant: it moved a file read into an existing
+`try` instead of adding a `catch { return undefined }`, and used a symbol as its own mark value instead of `true`,
+so no boolean-literal mutant could survive. `lz-tpp` picks transformations by priority only, and `lz-red` does not
+mention tests written to kill a mutant that other tests cannot reach. Evidence: `fix-S-progress.md`, S1 and S3.
+
+O3 held again in that round: each invocation said the worker writes and runs the test itself, and the skills'
+text still says not to run the suite unprompted. O8 gained one more case: `lz-red` step 5's "an import failure is
+a prerequisite to clear, not the red" made the worker export a constant before running the red, so the red came
+from the function under test and not from ESM linking.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -133,6 +151,14 @@ with a type guard, `implements` on a fake, a typed test double, `satisfies`, a n
 
 **S10 (from O11).** For TypeScript, list a string-literal or discriminated union as the first candidate for
 Primitive Obsession, before the class-shaped ones.
+
+**S11 (from O12).** Add a preparatory-refactoring route to `lz-refactor`: a refactoring done so that the next test
+or change is easy, with a step-4 count over the change about to be made, and the rule that it lands green before
+the next red.
+
+**S12 (from O13).** Add a short note to `lz-tpp`: when a project gates on mutation score, prefer the
+transformation that leaves no equivalent mutant, and say which shapes create them (a separate `catch` that returns
+a default, a boolean literal used only as a mark).
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
