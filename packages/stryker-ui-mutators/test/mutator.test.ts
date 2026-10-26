@@ -90,6 +90,16 @@ describe('toNodeMutator', () => {
     );
   });
 
+  it('finds no site for a JSX element as the value, or for an empty expression container, as a hand-built tree has it', () => {
+    const file = parse('<a href=<b /> />;');
+    const empty = parse('<a href="/x" />;');
+    const [attribute] = firstElement(empty).openingElement.attributes;
+    assert.ok(t.isJSXAttribute(attribute));
+    attribute.value = t.jsxExpressionContainer(t.jsxEmptyExpression());
+
+    assert.deepEqual([sitesOf(file, 'href'), sitesOf(empty, 'href')], [[], []]);
+  });
+
   it('finds no site for an attribute whose opening element has no JSX element around it', () => {
     const file = parse('<input disabled />;');
     const [statement] = file.program.body as [t.ExpressionStatement];
