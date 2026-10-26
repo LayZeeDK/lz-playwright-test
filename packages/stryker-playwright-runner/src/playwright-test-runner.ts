@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import { createRequire } from 'node:module';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -23,10 +22,9 @@ import {
 
 import { readRunnerOptions, type RunnerOptions } from './options.ts';
 import {
-  type CommonModule,
-  type CoreBundleModule,
-  type RunnerModule,
-  TEST_RUNNER_METHODS,
+  loadPlaywright,
+  NO_COPY_PROMPT_ENV,
+  type Playwright,
   type TestRunner,
 } from './playwright-internals.ts';
 import {
@@ -55,14 +53,11 @@ interface ServerCheck {
   isUp(): Promise<boolean>;
 }
 
-type IsUrlAvailable = CoreBundleModule['utils']['isURLAvailable'];
-
 // `.ts` when this module runs from source, `.js` when it runs from the build.
 const HOOK = new URL(
   `./worker-hook${path.extname(import.meta.filename)}`,
   import.meta.url,
 ).href;
-const MIN_PLAYWRIGHT = { major: 1, minor: 63 };
 // Config load and worker start before the first test, measured at about 2.7 s.
 const RUN_START_MS = 3000;
 // Leaves room to end a timed-out test before Stryker's own timer kills the worker: the run's start,
@@ -72,8 +67,8 @@ const TIMEOUT_HEADROOM_MS = RUN_START_MS + FRAME_READ_TIMEOUT_MS;
 const MIN_TEST_TIMEOUT_MS = 2000;
 
 /**
- * Hosts Playwright Test in-process through `playwright/lib/runner` (exported, undocumented), so it
- * pins a minimum Playwright version and probes the internals it calls.
+ * Hosts Playwright Test in-process through its undocumented TestRunner, which
+ * playwright-internals.ts loads, checks and types.
  */
 export class PlaywrightTestRunner implements StrykerTestRunner {
   static inject = tokens(commonTokens.options, commonTokens.logger);
@@ -103,56 +98,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   async init(): Promise<void> {
     const options = readRunnerOptions(this.strykerOptions);
     this.options = options;
-    const { configFile } = options;
-    const testRequire = createRequire(
-      createRequire(configFile ?? path.resolve('package.json')).resolve(
-        '@playwright/test',
-      ),
-    );
-    // playwright-core is a dependency of playwright, not of @playwright/test, so resolve it from
-    // playwright for layouts that do not hoist (pnpm).
-    const playwrightRequire = createRequire(
-      testRequire.resolve('playwright/package.json'),
-    );
-    const { version } = playwrightRequire('./package.json') as {
-      version: string;
-    };
-    const [major, minor] = version.split('.').map(Number);
-    const supported =
-      major > MIN_PLAYWRIGHT.major ||
-      (major === MIN_PLAYWRIGHT.major && minor >= MIN_PLAYWRIGHT.minor);
-
-    if (!supported) {
-      throw new Error(
-        `The Playwright test runner needs Playwright ${MIN_PLAYWRIGHT.major}.${MIN_PLAYWRIGHT.minor} or later, found ${version}.`,
-      );
-    }
-
-    const { testRunner } = playwrightRequire(
-      'playwright/lib/runner',
-    ) as Partial<RunnerModule>;
-    const { configLoader } = playwrightRequire(
-      'playwright/lib/common',
-    ) as Partial<CommonModule>;
-    const { utils } = playwrightRequire(
-      'playwright-core/lib/coreBundle',
-    ) as Partial<CoreBundleModule>;
-    const isURLAvailable = utils?.isURLAvailable;
-
-    const prototype = testRunner?.TestRunner?.prototype;
-
-    if (
-      typeof testRunner?.TestRunner !== 'function' ||
-      TEST_RUNNER_METHODS.some(
-        (method) => typeof prototype?.[method] !== 'function',
-      ) ||
-      typeof configLoader?.resolveConfigLocation !== 'function' ||
-      typeof isURLAvailable !== 'function'
-    ) {
-      throw new Error(
-        `Playwright ${version} changed the internals this runner calls (playwright/lib/runner TestRunner with ${TEST_RUNNER_METHODS.join(', ')}; playwright/lib/common configLoader; playwright-core coreBundle isURLAvailable).`,
-      );
-    }
+    const pw = loadPlaywright(options.configFile);
 
     // Playwright deletes and recreates outputDir on global setup, so both directories live in a private
     // root that it never touches: on a shared /tmp no other user can claim either name in between.
@@ -165,18 +111,14 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
     this.outputDir = path.join(this.rootDir, 'output');
     this.runsDir = path.join(this.rootDir, 'runs');
     fs.mkdirSync(this.runsDir);
-    this.playwright = new testRunner.TestRunner(
-      configLoader.resolveConfigLocation(configFile),
-      {
-        outputDir: this.outputDir,
-        use: { screenshot: 'off', trace: 'off', video: 'off' },
-      },
-    );
-    await this.playwright.initialize({});
+    this.playwright = await pw.createTestRunner(options.configFile, {
+      outputDir: this.outputDir,
+      use: { screenshot: 'off', trace: 'off', video: 'off' },
+    });
 
     const config = await this.playwright.loadConfig();
     this.servers = config.webServers.flatMap((server) =>
-      serverCheck(server, isURLAvailable),
+      serverCheck(server, pw.isURLAvailable),
     );
     this.warnAboutAssertionTimeouts(config, options.strykerTimeoutMS);
     // Every project, setup dependencies included: the one timeout override applies to all that run.
@@ -336,9 +278,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
       NODE_OPTIONS: `${this.baseNodeOptions ?? ''} --import "${HOOK}"`.trim(),
       [RUN_SETTINGS]: JSON.stringify(settings),
       [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: request.activeMutant,
-      // A failed test's page gets an aria snapshot for Playwright's error prompt, which nobody reads
-      // here; on a page stuck in a loop it waits out its 5 s timeout and pushes the run past Stryker's.
-      PLAYWRIGHT_NO_COPY_PROMPT: '1',
+      [NO_COPY_PROMPT_ENV]: '1',
     });
     const reporter = new CollectingReporter();
 
@@ -403,7 +343,7 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
 // connection for a port.
 function serverCheck(
   server: { url?: string; port?: number; ignoreHTTPSErrors?: boolean },
-  isURLAvailable: IsUrlAvailable,
+  isURLAvailable: Playwright['isURLAvailable'],
 ): ServerCheck[] {
   if (server.url) {
     const url = new URL(server.url);

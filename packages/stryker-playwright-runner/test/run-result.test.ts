@@ -286,7 +286,7 @@ test('tests that ran without the hook are an error', () => {
 });
 
 test('a mutant run selects every test of a describe.serial group, not one test alone', () => {
-  const file = { parent: undefined };
+  const file = { _parallelMode: 'none', parent: undefined };
   const serial = { _parallelMode: 'serial', parent: file };
   const nestedSerial = { _parallelMode: 'serial', parent: serial };
   const plain = { _parallelMode: 'default', parent: file };

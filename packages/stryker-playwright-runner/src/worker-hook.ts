@@ -15,6 +15,7 @@ import type {
 } from '@playwright/test';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
+import { instrumentationOf, WORKER_ENTRY } from './playwright-internals.ts';
 import {
   FRAME_READ_TIMEOUT_MS,
   readRunSettings,
@@ -23,13 +24,6 @@ import {
   SNAPSHOT_SUFFIX,
   type Snapshot,
 } from './protocol.ts';
-
-interface Instrumentation {
-  addListener(listener: {
-    runAfterCreateBrowserContext?(context: BrowserContext): Promise<void>;
-    runBeforeCloseBrowserContext?(context: BrowserContext): Promise<void>;
-  }): void;
-}
 
 interface ContextState {
   testId?: string;
@@ -49,11 +43,7 @@ type Test = TestType<object, object>;
 const entry = process.argv[1] ?? '';
 const settings = readRunSettings(process.env);
 
-if (
-  settings &&
-  isMainThread &&
-  /[\\/]playwright[\\/]lib[\\/]worker[\\/]workerProcessEntry\.js$/.test(entry)
-) {
+if (settings && isMainThread && WORKER_ENTRY.test(entry)) {
   install(createRequire(entry), settings);
 }
 
@@ -62,11 +52,7 @@ function install(
   { outDir, perTest, hitLimit }: RunSettings,
 ) {
   const { test } = playwrightRequire('playwright/test') as { test: Test };
-  const { _instrumentation: instrumentation } = playwrightRequire(
-    'playwright-core',
-  ) as {
-    _instrumentation: Instrumentation;
-  };
+  const instrumentation = instrumentationOf(playwrightRequire);
   const ns = INSTRUMENTER_CONSTANTS.NAMESPACE;
   const activeMutant =
     process.env[INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE];

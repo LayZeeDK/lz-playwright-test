@@ -13,7 +13,7 @@ import {
   TestStatus,
 } from '@stryker-mutator/api/test-runner';
 
-import type { SuiteInternals, TestRunner } from './playwright-internals.ts';
+import { parallelModeOf, type TestRunner } from './playwright-internals.ts';
 import type { Snapshot } from './protocol.ts';
 
 type CoverageAnalysis = DryRunOptions['coverageAnalysis'];
@@ -152,22 +152,12 @@ export function serialGroups(
   for (const test of testCases) {
     let group: object | undefined;
 
-    // Without the field every test would run alone, and serial chains would give false kills.
-    if (
-      typeof (test.parent as SuiteInternals | undefined)?._parallelMode !==
-      'string'
-    ) {
-      throw new Error(
-        'Playwright suites no longer carry Suite._parallelMode, which this runner reads to keep describe.serial groups together.',
-      );
-    }
-
     for (
       let suite: Suite | undefined = test.parent;
       suite;
       suite = suite.parent
     ) {
-      if ((suite as SuiteInternals)._parallelMode === 'serial') {
+      if (parallelModeOf(suite) === 'serial') {
         group = suite;
       }
     }
