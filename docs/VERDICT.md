@@ -87,18 +87,24 @@ tests cover all ten. The plugin patches StrykerJS internals, so it supports Stry
   tests ran but the hook never installed, when a mutant run produced no test results, when Playwright
   failed without running a test, or when the Playwright run was interrupted. The dry run also fails
   when tests ran but no page loaded instrumented code, whatever the `coverageAnalysis` setting. That
-  error asks whether the `webServer` serves the Stryker sandbox, with two exceptions. When no test opened
-  a page, it says so. When every frame failed to answer in time, it says that instead. A dry run that
+  error asks whether the `webServer` serves the Stryker sandbox, with two exceptions. When no
+  instrumented code ran at all, neither in a page nor in a Playwright worker, it says so. When every
+  frame failed to answer in time, it says that instead. A dry run that
   finds no tests and does not fail comes back empty, so Stryker's own `allowEmpty` decides.
 - In a mutant run, a test that fails and then passes on a retry counts as failed: retries set with
   `describe.configure({ retries })` outrank the `retries: 0` that Playwright's `TestRunner.runTests`
   sets. A test attempt that fails on its own kills the mutant even when another attempt or another test
   timed out. A `test.fail()` test that fails as expected does not kill the mutant. In the dry run, a
   timed-out test is reported as a failed test.
-- A failing test kills the mutant even when the hit count says the page never ran it. The hit count
-  covers only code that runs in a page. App code that the Node test workers import, and a setup test,
-  also run with the mutant active, so a test can fail because of the mutant while the count stays 0.
-  If the runner required a hit before it counted a failing test, those mutants would wrongly survive.
+- App code that a Playwright test worker imports, outside any page, reports coverage and hits too. The
+  hook sets up the worker's own Stryker namespace before any test file loads, and writes its coverage
+  and hit count when the worker exits. In the perTest dry run, coverage made while a test runs counts
+  for that test, and coverage made at import time counts as static. Node code gets the hit limit, so a
+  loop there reports a Timeout ("Hit limit reached"), as one in a page does.
+- A failing test kills the mutant even when the hit count is 0. A setup test runs with the mutant
+  active, and a worker that Playwright force-kills never writes its count, so a test can fail because
+  of the mutant while the count stays 0. If the runner required a hit before it counted a failing
+  test, those mutants would wrongly survive.
 - A Playwright worker that crashes during a test fails that test, so the mutant counts as Killed, as in
   StrykerJS pull request 6020. A spec file whose imports throw with the mutant active fails earlier, in
   Playwright's loader process, and the run reports an Error, as Stryker's jest and vitest runners do.
@@ -394,10 +400,16 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   runs only the tests that reached it from their own pages, so it can survive when only a test that
   uses the shared page would have killed it (inferred from Stryker's test planner, not run). Shared
   pages make such mutants common with this runner.
-- App code that the Node test workers import (not the page) gets the active mutant but no coverage.
-  With coverage analysis on, its mutants show as NoCoverage. With `coverageAnalysis: 'off'`, every test
-  runs against them. Even with `'off'`, the dry run needs at least one test that loads instrumented code
-  in a page. A suite in which no page loads instrumented code fails the dry run.
+- Node coverage in a test worker has no context to tell a test's own code from a `beforeAll` hook or a
+  worker fixture that runs during it, so coverage those make counts for that test, where a page's
+  counts as static. A mutant reached only there and asserted only by a later test can survive when it
+  should be killed. Node coverage from a worker that Playwright force-kills (no heartbeat for 5 min) is
+  lost, and code in Playwright's loader process or the `webServer` gets none.
+- An infinite loop in a test worker's own Node code, outside a page, blocks that worker. Neither the
+  per-test timeout nor the runner's stop ends it; `stopTests()` waits until Playwright force-kills the
+  worker after 5 minutes without a heartbeat (measured once, before the worker counted hits: 357 s
+  for a run with a 60 s budget). The hit limit ends such a loop, and without one Stryker's own timer
+  does.
 - A timeout that reaches Stryker's own timer costs a full init: config load, global setup, and a
   `webServer` start, including any build that start runs. With the runner's own stop that happens only
   when the stop takes longer than 2.6 s (once in 9 measured runs), in a dry run, or when a loop runs at

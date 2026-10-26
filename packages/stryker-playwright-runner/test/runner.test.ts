@@ -85,29 +85,28 @@ function testId(title: string): string {
   return found.id;
 }
 
-// The ids of the fixture's mutants that a page load reaches when a test also calls `called`: the code
-// outside the app's functions, plus the bodies of the called functions. Lines are 0-based, as in
+// The ids of the fixture's mutants in the bodies of the lib.js functions `called`, plus, with
+// `pageLoad`, those in app.js, all of which runs when a page loads the app. Lines are 0-based, as in
 // Stryker's mutant locations.
-function mutantsReached(called: string[]): string[] {
-  const source = readFileSync(fixture('src/app.js'), 'utf8').split('\n');
+function mutantsReached(called: string[], pageLoad = true): string[] {
+  const lib = readFileSync(fixture('src/lib.js'), 'utf8').split('\n');
   const lines = (name: string) => {
-    const first = source.findIndex((line) =>
+    const first = lib.findIndex((line) =>
       line.startsWith(`export function ${name}(`),
     );
 
-    return { first, last: source.indexOf('}', first) };
+    return { first, last: lib.indexOf('}', first) };
   };
-  const all = ['add', 'countTo', 'double', 'half'].map(lines);
   const reached = called.map(lines);
-  const within = (line: number) => (range: { first: number; last: number }) =>
-    line >= range.first && line <= range.last;
 
   return mutants
-    .filter(({ location }) => {
-      const line = location.start.line;
-
-      return !all.some(within(line)) || reached.some(within(line));
-    })
+    .filter(({ fileName, location: { start } }) =>
+      fileName === fixture('src/app.js')
+        ? pageLoad
+        : reached.some(
+            ({ first, last }) => start.line >= first && start.line <= last,
+          ),
+    )
     .map(({ id }) => id)
     .sort();
 }
@@ -132,17 +131,19 @@ function mutantRun(
 before(async () => {
   const instrumenter = new Instrumenter(log);
   const result = await instrumenter.instrument(
-    [
-      {
-        name: fixture('src/app.js'),
-        content: readFileSync(fixture('src/app.js'), 'utf8'),
-        mutate: true,
-      },
-    ],
+    ['app.js', 'lib.js'].map((file) => ({
+      name: fixture(`src/${file}`),
+      content: readFileSync(fixture(`src/${file}`), 'utf8'),
+      mutate: true,
+    })),
     { plugins: null, excludedMutations: [], ignorers: [] },
   );
   mutants = result.mutants;
-  writeFileSync(fixture('public/app.js'), result.files[0].content);
+
+  for (const { name, content } of result.files) {
+    writeFileSync(fixture(`public/${path.basename(name)}`), content);
+  }
+
   rmSync(fixture('test-results'), { recursive: true, force: true });
   mkdirSync(deadRoot, { recursive: true });
   mkdirSync(oldSchemeRoot, { recursive: true });
@@ -181,7 +182,7 @@ test('init removes the temp roots of dead runners and leaves those of the old sc
 });
 
 test('dry run completes with every test passing', () => {
-  assert.equal(tests.length, 11);
+  assert.equal(tests.length, 13);
   assert.ok(
     tests.every((t) => t.status === TestStatus.Success),
     JSON.stringify(tests),
@@ -288,6 +289,36 @@ test('reused contexts still get per-test coverage', () => {
     undefined,
   );
   assert.ok(perTest[testId('reused context, second test')]?.[loopMutant]);
+});
+
+test('app code a test runs in the Playwright worker gets per-test coverage', () => {
+  const { perTest } = dryRun.mutantCoverage!;
+
+  assert.deepEqual(
+    Object.keys(perTest[testId('adds in the worker')] ?? {}).sort(),
+    mutantsReached(['add'], false),
+  );
+});
+
+test('a mutant in app code that only the worker runs is killed by its test', async () => {
+  const result = await mutantRun(mutant('ArithmeticOperator', 'a - b'), {
+    testFilter: [testId('adds in the worker')],
+  });
+
+  assert.equal(result.status, MutantRunStatus.Killed, JSON.stringify(result));
+});
+
+test('an infinite loop in app code that the worker runs trips the hit limit', async () => {
+  const result = await mutantRun(mutant('UpdateOperator', 'i--'), {
+    testFilter: [testId('counts in the worker')],
+    hitLimit: 1000,
+  });
+
+  assert.equal(result.status, MutantRunStatus.Timeout, JSON.stringify(result));
+  assert.match(
+    result.status === MutantRunStatus.Timeout ? (result.reason ?? '') : '',
+    /Hit limit reached/,
+  );
 });
 
 test('a runtime mutant is killed by the test that covers it', async () => {

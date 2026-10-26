@@ -68,6 +68,14 @@ function install(
   // "no page loaded instrumented code". Appending keeps the snapshots of an earlier worker in this
   // run that had the same pid.
   fs.writeFileSync(outFile, '', { flag: 'a' });
+  // Before any test file is imported: the hook is preloaded with --import.
+  recordNodeCoverage(
+    ((globalThis as Record<string, unknown>)[ns] ??= {}) as NodeNamespace,
+    { perTest, hitLimit },
+    () => currentTestId(test),
+    // The leading newline ends a partial line a killed worker with the same pid left behind.
+    (line) => fs.appendFileSync(outFile, '\n' + line + '\n'),
+  );
 
   // Closing a page that owns its context closes the context first, so the same page can come up twice.
   function readOnce(pages: Page[]): Promise<FrameRead[]> {
@@ -145,6 +153,88 @@ function install(
       } satisfies PageSettings);
     },
     runBeforeCloseBrowserContext: collect,
+  });
+}
+
+/** The fields of the worker's own Stryker namespace that the hook sets or reads. */
+export interface NodeNamespace {
+  activeMutant?: string;
+  currentTestId?: string;
+  mutantCoverage?: unknown;
+  hitCount?: number;
+  hitLimit?: number;
+}
+
+/**
+ * Makes the worker's own namespace report the coverage and hits of the app code its tests import. It
+ * leaves activeMutant alone: the instrumented code reads it from the environment only while it is
+ * unset. The instrumented code reads currentTestId on every call, so a getter puts coverage made
+ * during a test under that test, and coverage made while no test runs, such as at import, in static.
+ * runTests resolves after its workers exit, so a line written at exit is there to read, except after a
+ * failure that reaches maxFailures: then it may resolve first. The hit limit throws, which fails the
+ * test, so the count is written the moment it passes the limit instead.
+ */
+export function recordNodeCoverage(
+  ns: NodeNamespace,
+  { perTest, hitLimit }: { perTest: boolean; hitLimit?: number },
+  currentTestId: () => string | undefined,
+  write: (line: string) => void,
+  onExit: (listener: () => void) => void = (listener) => {
+    process.on('exit', listener);
+  },
+): void {
+  let written = false;
+  const writeOnce = () => {
+    written = true;
+
+    // After a failure that reaches maxFailures the runner may have read and removed the run's
+    // directory already. A throw in an exit listener keeps Playwright's worker from exiting until
+    // its 5-minute force-kill, so a write with nowhere to go is dropped.
+    try {
+      write(
+        serializeSnapshot({
+          mutantCoverage: ns.mutantCoverage,
+          hitCount: ns.hitCount,
+          outlivedItsTest: false,
+        }),
+      );
+    } catch {
+      // Nothing reads this run's snapshots any more.
+    }
+  };
+
+  // Stryker sizes the limit from the dry run's hits, Node hits included, so Node code counts too.
+  if (hitLimit !== undefined) {
+    let hits = 0;
+    ns.hitLimit = hitLimit;
+    Object.defineProperty(ns, 'hitCount', {
+      get: () => hits,
+      set: (value: number) => {
+        hits = value;
+
+        if (hits > hitLimit && !written) {
+          writeOnce();
+        }
+      },
+      configurable: true,
+      enumerable: true,
+    });
+  }
+
+  if (perTest) {
+    Object.defineProperty(ns, 'currentTestId', {
+      get: currentTestId,
+      configurable: true,
+      enumerable: true,
+    });
+  }
+
+  onExit(() => {
+    if (written || (ns.mutantCoverage === undefined && !ns.hitCount)) {
+      return;
+    }
+
+    writeOnce();
   });
 }
 

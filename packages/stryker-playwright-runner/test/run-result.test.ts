@@ -585,7 +585,7 @@ test('a snapshot with cyclic coverage is written as a lost frame', () => {
   );
 });
 
-test('the missing-coverage error says no page opened instead of blaming the webServer', () => {
+test('the missing-coverage error says no instrumented code ran instead of blaming the webServer', () => {
   const passed = {
     id: 'a',
     name: 'a',
@@ -595,7 +595,24 @@ test('the missing-coverage error says no page opened instead of blaming the webS
 
   assert.equal(
     missingCoverageError([passed], []),
-    'Tests ran, but none opened a page, so no page loaded instrumented code. The dry run needs at least one test that loads the app in a page.',
+    'Tests ran, but no instrumented code ran, neither in a page nor in a Playwright worker. The dry run needs at least one test that runs the app code, in a page or by importing it.',
+  );
+});
+
+test('coverage from a Playwright worker alone satisfies the dry run', () => {
+  const passed = {
+    id: 'a',
+    name: 'a',
+    status: TestStatus.Success,
+    timeSpentMs: 10,
+  } as const;
+
+  assert.equal(
+    missingCoverageError(
+      [passed],
+      [parsed({ mutantCoverage: { static: { '1': 1 }, perTest: {} } })],
+    ),
+    undefined,
   );
 });
 

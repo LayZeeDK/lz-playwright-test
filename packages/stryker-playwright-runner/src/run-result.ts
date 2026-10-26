@@ -347,7 +347,7 @@ export function missingCoverageError(
   }
 
   if (snapshots.length === 0) {
-    return 'Tests ran, but none opened a page, so no page loaded instrumented code. The dry run needs at least one test that loads the app in a page.';
+    return 'Tests ran, but no instrumented code ran, neither in a page nor in a Playwright worker. The dry run needs at least one test that runs the app code, in a page or by importing it.';
   }
 
   const lost = snapshots.filter((snapshot) => snapshot.lost).length;
