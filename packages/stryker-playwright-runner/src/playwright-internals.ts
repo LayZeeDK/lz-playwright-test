@@ -187,9 +187,24 @@ export function instrumentationOf(
   return core._instrumentation;
 }
 
+/** What Playwright 1.64.1's timeout manager runs: the test body, hooks, worker teardown, modifiers. */
+const SLOT_TYPES = [
+  'test',
+  'beforeEach',
+  'afterEach',
+  'beforeAll',
+  'afterAll',
+  'teardown',
+  'skip',
+  'slow',
+  'fail',
+  'fixme',
+] as const;
+
+export type SlotType = (typeof SLOT_TYPES)[number];
+
 export interface RunningSlot {
-  /** `test` for the test body, else the hook type, such as `beforeAll`. */
-  readonly type: string;
+  readonly type: SlotType;
   /** Whether a fixture of that slot is being set up or torn down. */
   readonly inFixture: boolean;
 }
@@ -203,11 +218,15 @@ export function runningSlotOf(testInfo: unknown): RunningSlot | undefined {
   const running = isRecord(manager) ? manager._running : undefined;
   const runnable = isRecord(running) ? running.runnable : undefined;
 
-  if (!isRecord(runnable) || typeof runnable.type !== 'string') {
+  if (!isRecord(runnable) || !isSlotType(runnable.type)) {
     return undefined;
   }
 
   return { type: runnable.type, inFixture: runnable.fixture !== undefined };
+}
+
+function isSlotType(value: unknown): value is SlotType {
+  return SLOT_TYPES.some((type) => type === value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

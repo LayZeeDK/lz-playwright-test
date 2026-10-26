@@ -8,7 +8,10 @@ import type { TestContext } from 'node:test';
 import type { Browser, BrowserContext, Frame, Page } from '@playwright/test';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
-import type { Instrumentation } from '../../src/playwright-internals.ts';
+import type {
+  Instrumentation,
+  SlotType,
+} from '../../src/playwright-internals.ts';
 import type { RunSettings } from '../../src/protocol.ts';
 import type {
   install,
@@ -22,7 +25,7 @@ type Listener = Parameters<Instrumentation['addListener']>[0];
 
 /** The shape of Playwright's TestInfo._timeoutManager._running.runnable. */
 export interface Runnable {
-  type: string;
+  type: SlotType;
   fixture?: { title: string };
 }
 

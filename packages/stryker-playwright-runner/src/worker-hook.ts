@@ -17,6 +17,7 @@ import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 import {
   instrumentationOf,
   runningSlotOf,
+  type SlotType,
   WORKER_ENTRY,
 } from './playwright-internals.ts';
 import {
@@ -241,12 +242,14 @@ export function recordNodeCoverage(
 
 // Playwright makes a test current before it runs the beforeAll hooks and sets up the fixtures it
 // needs, so test.info() alone names the first test of a group for code that serves the whole group.
-const PER_TEST_SLOTS: ReadonlySet<string> = new Set([
+// Fixtures differ between the two rules: Node code cannot tell a worker fixture from a test's own, so
+// it counts for no test, while a context a fixture opens is checked again at close (outlivedItsTest).
+const PER_TEST_SLOTS: ReadonlySet<SlotType> = new Set([
   'test',
   'beforeEach',
   'afterEach',
 ]);
-const GROUP_HOOKS: ReadonlySet<string> = new Set(['beforeAll', 'afterAll']);
+const GROUP_HOOKS: ReadonlySet<SlotType> = new Set(['beforeAll', 'afterAll']);
 
 /** The test that Node code running now belongs to: none in a beforeAll or afterAll hook or a fixture. */
 function nodeTestId(test: Test): string | undefined {

@@ -120,6 +120,26 @@ test("the running slot is read from the TestInfo's timeout manager", () => {
   );
 });
 
+test("every runnable type of Playwright's timeout manager is a slot", () => {
+  for (const type of [
+    'test',
+    'beforeEach',
+    'afterEach',
+    'beforeAll',
+    'afterAll',
+    'teardown',
+    'skip',
+    'slow',
+    'fail',
+    'fixme',
+  ]) {
+    assert.deepEqual(
+      runningSlotOf({ _timeoutManager: { _running: { runnable: { type } } } }),
+      { type, inFixture: false },
+    );
+  }
+});
+
 test('a TestInfo without that shape, or with nothing running, has no running slot', () => {
   for (const testInfo of [
     undefined,
@@ -131,6 +151,7 @@ test('a TestInfo without that shape, or with nothing running, has no running slo
     { _timeoutManager: { _running: {} } },
     { _timeoutManager: { _running: { runnable: null } } },
     { _timeoutManager: { _running: { runnable: { type: 1 } } } },
+    { _timeoutManager: { _running: { runnable: { type: 'beforeSome' } } } },
   ]) {
     assert.equal(runningSlotOf(testInfo), undefined, JSON.stringify(testInfo));
   }

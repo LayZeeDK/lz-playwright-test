@@ -524,7 +524,7 @@ test('a context a beforeAll or afterAll hook opens and closes counts as shared, 
   hooked.scope[hooked.ns].hitCount = 1;
   const created: Awaited<ReturnType<typeof hooked.context>>[] = [];
 
-  for (const type of ['beforeAll', 'afterAll']) {
+  for (const type of ['beforeAll', 'afterAll'] as const) {
     hooked.setTest('t1', { type });
     const opened = await hooked.context();
     opened.open(hooked.page().page);
