@@ -413,8 +413,13 @@ function installed(
     ns,
     scope,
     hooks,
-    read: () =>
-      readFileSync(path.join(outDir, `worker-${process.pid}.ndjson`), 'utf8'),
+    files: () => readdirSync(outDir),
+    read: () => {
+      const [file, ...more] = readdirSync(outDir);
+      assert.ok(file !== undefined && more.length === 0, 'one snapshot file');
+
+      return readFileSync(path.join(outDir, file), 'utf8');
+    },
     /** `runs` is what Playwright's timeout manager runs for that test: its body by default. */
     setTest: (id: string | undefined, runs: Runnable = { type: 'test' }) => {
       running = id;
@@ -439,20 +444,21 @@ test('install creates the worker snapshot file at once', (t) => {
   assert.equal(installed(t, { perTest: false }).read(), '');
 });
 
-test('install keeps what an earlier worker with the same pid wrote', (t) => {
-  const hooked = installed(
-    t,
-    { perTest: false },
-    {
-      prepare: (outDir) =>
-        writeFileSync(
-          path.join(outDir, `worker-${process.pid}.ndjson`),
-          '{"earlier":true}\n',
-        ),
-    },
-  );
+test('each install names its snapshot file by the worker pid and a random part', (t) => {
+  const name = /^worker-(\d+)-([0-9a-f-]{36})\.ndjson$/;
+  const [first, second] = [
+    installed(t, { perTest: false }),
+    installed(t, { perTest: false }),
+  ].map((hooked) => {
+    const [file] = hooked.files();
+    const match = name.exec(file ?? '');
+    assert.ok(match, file);
 
-  assert.equal(hooked.read(), '{"earlier":true}\n');
+    return match;
+  });
+
+  assert.equal(first[1], String(process.pid));
+  assert.notEqual(first[2], second[2]);
 });
 
 test("install counts the worker's own hits in its namespace and writes them past the limit", (t) => {
@@ -460,7 +466,7 @@ test("install counts the worker's own hits in its namespace and writes them past
 
   hooked.scope[hooked.ns].hitCount = 3;
 
-  assert.equal(hooked.read(), '\n{"hitCount":3,"outlivedItsTest":false}\n');
+  assert.equal(hooked.read(), '{"hitCount":3,"outlivedItsTest":false}\n');
 });
 
 test("install keeps a namespace the worker's instrumented code made first", (t) => {
@@ -595,8 +601,7 @@ test('a closing context writes what each frame of each page holds, as one line p
   };
   assert.equal(
     hooked.read(),
-    '\n' +
-      [frameLine, frameLine].map((line) => JSON.stringify(line)).join('\n') +
+    [frameLine, frameLine].map((line) => JSON.stringify(line)).join('\n') +
       '\n',
   );
 });

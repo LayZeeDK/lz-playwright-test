@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -61,12 +62,15 @@ export function install(
   const instrumentation = instrumentationOf(playwrightRequire);
   const activeMutant =
     process.env[INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE];
-  const outFile = path.join(outDir, `worker-${process.pid}${SNAPSHOT_SUFFIX}`);
+  const outFile = path.join(
+    outDir,
+    `worker-${process.pid}-${randomUUID()}${SNAPSHOT_SUFFIX}`,
+  );
   const contexts = new WeakMap<BrowserContext, ContextState>();
   const alreadyRead = new WeakSet<Page>();
   const patchedBrowsers = new WeakSet<Browser>();
 
-  fs.writeFileSync(outFile, '', { flag: 'a' });
+  fs.writeFileSync(outFile, '');
   const scope = globalThis as unknown as Record<
     string,
     NodeNamespace | undefined
@@ -75,7 +79,7 @@ export function install(
     (scope[ns] ??= {}),
     { perTest, hitLimit },
     () => nodeTestId(test),
-    (line) => fs.appendFileSync(outFile, '\n' + line + '\n'),
+    (line) => fs.appendFileSync(outFile, line + '\n'),
   );
 
   // Closing a page that owns its context closes the context first, so the same page can come up twice.
@@ -106,7 +110,7 @@ export function install(
     );
 
     if (lines.length) {
-      fs.appendFileSync(outFile, '\n' + lines.join('\n') + '\n');
+      fs.appendFileSync(outFile, lines.join('\n') + '\n');
     }
   }
 
