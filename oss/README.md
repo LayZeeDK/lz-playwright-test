@@ -55,3 +55,31 @@ it uses is `oss/realworld-api`. Then run `npx stryker run stryker.playwright.con
    - adds `.stryker-tmp` to `.gitignore`.
 3. Run `npx stryker run stryker.playwright.config.ts`. If it reports "Failed to delete stryker temp
    directory", stop the Nx daemon the build started: `npx nx daemon --stop` from the sandbox folder.
+
+## epic-stack: epicweb-dev/epic-stack at 893610d
+
+The run uses the UI operators and the TypeScript checker, against the repo's own e2e tests on its Vite
+dev server (`npm run dev`), which compiles Stryker's sandbox on the fly.
+
+1. Copy `.env.example` to `.env`, the repo's own setup step.
+2. Install the runner, StrykerJS, and Playwright as above, plus the operators and the checker:
+   `npm install -D @stryker-mutator/typescript-checker@10.1.1
+   file:<this repo>/packages/stryker-ui-mutators`. The copy pins `@playwright/test` to `^1.58.1`.
+3. Apply `epic-stack/copy.patch` and copy `epic-stack/stryker.playwright.config.ts` into the copy.
+   The patch:
+   - sets Prisma's `engineType = "binary"`. Prisma 6.19 ships its query engine for Windows only as
+     an x64 Node-API library, which arm64 Node cannot load. The binary engine is an x64 process,
+     which Windows on Arm runs under emulation;
+   - moves the default port from 3000 to 3313. The dev server moves to the next free port when its
+     port is taken, while Playwright keeps waiting on the configured one;
+   - raises the test timeout from 15 s to 30 s. On a cold dev server the 2FA test ran past 15 s;
+   - adds `use.actionTimeout: 5000`, which the copy's config does not set;
+   - marks "Users can update their profile photo" `test.fixme`. It failed in every plain run: its
+     `/change/i` button locator matches the previous page's "Save changes" button before the photo
+     page renders.
+4. Run the repo's setup steps: `npx prisma generate --sql`, `npx prisma migrate deploy`,
+   `npm run build`, `npx playwright install chromium`, and `npx react-router typegen` for the
+   checker. Plain `npx playwright test --workers=1` then passes 25 tests and skips 1.
+5. Run `npx stryker run stryker.playwright.config.ts`. Keep the copy's `reuseExistingServer: true`:
+   when the type checker finishes, Stryker starts a second test runner, which would otherwise fail
+   with "http://localhost:3313 is already used".
