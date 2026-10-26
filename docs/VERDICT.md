@@ -123,7 +123,9 @@ tests cover all ten. The plugin patches StrykerJS internals, so it supports Stry
 ## Evidence
 
 All numbers are from one Windows 11 arm64 machine shared with other sessions, so treat timings as
-indicative. Each row is a single run unless it says otherwise. The run logs and the decision log that
+indicative. The rows marked Linux ran on the same machine in a Docker container of the
+`mcr.microsoft.com/playwright:v1.64.1-noble` image (Ubuntu 24.04, Linux arm64, Node 24.22.1), from a
+`git archive` of the commit in the Code column. Each row is a single run unless it says otherwise. The run logs and the decision log that
 this section cites are local working records in gitignored folders, not part of the repo. To check a
 row, rerun it with the commands in Rerun.
 
@@ -138,15 +140,26 @@ earlier run, which the rows replace; the wall times differ by up to 1m14s, which
 shared machine cannot explain. One `oss/README.md` step needed a fix for the ngx-yeti rerun (3ff6277).
 
 Wall time is Stryker's own "Done in" from the run's log. The define row has no kept log, so its time is
-the shell's elapsed time for the whole command.
+the shell's elapsed time for the whole command. A "(step)" time is the elapsed time of the whole Nx target in
+`tools/linux-run.sh`, build check included, because those logs were not kept.
 
-The packages and their public names changed to `lz-` names at 7b9a022; the rows below ran before it and
-use the old names (`@layzee/stryker-playwright-runner`, `@layzee/stryker-ui-mutators`, `testRunner:
+The Linux rows ran at 74df74e and gave the Windows counts. That run also found a bug that shows only on Linux. The runner
+checked whether the `webServer` port answered on `localhost` only, which resolves to `127.0.0.1` for
+`net.connect` in Docker's default network while a server on `localhost` listens on `::1`. 2a53a36 checks both
+loopback addresses, as Playwright does. At 9a27326 the container passed `npm ci`, lint, typecheck, build, the
+runner's 210 unit tests, the operators' 216, and the 49 browser tests. Its demo Stryker runs were stopped
+after 25 of the first run's 32 mutants (5 survived and none timed out by then), because Docker's virtual
+machine left less than 4 GB of the host's memory free for other work.
+
+The packages and their public names changed to `lz-` names at 7b9a022. The rows at 9a27326 ran after it;
+every other row ran before it and used the old names (`@layzee/stryker-playwright-runner`, `@layzee/stryker-ui-mutators`, `testRunner:
 'playwright'`, the `playwright` options key, and operator names without the `Lz` prefix).
 
 | Case                                                                                                                                                                  | Runner                                                                                       | Code                             | Score                                                                                                            | Wall time                      |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------ |
 | Demo e2e, 32 mutants in `cart.ts`                                                                                                                                     | this runner, `timeoutMS` 10000                                                               | 905b030                          | 27 killed, 5 survived                                                                                            | 4m03s                          |
+| Same, after the rename to `lz-` names                                                                                                                                 | this runner, `timeoutMS` 10000                                                               | 9a27326                          | 27 killed, 5 survived                                                                                            | 4m18s                          |
+| Same, Linux                                                                                                                                                           | this runner, `timeoutMS` 10000                                                               | 74df74e                          | 27 killed, 5 survived                                                                                            | 3m17s (step)                   |
 | Same                                                                                                                                                                  | this runner, `timeoutMS` 10000                                                               | before fca053d                   | 27 killed, 5 survived                                                                                            | 4m02s                          |
 | Same                                                                                                                                                                  | this runner before the per-test timeout fix, `timeoutMS` 10000                               | before fca053d                   | 26 killed, 1 timeout, 5 survived                                                                                 | 4m35s                          |
 | Same                                                                                                                                                                  | this runner before the per-test timeout fix, `timeoutMS` 5000                                | before fca053d                   | 26 killed, 1 timeout, 5 survived                                                                                 | 5m51s                          |
@@ -156,8 +169,13 @@ use the old names (`@layzee/stryker-playwright-runner`, `@layzee/stryker-ui-muta
 | Same, lines 11 to 17 (7 mutants), `timeoutMS` 1 and `timeoutFactor` 0 so Stryker's own timer fires first                                                              | this runner                                                                                  | 905b030                          | 7 timeouts                                                                                                       | 1m18s                          |
 | Same, lines 11 to 17                                                                                                                                                  | this runner                                                                                  | 53a5aa6                          | 7 timeouts                                                                                                       | 1m28s                          |
 | Demo CT, 27 mutants in `price-tag.tsx` via `mount()`                                                                                                                  | this runner, `timeoutMS` 10000                                                               | before fca053d                   | 21 killed, 6 survived                                                                                            | 2m30s                          |
+| Same, after the rename to `lz-` names                                                                                                                                 | this runner, `timeoutMS` 10000                                                               | 9a27326                          | 21 killed, 6 survived                                                                                            | 2m45s                          |
+| Same, Linux                                                                                                                                                           | this runner, `timeoutMS` 10000                                                               | 74df74e                          | 21 killed, 6 survived                                                                                            | 2m16s (step)                   |
 | Same                                                                                                                                                                  | this runner, `--concurrency 2`                                                               | before fca053d                   | 21 killed, 6 survived                                                                                            | 1m26s                          |
 | Demo e2e with the UI operators (`stryker.e2e.ui.config.ts`), 65 mutants in `app.tsx` and `price-tag.tsx`, 17 of them from UI operators                                | this runner and `@layzee/stryker-ui-mutators`, `timeoutMS` 10000                             | 107505c                          | UI: 8 killed, 3 timeouts, 4 survived, 2 no coverage. Built-in: 12 killed, 8 timeouts, 1 survived, 27 no coverage | 5m15s                          |
+| Same, after the rename to `lz-` names                                                                                                                                 | this runner and `@layzee/lz-stryker-ui-mutators`, `timeoutMS` 10000                          | 9a27326                          | UI: 8 killed, 3 timeouts, 4 survived, 2 no coverage. Built-in: 12 killed, 8 timeouts, 1 survived, 27 no coverage | 6m14s                          |
+| Same, with both packages installed from their packed tarballs into a project outside the workspace (`tools/packed-demo/`)                                             | same                                                                                         | 9a27326                          | The same status for each of the 65 mutants as the row above                                                      | 4m55s                          |
+| Same as the 107505c row, Linux                                                                                                                                        | this runner and `@layzee/stryker-ui-mutators`, `timeoutMS` 10000                             | 74df74e                          | UI: 8 killed, 3 timeouts, 4 survived, 2 no coverage. Built-in: 12 killed, 8 timeouts, 1 survived, 27 no coverage | 4m07s (step)                   |
 | Same, with `use.actionTimeout: 5000` added to the demo's Playwright config                                                                                            | same                                                                                         | 107505c                          | UI: 11 killed, 4 survived, 2 no coverage. Built-in: 20 killed, 1 survived, 27 no coverage                        | 4m26s                          |
 | `stryker-playwright-hello-world`, 7 mutants                                                                                                                           | this runner (repo's `define` removed)                                                        | before fca053d                   | 6 killed, 1 survived                                                                                             | median 44s (43 to 46s), 5 runs |
 | Same                                                                                                                                                                  | the repo's own `command` runner setup                                                        | -                                | 6 killed, 1 survived                                                                                             | median 64s (57 to 66s), 5 runs |
@@ -175,7 +193,9 @@ emptied the text or label of, and waits for it until the test timeout (see Limit
 `actionTimeout` set, those three and the eight built-in timeouts end as kills by the named tests. The
 four survivors are gaps in the demo's tests, not equivalent mutants: the tests read the three totals
 by test id, not by their labels, and read each line's name from its input's `aria-label`, not from the
-label text. The two uncovered mutants are in `price-tag.tsx`, which no e2e page renders. No UI mutant
+label text. `spikes/live-mutant/` shows two of the four on a live page, with Stryker's own instrumented
+build and mutant ids. Mutant 23 removes the "Subtotal" label and mutant 16 removes both line names, while
+the totals the tests read stay the same. The two uncovered mutants are in `price-tag.tsx`, which no e2e page renders. No UI mutant
 was equivalent, and none was a compile or runtime error. The demo app has sites for only three of the
 ten operators (`LzTextLiteral`, `LzChildExpression`, `LzUrlAttribute`). The other seven have evidence from
 tests only, below.
@@ -486,11 +506,24 @@ differ. The command line itself was not run.
 
 For the second UI operator row, add `actionTimeout: 5000` to the top-level `use` block of
 `apps/demo-app-e2e/playwright.config.mts` for that run only. `spikes/fail-loud/README.md` gives the
-fail-loud commands. For the RealWorld row with `use.actionTimeout: 5000`, add `actionTimeout: 5000` to the top-level `use` block of
+fail-loud commands, and `tools/packed-demo/README.md` the packed-tarball row. For the RealWorld row with `use.actionTimeout: 5000`, add `actionTimeout: 5000` to the top-level `use` block of
 the copy's `apps/conduit-e2e/playwright.config.ts` after `prepare.ts` has run. `prepare.ts` does not
 add it. `oss/README.md` gives the steps for the hello-world forced-timeout row, ngx-yeti, Analog, and epic-stack.
 
-Versions: StrykerJS 10.1.1, Playwright 1.64.1, Nx 24.0.1, Vite 8.3.5, Node 24.22.0.
+Versions: StrykerJS 10.1.1, Playwright 1.64.1, Nx 24.0.1, Vite 8.3.5, Node 24.22.0 (24.22.1 in the Linux
+container). The runner's and the operators' test suites also pass on Node 22.23.1, on Windows.
+
+The Linux rows ran `tools/linux-run.sh` in the container: `npm ci`, lint, typecheck, build, the three test
+targets, and the three demo targets, each with its log and exit code in the mounted folder. From an empty
+folder `<out>`:
+
+```sh
+git archive HEAD -o <out>/head.tar
+cp tools/linux-run.sh <out>/
+docker run --rm --init --ipc=host --memory 6g -v "<out>:/out" mcr.microsoft.com/playwright:v1.64.1-noble bash /out/linux-run.sh
+```
+
+Without `--memory`, the container's file cache grew Docker's WSL virtual machine to 11 GB on a 32 GB host.
 
 ## Research behind the design
 

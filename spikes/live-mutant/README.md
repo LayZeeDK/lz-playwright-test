@@ -20,7 +20,7 @@ mutant per browser session. This spike checks each step. Lars approved it on 202
    `globalThis.__stryker__.activeMutant` with `page.context().addInitScript` before the app loads (as the runner's
    worker hook does), reads the page, and exits with the number of failed cases.
 
-## Results so far (measured, 2026-10-26, StrykerJS 10.1.1, Vite 8.3.5)
+## Results (measured, 2026-10-26, StrykerJS 10.1.1, Vite 8.3.5)
 
 - Step 1 ran in 11 s. Its `out/mutation.json` lists the same 65 mutants as the e2e-ui report at 74df74e,
   matched on id, file, line and column, mutator (ignoring the `Lz` prefix the rename added) and replacement.
@@ -39,9 +39,9 @@ mutant per browser session. This spike checks each step. Lars approved it on 202
 
 ## Verdict
 
-The launch works: an agent can serve Stryker's instrumented copy of the demo app and show any one mutant of a
-report on a live page. All three mutants above survived the e2e-ui run, and each visibly changes the page, which
-measures the VERDICT claim that they are test gaps rather than equivalent mutants. A `control-demo-app` feature
-would take this as its entry point: `up` runs step 1 once per head and starts Vite on the sandbox, and a recipe
-opens one session per mutant with the init script. Not covered: the CT gallery, and a mutant that only runs on
-the server (the demo app has none).
+The launch works. An agent can serve Stryker's instrumented copy of the demo app and show any one mutant of a
+report on a live page. All three mutants above survived the e2e-ui run, and each visibly changes the page, so
+none of them is equivalent. Mutants 23 and 16 are two of the four UI survivors that VERDICT calls test gaps.
+A `control-demo-app` feature would take this as its entry point. Its `up` would run step 1 once per head and
+start Vite on the sandbox, and a recipe would open one session per mutant with the init script. The spike does
+not cover the CT gallery, or a mutant that only runs on the server, which the demo app does not have.

@@ -1,6 +1,6 @@
 # stryker-playwright-runner
 
-A prototype StrykerJS test runner for Playwright Test. One plugin runs Playwright e2e tests and
+A StrykerJS test runner for Playwright Test. One plugin runs Playwright e2e tests and
 Playwright component tests (`mount()`) as Stryker tests, with per-test coverage, and starts the
 `webServer` once instead of once per mutant. A second plugin adds mutation operators for the parts of
 JSX that Playwright tests look at: text, labels, handlers, conditional elements, links, and disabled,
@@ -31,7 +31,8 @@ build first (the Nx targets below do).
   `STRYKER_BASELINE=define` or `STRYKER_BASELINE=off`.
 - `oss/`: the configs, patches, and scripts that copies of four open-source repos needed for a Stryker
   run. `oss/README.md` describes each copy.
-- `tools/`: the benchmark scripts that the Rerun section of `docs/VERDICT.md` calls.
+- `tools/`: the scripts that the Rerun section of `docs/VERDICT.md` calls: the benchmarks, the Linux
+  container run (`linux-run.sh`), and the demo on the packed tarballs (`packed-demo/`).
 - `docs/research/`: the research behind the design.
 - `docs/filings.md`: drafts of upstream issues found while validating the runner, none filed.
 - `docs/design/`: the design for the UI mutation operators.

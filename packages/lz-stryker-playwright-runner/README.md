@@ -10,7 +10,7 @@ once per Stryker test runner process instead of once per mutant.
   Playwright internals that a release can change, and stops with an error that names them when they
   have changed.
 - `@stryker-mutator/core` 10, tested on 10.1.1.
-- Node.js 22 or later, tested on 22.23.1 and 24.22.0.
+- Node.js 22 or later, tested on 22.23.1 and 24.22.0 on Windows 11 arm64, and on 24.22.1 on Linux arm64.
 - Chromium. Firefox and WebKit are untested.
 
 ## Configure Stryker

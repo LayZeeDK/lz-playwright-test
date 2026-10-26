@@ -247,7 +247,7 @@ shapes cannot ship there, and the operators measure what lint cannot see.
 - **Version range.** Peer dependency `@stryker-mutator/core` `~10.1.0`. At run time the plugin reads the
   version of the instrumenter it resolved. A version other than `10.1.1`, the tested one, logs a warning
   and the install goes on. The self-check, not the version, decides whether the run may continue. The
-  prototype throws on any other version. The plugin will warn instead.
+  Opus prototype throws on any other version.
 - **Registration without an upstream change.** On import, the plugin finds the instrumenter that the
   running `@stryker-mutator/core` uses. When `process.argv[1]`, after `realpath`, is core's
   `bin/stryker.js`, the plugin resolves the instrumenter from that core's folder, so a global or

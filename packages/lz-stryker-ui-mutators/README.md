@@ -22,7 +22,7 @@ shapes it skips. Reports show each operator's name as the mutator name.
 
 - `@stryker-mutator/core` 10.1, tested on 10.1.1. The plugin patches internals of that version's
   instrumenter, and warns when it finds another version.
-- Node.js 22 or later, tested on 22.23.1 and 24.22.0.
+- Node.js 22 or later, tested on 22.23.1 and 24.22.0 on Windows 11 arm64, and on 24.22.1 on Linux arm64.
 
 The operators do not need a particular test runner. With `@layzee/lz-stryker-playwright-runner`, a
 Playwright test can kill each of them.
