@@ -308,15 +308,16 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
 - Requires Playwright 1.63 or a later 1.x release. The runner refuses older versions and Playwright 2
   with a clear error, and its peer range is `>=1.63.0 <2`.
 - The runner is tested only with Chromium. Firefox and WebKit are untested.
-- The runner depends on six Playwright internals, any of which a Playwright release can change:
+- The runner depends on seven Playwright internals, any of which a Playwright release can change:
   `TestRunner` from `playwright/lib/runner`, `configLoader` from `playwright/lib/common`, `isURLAvailable`
   from `playwright-core/lib/coreBundle`, the path of Playwright's worker entry file
-  (`playwright/lib/worker/workerProcessEntry.js`), `_instrumentation` from `playwright-core`, and the
-  `_parallelMode` field of Playwright's suites. The `lib/` modules are in the package exports but
+  (`playwright/lib/worker/workerProcessEntry.js`), `_instrumentation` from `playwright-core`, the
+  `_parallelMode` field of Playwright's suites, and `TestInfo._timeoutManager`, which says whether a hook
+  or fixture is running. The `lib/` modules are in the package exports but
   undocumented. The runner checks the first three at startup and fails with an error that lists them.
   A moved worker entry leaves the hook uninstalled, and a missing `_instrumentation` makes the hook throw
   in the worker. Either one fails the dry run. A missing `_parallelMode` stops the runner with an error
-  that names it.
+  that names it. A missing `_timeoutManager` fails nothing: all Node coverage then counts as static.
 - The runner also sets `PLAYWRIGHT_NO_COPY_PROMPT`, an environment variable that Playwright reads but
   does not document, to turn off the page snapshot for its error prompt. If a release renames or drops
   that variable, nothing fails. A timed-out mutant run then takes about 12.5 s on an 8 s budget again,
