@@ -8,6 +8,7 @@ import {
   parallelModeOf,
   probeInternals,
   type RunnerModule,
+  runningSlotOf,
   supportsPlaywright,
   TEST_RUNNER_METHODS,
   WORKER_ENTRY,
@@ -102,9 +103,40 @@ test('the describe mode is read from the suite, and its absence fails loudly', (
   });
 });
 
+test("the running slot is read from the TestInfo's timeout manager", () => {
+  const info = (runnable: unknown) => ({
+    _timeoutManager: { _running: { runnable } },
+  });
+
+  assert.deepEqual(runningSlotOf(info({ type: 'beforeAll' })), {
+    type: 'beforeAll',
+    inFixture: false,
+  });
+  assert.deepEqual(
+    runningSlotOf(info({ type: 'test', fixture: { title: 'server' } })),
+    { type: 'test', inFixture: true },
+  );
+});
+
+test('a TestInfo without that shape, or with nothing running, has no running slot', () => {
+  for (const testInfo of [
+    undefined,
+    null,
+    {},
+    { _timeoutManager: null },
+    { _timeoutManager: {} },
+    { _timeoutManager: { _running: null } },
+    { _timeoutManager: { _running: {} } },
+    { _timeoutManager: { _running: { runnable: null } } },
+    { _timeoutManager: { _running: { runnable: { type: 1 } } } },
+  ]) {
+    assert.equal(runningSlotOf(testInfo), undefined, JSON.stringify(testInfo));
+  }
+});
+
 test('only playwright-internals.ts names a Playwright internal', () => {
   const internals =
-    /lib\/runner|lib\/common|coreBundle|_instrumentation|_parallelMode|workerProcessEntry|PLAYWRIGHT_NO_COPY_PROMPT/;
+    /lib\/runner|lib\/common|coreBundle|_instrumentation|_parallelMode|_timeoutManager|workerProcessEntry|PLAYWRIGHT_NO_COPY_PROMPT/;
   const offenders = readdirSync(src)
     .filter((file) => file !== 'playwright-internals.ts')
     .filter((file) => internals.test(readFileSync(new URL(file, src), 'utf8')));

@@ -248,6 +248,12 @@ test('without a hit limit the worker counts no hits', () => {
 
 type Listener = Parameters<Instrumentation['addListener']>[0];
 
+/** The shape of Playwright's TestInfo._timeoutManager._running.runnable. */
+interface Runnable {
+  type: string;
+  fixture?: { title: string };
+}
+
 interface FakeFrame {
   /** The global name the frame's namespace has; undefined reads the name the hook asks for. */
   name?: string;
@@ -281,6 +287,7 @@ function installed(
   const exitListeners = process.listeners('exit');
   const previousMutant = process.env[ACTIVE_MUTANT];
   let running: string | undefined;
+  let runnable: Runnable = { type: 'test' };
   let listener: Listener | undefined;
   const test = {
     info: () => {
@@ -290,7 +297,7 @@ function installed(
         );
       }
 
-      return { testId: running };
+      return { testId: running, _timeoutManager: { _running: { runnable } } };
     },
   };
   const modules: Record<string, unknown> = {
@@ -408,8 +415,10 @@ function installed(
     hooks,
     read: () =>
       readFileSync(path.join(outDir, `worker-${process.pid}.ndjson`), 'utf8'),
-    setTest: (id: string | undefined) => {
+    /** `runs` is what Playwright's timeout manager runs for that test: its body by default. */
+    setTest: (id: string | undefined, runs: Runnable = { type: 'test' }) => {
       running = id;
+      runnable = runs;
     },
     exitListeners: added,
     frame,
@@ -481,6 +490,39 @@ test("the worker's namespace names the running Playwright test, and none between
   hooked.setTest(undefined);
 
   assert.equal(hooked.scope[hooked.ns].currentTestId, undefined);
+});
+
+test("the worker's namespace names the test in its beforeEach and afterEach hooks", (t) => {
+  const hooked = installed(t, { perTest: true });
+
+  hooked.setTest('t1', { type: 'beforeEach' });
+
+  assert.equal(hooked.scope[hooked.ns].currentTestId, 't1');
+
+  hooked.setTest('t1', { type: 'afterEach' });
+
+  assert.equal(hooked.scope[hooked.ns].currentTestId, 't1');
+});
+
+test("the worker's namespace names no test in a beforeAll or afterAll hook, a fixture, or an unknown slot", (t) => {
+  const hooked = installed(t, { perTest: true });
+  const shared: Runnable[] = [
+    { type: 'beforeAll' },
+    { type: 'afterAll' },
+    { type: 'test', fixture: { title: 'server' } },
+    { type: 'beforeEach', fixture: { title: 'server' } },
+    { type: 'teardown' },
+  ];
+
+  for (const runs of shared) {
+    hooked.setTest('t1', runs);
+
+    assert.equal(
+      hooked.scope[hooked.ns].currentTestId,
+      undefined,
+      JSON.stringify(runs),
+    );
+  }
 });
 
 test('at exit the worker writes its Node coverage to its snapshot file', (t) => {
@@ -620,6 +662,44 @@ test('per-test coverage of a context that outlived its test, or began outside on
   assert.deepEqual(
     parsedLines(hooked.read()).map((line) => line.outlivedItsTest),
     [false, true, true],
+  );
+});
+
+test('a context a beforeAll or afterAll hook opens and closes counts as shared, and its pages name no test', async (t) => {
+  const hooked = installed(t, { perTest: true });
+  hooked.scope[hooked.ns].hitCount = 1;
+  const created: Awaited<ReturnType<typeof hooked.context>>[] = [];
+
+  for (const type of ['beforeAll', 'afterAll']) {
+    hooked.setTest('t1', { type });
+    const opened = await hooked.context();
+    opened.open(hooked.page().page);
+    await opened.close();
+    created.push(opened);
+  }
+
+  assert.deepEqual(
+    created.map(({ scripts }) => scripts[0][1].testId),
+    [undefined, undefined],
+  );
+  assert.deepEqual(
+    parsedLines(hooked.read()).map((line) => line.outlivedItsTest),
+    [true, true],
+  );
+});
+
+test("a context a test's own fixture opens belongs to that test", async (t) => {
+  const hooked = installed(t, { perTest: true });
+  hooked.scope[hooked.ns].hitCount = 1;
+  hooked.setTest('t1', { type: 'test', fixture: { title: 'context' } });
+  const opened = await hooked.context();
+  opened.open(hooked.page().page);
+  await opened.close();
+
+  assert.equal(opened.scripts[0][1].testId, 't1');
+  assert.deepEqual(
+    parsedLines(hooked.read()).map((line) => line.outlivedItsTest),
+    [false],
   );
 });
 

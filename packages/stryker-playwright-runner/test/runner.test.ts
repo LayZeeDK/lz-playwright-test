@@ -220,7 +220,7 @@ test('init removes the temp roots of dead runners and leaves those of the old sc
 });
 
 test('dry run completes with every test passing', () => {
-  assert.equal(tests.length, 13);
+  assert.equal(tests.length, 16);
   assert.ok(
     tests.every((t) => t.status === TestStatus.Success),
     JSON.stringify(tests),
@@ -346,6 +346,33 @@ test('app code imported into the Playwright worker, outside any test, is static 
   assert.deepEqual(
     Object.keys(perTest).filter((id) => perTest[id]?.[importMutant]),
     [],
+  );
+});
+
+test('app code a beforeAll hook or a worker fixture runs in the Playwright worker is static coverage', () => {
+  assert.ok(dryRun.mutantCoverage);
+  const { perTest, static: shared } = dryRun.mutantCoverage;
+  const groupMutants = [
+    mutant('ArithmeticOperator', 'n - 1', 'src/node-only.ts').id,
+    mutant('ArithmeticOperator', 'n + 1', 'src/node-only.ts').id,
+  ];
+
+  for (const id of groupMutants) {
+    assert.ok(shared[id], `mutant ${id} counts as static`);
+    assert.deepEqual(
+      Object.keys(perTest).filter((test) => perTest[test]?.[id]),
+      [],
+    );
+  }
+});
+
+test('a page a beforeAll hook opens and closes in its own context is static coverage', () => {
+  assert.ok(dryRun.mutantCoverage);
+  assert.equal(
+    dryRun.mutantCoverage.perTest[
+      testId('reads what the beforeAll page computed')
+    ],
+    undefined,
   );
 });
 

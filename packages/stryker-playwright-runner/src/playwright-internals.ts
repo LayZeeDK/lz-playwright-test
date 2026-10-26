@@ -192,6 +192,33 @@ export function instrumentationOf(
   return core._instrumentation;
 }
 
+export interface RunningSlot {
+  /** `test` for the test body, else the hook type, such as `beforeAll`. */
+  readonly type: string;
+  /** Whether a fixture of that slot is being set up or torn down. */
+  readonly inFixture: boolean;
+}
+
+/**
+ * What the timeout manager of a TestInfo runs now (TestInfo._timeoutManager._running.runnable).
+ * Undefined when it runs nothing, or when Playwright no longer has that shape.
+ */
+export function runningSlotOf(testInfo: unknown): RunningSlot | undefined {
+  const manager = isRecord(testInfo) ? testInfo._timeoutManager : undefined;
+  const running = isRecord(manager) ? manager._running : undefined;
+  const runnable = isRecord(running) ? running.runnable : undefined;
+
+  if (!isRecord(runnable) || typeof runnable.type !== 'string') {
+    return undefined;
+  }
+
+  return { type: runnable.type, inFixture: runnable.fixture !== undefined };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 export function parallelModeOf(suite: unknown): ParallelMode {
   const mode = (suite as { _parallelMode?: unknown } | undefined)
     ?._parallelMode;

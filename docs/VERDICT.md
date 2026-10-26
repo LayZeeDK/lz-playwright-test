@@ -52,8 +52,9 @@ tests cover all ten. The plugin patches StrykerJS internals, so it supports Stry
   script runs. Before the context closes it reads `__stryker__.mutantCoverage` and the hit count from
   every frame.
 - Coverage survives same-origin navigations through `sessionStorage`. A context that outlives its test
-  (created in `beforeAll` or a worker fixture) reports its coverage as static, so Stryker runs every test
-  for those mutants instead of crediting the wrong one. `browser.close()`, and `page.close()` on a page
+  (created in `beforeAll` or a worker fixture), or that a `beforeAll` or `afterAll` hook opens and closes,
+  reports its coverage as static, so Stryker runs every test for those mutants instead of crediting the
+  wrong one. `browser.close()`, and `page.close()` on a page
   whose context stays open, skip the before-close hook for what they close, so the hook reads those
   pages first. The dry run warns about frames that did not answer in time and logs how much coverage
   came from shared contexts.
@@ -401,10 +402,11 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   runs only the tests that reached it from their own pages, so it can survive when only a test that
   uses the shared page would have killed it (inferred from Stryker's test planner, not run). Shared
   pages make such mutants common with this runner.
-- Node coverage in a test worker has no context to tell a test's own code from a `beforeAll` hook or a
-  worker fixture that runs during it, so coverage those make counts for that test, where a page's
-  counts as static. A mutant reached only there and asserted only by a later test can survive when it
-  should be killed. Node coverage from a worker that Playwright force-kills (no heartbeat for 5 min) is
+- Node coverage in a test worker counts for a test only while Playwright runs that test's body or its
+  `beforeEach` and `afterEach` hooks. Coverage from `beforeAll` and `afterAll` hooks and from fixture
+  setup and teardown, test-scoped fixtures included, counts as static, so Stryker runs every test for
+  those mutants. The runner reads that from Playwright's internal `TestInfo._timeoutManager`; if a
+  Playwright release drops it, all Node coverage counts as static. Node coverage from a worker that Playwright force-kills (no heartbeat for 5 min) is
   lost, and code in Playwright's loader process or the `webServer` gets none.
 - An infinite loop in a test worker's own Node code, outside a page, blocks that worker. Neither the
   per-test timeout nor the runner's stop ends it; `stopTests()` waits until Playwright force-kills the

@@ -37,6 +37,22 @@ test.describe.serial('with a page shared from beforeAll', () => {
   });
 });
 
+test.describe('after a beforeAll that opens and closes its own context', () => {
+  let counted = 0;
+
+  test.beforeAll(async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto('/');
+    counted = await page.evaluate(() => window.countTo(4));
+    await context.close();
+  });
+
+  test('reads what the beforeAll page computed', () => {
+    expect(counted).toBe(4);
+  });
+});
+
 test('keeps coverage across a navigation to a page without the app', async ({
   page,
 }) => {

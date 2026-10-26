@@ -8,11 +8,16 @@ import type {
   BrowserContext,
   Frame,
   Page,
+  TestInfo,
   TestType,
 } from '@playwright/test';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
-import { instrumentationOf, WORKER_ENTRY } from './playwright-internals.ts';
+import {
+  instrumentationOf,
+  runningSlotOf,
+  WORKER_ENTRY,
+} from './playwright-internals.ts';
 import {
   FRAME_READ_TIMEOUT_MS,
   readRunSettings,
@@ -69,7 +74,7 @@ export function install(
   recordNodeCoverage(
     (scope[ns] ??= {}),
     { perTest, hitLimit },
-    () => currentTestId(test),
+    () => nodeTestId(test),
     (line) => fs.appendFileSync(outFile, '\n' + line + '\n'),
   );
 
@@ -95,7 +100,7 @@ export function install(
     ];
     const outlivedItsTest =
       perTest &&
-      (state.testId === undefined || state.testId !== currentTestId(test));
+      (state.testId === undefined || state.testId !== contextTestId(test));
     const lines = snapshots.map((snapshot) =>
       serializeSnapshot({ ...snapshot, outlivedItsTest }),
     );
@@ -133,7 +138,7 @@ export function install(
   instrumentation.addListener({
     async runAfterCreateBrowserContext(context) {
       const state: ContextState = {
-        testId: perTest ? currentTestId(test) : undefined,
+        testId: perTest ? contextTestId(test) : undefined,
         closedPageSnapshots: [],
         collected: false,
       };
@@ -216,9 +221,36 @@ export function recordNodeCoverage(
   });
 }
 
-function currentTestId(test: Test): string | undefined {
+// Playwright makes a test current before it runs the beforeAll hooks and sets up the fixtures it
+// needs, so test.info() alone names the first test of a group for code that serves the whole group.
+const PER_TEST_SLOTS: ReadonlySet<string> = new Set([
+  'test',
+  'beforeEach',
+  'afterEach',
+]);
+const GROUP_HOOKS: ReadonlySet<string> = new Set(['beforeAll', 'afterAll']);
+
+/** The test that Node code running now belongs to: none in a beforeAll or afterAll hook or a fixture. */
+function nodeTestId(test: Test): string | undefined {
+  const info = testInfoOf(test);
+  const slot = runningSlotOf(info);
+
+  return slot && !slot.inFixture && PER_TEST_SLOTS.has(slot.type)
+    ? info?.testId
+    : undefined;
+}
+
+/** The test a context opened or closed now belongs to: a test's own fixtures open its context. */
+function contextTestId(test: Test): string | undefined {
+  const info = testInfoOf(test);
+  const type = runningSlotOf(info)?.type;
+
+  return type !== undefined && GROUP_HOOKS.has(type) ? undefined : info?.testId;
+}
+
+function testInfoOf(test: Test): TestInfo | undefined {
   try {
-    return test.info().testId;
+    return test.info();
   } catch {
     return undefined;
   }
