@@ -1,6 +1,6 @@
 import type { Suite, TestCase } from '@playwright/test/reporter';
 
-import { parallelModeOf, type TestRunner } from './playwright-internals.ts';
+import { isSerialSuite, type TestRunner } from './playwright-internals.ts';
 import { CollectingReporter } from './reporter.ts';
 
 /** The ids of a describe.serial group's tests, by the id of each test in it. */
@@ -59,7 +59,7 @@ export function serialGroups(testCases: Iterable<TestCase>): SerialGroups {
       suite;
       suite = suite.parent
     ) {
-      if (parallelModeOf(suite) === 'serial') {
+      if (isSerialSuite(suite)) {
         group = suite;
       }
     }

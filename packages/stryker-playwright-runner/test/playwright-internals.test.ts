@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import {
   type CommonModule,
   type CoreBundleModule,
-  parallelModeOf,
+  isSerialSuite,
   probeInternals,
   type RunnerModule,
   runningSlotOf,
@@ -95,11 +95,12 @@ test('the probe names every internal when one is missing', () => {
 });
 
 test('the describe mode is read from the suite, and its absence fails loudly', () => {
-  assert.equal(parallelModeOf({ _parallelMode: 'serial' }), 'serial');
-  assert.throws(() => parallelModeOf({}), {
+  assert.equal(isSerialSuite({ _parallelMode: 'serial' }), true);
+  assert.equal(isSerialSuite({ _parallelMode: 'none' }), false);
+  assert.throws(() => isSerialSuite({}), {
     message: /Suite\._parallelMode/,
   });
-  assert.throws(() => parallelModeOf(undefined), {
+  assert.throws(() => isSerialSuite(undefined), {
     message: /Suite\._parallelMode/,
   });
 });

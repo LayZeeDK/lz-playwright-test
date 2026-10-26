@@ -73,8 +73,6 @@ export interface CommonModule {
   };
 }
 
-type ParallelMode = 'none' | 'default' | 'serial' | 'parallel';
-
 export const MIN_PLAYWRIGHT: {
   readonly major: number;
   readonly minor: number;
@@ -216,9 +214,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-export function parallelModeOf(suite: unknown): ParallelMode {
-  const mode = (suite as { _parallelMode?: unknown } | undefined)
-    ?._parallelMode;
+export function isSerialSuite(suite: unknown): boolean {
+  const mode = isRecord(suite) ? suite._parallelMode : undefined;
 
   if (typeof mode !== 'string') {
     throw new Error(
@@ -226,5 +223,5 @@ export function parallelModeOf(suite: unknown): ParallelMode {
     );
   }
 
-  return mode as ParallelMode;
+  return mode === 'serial';
 }
