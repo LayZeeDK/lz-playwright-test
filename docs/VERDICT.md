@@ -195,8 +195,8 @@ JSX placement leaves the built-in mutants of five files unchanged, with a negati
 render check that every mutant of the design spike's sample renders like the same edit made by hand.
 `packages/stryker-playwright-runner/test/browser/ui-mutators.test.ts` runs the runner on a page
 instrumented with the UI operators: for each of the ten operators a Playwright test kills one of its
-mutants, and a test that does not observe that mutant lets it survive. `spikes/fail-loud/` runs `stryker run` with
-the plugin listed in `plugins` and with the plugin imported from the config. Both report UI mutants,
+mutants, and a test that does not observe that mutant lets it survive. `spikes/fail-loud/` runs
+`stryker run` with the plugin listed in `plugins` and with the plugin imported from the config. Both report UI mutants,
 and with one operator's sample broken on purpose both exit 1 and name that operator.
 
 `packages/stryker-playwright-runner/test/browser/runner.test.ts` checks the runner against a fixture
@@ -317,9 +317,10 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   undocumented. The runner checks the first three at startup and fails with an error that lists them.
   A moved worker entry leaves the hook uninstalled, and a missing `_instrumentation` makes the hook throw
   in the worker. Either one fails the dry run. A missing `_parallelMode` stops the runner with an error
-  that names it. A missing `_timeoutManager` makes the hook throw an error that names it and the
-  Playwright version when instrumented code or a new browser context asks for the current test. That
-  happens only in a `perTest` dry run, and fails it.
+  that names it. A missing `_timeoutManager`, or one running a type of hook the runner does not know,
+  makes the hook throw an error that names it and the Playwright version when instrumented code or a new
+  browser context asks for the current test. That happens only in a `perTest` dry run, and fails it
+  unless the test itself catches that error.
 - The runner also sets `PLAYWRIGHT_NO_COPY_PROMPT`, an environment variable that Playwright reads but
   does not document, to turn off the page snapshot for its error prompt. If a release renames or drops
   that variable, nothing fails. A timed-out mutant run then takes about 12.5 s on an 8 s budget again,

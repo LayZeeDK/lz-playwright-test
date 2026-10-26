@@ -146,7 +146,7 @@ test("every runnable type of Playwright's timeout manager is a slot", () => {
   }
 });
 
-test('no TestInfo, or a timeout manager that runs nothing known, has no running slot', () => {
+test('no TestInfo, or a timeout manager that runs nothing, has no running slot', () => {
   for (const testInfo of [
     undefined,
     null,
@@ -154,8 +154,6 @@ test('no TestInfo, or a timeout manager that runs nothing known, has no running 
     { _timeoutManager: { _running: null } },
     { _timeoutManager: { _running: {} } },
     { _timeoutManager: { _running: { runnable: null } } },
-    { _timeoutManager: { _running: { runnable: { type: 1 } } } },
-    { _timeoutManager: { _running: { runnable: { type: 'beforeSome' } } } },
   ]) {
     assert.equal(
       runningSlotOf(testInfo, '1.64.1'),
@@ -165,11 +163,14 @@ test('no TestInfo, or a timeout manager that runs nothing known, has no running 
   }
 });
 
-test('a TestInfo without an object timeout manager fails loudly, naming the internal and the version', () => {
+test('a TestInfo without an object timeout manager, or running an unknown slot type, fails loudly, naming the internal and the version', () => {
   for (const testInfo of [
     {},
     { _timeoutManager: null },
     { _timeoutManager: 'manager' },
+    { _timeoutManager: { _running: { runnable: {} } } },
+    { _timeoutManager: { _running: { runnable: { type: 1 } } } },
+    { _timeoutManager: { _running: { runnable: { type: 'beforeSome' } } } },
   ]) {
     assert.throws(
       () => runningSlotOf(testInfo, '1.99.0'),

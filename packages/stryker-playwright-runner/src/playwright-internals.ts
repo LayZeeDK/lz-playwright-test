@@ -187,7 +187,7 @@ export function instrumentationOf(
   return core._instrumentation;
 }
 
-/** What Playwright 1.64.1's timeout manager runs: the test body, hooks, worker teardown, modifiers. */
+/** What the timeout manager of Playwright 1.63 and 1.64 runs: the test body, hooks, worker teardown, modifiers. */
 const SLOT_TYPES = [
   'test',
   'beforeEach',
@@ -211,8 +211,8 @@ export interface RunningSlot {
 
 /**
  * What the timeout manager of a TestInfo runs now (TestInfo._timeoutManager._running.runnable).
- * Undefined when there is no TestInfo or its timeout manager runs nothing known; throws when a
- * TestInfo has no timeout manager.
+ * Undefined when there is no TestInfo or its timeout manager runs nothing; throws when a TestInfo has
+ * no timeout manager or it runs a type this runner does not know.
  */
 export function runningSlotOf(
   testInfo: unknown,
@@ -225,19 +225,27 @@ export function runningSlotOf(
   const manager = testInfo._timeoutManager;
 
   if (!isRecord(manager)) {
-    throw new Error(
-      `Playwright ${version} changed the internals this runner calls (TestInfo._timeoutManager, which tells a test from the hooks and fixtures that serve a group).`,
-    );
+    throw timeoutManagerChanged(version);
   }
 
   const running = manager._running;
   const runnable = isRecord(running) ? running.runnable : undefined;
 
-  if (!isRecord(runnable) || !isSlotType(runnable.type)) {
+  if (!isRecord(runnable)) {
     return undefined;
   }
 
+  if (!isSlotType(runnable.type)) {
+    throw timeoutManagerChanged(version);
+  }
+
   return { type: runnable.type, inFixture: runnable.fixture !== undefined };
+}
+
+function timeoutManagerChanged(version: string): Error {
+  return new Error(
+    `Playwright ${version} changed the internals this runner calls (TestInfo._timeoutManager, which tells a test from the hooks and fixtures that serve a group).`,
+  );
 }
 
 function isSlotType(value: unknown): value is SlotType {
