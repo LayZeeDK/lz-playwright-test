@@ -1,4 +1,5 @@
 import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 
 import {
@@ -37,7 +38,12 @@ import {
   type RunRequest,
   runSettings,
 } from './run-result.ts';
-import { createTempRoot, removeDir, type TempRoot } from './temp-root.ts';
+import {
+  createTempRoot,
+  removeDir,
+  removeLeftRoots,
+  type TempRoot,
+} from './temp-root.ts';
 import {
   assertionTimeoutWarning,
   type ConfigTimeouts,
@@ -94,6 +100,14 @@ export class PlaywrightTestRunner implements StrykerTestRunner {
   async init(): Promise<void> {
     const options = readRunnerOptions(this.strykerOptions);
     const pw = loadPlaywright(options.configFile);
+    const removed = removeLeftRoots(os.tmpdir());
+
+    if (removed.length) {
+      this.log.debug(
+        `Removed the temp directories of runners that no longer run: ${removed.join(', ')}`,
+      );
+    }
+
     const root = createTempRoot();
     let playwright: TestRunner | undefined;
 

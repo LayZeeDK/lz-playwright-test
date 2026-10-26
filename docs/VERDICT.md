@@ -332,12 +332,11 @@ tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In 
   copies `sessionStorage`, so its coverage counts twice (harmless for test selection). An iframe that
   navigates within its origin drops the earlier document's coverage without counting it as lost, so
   mutants only that document reached show as NoCoverage (inferred from the hook's code, not run).
-- A runner that Stryker kills while its teardown hangs (a page stuck in a loop can keep `stopTests()`
-  past Stryker's 2 s of grace) leaves its private temp directory behind, one per such kill (inferred
-  from the code, not run). The runner removes that directory last because the test that `stopTests()`
-  ends still writes its error context into it. The private directory exists so that, on a shared
-  `/tmp`, no other user can claim the name of Playwright's output directory while Playwright deletes
-  and recreates it.
+- Runners before this change named their private temp directories `stryker-pw-<worker>-*`, and a
+  runner that Stryker killed while its teardown hung left one behind. The runner now names them
+  `stryker-playwright-<pid>-*` and removes, at `init`, those of runners of the same user that no longer
+  run. It never removes `stryker-pw-*` directories, because their number is no pid and a live one of an
+  older runner would look dead; remove those from the system temp folder once by hand.
 - Stryker gives a runner's `dispose` 2 s and then kills its process tree. The runner's `dispose` stops
   the tests and then runs global teardown, so a `globalTeardown` that needs more than what is left of
   the 2 s is cut off (inferred from the code, not run).

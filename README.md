@@ -53,7 +53,8 @@ On every run, these settings replace the ones in the Playwright config, except w
 
 - `screenshot`, `trace`, and `video` are off.
 - The reporters in the Playwright config do not run.
-- `outputDir` is a folder in a private temp directory, which `dispose` removes.
+- `outputDir` is a folder in a private temp directory, which `dispose` removes. A runner that Stryker
+  killed first leaves that directory behind; the next runner to start removes it.
 - `maxFailures` is 1, unless Stryker's `disableBail` is on. `disableBail` cannot clear a `maxFailures` that
   the Playwright config sets.
 - In a mutant run, the per-test timeout is Stryker's timeout for the mutant less 5 s but at least 2 s,

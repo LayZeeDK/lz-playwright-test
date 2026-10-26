@@ -1,7 +1,17 @@
 // Drives PlaywrightTestRunner directly against a fixture instrumented by Stryker's own instrumenter.
 // Run: node --test packages/stryker-playwright-runner/test/runner.test.ts
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -21,14 +31,19 @@ import {
   PlaywrightTestRunner,
 } from '../src/playwright-test-runner.ts';
 
-// The runner's private state, which some tests check directly.
+// The runner's private state, which one test checks directly.
 function session() {
   return (
     runner as unknown as {
-      session: { root: { dir: string }; serialGroups: Map<string, string[]> };
+      session: { serialGroups: Map<string, string[]> };
     }
   ).session;
 }
+
+// A pid that ran and exited, so no process owns it now.
+const deadPid = spawnSync(process.execPath, ['-e', '']).pid;
+const deadRoot = path.join(tmpdir(), `stryker-playwright-${deadPid}-left`);
+const oldSchemeRoot = path.join(tmpdir(), 'stryker-pw-0-runner-test');
 
 const fixture = (file: string) =>
   fileURLToPath(new URL(`./fixture/${file}`, import.meta.url));
@@ -129,6 +144,8 @@ before(async () => {
   mutants = result.mutants;
   writeFileSync(fixture('public/app.js'), result.files[0].content);
   rmSync(fixture('test-results'), { recursive: true, force: true });
+  mkdirSync(deadRoot, { recursive: true });
+  mkdirSync(oldSchemeRoot, { recursive: true });
 
   const options = {
     playwright: { configFile: fixture('playwright.config.ts') },
@@ -150,9 +167,17 @@ before(async () => {
 let disposed = false;
 
 after(async () => {
+  rmSync(deadRoot, { recursive: true, force: true });
+  rmSync(oldSchemeRoot, { recursive: true, force: true });
+
   if (!disposed) {
     await runner?.dispose();
   }
+});
+
+test('init removes the temp roots of dead runners and leaves those of the old scheme', () => {
+  assert.equal(existsSync(deadRoot), false);
+  assert.equal(existsSync(oldSchemeRoot), true);
 });
 
 test('dry run completes with every test passing', () => {
@@ -365,14 +390,18 @@ test('no Playwright artifacts are written next to the config', () => {
 });
 
 test('dispose removes the temp directory the runner kept its output and runs in', async () => {
-  const rootDir = session().root.dir;
-  assert.ok(
-    existsSync(rootDir),
+  const ownRoots = () =>
+    readdirSync(tmpdir()).filter((name) =>
+      name.startsWith(`stryker-playwright-${process.pid}-`),
+    );
+  assert.equal(
+    ownRoots().length,
+    1,
     'the temp directory exists while the runner is up',
   );
 
   await runner.dispose();
   disposed = true;
 
-  assert.equal(existsSync(rootDir), false);
+  assert.deepEqual(ownRoots(), []);
 });
