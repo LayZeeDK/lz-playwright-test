@@ -1,10 +1,12 @@
 import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
+import base from './stryker.base.ts';
 
 // Baseline: Stryker's command runner. STRYKER_BASELINE=define activates mutants through a Vite define
 // (the stryker-playwright-hello-world pattern); without it nothing reaches the browser.
 const define = process.env.STRYKER_BASELINE === 'define';
 
 export default {
+  ...base,
   testRunner: 'command',
   commandRunner: {
     command:
@@ -12,12 +14,7 @@ export default {
   },
   mutate: ['apps/demo-app/src/app/cart.ts'],
   coverageAnalysis: 'off',
-  concurrency: 1,
-  reporters: ['clear-text', 'progress', 'json'],
   jsonReporter: {
     fileName: `reports/e2e-command-${define ? 'define' : 'off'}/mutation.json`,
   },
-  tempDirName: '.stryker-tmp',
-  // A copied .nx/workspace-data sends the sandbox's Nx to this workspace's daemon, which refuses it.
-  ignorePatterns: ['/.nx', '/.claude', '/.stryker-tmp-*'],
 } satisfies PartialStrykerOptions;
