@@ -24,20 +24,25 @@ import {
   type TestRunner,
 } from './playwright-internals.ts';
 import { readSnapshotDir, RUN_SETTINGS } from './protocol.ts';
+import { CollectingReporter } from './reporter.ts';
 import {
-  CollectingReporter,
-  type CoverageGaps,
   dryRunRequest,
-  dryRunResult,
-  listSerialGroups,
-  mayHaveLostItsServer,
   mutantRunRequest,
-  mutantRunResult,
-  projectsThatRun,
-  type RunOutput,
   type RunRequest,
   runSettings,
+} from './run-request.ts';
+import {
+  type CoverageGaps,
+  dryRunResult,
+  mayHaveLostItsServer,
+  mutantRunResult,
+  type RunOutput,
 } from './run-result.ts';
+import {
+  listSerialGroups,
+  projectsThatRun,
+  type SerialGroups,
+} from './serial-groups.ts';
 import {
   createTempRoot,
   removeDir,
@@ -61,7 +66,7 @@ interface Session {
   readonly playwright: TestRunner;
   readonly root: TempRoot;
   readonly servers: readonly ServerCheck[];
-  readonly serialGroups: Map<string, string[]>;
+  readonly serialGroups: SerialGroups;
   readonly timeouts: ConfigTimeouts;
 }
 

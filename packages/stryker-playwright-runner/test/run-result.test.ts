@@ -28,27 +28,31 @@ import {
   type Snapshot,
   type SnapshotLine,
 } from '../src/protocol.ts';
+import { CollectingReporter } from '../src/reporter.ts';
 import {
-  CollectingReporter,
-  coverageGaps,
   type DryRunRequest,
   dryRunRequest,
+  type MutantRunRequest,
+  mutantRunRequest,
+  runSettings,
+} from '../src/run-request.ts';
+import {
+  coverageGaps,
   dryRunResult,
-  listSerialGroups,
   mayHaveLostItsServer,
   mergeCoverage,
   missingCoverageError,
-  type MutantRunRequest,
-  mutantRunRequest,
   mutantRunResult,
-  projectsThatRun,
   type RunOutput,
-  runSettings,
   type RunStatus,
-  serialGroups,
   toRunResult,
-  withSerialGroups,
 } from '../src/run-result.ts';
+import {
+  listSerialGroups,
+  projectsThatRun,
+  serialGroups,
+  withSerialGroups,
+} from '../src/serial-groups.ts';
 import { DRY_RUN_BUDGET } from '../src/timeouts.ts';
 
 type Outcome = ReturnType<TestCase['outcome']>;

@@ -1,31 +1,23 @@
-import type {
-  FullResult,
-  Suite,
-  TestCase,
-  TestError,
-} from '@playwright/test/reporter';
+import type { FullResult, TestCase } from '@playwright/test/reporter';
 import type { MutantCoverage } from '@stryker-mutator/api/core';
 import {
   determineHitLimitReached,
-  type DryRunOptions,
   type DryRunResult,
   DryRunStatus,
-  type MutantRunOptions,
   type MutantRunResult,
   type TestResult,
   TestStatus,
   toMutantRunResult,
 } from '@stryker-mutator/api/test-runner';
 
-import { parallelModeOf, type TestRunner } from './playwright-internals.ts';
-import type { RunSettings, Snapshot } from './protocol.ts';
-import {
-  type ConfigTimeouts,
-  DRY_RUN_BUDGET,
-  mutantRunBudget,
-  type RunBudget,
-  timeoutReason,
-} from './timeouts.ts';
+import type { Snapshot } from './protocol.ts';
+import { type CollectingReporter, errorText } from './reporter.ts';
+import type {
+  DryRunRequest,
+  MutantRunRequest,
+  RunRequest,
+} from './run-request.ts';
+import { timeoutReason } from './timeouts.ts';
 
 export type RunResult =
   | {
@@ -34,24 +26,6 @@ export type RunResult =
       snapshots: Snapshot[];
     }
   | Exclude<DryRunResult, { status: DryRunStatus.Complete }>;
-
-export type RunRequest = DryRunRequest | MutantRunRequest;
-
-export interface DryRunRequest {
-  readonly kind: 'dry';
-  readonly disableBail: boolean;
-  readonly coverageAnalysis: DryRunOptions['coverageAnalysis'];
-  readonly budget: RunBudget;
-}
-
-export interface MutantRunRequest {
-  readonly kind: 'mutant';
-  readonly disableBail: boolean;
-  readonly activeMutant: string;
-  readonly testFilter: string[] | undefined;
-  readonly hitLimit: number | undefined;
-  readonly budget: RunBudget;
-}
 
 export type RunStatus = FullResult['status'] | 'deadline';
 
@@ -73,169 +47,6 @@ const OUTCOME: Record<ReturnType<TestCase['outcome']>, TestStatus> = {
   unexpected: TestStatus.Failed,
   skipped: TestStatus.Skipped,
 };
-
-export class CollectingReporter {
-  readonly errors: string[] = [];
-  output = '';
-  // Playwright reports each attempt of a retried test with the same TestCase, which holds them all.
-  readonly testCases = new Map<string, TestCase>();
-  private suite?: Suite;
-
-  printsToStdio() {
-    return false;
-  }
-
-  onBegin(_config: unknown, suite: Suite) {
-    this.suite = suite;
-  }
-
-  get listedTests(): TestCase[] {
-    return this.suite?.allTests() ?? [];
-  }
-
-  anyAttemptFailed(): boolean {
-    return [...this.testCases.values()].some((test) =>
-      test.results.some(
-        (result) =>
-          result.status !== test.expectedStatus && result.status !== 'skipped',
-      ),
-    );
-  }
-
-  onTestEnd(test: TestCase) {
-    this.testCases.set(test.id, test);
-  }
-
-  onStdOut(chunk: string | Buffer) {
-    this.output = (this.output + chunk.toString()).slice(-4000);
-  }
-
-  onStdErr(chunk: string | Buffer) {
-    this.onStdOut(chunk);
-  }
-
-  onError(error: TestError) {
-    this.errors.push(errorText(error));
-  }
-}
-
-// Given no names, listTests would also load the default: false projects.
-export function projectsThatRun(
-  option: string[] | undefined,
-  projects: { default: boolean; project: { name: string } }[],
-): string[] {
-  return option?.length
-    ? option
-    : projects
-        .filter((project) => project.default)
-        .map(({ project }) => project.name);
-}
-
-export async function listSerialGroups(
-  playwright: Pick<TestRunner, 'listTests'>,
-  projects: string[],
-): Promise<Map<string, string[]>> {
-  const reporter = new CollectingReporter();
-  const result = await playwright.listTests(reporter, { projects });
-
-  if (!result) {
-    throw new Error(
-      'Playwright threw while listing the tests. Rerun Stryker with --logLevel trace to see its error.',
-    );
-  }
-
-  if (result.status !== 'passed') {
-    throw new Error(
-      `Playwright could not list the tests (${result.status}):\n${reporter.errors.join('\n')}`,
-    );
-  }
-
-  // A file that fails to load leaves the status "passed", and its serial groups would be missing.
-  if (reporter.errors.length) {
-    throw new Error(
-      `Playwright could not load every test file:\n${reporter.errors.join('\n')}`,
-    );
-  }
-
-  return serialGroups(reporter.listedTests);
-}
-
-export function serialGroups(
-  testCases: Iterable<TestCase>,
-): Map<string, string[]> {
-  const bySuite = new Map<object, string[]>();
-  const byTest = new Map<string, string[]>();
-
-  for (const test of testCases) {
-    let group: object | undefined;
-
-    for (
-      let suite: Suite | undefined = test.parent;
-      suite;
-      suite = suite.parent
-    ) {
-      if (parallelModeOf(suite) === 'serial') {
-        group = suite;
-      }
-    }
-
-    if (group) {
-      const ids = bySuite.get(group) ?? [];
-      ids.push(test.id);
-      bySuite.set(group, ids);
-      byTest.set(test.id, ids);
-    }
-  }
-
-  return byTest;
-}
-
-export function withSerialGroups(
-  testFilter: string[] | undefined,
-  groups: Map<string, string[]>,
-): string[] | undefined {
-  return (
-    testFilter && [
-      ...new Set(testFilter.flatMap((id) => groups.get(id) ?? [id])),
-    ]
-  );
-}
-
-export function dryRunRequest({
-  disableBail,
-  coverageAnalysis,
-}: DryRunOptions): DryRunRequest {
-  return { kind: 'dry', disableBail, coverageAnalysis, budget: DRY_RUN_BUDGET };
-}
-
-export function mutantRunRequest(
-  {
-    activeMutant,
-    testFilter,
-    hitLimit,
-    disableBail,
-    timeout,
-  }: MutantRunOptions,
-  session: {
-    readonly serialGroups: Map<string, string[]>;
-    readonly timeouts: ConfigTimeouts;
-  },
-): MutantRunRequest {
-  return {
-    kind: 'mutant',
-    disableBail,
-    activeMutant: activeMutant.id,
-    testFilter: withSerialGroups(testFilter, session.serialGroups),
-    hitLimit,
-    budget: mutantRunBudget(timeout, session.timeouts),
-  };
-}
-
-export function runSettings(request: RunRequest, outDir: string): RunSettings {
-  return request.kind === 'dry'
-    ? { outDir, perTest: request.coverageAnalysis === 'perTest' }
-    : { outDir, perTest: false, hitLimit: request.hitLimit };
-}
 
 export function mayHaveLostItsServer(output: RunOutput): boolean {
   return output.status !== 'deadline' && output.reporter.anyAttemptFailed();
@@ -482,8 +293,4 @@ function toTestResult(test: TestCase, isMutantRun: boolean): TestResult {
       test.results.findLast((result) => result.error)?.error,
     ),
   };
-}
-
-function errorText(error: TestError | undefined): string {
-  return error?.message ?? error?.value ?? 'Test failed';
 }
