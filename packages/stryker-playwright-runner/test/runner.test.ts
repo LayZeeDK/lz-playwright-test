@@ -323,7 +323,7 @@ test('an infinite loop trips the hit limit and reports a timeout', async () => {
 });
 
 test('a webServer that dies between runs is restarted instead of failing every test', async () => {
-  await fetch('http://localhost:4321/__exit').catch(() => {});
+  await fetch('http://localhost:4321/__exit').catch(() => undefined);
   assert.equal(await listening(4321), false, 'the fixture server stopped');
 
   const survived = await mutantRun(mutant('ArithmeticOperator', 'a - b'), {
