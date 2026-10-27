@@ -16,6 +16,7 @@ import {
   type Instrumentation,
   type SlotType,
 } from '../../src/playwright-internals.ts';
+import { setEnv } from '../../src/playwright-test-runner.ts';
 import type { RunSettings } from '../../src/protocol.ts';
 import type {
   install,
@@ -134,20 +135,12 @@ export function fakeInstall(
     },
   };
 
-  if (activeMutant === undefined) {
-    delete process.env[ACTIVE_MUTANT];
-  } else {
-    process.env[ACTIVE_MUTANT] = activeMutant;
-  }
+  setEnv({ [ACTIVE_MUTANT]: activeMutant });
 
   try {
     installHook((id) => modules[id], { outDir, ...settings }, ns);
   } finally {
-    if (previousMutant === undefined) {
-      delete process.env[ACTIVE_MUTANT];
-    } else {
-      process.env[ACTIVE_MUTANT] = previousMutant;
-    }
+    setEnv({ [ACTIVE_MUTANT]: previousMutant });
   }
 
   const added = process

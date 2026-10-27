@@ -313,7 +313,7 @@ export async function withEnv<T>(
   }
 }
 
-function setEnv(values: Readonly<Record<string, string | undefined>>) {
+export function setEnv(values: Readonly<Record<string, string | undefined>>) {
   Object.entries(values).forEach(([name, value]) => {
     if (value === undefined) {
       delete process.env[name];

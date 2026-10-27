@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import type { TestCase, TestResult } from '@playwright/test/reporter';
-import type { MutantCoverage } from '@stryker-mutator/api/core';
 import {
   DryRunStatus,
   MutantRunStatus,
@@ -36,6 +35,7 @@ import {
   fakeTestCase,
   mutantRequest,
   type Outcome,
+  plain,
 } from './support/doubles.ts';
 
 // A snapshot as the runner reads it from a line the hook wrote.
@@ -651,11 +651,6 @@ test('a parsed line drops counts that are not hit counts, and merging sums the r
   assert.deepEqual({ ...coverage.static }, { '1': 3, '6': 0 });
   assert.deepEqual({ ...coverage.perTest['a'] }, { '1': 2, '6': 0 });
 });
-
-// mergeCoverage builds null-prototype maps, which deepEqual tells apart from object literals.
-function plain(coverage: MutantCoverage | undefined): unknown {
-  return JSON.parse(JSON.stringify(coverage));
-}
 
 test('a page frame puts its per-test coverage under its test and its static coverage in static', () => {
   const coverage = merge([

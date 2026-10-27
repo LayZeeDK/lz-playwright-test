@@ -30,7 +30,9 @@ import {
   finishedTest,
   logger,
   mutantRunOptions,
+  plain,
   strykerOptions,
+  stubEnv,
 } from './support/doubles.ts';
 import {
   ACTIVE_MUTANT,
@@ -41,11 +43,14 @@ import {
 
 const HOOK = new URL('../src/worker-hook.ts', import.meta.url).href;
 
-function portOf(server: net.Server): number {
+/** A server listening on a free localhost port, and that port. */
+async function listening(): Promise<{ server: net.Server; port: number }> {
+  const server = net.createServer();
+  await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
   const address = server.address();
   assert.ok(typeof address === 'object' && address !== null);
 
-  return address.port;
+  return { server, port: address.port };
 }
 
 test('the package declares the runner as the lz-stryker-playwright test runner, with its options schema', () => {
@@ -381,8 +386,7 @@ test('a dry run runs every test with the hook and the run settings in the worker
   assert.equal(run.env.PLAYWRIGHT_NO_COPY_PROMPT, '1');
   assert.equal(existsSync(run.settings.outDir), false);
   assert.deepEqual({ ...process.env }, before);
-  // The coverage maps have no prototype; the JSON copy compares their content.
-  assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+  assert.deepEqual(plain(result), {
     status: DryRunStatus.Complete,
     tests: [
       {
@@ -400,15 +404,7 @@ test('a dry run runs every test with the hook and the run settings in the worker
 
 test('the hook is preloaded before the NODE_OPTIONS the runner started with, so its own copy installs first', async (t) => {
   const fake = fakePlaywright(t);
-  const original = process.env.NODE_OPTIONS;
-  t.after(() => {
-    if (original === undefined) {
-      delete process.env.NODE_OPTIONS;
-    } else {
-      process.env.NODE_OPTIONS = original;
-    }
-  });
-  delete process.env.NODE_OPTIONS;
+  stubEnv(t, { NODE_OPTIONS: undefined });
   const bare = fake.runner(fake.configFile).shell;
   process.env.NODE_OPTIONS = '--max-old-space-size=100';
   const based = fake.runner(fake.configFile).shell;
@@ -780,10 +776,8 @@ test('a restart whose global setup fails fails the run', async (t) => {
 });
 
 test('a webServer port is checked by connecting to it, and one without url or port is not checked', async (t) => {
-  const server = net.createServer();
-  await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
+  const { server, port } = await listening();
   t.after(() => server.close());
-  const port = portOf(server);
   const fake = fakePlaywright(t, { webServers: [{ port }, {}] });
   const { shell, lines } = fake.runner(fake.configFile);
   await shell.init();
@@ -795,9 +789,7 @@ test('a webServer port is checked by connecting to it, and one without url or po
 });
 
 test('a webServer port that stopped answering is restarted and named by its port', async (t) => {
-  const server = net.createServer();
-  await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
-  const port = portOf(server);
+  const { server, port } = await listening();
   await new Promise((resolve) => server.close(resolve));
   const fake = fakePlaywright(t, { webServers: [{ port }] });
   const { shell, lines } = fake.runner(fake.configFile);
@@ -837,7 +829,7 @@ test('a port check that neither connects nor fails gives up at its timeout, and 
   assert.equal(socket.destroyed, true);
 });
 
-for (const loopback of ['::1', '127.0.0.1']) {
+['::1', '127.0.0.1'].forEach((loopback) => {
   test(`a port answers when only ${loopback} accepts connections on it`, async () => {
     const answer = acceptsConnections(4321, (options) => {
       const socket = new net.Socket();
@@ -854,17 +846,15 @@ for (const loopback of ['::1', '127.0.0.1']) {
 
     assert.equal(await answer, true);
   });
-}
+});
 
 test('a port accepts connections while a server listens on it, and not after', async (t) => {
-  const server = net.createServer();
+  const { server, port } = await listening();
   t.after(() => {
     if (server.listening) {
       server.close();
     }
   });
-  await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
-  const port = portOf(server);
 
   assert.equal(await acceptsConnections(port), true);
 

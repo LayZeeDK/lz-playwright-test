@@ -7,11 +7,7 @@ import {
   RUN_SETTINGS,
   serializeSnapshot,
 } from '../src/protocol.ts';
-
-// parseSnapshotLine builds null-prototype maps, which deepEqual tells apart from object literals.
-function plain(value: unknown): unknown {
-  return JSON.parse(JSON.stringify(value));
-}
+import { plain } from './support/doubles.ts';
 
 test('a snapshot with a BigInt hit count is written as a lost frame', () => {
   const line = serializeSnapshot({ hitCount: 1n, outlivedItsTest: true });

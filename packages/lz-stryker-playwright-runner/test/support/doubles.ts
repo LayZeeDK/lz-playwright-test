@@ -11,6 +11,7 @@ import type {
 } from '@stryker-mutator/api/test-runner';
 
 import type { RunnerStrykerOptions } from '../../src/options.ts';
+import { setEnv } from '../../src/playwright-test-runner.ts';
 import type { ReportedTest } from '../../src/reporter.ts';
 import type { DryRunRequest, MutantRunRequest } from '../../src/run-request.ts';
 import { DRY_RUN_BUDGET } from '../../src/timeouts.ts';
@@ -31,6 +32,23 @@ export function tempTree(
   });
 
   return dir;
+}
+
+/** Sets `values` in process.env, an undefined value unsetting its variable, and restores them after the test. */
+export function stubEnv(
+  t: TestContext,
+  values: Readonly<Record<string, string | undefined>>,
+): void {
+  const previous = Object.fromEntries(
+    Object.keys(values).map((name) => [name, process.env[name]]),
+  );
+  t.after(() => setEnv(previous));
+  setEnv(values);
+}
+
+// Coverage maps have no prototype, which deepEqual tells apart from object literals; the JSON copy compares their content.
+export function plain(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value));
 }
 
 /** A test with no attempts yet. */

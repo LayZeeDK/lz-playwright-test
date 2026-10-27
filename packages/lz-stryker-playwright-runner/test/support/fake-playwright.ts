@@ -1,8 +1,7 @@
 // A fake Playwright install that loadPlaywright resolves from the config's folder, as it resolves a real
 // one, with a fake TestRunner that plays what Playwright and the worker hook do.
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { TestContext } from 'node:test';
 
@@ -25,7 +24,13 @@ import {
   LzStrykerCollectingReporter,
   type ReportedTest,
 } from '../../src/reporter.ts';
-import { finishedTest, logger, strykerOptions } from './doubles.ts';
+import {
+  finishedTest,
+  logger,
+  strykerOptions,
+  stubEnv,
+  tempTree,
+} from './doubles.ts';
 
 export type Status = FullResult['status'];
 
@@ -83,27 +88,31 @@ export function fakePlaywright(
   behaviour: Behaviour = {},
   version = '1.63.0',
 ) {
-  const dir = mkdtempSync(path.join(tmpdir(), 'runner-shell-test-'));
+  const live: LzStrykerPlaywrightTestRunner[] = [];
+  const globals: Record<string, unknown> = globalThis;
+
+  // Registered first, so the runners are disposed before the folder goes and the temp variables are restored.
+  t.after(async () => {
+    await Promise.all(live.map((shell) => shell.dispose()));
+    delete globals[FAKE];
+  });
+
+  const dir = tempTree(t, 'runner-shell-test-', {
+    'playwright.config.ts': '',
+    'node_modules/@playwright/test/package.json': '{"name":"@playwright/test"}',
+    'node_modules/@playwright/test/index.js': '',
+    'node_modules/playwright/package.json': JSON.stringify({
+      name: 'playwright',
+      version,
+    }),
+    'node_modules/playwright/lib/runner.js': `module.exports = globalThis.${FAKE}.runner;`,
+    'node_modules/playwright/lib/common.js': `module.exports = globalThis.${FAKE}.common;`,
+    'node_modules/playwright-core/package.json': '{"name":"playwright-core"}',
+    'node_modules/playwright-core/lib/coreBundle.js': `module.exports = globalThis.${FAKE}.coreBundle;`,
+  });
   const tmp = path.join(dir, 'tmp');
-  const modules = path.join(dir, 'node_modules');
-  const files: Record<string, string> = {
-    '@playwright/test/package.json': '{"name":"@playwright/test"}',
-    '@playwright/test/index.js': '',
-    'playwright/package.json': JSON.stringify({ name: 'playwright', version }),
-    'playwright/lib/runner.js': `module.exports = globalThis.${FAKE}.runner;`,
-    'playwright/lib/common.js': `module.exports = globalThis.${FAKE}.common;`,
-    'playwright-core/package.json': '{"name":"playwright-core"}',
-    'playwright-core/lib/coreBundle.js': `module.exports = globalThis.${FAKE}.coreBundle;`,
-  };
-
-  for (const [file, content] of Object.entries(files)) {
-    mkdirSync(path.dirname(path.join(modules, file)), { recursive: true });
-    writeFileSync(path.join(modules, file), content);
-  }
-
   mkdirSync(tmp);
   const configFile = path.join(dir, 'playwright.config.ts');
-  writeFileSync(configFile, '');
   const calls: Call[] = [];
   const runs: Run[] = [];
   let stopRequested = Promise.withResolvers<void>();
@@ -203,33 +212,9 @@ export function fakePlaywright(
       },
     },
   };
-  const globals: Record<string, unknown> = globalThis;
-  const tmpEnv = ['TMPDIR', 'TEMP', 'TMP'].map(
-    (name) => [name, process.env[name]] as const,
-  );
   globals[FAKE] = fake;
-
   // init() and the temp root read os.tmpdir(), so the fake's own folder stands in for it.
-  for (const [name] of tmpEnv) {
-    process.env[name] = tmp;
-  }
-
-  const live: LzStrykerPlaywrightTestRunner[] = [];
-
-  t.after(async () => {
-    await Promise.all(live.map((shell) => shell.dispose()));
-
-    for (const [name, value] of tmpEnv) {
-      if (value === undefined) {
-        delete process.env[name];
-      } else {
-        process.env[name] = value;
-      }
-    }
-
-    delete globals[FAKE];
-    rmSync(dir, { recursive: true, force: true });
-  });
+  stubEnv(t, { TMPDIR: tmp, TEMP: tmp, TMP: tmp });
 
   return {
     dir,
