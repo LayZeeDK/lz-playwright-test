@@ -14,9 +14,9 @@ let ignorer: string;
 
 try {
   const [plugin] = strykerPlugins;
-  ignorer = `${plugin.kind} ${plugin.name} ${String(plugin.factory().shouldIgnore({} as never))}`;
+  ignorer = `${plugin.kind} ${plugin.name} ${String(plugin.factory().shouldIgnore({}))}`;
 } catch (error) {
-  ignorer = `throws ${(error as Error).message}`;
+  ignorer = `throws ${error instanceof Error ? error.message : String(error)}`;
 }
 
 console.log(

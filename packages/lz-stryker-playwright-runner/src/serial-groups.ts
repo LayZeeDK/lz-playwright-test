@@ -1,7 +1,9 @@
-import type { Suite, TestCase } from '@playwright/test/reporter';
-
-import { isSerialSuite, type TestRunner } from './playwright-internals.ts';
-import { LzStrykerCollectingReporter } from './reporter.ts';
+import {
+  isRecord,
+  isSerialSuite,
+  type TestRunner,
+} from './playwright-internals.ts';
+import { LzStrykerCollectingReporter, type ReportedTest } from './reporter.ts';
 
 /** The ids of a describe.serial group's tests, by the id of each test in it. */
 export type SerialGroups = ReadonlyMap<string, readonly string[]>;
@@ -47,7 +49,7 @@ export async function listSerialGroups(
   return serialGroups(reporter.listedTests);
 }
 
-export function serialGroups(testCases: Iterable<TestCase>): SerialGroups {
+export function serialGroups(testCases: Iterable<ReportedTest>): SerialGroups {
   const bySuite = new Map<object, string[]>();
   const byTest = new Map<string, string[]>();
 
@@ -55,8 +57,8 @@ export function serialGroups(testCases: Iterable<TestCase>): SerialGroups {
     let group: object | undefined;
 
     for (
-      let suite: Suite | undefined = test.parent;
-      suite;
+      let suite: unknown = test.parent;
+      isRecord(suite);
       suite = suite.parent
     ) {
       if (isSerialSuite(suite)) {

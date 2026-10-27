@@ -15,7 +15,7 @@ import path from 'node:path';
 import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import type { Mutant, StrykerOptions } from '@stryker-mutator/api/core';
+import type { Mutant, MutantCoverage } from '@stryker-mutator/api/core';
 import {
   type CompleteDryRunResult,
   DryRunStatus,
@@ -93,6 +93,12 @@ function mutant(
   assert.ok(found, `mutant ${mutatorName} ${replacement} exists`);
 
   return found;
+}
+
+function dryRunCoverage(): MutantCoverage {
+  assert.ok(dryRun.mutantCoverage, 'the dry run reports coverage');
+
+  return dryRun.mutantCoverage;
 }
 
 function testId(title: string): string {
@@ -183,10 +189,7 @@ before(async () => {
     lzStrykerPlaywright: { configFile: fixture('playwright.config.ts') },
     timeoutMS: 10_000,
   };
-  runner = new LzStrykerPlaywrightTestRunner(
-    options as unknown as StrykerOptions,
-    log,
-  );
+  runner = new LzStrykerPlaywrightTestRunner(options, log);
   await runner.init();
 
   const dry = await runner.dryRun({
@@ -244,7 +247,7 @@ test('init finds the describe.serial groups', () => {
 });
 
 test('per-test coverage separates tests that reach different code', () => {
-  const { perTest } = dryRun.mutantCoverage!;
+  const { perTest } = dryRunCoverage();
   const greeting = perTest[testId('shows the greeting')];
   const counting = perTest[testId('counts to three')];
   const loopMutant = mutant('UpdateOperator', 'i--').id;
@@ -263,7 +266,7 @@ test('per-test coverage separates tests that reach different code', () => {
 });
 
 test('per-test coverage holds exactly the mutants each test reaches, with their hit counts', () => {
-  const { perTest } = dryRun.mutantCoverage!;
+  const { perTest } = dryRunCoverage();
   const greeting = perTest[testId('shows the greeting')];
   const counting = perTest[testId('counts to three')];
 
@@ -279,11 +282,11 @@ test('a page shared from beforeAll reports its coverage as static', () => {
   const loopMutant = mutant('UpdateOperator', 'i--').id;
 
   assert.ok(
-    dryRun.mutantCoverage!.static[loopMutant],
+    dryRunCoverage().static[loopMutant],
     'shared-page coverage lands in static',
   );
   assert.equal(
-    dryRun.mutantCoverage!.perTest[testId('first user of the shared page')],
+    dryRunCoverage().perTest[testId('first user of the shared page')],
     undefined,
   );
 });
@@ -291,7 +294,7 @@ test('a page shared from beforeAll reports its coverage as static', () => {
 test('coverage survives a navigation to a page without instrumented code', () => {
   const greetingMutant = mutant('StringLiteral', '""').id;
   const coverage =
-    dryRun.mutantCoverage!.perTest[
+    dryRunCoverage().perTest[
       testId('keeps coverage across a navigation to a page without the app')
     ];
 
@@ -301,13 +304,13 @@ test('coverage survives a navigation to a page without instrumented code', () =>
 test('a page never closed before the worker closes the browser still reports coverage, as static', () => {
   const doubleMutant = mutant('ArithmeticOperator', 'n / 2').id;
 
-  assert.ok(dryRun.mutantCoverage!.static[doubleMutant]);
+  assert.ok(dryRunCoverage().static[doubleMutant]);
 });
 
 test('a page the test closes still reports its coverage, for that test', () => {
   const halfMutant = mutant('ArithmeticOperator', 'n * 2').id;
   const coverage =
-    dryRun.mutantCoverage!.perTest[
+    dryRunCoverage().perTest[
       testId('halves on a second page it closes before the test ends')
     ];
 
@@ -315,7 +318,7 @@ test('a page the test closes still reports its coverage, for that test', () => {
 });
 
 test('reused contexts still get per-test coverage', () => {
-  const { perTest } = dryRun.mutantCoverage!;
+  const { perTest } = dryRunCoverage();
   const loopMutant = mutant('UpdateOperator', 'i--').id;
 
   assert.equal(
@@ -326,7 +329,7 @@ test('reused contexts still get per-test coverage', () => {
 });
 
 test('app code a test runs in the Playwright worker gets per-test coverage', () => {
-  const { perTest } = dryRun.mutantCoverage!;
+  const { perTest } = dryRunCoverage();
 
   assert.deepEqual(
     Object.keys(perTest[testId('adds in the worker')] ?? {}).sort(),
@@ -335,7 +338,7 @@ test('app code a test runs in the Playwright worker gets per-test coverage', () 
 });
 
 test('app code imported into the Playwright worker, outside any test, is static coverage', () => {
-  const { perTest, static: atImport } = dryRun.mutantCoverage!;
+  const { perTest, static: atImport } = dryRunCoverage();
   const importMutant = mutant('StringLiteral', '""', 'src/node-only.ts').id;
 
   assert.ok(atImport[importMutant], 'the import counts as static');
@@ -376,7 +379,7 @@ test('a mutant in app code that only the worker runs is killed by the test the d
   const workerMutant = mutant('ArithmeticOperator', 'a - b');
   const worker = testId('adds in the worker');
 
-  assert.ok(dryRun.mutantCoverage!.perTest[worker]?.[workerMutant.id]);
+  assert.ok(dryRunCoverage().perTest[worker]?.[workerMutant.id]);
 
   const result = await mutantRun(workerMutant, { testFilter: [worker] });
 

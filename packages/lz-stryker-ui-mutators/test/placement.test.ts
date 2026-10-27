@@ -19,6 +19,7 @@ import {
   type SourceFile,
 } from '../src/install.ts';
 import { operatorNames } from '../src/operators.ts';
+import { defined } from './support/defined.ts';
 import { exportedFunction } from './support/exports.ts';
 import { installInto, ours } from './support/installed.ts';
 
@@ -48,6 +49,9 @@ const builtIns = (mutants: readonly InstrumentedMutant[]): string[] =>
         `${start.line}:${start.column} ${mutatorName} ${replacement}`,
     )
     .sort();
+
+const firstContent = (result: InstrumentResult | undefined): string =>
+  defined(defined(result).files[0]).content;
 
 async function instrumentEach(excludedMutations: readonly string[]) {
   return Promise.all(
@@ -86,15 +90,15 @@ describe('the JSX placement, with every UI operator excluded', () => {
 
     it(`gives the stock output once mutant ids are masked, for ${file}`, () => {
       assert.equal(
-        masked(excluded[index]!.files[0]!.content),
-        masked(stock[index]!.files[0]!.content),
+        masked(firstContent(excluded[index])),
+        masked(firstContent(stock[index])),
       );
     });
 
     it(`gives the stock list of built-in mutants (line:col mutator replacement), for ${file}`, () => {
       assert.deepEqual(
-        builtIns(excluded[index]!.mutants),
-        builtIns(stock[index]!.mutants),
+        builtIns(defined(excluded[index]).mutants),
+        builtIns(defined(stock[index]).mutants),
       );
     });
   }
@@ -114,8 +118,8 @@ describe('the JSX placement, with every UI operator excluded', () => {
   it('shows a difference when one UI operator is left unexcluded (the negative control)', () => {
     const differing = corpus.filter(
       (_file, index) =>
-        masked(oneLeftOn[index]!.files[0]!.content) !==
-        masked(stock[index]!.files[0]!.content),
+        masked(firstContent(oneLeftOn[index])) !==
+        masked(firstContent(stock[index])),
     );
 
     assert.ok(differing.length > 0);
@@ -127,7 +131,7 @@ describe('the JSX placement, with the UI operators on', () => {
     if (name.endsWith('.tsx')) {
       it(`instruments ${name.split(/[\\/]/).pop()} to TSX that Babel parses again`, () => {
         assert.doesNotThrow(() =>
-          parse(on[index]!.files[0]!.content, {
+          parse(firstContent(on[index]), {
             sourceType: 'module',
             plugins: ['typescript', 'jsx'],
           }),
@@ -151,7 +155,7 @@ describe('the JSX placement, with the UI operators on', () => {
           'export const a = <div><img alt="Logo" /><p>Hello</p><button>Go</button></div>;\n',
       },
     ]);
-    const code = files[0]!.content;
+    const code = defined(files[0]).content;
 
     assert.match(
       code,
@@ -184,7 +188,7 @@ describe('the JSX placement, with the UI operators on', () => {
       'LzUrlAttribute',
     ]);
     assert.doesNotThrow(() =>
-      parse(files[0]!.content, {
+      parse(defined(files[0]).content, {
         sourceType: 'module',
         plugins: ['typescript', 'jsx'],
       }),

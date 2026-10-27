@@ -3,12 +3,9 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 import {
-  type CommonModule,
-  type CoreBundleModule,
   instrumentationOf,
   isSerialSuite,
   probeInternals,
-  type RunnerModule,
   runningSlotOf,
   supportsPlaywright,
   TEST_RUNNER_METHODS,
@@ -25,13 +22,13 @@ function fakeModules(methods = TEST_RUNNER_METHODS) {
   }
 
   return {
-    runner: { testRunner: { TestRunner } } as unknown as Partial<RunnerModule>,
+    runner: { testRunner: { TestRunner } },
     common: {
       configLoader: { resolveConfigLocation: () => ({}) },
-    } as Partial<CommonModule>,
+    },
     coreBundle: {
       utils: { isURLAvailable: async () => true },
-    } as Partial<CoreBundleModule>,
+    },
   };
 }
 
@@ -78,7 +75,7 @@ test('the probe names every internal when one is missing', () => {
   const missingLoader = { ...fakeModules(), common: {} };
   const missingUtil = {
     ...fakeModules(),
-    coreBundle: { utils: {} } as Partial<CoreBundleModule>,
+    coreBundle: { utils: {} },
   };
   const missingRunner = { ...fakeModules(), runner: {} };
 

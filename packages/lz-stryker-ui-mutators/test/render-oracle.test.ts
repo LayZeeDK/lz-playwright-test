@@ -21,6 +21,7 @@ import {
   type InstrumentedMutant,
   type InstrumentResult,
 } from '../src/install.ts';
+import { defined } from './support/defined.ts';
 import { exportedFunction } from './support/exports.ts';
 import { installInto, ours } from './support/installed.ts';
 
@@ -60,7 +61,7 @@ before(async () => {
     { name: samplePath, content: source },
   ]);
   original = renderAll(await load(source));
-  build = await load(isolated(result.files[0]!.content));
+  build = await load(isolated(defined(result.files[0]).content));
 });
 after(() => rmSync(outDir, { recursive: true, force: true }));
 
@@ -159,7 +160,7 @@ function renderAll(App: Component): string {
       try {
         return serialize(App(scenario));
       } catch (error) {
-        return `THROWS ${(error as Error).message}`;
+        return `THROWS ${String(error)}`;
       }
     })
     .join('\n');
@@ -174,10 +175,13 @@ function offsetOf(line: number, column: number): number {
   );
 }
 
+declare global {
+  var __renderOracle__: unknown;
+}
+
 // The instrumented header caches the namespace object, so the test changes it in place rather than replacing it.
-const namespace: { activeMutant?: string | undefined } = ((
-  globalThis as { __renderOracle__?: { activeMutant?: string | undefined } }
-).__renderOracle__ ??= {});
+const namespace: { activeMutant?: string | undefined } = {};
+globalThis.__renderOracle__ = namespace;
 
 /** Each mutant's render through the build and through the hand-applied source, `undefined` id for the baseline. */
 async function renders(mutant: InstrumentedMutant) {

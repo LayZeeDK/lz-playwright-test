@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { isRecord } from './playwright-internals.ts';
+
 /**
  * Playwright deletes and recreates `outputDir` in global setup, so both directories live in a root it
  * never touches: on a shared /tmp no other user can claim either name in between.
@@ -62,7 +64,7 @@ export function isRunning(
 
     return true;
   } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM';
+    return isRecord(error) && error.code === 'EPERM';
   }
 }
 

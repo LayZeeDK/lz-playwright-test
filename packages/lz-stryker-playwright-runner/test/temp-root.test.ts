@@ -147,6 +147,15 @@ test('a process this user may not signal still runs', () => {
   assert.equal(isRunning(1, killError('EPERM')), true);
 });
 
+test('a kill that throws no error object leaves the process counted as not running', () => {
+  assert.equal(
+    isRunning(1, () => {
+      throw null;
+    }),
+    false,
+  );
+});
+
 test('a real directory with this user as owner is ours', () => {
   assert.equal(isOwnDir('d', { getuid: () => 501 }, directory(501)), true);
 });

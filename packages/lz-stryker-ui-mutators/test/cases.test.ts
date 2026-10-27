@@ -7,6 +7,7 @@ import { before, test } from 'node:test';
 
 import { resolveFromCore, type InstrumentResult } from '../src/install.ts';
 import { cases, type Case } from './cases.ts';
+import { defined } from './support/defined.ts';
 import { installInto, ours } from './support/installed.ts';
 
 function source(testCase: Case): string {
@@ -30,7 +31,7 @@ before(async () => {
 
 for (const [index, testCase] of cases.entries()) {
   test(`${testCase.id}: ${testCase.title}`, () => {
-    const file = files[index]!.name;
+    const file = defined(files[index]).name;
     const actual = result.mutants
       .filter(
         ({ fileName, mutatorName }) =>
@@ -48,10 +49,9 @@ for (const [index, testCase] of cases.entries()) {
     assert.deepEqual(actual, expected, `origin ${testCase.origin}`);
 
     if (testCase.instrumented !== undefined) {
-      assert.ok(
-        result.files[index]!.content.includes(testCase.instrumented),
-        result.files[index]!.content,
-      );
+      const { content } = defined(result.files[index]);
+
+      assert.ok(content.includes(testCase.instrumented), content);
     }
   });
 }

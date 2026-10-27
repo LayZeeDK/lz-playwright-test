@@ -5,10 +5,13 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { TestContext } from 'node:test';
 
-import type { Browser, BrowserContext, Frame, Page } from '@playwright/test';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
 import {
+  type HookedBrowser,
+  type HookedContext,
+  type HookedFrame,
+  type HookedPage,
   type Instrumentation,
   isRecord,
   type SlotType,
@@ -96,11 +99,7 @@ export function fakeInstall(
   }
 
   try {
-    installHook(
-      ((id: string) => modules[id]) as NodeJS.Require,
-      { outDir, ...settings },
-      ns,
-    );
+    installHook((id) => modules[id], { outDir, ...settings }, ns);
   } finally {
     if (previousMutant === undefined) {
       delete process.env[ACTIVE_MUTANT];
@@ -121,57 +120,60 @@ export function fakeInstall(
   assert.ok(listener);
   const hooks = listener;
 
-  function frame({ name, evaluate, detached = false }: FakeFrame = {}): Frame {
+  function frame({
+    name,
+    evaluate,
+    detached = false,
+  }: FakeFrame = {}): HookedFrame {
     return {
-      evaluate: (fn: (name: string) => unknown, asked: string) =>
+      evaluate: (fn, asked) =>
         evaluate ? evaluate(fn, asked) : Promise.resolve(fn(name ?? asked)),
       isDetached: () => detached,
-    } as unknown as Frame;
+    };
   }
 
-  function page(frames: Frame[] = [frame()]) {
+  function page(frames: HookedFrame[] = [frame()]) {
     const closed: unknown[] = [];
-    const fake = {
+    const created: HookedPage = {
       frames: () => frames,
-      close: async (options?: unknown) => {
+      close: async (options) => {
         closed.push(options);
       },
     };
 
-    return { page: fake as unknown as Page, closed };
+    return { page: created, closed };
   }
 
   function browser() {
-    const contexts: BrowserContext[] = [];
+    const contexts: HookedContext[] = [];
     const closed: unknown[] = [];
-    const fake = {
+    const created: HookedBrowser = {
       contexts: () => contexts,
-      close: async (options?: unknown) => {
+      close: async (options) => {
         closed.push(options);
       },
     };
 
-    return { browser: fake as unknown as Browser, contexts, closed };
+    return { browser: created, contexts, closed };
   }
 
   /** A context as Playwright creates it, which the hook sees through the instrumentation. */
   async function context(owner: ReturnType<typeof browser> | null = null) {
-    const pages: Page[] = [];
-    const onPage: ((page: Page) => void)[] = [];
+    const pages: HookedPage[] = [];
+    const onPage: ((page: HookedPage) => void)[] = [];
     const scripts: [unknown, PageSettings][] = [];
     const events: string[] = [];
-    const fake = {
+    const created: HookedContext = {
       pages: () => pages,
       browser: () => owner?.browser ?? null,
-      on: (event: string, handler: (page: Page) => void) => {
+      on: (event, handler) => {
         events.push(event);
         onPage.push(handler);
       },
-      addInitScript: async (script: unknown, arg: PageSettings) => {
-        scripts.push([script, arg]);
+      addInitScript: async (script, settings) => {
+        scripts.push([script, settings]);
       },
     };
-    const created = fake as unknown as BrowserContext;
     owner?.contexts.push(created);
     await hooks.runAfterCreateBrowserContext?.(created);
 
@@ -179,7 +181,7 @@ export function fakeInstall(
       context: created,
       scripts,
       events,
-      open: (opened: Page) => {
+      open: (opened: HookedPage) => {
         pages.push(opened);
         onPage.forEach((handler) => handler(opened));
       },

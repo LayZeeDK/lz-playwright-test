@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { parseSnapshotLine, serializeSnapshot } from '../src/protocol.ts';
+import {
+  parseSnapshotLine,
+  readRunSettings,
+  RUN_SETTINGS,
+  serializeSnapshot,
+} from '../src/protocol.ts';
 
 // parseSnapshotLine builds null-prototype maps, which deepEqual tells apart from object literals.
 function plain(value: unknown): unknown {
@@ -63,4 +68,33 @@ test('a parsed line keeps no coverage that is not a map', () => {
     ),
     { static: {}, perTest: { a: {} } },
   );
+});
+
+test('the run settings are read from the environment, with a hit limit only when one is set', () => {
+  assert.equal(readRunSettings({}), undefined);
+  assert.deepEqual(
+    readRunSettings({ [RUN_SETTINGS]: '{"outDir":"out","perTest":true}' }),
+    { outDir: 'out', perTest: true },
+  );
+  assert.deepEqual(
+    readRunSettings({
+      [RUN_SETTINGS]: '{"outDir":"out","perTest":false,"hitLimit":5}',
+    }),
+    { outDir: 'out', perTest: false, hitLimit: 5 },
+  );
+});
+
+test('run settings that are not an object or have a field of the wrong type are refused', () => {
+  for (const raw of [
+    'null',
+    '[]',
+    '{"perTest":true}',
+    '{"outDir":"out"}',
+    '{"outDir":"out","perTest":"true"}',
+    '{"outDir":"out","perTest":true,"hitLimit":"5"}',
+  ]) {
+    assert.throws(() => readRunSettings({ [RUN_SETTINGS]: raw }), {
+      message: `${RUN_SETTINGS} holds no valid run settings: ${raw}`,
+    });
+  }
 });

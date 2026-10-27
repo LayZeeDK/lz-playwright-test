@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import type { StrykerOptions } from '@stryker-mutator/api/core';
+import { isRecord } from './playwright-internals.ts';
 
 export interface LzStrykerPlaywrightOptions {
   configFile?: string;
@@ -66,24 +66,52 @@ export interface RunnerOptions {
   readonly strykerTimeoutMS: number;
 }
 
-export function readRunnerOptions(options: StrykerOptions): RunnerOptions {
+/** The Stryker options the runner reads. */
+export interface RunnerStrykerOptions {
+  readonly testFiles?: readonly string[];
+  readonly timeoutMS: number;
+  readonly lzStrykerPlaywright?: unknown;
+}
+
+export function readRunnerOptions(
+  options: RunnerStrykerOptions,
+): RunnerOptions {
   if (options.testFiles?.length) {
     throw new Error(
       'The Playwright test runner does not support the --testFiles option.',
     );
   }
 
-  const own =
-    (
-      options as StrykerOptions & {
-        lzStrykerPlaywright?: LzStrykerPlaywrightOptions;
-      }
-    ).lzStrykerPlaywright ?? {};
+  const own = options.lzStrykerPlaywright ?? {};
 
-  return {
-    configFile: own.configFile ? path.resolve(own.configFile) : undefined,
-    projects: own.projects,
-    workers: own.workers ?? OPTION_PROPERTIES.workers.default,
-    strykerTimeoutMS: options.timeoutMS,
-  };
+  if (isRecord(own)) {
+    const {
+      configFile,
+      projects,
+      workers = OPTION_PROPERTIES.workers.default,
+    } = own;
+
+    if (
+      (configFile === undefined || typeof configFile === 'string') &&
+      (projects === undefined || isStringArray(projects)) &&
+      typeof workers === 'number'
+    ) {
+      return {
+        configFile: configFile ? path.resolve(configFile) : undefined,
+        projects,
+        workers,
+        strykerTimeoutMS: options.timeoutMS,
+      };
+    }
+  }
+
+  throw new Error(
+    `The lzStrykerPlaywright options do not match their schema: ${JSON.stringify(own)}`,
+  );
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === 'string')
+  );
 }

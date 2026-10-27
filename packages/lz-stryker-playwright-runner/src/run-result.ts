@@ -11,7 +11,11 @@ import {
 } from '@stryker-mutator/api/test-runner';
 
 import { emptyRecord, type Snapshot } from './protocol.ts';
-import { type LzStrykerCollectingReporter, errorText } from './reporter.ts';
+import {
+  type LzStrykerCollectingReporter,
+  errorText,
+  type ReportedTest,
+} from './reporter.ts';
 import type {
   DryRunRequest,
   MutantRunRequest,
@@ -59,7 +63,9 @@ export interface AttemptSummary {
   readonly timedOut: boolean;
 }
 
-export function attemptSummary(testCases: Iterable<TestCase>): AttemptSummary {
+export function attemptSummary(
+  testCases: Iterable<ReportedTest>,
+): AttemptSummary {
   const attempts = [...testCases].flatMap((test) =>
     test.results.map(({ status }) => ({
       status,
@@ -287,7 +293,7 @@ function emptyRunResult(request: RunRequest): RunResult {
   };
 }
 
-function toTestResult(test: TestCase, isMutantRun: boolean): TestResult {
+function toTestResult(test: ReportedTest, isMutantRun: boolean): TestResult {
   // The root suite's title is the empty first one.
   const titles = test.titlePath().filter(Boolean);
   const last = test.results.at(-1);

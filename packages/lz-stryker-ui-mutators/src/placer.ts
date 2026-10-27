@@ -25,10 +25,14 @@ export function withJsxPlacement(
         path.node.value = t.jsxExpressionContainer(
           valueExpression(path.node, t),
         );
-        place(
-          child(path, 'value.expression'),
-          remap(appliedMutants, (node) => valueExpression(node, t)),
-        );
+        const value = path.get('value');
+
+        if (value.isJSXExpressionContainer()) {
+          place(
+            value.get('expression'),
+            remap(appliedMutants, (node) => valueExpression(node, t)),
+          );
+        }
 
         return;
       }
@@ -38,7 +42,7 @@ export function withJsxPlacement(
           t.jsxExpressionContainer(cleanedText(path.node, t)),
         );
         place(
-          child(container, 'expression'),
+          container.get('expression'),
           remap(appliedMutants, (node) => cleanedText(node, t)),
         );
 
@@ -49,7 +53,7 @@ export function withJsxPlacement(
         const [container] = path.replaceWith(
           t.jsxExpressionContainer(path.node),
         );
-        place(child(container, 'expression'), appliedMutants);
+        place(container.get('expression'), appliedMutants);
 
         return;
       }
@@ -57,11 +61,6 @@ export function withJsxPlacement(
       place(path, appliedMutants);
     },
   };
-}
-
-// The `as` stays here, around no code Stryker could mutate, as it skips `as` expressions.
-function child(path: NodePath, key: string): NodePath {
-  return path.get(key) as NodePath;
 }
 
 function remap(

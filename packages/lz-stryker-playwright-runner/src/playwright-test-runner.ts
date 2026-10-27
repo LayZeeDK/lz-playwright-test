@@ -2,7 +2,6 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 
-import type { StrykerOptions } from '@stryker-mutator/api/core';
 import type { Logger } from '@stryker-mutator/api/logging';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 import type {
@@ -13,7 +12,11 @@ import type {
   TestRunner as StrykerTestRunner,
 } from '@stryker-mutator/api/test-runner';
 
-import { readRunnerOptions, type RunnerOptions } from './options.ts';
+import {
+  readRunnerOptions,
+  type RunnerOptions,
+  type RunnerStrykerOptions,
+} from './options.ts';
 import {
   loadPlaywright,
   NO_COPY_PROMPT_ENV,
@@ -79,12 +82,12 @@ const RUN_OVERRIDES = {
 export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
   static inject = tokens(commonTokens.options, commonTokens.logger);
 
-  private readonly strykerOptions: StrykerOptions;
+  private readonly strykerOptions: RunnerStrykerOptions;
   private readonly log: Logger;
   private readonly baseNodeOptions = process.env.NODE_OPTIONS;
   private session?: Session | undefined;
 
-  constructor(options: StrykerOptions, log: Logger) {
+  constructor(options: RunnerStrykerOptions, log: Logger) {
     this.strykerOptions = options;
     this.log = log;
   }
@@ -330,9 +333,15 @@ function setEnv(values: Readonly<Record<string, string | undefined>>) {
 // Playwright's own webServer port check tries both loopback addresses: localhost can resolve to only one of them.
 const LOOPBACK_HOSTS = ['127.0.0.1', '::1'];
 
+/** The members of a net.Socket that a port check uses. */
+export interface ConnectingSocket {
+  once(event: 'connect' | 'error' | 'timeout', listener: () => void): unknown;
+  destroy(): unknown;
+}
+
 export function acceptsConnections(
   port: number,
-  connect: (options: net.TcpNetConnectOpts) => net.Socket = net.connect,
+  connect: (options: net.TcpNetConnectOpts) => ConnectingSocket = net.connect,
 ): Promise<boolean> {
   return new Promise((resolve) => {
     let answered = 0;

@@ -134,5 +134,25 @@ export function readRunSettings(
 ): RunSettings | undefined {
   const raw = env[RUN_SETTINGS];
 
-  return raw === undefined ? undefined : (JSON.parse(raw) as RunSettings);
+  if (raw === undefined) {
+    return undefined;
+  }
+
+  const settings: unknown = JSON.parse(raw);
+
+  if (isRecord(settings)) {
+    const { outDir, perTest, hitLimit } = settings;
+
+    if (
+      typeof outDir === 'string' &&
+      typeof perTest === 'boolean' &&
+      (hitLimit === undefined || typeof hitLimit === 'number')
+    ) {
+      return hitLimit === undefined
+        ? { outDir, perTest }
+        : { outDir, perTest, hitLimit };
+    }
+  }
+
+  throw new Error(`${RUN_SETTINGS} holds no valid run settings: ${raw}`);
 }

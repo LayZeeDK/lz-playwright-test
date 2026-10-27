@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { TestContext } from 'node:test';
 
-import type { FullResult, Reporter, TestCase } from '@playwright/test/reporter';
+import type { FullResult, Reporter } from '@playwright/test/reporter';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
 import type {
@@ -21,7 +21,10 @@ import {
   serializeSnapshot,
   type SnapshotLine,
 } from '../../src/protocol.ts';
-import { LzStrykerCollectingReporter } from '../../src/reporter.ts';
+import {
+  LzStrykerCollectingReporter,
+  type ReportedTest,
+} from '../../src/reporter.ts';
 import { finishedTest, logger, strykerOptions } from './doubles.ts';
 
 export type Status = FullResult['status'];
@@ -55,7 +58,7 @@ export interface Run {
 export interface Behaviour {
   projects?: Project[];
   webServers?: WebServer[];
-  listed?: TestCase[];
+  listed?: ReportedTest[];
   initialize?: () => Promise<void>;
   globalSetup?: (reporter: Reporter) => Status;
   globalTeardown?: () => Promise<void>;

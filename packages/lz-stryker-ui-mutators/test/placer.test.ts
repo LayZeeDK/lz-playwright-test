@@ -37,16 +37,16 @@ describe('withJsxPlacement', () => {
     });
     const [path] = attributes;
     assert.ok(path);
-    delete (path.node as { value?: unknown }).value;
+    delete path.node.value;
     const mutant = t.jsxAttribute(t.jsxIdentifier('disabled'));
-    delete (mutant as { value?: unknown }).value;
+    delete mutant.value;
 
     methods.place(path, new Map([['1', mutant]]));
 
     assert.deepEqual(
       placed.map(({ node, mutants }) => [
         node.type,
-        (node as t.BooleanLiteral).value,
+        t.isBooleanLiteral(node) && node.value,
         mutants,
       ]),
       [['BooleanLiteral', true, [t.booleanLiteral(true)]]],

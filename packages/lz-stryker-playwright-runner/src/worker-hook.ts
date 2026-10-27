@@ -4,17 +4,14 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { isMainThread } from 'node:worker_threads';
 
-import type {
-  Browser,
-  BrowserContext,
-  Frame,
-  Page,
-  TestInfo,
-  TestType,
-} from '@playwright/test';
+import type { TestInfo, TestType } from '@playwright/test';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
 import {
+  type HookedBrowser,
+  type HookedContext,
+  type HookedFrame,
+  type HookedPage,
   instrumentationOf,
   isRecord,
   runningSlotOf,
@@ -87,7 +84,7 @@ if (
 }
 
 export function install(
-  playwrightRequire: NodeJS.Require,
+  playwrightRequire: (id: string) => unknown,
   { outDir, perTest, hitLimit }: RunSettings,
   ns: string = INSTRUMENTER_CONSTANTS.NAMESPACE,
 ): void {
@@ -101,9 +98,9 @@ export function install(
     outDir,
     `worker-${process.pid}-${randomUUID()}${SNAPSHOT_SUFFIX}`,
   );
-  const contexts = new WeakMap<BrowserContext, ContextState>();
-  const alreadyRead = new WeakSet<Page>();
-  const patchedBrowsers = new WeakSet<Browser>();
+  const contexts = new WeakMap<HookedContext, ContextState>();
+  const alreadyRead = new WeakSet<HookedPage>();
+  const patchedBrowsers = new WeakSet<HookedBrowser>();
 
   fs.writeFileSync(outFile, '');
   recordNodeCoverage(
@@ -114,14 +111,14 @@ export function install(
   );
 
   // Closing a page that owns its context closes the context first, so the same page can come up twice.
-  function readOnce(pages: Page[]): Promise<FrameRead[]> {
+  function readOnce(pages: HookedPage[]): Promise<FrameRead[]> {
     const fresh = pages.filter((page) => !alreadyRead.has(page));
     fresh.forEach((page) => alreadyRead.add(page));
 
     return readPages(fresh, ns);
   }
 
-  async function collect(context: BrowserContext) {
+  async function collect(context: HookedContext) {
     const state = contexts.get(context);
 
     if (!state || state.collected) {
@@ -147,7 +144,7 @@ export function install(
 
   // browser.close(), and page.close() on a page whose context stays open, skip the before-close hook for
   // what they close, so read first.
-  function collectBeforePageCloses(state: ContextState, page: Page) {
+  function collectBeforePageCloses(state: ContextState, page: HookedPage) {
     const close = page.close.bind(page);
     page.close = async (options) => {
       state.closedPageSnapshots.push(...(await readOnce([page])));
@@ -156,7 +153,7 @@ export function install(
     };
   }
 
-  function collectBeforeBrowserCloses(browser: Browser | null) {
+  function collectBeforeBrowserCloses(browser: HookedBrowser | null) {
     if (!browser || patchedBrowsers.has(browser)) {
       return;
     }
@@ -319,7 +316,10 @@ function testInfoOf(test: Test): TestInfo | undefined {
   }
 }
 
-async function readPages(pages: Page[], ns: string): Promise<FrameRead[]> {
+async function readPages(
+  pages: HookedPage[],
+  ns: string,
+): Promise<FrameRead[]> {
   const snapshots = await Promise.all(
     pages
       .flatMap((page) => page.frames())
@@ -330,7 +330,7 @@ async function readPages(pages: Page[], ns: string): Promise<FrameRead[]> {
 }
 
 async function readNamespace(
-  frame: Frame,
+  frame: HookedFrame,
   ns: string,
 ): Promise<FrameRead | undefined> {
   const { promise: lost, resolve } = Promise.withResolvers<FrameRead>();
@@ -351,6 +351,7 @@ async function readNamespace(
 
       return { mutantCoverage, hitCount };
     }, ns)
+    .then(frameRead)
     .catch(() =>
       frame.isDetached() ? undefined : ({ lost: true } satisfies FrameRead),
     );
@@ -360,6 +361,13 @@ async function readNamespace(
   } finally {
     clearTimeout(timer);
   }
+}
+
+// What a page's evaluate returns has crossed a serialization boundary.
+function frameRead(value: unknown): FrameRead | undefined {
+  return isRecord(value)
+    ? { mutantCoverage: value.mutantCoverage, hitCount: value.hitCount }
+    : undefined;
 }
 
 export function initPage({

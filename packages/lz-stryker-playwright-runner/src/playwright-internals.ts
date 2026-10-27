@@ -1,7 +1,8 @@
 import { createRequire } from 'node:module';
 
-import type { BrowserContext } from '@playwright/test';
 import type { FullResult, Reporter } from '@playwright/test/reporter';
+
+import type { PageSettings } from './worker-hook.ts';
 
 type Status = FullResult['status'];
 
@@ -48,9 +49,7 @@ const TEST_RUNNER_METHOD_SET: Record<keyof TestRunner, true> = {
   runTests: true,
   stopTests: true,
 };
-export const TEST_RUNNER_METHODS = Object.keys(
-  TEST_RUNNER_METHOD_SET,
-) as (keyof TestRunner)[];
+export const TEST_RUNNER_METHODS = Object.keys(TEST_RUNNER_METHOD_SET);
 
 export interface RunnerModule {
   testRunner: {
@@ -87,10 +86,39 @@ export const WORKER_ENTRY =
  */
 export const NO_COPY_PROMPT_ENV = 'PLAYWRIGHT_NO_COPY_PROMPT';
 
+/** The members of a Playwright Frame the worker hook calls; the page function reads one global. */
+export interface HookedFrame {
+  evaluate(fn: (name: string) => unknown, name: string): Promise<unknown>;
+  isDetached(): boolean;
+}
+
+/** The members of a Playwright Page the worker hook calls; it replaces `close`. */
+export interface HookedPage {
+  frames(): HookedFrame[];
+  close(options?: unknown): Promise<void>;
+}
+
+/** The members of a Playwright Browser the worker hook calls; it replaces `close`. */
+export interface HookedBrowser {
+  contexts(): HookedContext[];
+  close(options?: unknown): Promise<void>;
+}
+
+/** The members of a Playwright BrowserContext the worker hook calls. */
+export interface HookedContext {
+  pages(): HookedPage[];
+  browser(): HookedBrowser | null;
+  on(event: 'page', handler: (page: HookedPage) => void): unknown;
+  addInitScript(
+    script: (settings: PageSettings) => void,
+    settings: PageSettings,
+  ): Promise<unknown>;
+}
+
 export interface Instrumentation {
   addListener(listener: {
-    runAfterCreateBrowserContext?(context: BrowserContext): Promise<void>;
-    runBeforeCloseBrowserContext?(context: BrowserContext): Promise<void>;
+    runAfterCreateBrowserContext?(context: HookedContext): Promise<void>;
+    runBeforeCloseBrowserContext?(context: HookedContext): Promise<void>;
   }): void;
 }
 

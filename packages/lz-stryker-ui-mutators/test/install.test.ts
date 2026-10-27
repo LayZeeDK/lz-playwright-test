@@ -14,6 +14,8 @@ import { dirname, join } from 'node:path';
 import { after, describe, it } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
+import { types } from '@babel/core';
+
 import {
   corePackageJson,
   install,
@@ -23,7 +25,7 @@ import {
   type Instrumenter,
   type SourceFile,
 } from '../src/install.ts';
-import type { BabelTypes, NodeMutatorLike, Operator } from '../src/mutator.ts';
+import type { NodeMutatorLike, Operator } from '../src/mutator.ts';
 import type { MutantPlacerLike } from '../src/placer.ts';
 import { exportedFunction } from './support/exports.ts';
 
@@ -41,8 +43,12 @@ function operator(name: string): Operator {
 /** A fake instrumenter: each marked mutator not in `silent` makes one mutant in its own self-check file. */
 function setup({
   builtIns = ['StringLiteral', 'BooleanLiteral'],
-  silent = [] as string[],
+  silent = [],
   version = TESTED_VERSION,
+}: {
+  readonly builtIns?: readonly string[];
+  readonly silent?: readonly string[];
+  readonly version?: string;
 } = {}) {
   const allMutators: NodeMutatorLike[] = builtIns.map((name) => ({
     name,
@@ -58,7 +64,7 @@ function setup({
   const instrumenter: Instrumenter = {
     dir: '/stryker/instrumenter',
     version,
-    types: {} as BabelTypes,
+    types,
     allMutators,
     expressionPlacer,
     async instrument(files) {
@@ -590,24 +596,34 @@ describe('resolveFromCore against a fake instrumenter', () => {
     const { corePackage } = fakeCore(['expressionMutantPlacer']);
     const instrumenter = await resolveFromCore(corePackage);
 
-    const result = (await instrumenter.instrument([
+    // The fake core's Instrumenter resolves to what it was given, not to an InstrumentResult.
+    const result: unknown = await instrumenter.instrument([
       { name: 'a.tsx', content: 'x' },
-    ])) as unknown as {
-      files: unknown;
-      options: unknown;
-      logger: Record<string, () => unknown>;
-    };
-
-    assert.deepEqual(result.files, [
-      { name: 'a.tsx', content: 'x', mutate: true },
     ]);
-    assert.deepEqual(result.options, {
+    assert.ok(typeof result === 'object' && result !== null);
+    const {
+      files,
+      options,
+      logger,
+    }: { files?: unknown; options?: unknown; logger?: unknown } = result;
+    assert.ok(typeof logger === 'object' && logger !== null);
+
+    assert.deepEqual(files, [{ name: 'a.tsx', content: 'x', mutate: true }]);
+    assert.deepEqual(options, {
       plugins: null,
       excludedMutations: [],
       ignorers: [],
     });
     assert.deepEqual(
-      Object.entries(result.logger).map(([name, method]) => [name, method()]),
+      Object.keys(logger).map((name) => {
+        const method: unknown = Reflect.get(logger, name);
+        const returned: unknown =
+          typeof method === 'function'
+            ? Reflect.apply(method, undefined, [])
+            : method;
+
+        return [name, returned];
+      }),
       [
         ['debug', undefined],
         ['info', undefined],

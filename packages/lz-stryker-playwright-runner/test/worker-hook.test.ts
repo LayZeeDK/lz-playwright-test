@@ -12,8 +12,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { before, type TestContext, test } from 'node:test';
 
-import type { BrowserContext } from '@playwright/test';
-
+import type { HookedContext } from '../src/playwright-internals.ts';
 import {
   FRAME_READ_TIMEOUT_MS,
   RUN_SETTINGS,
@@ -544,9 +543,12 @@ test('a context closes into the snapshot file once', async (t) => {
 test('a context the hook never saw created writes nothing', async (t) => {
   const hooked = installed(t, { perTest: false });
   hooked.namespace().hitCount = 1;
-  const unseen = {
+  const unseen: HookedContext = {
     pages: () => [hooked.page().page],
-  } as unknown as BrowserContext;
+    browser: () => null,
+    on: () => undefined,
+    addInitScript: async () => undefined,
+  };
 
   await hooked.hooks.runBeforeCloseBrowserContext?.(unseen);
 

@@ -19,10 +19,9 @@ export function h(
   for (const [name, value] of Object.entries(props ?? {})) {
     if (/^on[A-Z]/.test(name)) {
       if (typeof value === 'function') {
-        element.addEventListener(
-          name.slice(2).toLowerCase(),
-          value as EventListener,
-        );
+        element.addEventListener(name.slice(2).toLowerCase(), (event) => {
+          Reflect.apply(value, element, [event]);
+        });
       }
 
       continue;

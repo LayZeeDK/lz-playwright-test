@@ -57,6 +57,23 @@ test('the runner options refuse --testFiles', () => {
   );
 });
 
+test('the runner options refuse lzStrykerPlaywright options that are not an object or have a field of the wrong type', () => {
+  for (const lzStrykerPlaywright of [
+    'chromium',
+    { configFile: 1 },
+    { projects: 'chromium' },
+    { projects: ['chromium', 1] },
+    { workers: '2' },
+  ]) {
+    assert.throws(
+      () => readRunnerOptions(strykerOptions({ lzStrykerPlaywright })),
+      {
+        message: `The lzStrykerPlaywright options do not match their schema: ${JSON.stringify(lzStrykerPlaywright)}`,
+      },
+    );
+  }
+});
+
 test('without lzStrykerPlaywright options or with an empty --testFiles the runner takes its defaults', () => {
   const defaults = {
     configFile: undefined,

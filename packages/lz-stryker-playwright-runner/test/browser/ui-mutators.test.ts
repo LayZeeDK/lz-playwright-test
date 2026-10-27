@@ -8,12 +8,7 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import type {
-  Location,
-  Mutant,
-  StrykerOptions,
-} from '@stryker-mutator/api/core';
-import type { Logger } from '@stryker-mutator/api/logging';
+import type { Location, Mutant } from '@stryker-mutator/api/core';
 import {
   type CompleteDryRunResult,
   DryRunStatus,
@@ -25,19 +20,11 @@ import { Instrumenter } from '@stryker-mutator/instrumenter';
 import ts from 'typescript';
 
 import { LzStrykerPlaywrightTestRunner } from '../../src/playwright-test-runner.ts';
+import { logger } from '../support/doubles.ts';
 
 const fixture = (file: string) =>
   fileURLToPath(new URL(`./ui-fixture/${file}`, import.meta.url));
-const nothing = () => undefined;
-const log = {
-  ...Object.fromEntries(
-    ['trace', 'debug', 'info', 'warn', 'error', 'fatal'].map((level) => [
-      level,
-      nothing,
-    ]),
-  ),
-  isDebugEnabled: () => false,
-} as unknown as Logger;
+const { log } = logger();
 const source = readFileSync(fixture('src/app.tsx'), 'utf8');
 const sourceLines = source.split('\n');
 
@@ -47,11 +34,17 @@ let dryRun: CompleteDryRunResult;
 let tests: TestResult[];
 
 function textAt({ start, end }: Location): string {
-  const lines = sourceLines.slice(start.line, end.line + 1);
-  lines[lines.length - 1] = lines[lines.length - 1]!.slice(0, end.column);
-  lines[0] = lines[0]!.slice(start.column);
+  const last = end.line - start.line;
 
-  return lines.join('\n');
+  return sourceLines
+    .slice(start.line, end.line + 1)
+    .map((line, i) =>
+      line.slice(
+        i === 0 ? start.column : 0,
+        i === last ? end.column : undefined,
+      ),
+    )
+    .join('\n');
 }
 
 /** The one mutant of `mutatorName` at the source text `original`, with `replacement`. */
@@ -72,7 +65,10 @@ function mutant(
     `one ${mutatorName} mutant ${original} -> ${replacement}`,
   );
 
-  return found[0]!;
+  const [first] = found;
+  assert.ok(first);
+
+  return first;
 }
 
 function testId(title: string): string {
@@ -111,7 +107,9 @@ before(async () => {
     { plugins: null, excludedMutations: [], ignorers: [] },
   );
   mutants = result.mutants;
-  writeFileSync(fixture('public/app.js'), transpile(result.files[0]!.content));
+  const [app] = result.files;
+  assert.ok(app, 'the instrumented app');
+  writeFileSync(fixture('public/app.js'), transpile(app.content));
   writeFileSync(
     fixture('public/h.js'),
     transpile(readFileSync(fixture('src/h.ts'), 'utf8')),
@@ -122,10 +120,7 @@ before(async () => {
     lzStrykerPlaywright: { configFile: fixture('playwright.config.ts') },
     timeoutMS: 10_000,
   };
-  runner = new LzStrykerPlaywrightTestRunner(
-    options as unknown as StrykerOptions,
-    log,
-  );
+  runner = new LzStrykerPlaywrightTestRunner(options, log);
   await runner.init();
 
   const dry = await runner.dryRun({
@@ -151,7 +146,8 @@ test('dry run completes with every test passing', () => {
 });
 
 test('per-test coverage credits a text mutant only to the tests that render its element', () => {
-  const { perTest, static: staticCoverage } = dryRun.mutantCoverage!;
+  assert.ok(dryRun.mutantCoverage, 'the dry run reports coverage');
+  const { perTest, static: staticCoverage } = dryRun.mutantCoverage;
   const heading = mutant('LzTextLiteral', 'Orders', '').id;
   const status = mutant('LzTextLiteral', 'Revealed', '').id;
 

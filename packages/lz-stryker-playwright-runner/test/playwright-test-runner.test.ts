@@ -17,6 +17,7 @@ import {
 
 import { strykerPlugins, strykerValidationSchema } from '../src/index.ts';
 import { OPTION_PROPERTIES } from '../src/options.ts';
+import { isRecord } from '../src/playwright-internals.ts';
 import {
   acceptsConnections,
   LzStrykerPlaywrightTestRunner,
@@ -39,6 +40,13 @@ import {
 } from './support/fake-playwright.ts';
 
 const HOOK = new URL('../src/worker-hook.ts', import.meta.url).href;
+
+function portOf(server: net.Server): number {
+  const address = server.address();
+  assert.ok(typeof address === 'object' && address !== null);
+
+  return address.port;
+}
 
 test('the package declares the runner as the lz-stryker-playwright test runner, with its options schema', () => {
   assert.deepEqual(strykerPlugins, [
@@ -72,7 +80,8 @@ test('init creates the TestRunner on the resolved config with the run overrides,
   await shell.init();
 
   const [, configLocation, overrides] = fake.calls[0];
-  const { outputDir } = overrides as { outputDir: string };
+  const outputDir = isRecord(overrides) ? overrides.outputDir : undefined;
+  assert.ok(typeof outputDir === 'string');
 
   assert.deepEqual(configLocation, { resolved: fake.configFile });
   assert.deepEqual(overrides, {
@@ -688,7 +697,7 @@ test('a webServer port is checked by connecting to it, and one without url or po
   const server = net.createServer();
   await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
   t.after(() => server.close());
-  const { port } = server.address() as net.AddressInfo;
+  const port = portOf(server);
   const fake = fakePlaywright(t, { webServers: [{ port }, {}] });
   const { runner: shell, lines } = runner(fake.configFile);
   await shell.init();
@@ -702,7 +711,7 @@ test('a webServer port is checked by connecting to it, and one without url or po
 test('a webServer port that stopped answering is restarted and named by its port', async (t) => {
   const server = net.createServer();
   await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
-  const { port } = server.address() as net.AddressInfo;
+  const port = portOf(server);
   await new Promise((resolve) => server.close(resolve));
   const fake = fakePlaywright(t, { webServers: [{ port }] });
   const { runner: shell, lines } = runner(fake.configFile);
@@ -729,7 +738,7 @@ test('a port check that neither connects nor fails gives up at its timeout, and 
   const answer = acceptsConnections(4321, (options) => {
     asked.push(options);
 
-    return socket as unknown as net.Socket;
+    return socket;
   });
 
   socket.emit('timeout');
@@ -769,7 +778,7 @@ test('a port accepts connections while a server listens on it, and not after', a
     }
   });
   await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
-  const { port } = server.address() as net.AddressInfo;
+  const port = portOf(server);
 
   assert.equal(await acceptsConnections(port), true);
 

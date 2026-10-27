@@ -8,6 +8,7 @@ import type { MutantCoverage } from '@stryker-mutator/api/core';
 import {
   DryRunStatus,
   MutantRunStatus,
+  type TestResult as StrykerTestResult,
   TestStatus,
 } from '@stryker-mutator/api/test-runner';
 
@@ -49,7 +50,7 @@ function merge(lines: Partial<SnapshotLine>[]) {
   return mergeCoverage(lines.map(parsed));
 }
 
-// Playwright passes the same TestCase for every attempt and appends each attempt to its results.
+// Playwright reports a test again after each attempt, with every attempt so far in its results.
 function attempt(
   reporter: LzStrykerCollectingReporter,
   id: string,
@@ -59,8 +60,7 @@ function attempt(
 ) {
   const testCase =
     reporter.testCases.get(id) ?? fakeTestCase(id, { expectedStatus });
-  addAttempt(testCase, outcome, status);
-  reporter.onTestEnd(testCase);
+  reporter.onTestEnd(addAttempt(testCase, outcome, status));
 }
 
 function classify(
@@ -575,13 +575,25 @@ test('coverage from a Playwright worker alone satisfies the dry run', () => {
 });
 
 test('the missing-coverage error needs a test that ran, and none that failed', () => {
-  const result = (id: string, status: TestStatus) =>
-    ({ id, name: id, status, timeSpentMs: 10 }) as Parameters<
-      typeof missingCoverageError
-    >[0][number];
-  const skipped = result('a', TestStatus.Skipped);
-  const passed = result('b', TestStatus.Success);
-  const failed = result('c', TestStatus.Failed);
+  const skipped: StrykerTestResult = {
+    id: 'a',
+    name: 'a',
+    status: TestStatus.Skipped,
+    timeSpentMs: 10,
+  };
+  const passed: StrykerTestResult = {
+    id: 'b',
+    name: 'b',
+    status: TestStatus.Success,
+    timeSpentMs: 10,
+  };
+  const failed: StrykerTestResult = {
+    id: 'c',
+    name: 'c',
+    status: TestStatus.Failed,
+    failureMessage: 'c failed',
+    timeSpentMs: 10,
+  };
 
   assert.equal(missingCoverageError([skipped], []), undefined);
   assert.match(
@@ -613,18 +625,15 @@ test('tests that ran without the hook are an error', () => {
 });
 
 test('a page cannot reach Object.prototype through a __proto__ test id in its coverage', () => {
-  const perTest = JSON.parse('{ "__proto__": { "1": 1 } }') as Record<
-    string,
-    Record<string, number>
-  >;
+  const perTest: unknown = JSON.parse('{ "__proto__": { "1": 1 } }');
 
   try {
     const coverage = merge([{ mutantCoverage: { static: {}, perTest } }]);
 
-    assert.equal(({} as Record<string, unknown>)['1'], undefined);
+    assert.equal(Reflect.get({}, '1'), undefined);
     assert.deepEqual({ ...coverage.perTest['__proto__'] }, { '1': 1 });
   } finally {
-    delete (Object.prototype as Record<string, unknown>)['1'];
+    Reflect.deleteProperty(Object.prototype, '1');
   }
 });
 

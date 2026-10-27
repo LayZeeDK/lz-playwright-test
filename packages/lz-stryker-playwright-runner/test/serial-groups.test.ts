@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import type { FullResult, Suite, TestCase } from '@playwright/test/reporter';
+import type { FullResult } from '@playwright/test/reporter';
 
-import type { LzStrykerCollectingReporter } from '../src/reporter.ts';
+import type {
+  LzStrykerCollectingReporter,
+  ReportedTest,
+} from '../src/reporter.ts';
 import {
   listSerialGroups,
   projectsThatRun,
@@ -43,7 +46,7 @@ test('serial grouping fails loudly when Playwright suites lose _parallelMode', (
 function listing(
   result: { status: FullResult['status'] } | undefined,
   errors: string[] = [],
-  tests: TestCase[] = [],
+  tests: ReportedTest[] = [],
 ) {
   const calls: string[][] = [];
   const playwright = {
@@ -53,9 +56,7 @@ function listing(
     ) {
       calls.push(params.projects ?? []);
       errors.forEach((message) => reporter.onError({ message }));
-      reporter.onBegin(undefined, {
-        allTests: () => tests,
-      } as unknown as Suite);
+      reporter.onBegin(undefined, { allTests: () => tests });
 
       return result;
     },
