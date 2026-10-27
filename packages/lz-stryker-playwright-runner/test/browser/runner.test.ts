@@ -15,7 +15,11 @@ import path from 'node:path';
 import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import type { Mutant, MutantCoverage } from '@stryker-mutator/api/core';
+import type {
+  CoverageData,
+  Mutant,
+  MutantCoverage,
+} from '@stryker-mutator/api/core';
 import {
   type CompleteDryRunResult,
   DryRunStatus,
@@ -106,6 +110,13 @@ function testId(title: string): string {
   assert.ok(found, `test "${title}" exists`);
 
   return found.id;
+}
+
+function perTestCoverage(title: string): CoverageData {
+  const found = dryRunCoverage().perTest[testId(title)];
+  assert.ok(found, `test "${title}" has per-test coverage`);
+
+  return found;
 }
 
 // The ids of the fixture's mutants in the bodies of the lib.ts functions `called`, plus, with
@@ -247,9 +258,8 @@ test('init finds the describe.serial groups', () => {
 });
 
 test('per-test coverage separates tests that reach different code', () => {
-  const { perTest } = dryRunCoverage();
-  const greeting = perTest[testId('shows the greeting')];
-  const counting = perTest[testId('counts to three')];
+  const greeting = perTestCoverage('shows the greeting');
+  const counting = perTestCoverage('counts to three');
   const loopMutant = mutant('UpdateOperator', 'i--').id;
   const greetingMutant = mutant('StringLiteral', '""').id;
 
@@ -266,9 +276,8 @@ test('per-test coverage separates tests that reach different code', () => {
 });
 
 test('per-test coverage holds exactly the mutants each test reaches, with their hit counts', () => {
-  const { perTest } = dryRunCoverage();
-  const greeting = perTest[testId('shows the greeting')];
-  const counting = perTest[testId('counts to three')];
+  const greeting = perTestCoverage('shows the greeting');
+  const counting = perTestCoverage('counts to three');
 
   assert.deepEqual(Object.keys(greeting).sort(), mutantsReached(['add']));
   assert.deepEqual(

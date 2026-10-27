@@ -143,11 +143,12 @@ export function fakePlaywright(
       return { status: 'passed' };
     }
 
-    async runGlobalSetup(reporters: Reporter[]): Promise<{ status: Status }> {
+    async runGlobalSetup([reporter]: Reporter[]): Promise<{ status: Status }> {
       calls.push(['runGlobalSetup']);
+      assert.ok(reporter);
 
       return {
-        status: behaviour.globalSetup?.(reporters[0]) ?? 'passed',
+        status: behaviour.globalSetup?.(reporter) ?? 'passed',
       };
     }
 

@@ -368,19 +368,23 @@ test('install creates the worker snapshot file at once', (t) => {
 
 test('each install names its snapshot file by the worker pid and a random part', (t) => {
   const name = /^worker-(\d+)-([0-9a-f-]{36})\.ndjson$/;
-  const [first, second] = [
+  const parts = [
     installed(t, { perTest: false }),
     installed(t, { perTest: false }),
   ].map((hooked) => {
     const [file] = hooked.files();
     const match = name.exec(file ?? '');
     assert.ok(match, file);
+    const [, pid, random] = match;
 
-    return match;
+    return { pid, random };
   });
 
-  assert.equal(first[1], String(process.pid));
-  assert.notEqual(first[2], second[2]);
+  assert.deepEqual(
+    parts.map(({ pid }) => pid),
+    [String(process.pid), String(process.pid)],
+  );
+  assert.equal(new Set(parts.map(({ random }) => random)).size, 2);
 });
 
 test("install counts the worker's own hits in its namespace and writes them past the limit", (t) => {
@@ -550,12 +554,17 @@ test('without per-test coverage the init script names no test, and no mutant out
 
   const { scripts } = await hooked.context();
 
-  assert.deepEqual(scripts[0][1], {
-    ns: hooked.ns,
-    activeMutant: undefined,
-    testId: undefined,
-    hitLimit: undefined,
-  });
+  assert.deepEqual(scripts, [
+    [
+      hook.initPage,
+      {
+        ns: hooked.ns,
+        activeMutant: undefined,
+        testId: undefined,
+        hitLimit: undefined,
+      },
+    ],
+  ]);
 });
 
 test('a closing context writes what each frame of each page holds, as one line per frame', async (t) => {
@@ -668,8 +677,10 @@ test('a context a beforeAll or afterAll hook opens and closes counts as shared, 
   }
 
   assert.deepEqual(
-    created.map(({ scripts }) => scripts[0][1].testId),
-    [undefined, undefined],
+    created.map(({ scripts }) =>
+      scripts.map(([, settings]) => settings.testId),
+    ),
+    [[undefined], [undefined]],
   );
   assert.deepEqual(
     parsedLines(hooked.read()).map((line) => line.outlivedItsTest),
@@ -685,7 +696,10 @@ test("a context a test's own fixture opens belongs to that test", async (t) => {
   opened.open(hooked.page().page);
   await opened.close();
 
-  assert.equal(opened.scripts[0][1].testId, 't1');
+  assert.deepEqual(
+    opened.scripts.map(([, settings]) => settings.testId),
+    ['t1'],
+  );
   assert.deepEqual(
     parsedLines(hooked.read()).map((line) => line.outlivedItsTest),
     [false],
@@ -701,7 +715,10 @@ test('a context that began outside a test and closes inside one counts as shared
 
   await created.close();
 
-  assert.deepEqual(parsedLines(hooked.read())[0].outlivedItsTest, true);
+  assert.deepEqual(
+    parsedLines(hooked.read()).map((line) => line.outlivedItsTest),
+    [true],
+  );
 });
 
 test('without per-test coverage no context counts as shared', async (t) => {
@@ -714,7 +731,10 @@ test('without per-test coverage no context counts as shared', async (t) => {
 
   await created.close();
 
-  assert.equal(parsedLines(hooked.read())[0].outlivedItsTest, false);
+  assert.deepEqual(
+    parsedLines(hooked.read()).map((line) => line.outlivedItsTest),
+    [false],
+  );
 });
 
 test('a page closed before its context is read first, once, and closes with its options', async (t) => {

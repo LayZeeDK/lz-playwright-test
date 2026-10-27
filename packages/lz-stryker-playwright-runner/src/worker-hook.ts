@@ -96,7 +96,7 @@ function currentTestOf(playwrightTest: unknown): CurrentTest {
   };
 }
 
-// Undefined under `node -e`, which a worker's NODE_OPTIONS can reach; RegExp.test reads it as "undefined".
+// Undefined under `node -e`, which a worker's NODE_OPTIONS can reach.
 const entry = process.argv[1];
 const settings = readRunSettings(process.env);
 // `Symbol.for`, so a second copy of this package in the worker, from another install, sees the mark
@@ -108,6 +108,7 @@ const INSTALLED: unique symbol = Symbol.for(
 if (
   settings &&
   isMainThread &&
+  entry !== undefined &&
   WORKER_ENTRY.test(entry) &&
   !(INSTALLED in globalThis)
 ) {

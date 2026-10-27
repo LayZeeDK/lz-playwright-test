@@ -133,7 +133,7 @@ export interface Playwright {
 }
 
 export function supportsPlaywright(version: string): boolean {
-  const [major, minor] = version.split('.').map(Number);
+  const [major, minor = NaN] = version.split('.').map(Number);
 
   return major === MIN_PLAYWRIGHT.major && minor >= MIN_PLAYWRIGHT.minor;
 }

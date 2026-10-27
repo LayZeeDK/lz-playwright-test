@@ -44,6 +44,7 @@ test('the runner supports Playwright 1.63 and later 1.x releases', () => {
   assert.equal(supportsPlaywright('1.99.0'), true);
   assert.equal(supportsPlaywright('2.0.0'), false);
   assert.equal(supportsPlaywright('0.70.0'), false);
+  assert.equal(supportsPlaywright('1'), false);
 });
 
 test("the worker entry is Playwright's workerProcessEntry.js, by either path separator", () => {
@@ -358,7 +359,9 @@ test('the test runner calls each method on the instance Playwright constructed, 
   await runner.stopTests();
   await runner.runGlobalTeardown();
 
-  const [[, instance]] = seen;
+  const [first] = seen;
+  assert.ok(first);
+  const [, instance] = first;
   assert.ok(instance instanceof TestRunner);
   assert.deepEqual(instance.args, ['location', { workers: 1 }]);
   assert.deepEqual(seen, [
