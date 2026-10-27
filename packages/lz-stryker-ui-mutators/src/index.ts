@@ -1,8 +1,10 @@
 import type { Ignorer } from '@stryker-mutator/api/ignore';
 import { declareFactoryPlugin, PluginKind } from '@stryker-mutator/api/plugin';
 
+import { bundled } from './bundled-roles.ts';
 import { install } from './install.ts';
-import { operators } from './operators.ts';
+import { operatorsFor } from './operators.ts';
+import { consumerRoles } from './playwright-roles.ts';
 
 // Core sets this in every test-runner and checker child process (child-process-proxy.js:32), which re-import plugin
 // modules but never instrument.
@@ -12,7 +14,7 @@ if (installRan) {
   // A failure rejects this module's evaluation, and every later import of it rejects with the same error. A config
   // that imports it stops at once; under `plugins`, core only warns with the message, and the run then stops where
   // core creates the `lz-stryker-ui-mutators` ignorer this module never got to export.
-  await install(operators);
+  await install(operatorsFor(consumerRoles(bundled)));
 }
 
 function uiMutatorsIgnorer(): Ignorer {

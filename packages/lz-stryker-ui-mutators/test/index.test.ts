@@ -5,7 +5,6 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
-import { TESTED_VERSION } from '../src/install.ts';
 import { operatorNames } from '../src/operators.ts';
 
 const ENTRY = join(import.meta.dirname, 'fixture', 'entry.ts');
@@ -50,17 +49,14 @@ describe('index.ts', () => {
     });
   });
 
-  it("rejects its import with the operator's name when an operator's sample gives no mutant", () => {
-    const { status, stdout, stderr } = runEntry({}, 'broken');
+  it("rejects its import with install's error when another mutator has an operator's name", () => {
+    const { status, stdout, stderr } = runEntry({}, 'taken');
 
     assert.notEqual(status, 0);
     assert.equal(stdout, '');
     assert.match(
       stderr,
-      new RegExp(
-        `lz-stryker-ui-mutators: the instrumenter ${TESTED_VERSION.replaceAll('.', '\\.')} in .+ made no mutants ` +
-          'of LzTextLiteral from their samples',
-      ),
+      /lz-stryker-ui-mutators: another mutator already has the name LzTextLiteral\./,
     );
   });
 });

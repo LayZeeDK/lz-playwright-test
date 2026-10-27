@@ -1165,10 +1165,14 @@ export const cases: readonly Case[] = [
   },
   {
     id: 'design-22',
-    title: 'an href on an element other than a is not swapped to a span',
+    title:
+      "an area with an href is swapped to a span, as Playwright's role table gives it the link role",
     origin: 'design:Operators in the first release, LzElementRole',
     jsx: '<area href="/x" />',
-    expect: [['LzUrlAttribute', 'href=""']],
+    expect: [
+      ['LzUrlAttribute', 'href=""'],
+      ['LzElementRole', '<span />'],
+    ],
   },
   {
     id: 'design-23',

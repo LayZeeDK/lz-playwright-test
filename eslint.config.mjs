@@ -161,10 +161,11 @@ export default [
   {
     files: ['packages/lz-stryker-ui-mutators/package.json'],
     rules: {
-      // The operators import Babel for types only.
+      // The operators import Babel for types only; playwright-core's role table is resolved at run time.
       '@nx/dependency-checks': dependencyChecks([
         '@stryker-mutator/core',
         '@babel/core',
+        'playwright-core',
       ]),
     },
   },

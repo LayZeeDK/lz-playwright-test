@@ -26,7 +26,13 @@
     "node": ">=22.0.0"
   },
   "peerDependencies": {
-    "@stryker-mutator/core": "~10.1.0"
+    "@stryker-mutator/core": "~10.1.0",
+    "playwright-core": ">=1.63.0 <2"
+  },
+  "peerDependenciesMeta": {
+    "playwright-core": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@stryker-mutator/api": "10.1.1"

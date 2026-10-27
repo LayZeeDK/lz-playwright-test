@@ -442,6 +442,6 @@ function stringOf(
   return value;
 }
 
-function fieldOf(value: unknown, key: string): unknown {
+export function fieldOf(value: unknown, key: string): unknown {
   return isRecord(value) ? value[key] : undefined;
 }
