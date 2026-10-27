@@ -100,14 +100,14 @@ export function removeLeftRoots(
     owned = isOwnDir,
     remove = removeDir,
     ownPid = process.pid,
-    token = namespaceToken(),
+    token,
   }: {
     running?: (pid: number) => boolean;
     owned?: (dir: string) => boolean;
     remove?: (dir: string) => void;
     ownPid?: number;
-    token?: string;
-  } = {},
+    token: string;
+  },
 ): string[] {
   const removed: string[] = [];
 
@@ -137,10 +137,24 @@ export function removeDir(dir: string): void {
   fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
 }
 
+/**
+ * Sweeps the roots dead runners left, reports them, then creates this runner's root, both with one
+ * namespace token.
+ */
+export function claimTempRoot(
+  onRemoved: (removed: readonly string[]) => void,
+): TempRoot {
+  const tmp = os.tmpdir();
+  const token = namespaceToken();
+  onRemoved(removeLeftRoots(tmp, { token }));
+
+  return createTempRoot(tmp, process.pid, token);
+}
+
 export function createTempRoot(
-  tmp: string = os.tmpdir(),
-  pid: number = process.pid,
-  token: string = namespaceToken(),
+  tmp: string,
+  pid: number,
+  token: string,
   writeFile: (file: string, data: string) => void = fs.writeFileSync,
 ): TempRoot {
   const dir = fs.mkdtempSync(path.join(tmp, `${ROOT_PREFIX}${pid}-`));

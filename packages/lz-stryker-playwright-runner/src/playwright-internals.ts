@@ -174,9 +174,8 @@ export function probeInternals(
     throw changed();
   }
 
-  const prototype: unknown = TestRunner.prototype;
-  const methodOf = (name: keyof TestRunner) => {
-    const method = fieldOf(prototype, name);
+  const methodOf = (source: unknown, name: keyof TestRunner) => {
+    const method = fieldOf(source, name);
 
     if (typeof method !== 'function') {
       throw changed();
@@ -184,7 +183,10 @@ export function probeInternals(
 
     return method;
   };
-  TEST_RUNNER_METHODS.forEach(methodOf);
+  const prototype: unknown = TestRunner.prototype;
+  const methods = Object.fromEntries(
+    TEST_RUNNER_METHODS.map((name) => [name, methodOf(prototype, name)]),
+  );
 
   return {
     version,
@@ -201,7 +203,7 @@ export function probeInternals(
       const call = (
         name: keyof TestRunner,
         args: readonly unknown[],
-      ): unknown => Reflect.apply(methodOf(name), created, args);
+      ): unknown => Reflect.apply(methodOf(methods, name), created, args);
       const status = async (
         method: 'listTests' | 'runGlobalSetup' | 'runTests',
         args: readonly unknown[],

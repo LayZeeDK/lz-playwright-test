@@ -69,17 +69,18 @@ export function emptyRecord<T>(): Record<string, T> {
 
 // A key such as __proto__ or a count that is not a hit count must not reach an ordinary object.
 function hitCounts(value: unknown): Record<string, number> {
-  const counts = emptyRecord<number>();
+  return Object.assign(
+    emptyRecord<number>(),
+    Object.fromEntries(
+      entriesOf(value).flatMap(([mutantId, count]) =>
+        isHitCount(count) ? [[mutantId, count] as const] : [],
+      ),
+    ),
+  );
+}
 
-  for (const [mutantId, count] of Object.entries(
-    isRecord(value) ? value : {},
-  )) {
-    if (isHitCount(count)) {
-      counts[mutantId] = count;
-    }
-  }
-
-  return counts;
+function entriesOf(value: unknown): [string, unknown][] {
+  return Object.entries(isRecord(value) ? value : {});
 }
 
 function parseCoverage(value: unknown): MutantCoverage | undefined {
@@ -87,13 +88,15 @@ function parseCoverage(value: unknown): MutantCoverage | undefined {
     return undefined;
   }
 
-  const perTest: MutantCoverage['perTest'] = emptyRecord();
-
-  for (const [testId, hits] of Object.entries(
-    isRecord(value.perTest) ? value.perTest : {},
-  )) {
-    perTest[testId] = hitCounts(hits);
-  }
+  const perTest: MutantCoverage['perTest'] = Object.assign(
+    emptyRecord<Record<string, number>>(),
+    Object.fromEntries(
+      entriesOf(value.perTest).map(([testId, hits]) => [
+        testId,
+        hitCounts(hits),
+      ]),
+    ),
+  );
 
   return { static: hitCounts(value.static), perTest };
 }

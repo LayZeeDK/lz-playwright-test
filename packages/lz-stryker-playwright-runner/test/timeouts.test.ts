@@ -31,7 +31,10 @@ test('the config cap is the largest project timeout, and Infinity when a project
     ]).testTimeoutCap,
     Infinity,
   );
-  assert.equal(configTimeouts([]).testTimeoutCap, Infinity);
+  assert.deepEqual(configTimeouts([]), {
+    testTimeoutCap: Infinity,
+    expectTimeout: DEFAULT_EXPECT_TIMEOUT_MS,
+  });
 });
 
 test('the expect timeout is the largest over the projects, with Playwright default where unset', () => {

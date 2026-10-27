@@ -51,17 +51,7 @@ export function serialGroups(testCases: Iterable<ReportedTest>): SerialGroups {
   const byTest = new Map<string, string[]>();
 
   for (const test of testCases) {
-    let group: object | undefined;
-
-    for (
-      let suite: unknown = test.parent;
-      isRecord(suite);
-      suite = suite.parent
-    ) {
-      if (isSerialSuite(suite)) {
-        group = suite;
-      }
-    }
+    const group = outermostSerialSuite(test);
 
     if (group) {
       const ids = bySuite.get(group) ?? [];
@@ -72,6 +62,23 @@ export function serialGroups(testCases: Iterable<ReportedTest>): SerialGroups {
   }
 
   return byTest;
+}
+
+// The walk goes from the test outwards, so the last serial suite it meets is the outermost.
+function outermostSerialSuite(test: ReportedTest): object | undefined {
+  let outermost: object | undefined;
+
+  for (
+    let suite: unknown = test.parent;
+    isRecord(suite);
+    suite = suite.parent
+  ) {
+    if (isSerialSuite(suite)) {
+      outermost = suite;
+    }
+  }
+
+  return outermost;
 }
 
 export function withSerialGroups(

@@ -381,6 +381,25 @@ test('the test runner calls each method on the instance Playwright constructed, 
   ]);
 });
 
+test('the test runner calls the methods the probe read, not ones put on the prototype later', async () => {
+  const modules = fakeModules();
+  const playwright = probeInternals('1.99.0', modules);
+  const { TestRunner } = modules.runner.testRunner;
+  const later: string[] = [];
+  TEST_RUNNER_METHODS.forEach((method) => {
+    Object.assign(TestRunner.prototype, {
+      [method]: async () => {
+        later.push(method);
+      },
+    });
+  });
+
+  const runner = await playwright.createTestRunner(undefined, {});
+  await runner.stopTests();
+
+  assert.deepEqual(later, []);
+});
+
 test('the instrumentation is the one playwright-core exports, and its absence fails loudly', () => {
   const listeners: unknown[] = [];
   const core = {

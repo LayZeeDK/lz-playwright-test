@@ -36,11 +36,10 @@ interface ContextState {
   collected: boolean;
 }
 
-export interface PageSettings {
+export interface PageSettings extends Pick<RunSettings, 'hitLimit'> {
   ns: string;
   activeMutant?: string | undefined;
   testId?: string | undefined;
-  hitLimit?: number | undefined;
 }
 
 interface RunningTest {
@@ -265,7 +264,7 @@ function workerNamespace(name: string): StrykerNamespace {
 
 export function recordNodeCoverage(
   ns: StrykerNamespace,
-  { perTest, hitLimit }: { perTest: boolean; hitLimit?: number | undefined },
+  { perTest, hitLimit }: Pick<RunSettings, 'perTest' | 'hitLimit'>,
   currentTestId: () => string | undefined,
   write: (line: string) => void,
   onExit: (listener: () => void) => void = (listener) => {

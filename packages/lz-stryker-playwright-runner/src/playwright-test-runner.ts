@@ -1,5 +1,4 @@
 import net from 'node:net';
-import os from 'node:os';
 import path from 'node:path';
 
 import type { Logger } from '@stryker-mutator/api/logging';
@@ -44,12 +43,7 @@ import {
   projectsThatRun,
   type SerialGroups,
 } from './serial-groups.ts';
-import {
-  createTempRoot,
-  removeDir,
-  removeLeftRoots,
-  type TempRoot,
-} from './temp-root.ts';
+import { claimTempRoot, removeDir, type TempRoot } from './temp-root.ts';
 import {
   armDeadline,
   assertionTimeoutWarning,
@@ -100,15 +94,13 @@ export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
   async init(): Promise<void> {
     const options = readRunnerOptions(this.strykerOptions);
     const pw = loadPlaywright(options.configFile);
-    const removed = removeLeftRoots(os.tmpdir());
-
-    if (removed.length) {
-      this.log.debug(
-        `Removed the temp directories of runners that no longer run: ${removed.join(', ')}`,
-      );
-    }
-
-    const root = createTempRoot();
+    const root = claimTempRoot((removed) => {
+      if (removed.length) {
+        this.log.debug(
+          `Removed the temp directories of runners that no longer run: ${removed.join(', ')}`,
+        );
+      }
+    });
     let playwright: TestRunner | undefined;
 
     try {

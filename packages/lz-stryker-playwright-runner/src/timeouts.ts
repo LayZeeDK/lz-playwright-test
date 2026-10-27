@@ -20,19 +20,21 @@ export function configTimeouts(
     project: { timeout: number };
   }[],
 ): ConfigTimeouts {
+  if (projects.length === 0) {
+    return {
+      testTimeoutCap: Infinity,
+      expectTimeout: DEFAULT_EXPECT_TIMEOUT_MS,
+    };
+  }
+
   const timeouts = projects.map(({ project }) => project.timeout);
   const expectTimeouts = projects.map(
     ({ expect }) => expect?.timeout ?? DEFAULT_EXPECT_TIMEOUT_MS,
   );
 
   return {
-    testTimeoutCap:
-      timeouts.length === 0 || timeouts.includes(0)
-        ? Infinity
-        : Math.max(...timeouts),
-    expectTimeout: expectTimeouts.length
-      ? Math.max(...expectTimeouts)
-      : DEFAULT_EXPECT_TIMEOUT_MS,
+    testTimeoutCap: timeouts.includes(0) ? Infinity : Math.max(...timeouts),
+    expectTimeout: Math.max(...expectTimeouts),
   };
 }
 

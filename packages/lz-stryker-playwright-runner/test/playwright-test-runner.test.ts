@@ -206,6 +206,42 @@ test('init removes the temp roots of runners that no longer run, and says so', a
   assert.deepEqual(message.slice(prefix.length).split(', ').sort(), left);
 });
 
+test('init says which temp roots it removed before it creates its own, so a failed create keeps the line', async (t) => {
+  const fake = fakePlaywright(t);
+  const dead = spawnSync(process.execPath, ['-e', '']).pid;
+  const left = `${ROOT_PREFIX}${dead}-abc123`;
+  mkdirSync(path.join(fake.tmp, left));
+  writeFileSync(path.join(fake.tmp, left, OWNER_FILE), namespaceToken());
+  const { runner: shell, lines } = runner(fake.configFile);
+  t.mock.method(fs, 'mkdtempSync', () => {
+    throw new Error('ENOSPC');
+  });
+
+  await assert.rejects(shell.init(), { message: 'ENOSPC' });
+  t.mock.restoreAll();
+
+  assert.deepEqual(lines, [
+    [
+      'debug',
+      `Removed the temp directories of runners that no longer run: ${left}`,
+    ],
+  ]);
+});
+
+test('the temp root init creates holds the namespace token its sweep matches', async (t) => {
+  const fake = fakePlaywright(t);
+  const { runner: shell } = runner(fake.configFile);
+
+  await shell.init();
+
+  const [rootName] = readdirSync(fake.tmp);
+  assert.ok(rootName);
+  assert.equal(
+    fs.readFileSync(path.join(fake.tmp, rootName, OWNER_FILE), 'utf8'),
+    namespaceToken(),
+  );
+});
+
 test('a failed global setup fails init with its errors and output, and cleans up', async (t) => {
   const fake = fakePlaywright(t, {
     globalSetup: (reporter) => {
