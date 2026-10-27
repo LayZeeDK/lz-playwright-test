@@ -9,29 +9,22 @@ import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import type { Location, Mutant } from '@stryker-mutator/api/core';
-import {
-  type CompleteDryRunResult,
-  DryRunStatus,
-  MutantRunStatus,
-  type TestResult,
-  TestStatus,
-} from '@stryker-mutator/api/test-runner';
+import { MutantRunStatus, TestStatus } from '@stryker-mutator/api/test-runner';
 import { Instrumenter } from '@stryker-mutator/instrumenter';
 import ts from 'typescript';
 
-import { LzStrykerPlaywrightTestRunner } from '../../src/playwright-test-runner.ts';
 import { logger } from '../support/doubles.ts';
+import { type Session, startSession, transpile } from './support/session.ts';
 
 const fixture = (file: string) =>
   fileURLToPath(new URL(`./ui-fixture/${file}`, import.meta.url));
 const { log } = logger();
 const source = readFileSync(fixture('src/app.tsx'), 'utf8');
 const sourceLines = source.split('\n');
+const jsx = { jsx: ts.JsxEmit.React, jsxFactory: 'h' };
 
-let runner: LzStrykerPlaywrightTestRunner;
+let session: Session;
 let mutants: readonly Mutant[];
-let dryRun: CompleteDryRunResult;
-let tests: TestResult[];
 
 function textAt({ start, end }: Location): string {
   const last = end.line - start.line;
@@ -71,34 +64,8 @@ function mutant(
   return first;
 }
 
-function testId(title: string): string {
-  const found = tests.find((t) => t.name.endsWith(title));
-  assert.ok(found, `test "${title}" exists`);
-
-  return found.id;
-}
-
 function mutantRun(m: Mutant, title: string) {
-  return runner.mutantRun({
-    activeMutant: m,
-    testFilter: [testId(title)],
-    timeout: 60_000,
-    disableBail: false,
-    mutantActivation: 'runtime',
-    reloadEnvironment: false,
-    sandboxFileName: fixture('src/app.tsx'),
-  });
-}
-
-function transpile(code: string): string {
-  return ts.transpileModule(code, {
-    compilerOptions: {
-      jsx: ts.JsxEmit.React,
-      jsxFactory: 'h',
-      module: ts.ModuleKind.ESNext,
-      target: ts.ScriptTarget.ES2022,
-    },
-  }).outputText;
+  return session.mutantRun(m, { testFilter: [session.testId(title)] });
 }
 
 before(async () => {
@@ -109,35 +76,27 @@ before(async () => {
   mutants = result.mutants;
   const [app] = result.files;
   assert.ok(app, 'the instrumented app');
-  writeFileSync(fixture('public/app.js'), transpile(app.content));
+  writeFileSync(fixture('public/app.js'), transpile(app.content, jsx));
   writeFileSync(
     fixture('public/h.js'),
-    transpile(readFileSync(fixture('src/h.ts'), 'utf8')),
+    transpile(readFileSync(fixture('src/h.ts'), 'utf8'), jsx),
   );
   rmSync(fixture('test-results'), { recursive: true, force: true });
 
-  const options = {
-    lzStrykerPlaywright: { configFile: fixture('playwright.config.ts') },
-    timeoutMS: 10_000,
-  };
-  runner = new LzStrykerPlaywrightTestRunner(options, log);
-  await runner.init();
-
-  const dry = await runner.dryRun({
-    timeout: 60_000,
-    disableBail: false,
-    coverageAnalysis: 'perTest',
-  });
-  assert.equal(dry.status, DryRunStatus.Complete, JSON.stringify(dry));
-  dryRun = dry;
-  tests = dryRun.tests;
+  session = await startSession(
+    fixture('playwright.config.ts'),
+    fixture('src/app.tsx'),
+    log,
+  );
 });
 
 after(async () => {
-  await runner?.dispose();
+  await session?.runner.dispose();
 });
 
 test('dry run completes with every test passing', () => {
+  const { tests } = session.dryRun;
+
   assert.equal(tests.length, 10, JSON.stringify(tests));
   assert.ok(
     tests.every((t) => t.status === TestStatus.Success),
@@ -146,15 +105,19 @@ test('dry run completes with every test passing', () => {
 });
 
 test('per-test coverage credits a text mutant only to the tests that render its element', () => {
-  assert.ok(dryRun.mutantCoverage, 'the dry run reports coverage');
-  const { perTest, static: staticCoverage } = dryRun.mutantCoverage;
+  const { mutantCoverage } = session.dryRun;
+  assert.ok(mutantCoverage, 'the dry run reports coverage');
+  const { perTest, static: staticCoverage } = mutantCoverage;
   const heading = mutant('LzTextLiteral', 'Orders', '').id;
   const status = mutant('LzTextLiteral', 'Revealed', '').id;
 
-  assert.ok(perTest[testId('shows the heading')]?.[heading]);
-  assert.ok(perTest[testId('reveals the status')]?.[heading]);
-  assert.ok(perTest[testId('reveals the status')]?.[status]);
-  assert.equal(perTest[testId('shows the heading')]?.[status], undefined);
+  assert.ok(perTest[session.testId('shows the heading')]?.[heading]);
+  assert.ok(perTest[session.testId('reveals the status')]?.[heading]);
+  assert.ok(perTest[session.testId('reveals the status')]?.[status]);
+  assert.equal(
+    perTest[session.testId('shows the heading')]?.[status],
+    undefined,
+  );
   assert.equal(staticCoverage[status], undefined);
 });
 
@@ -237,7 +200,7 @@ const rows: readonly {
   },
 ];
 
-for (const { operator, original, replacement, killer, bystander } of rows) {
+rows.forEach(({ operator, original, replacement, killer, bystander }) => {
   const change = `${original} -> ${replacement || 'empty text'}`;
 
   test(`${operator}: "${bystander}" does not observe ${change}, so it survives`, async () => {
@@ -260,6 +223,6 @@ for (const { operator, original, replacement, killer, bystander } of rows) {
     );
 
     assert.equal(result.status, MutantRunStatus.Killed, JSON.stringify(result));
-    assert.deepEqual(result.killedBy, [testId(killer)]);
+    assert.deepEqual(result.killedBy, [session.testId(killer)]);
   });
-}
+});
