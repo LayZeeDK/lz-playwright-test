@@ -2,21 +2,17 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { parseSync, traverse, types as t } from '@babel/core';
+import { traverse, types as t } from '@babel/core';
 
 import { elementSiteOf, toNodeMutator } from '../src/mutator.ts';
 import { operatorsFor } from '../src/operators.ts';
 import type { RoleTable } from '../src/playwright-roles.ts';
+import { parse } from './support/babel.ts';
 import { defined } from './support/defined.ts';
 
 /** Each element that LzElementRole changes in `code` under `roles`, as `<name attributes> -> what it yields`. */
 function elementRoleMutants(code: string, roles: RoleTable): string[] {
-  const file = parseSync(code, {
-    configFile: false,
-    babelrc: false,
-    parserOpts: { plugins: ['jsx'] },
-  });
-  assert.ok(file);
+  const file = parse(code);
   const mutator = toNodeMutator(
     defined(operatorsFor(roles).find(({ name }) => name === 'LzElementRole')),
     t,

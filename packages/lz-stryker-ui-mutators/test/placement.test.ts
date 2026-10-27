@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { before, describe, it } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
@@ -33,7 +33,7 @@ const corpus: readonly SourceFile[] = [
 ].map((name) => ({ name, content: readFileSync(name, 'utf8') }));
 
 let instrumenter: Instrumenter;
-let parse: (code: string, options: object) => unknown;
+let parseTsx: (code: string) => unknown;
 let stock: InstrumentResult[];
 let excluded: InstrumentResult[];
 let oneLeftOn: InstrumentResult[];
@@ -73,8 +73,11 @@ before(async () => {
     ),
     'parse',
   );
-  parse = (code, options) =>
-    Reflect.apply(babelParse, undefined, [code, options]);
+  parseTsx = (code) =>
+    Reflect.apply(babelParse, undefined, [
+      code,
+      { sourceType: 'module', plugins: ['typescript', 'jsx'] },
+    ]);
   stock = await instrumentEach([]);
   await installInto(instrumenter);
   excluded = await instrumentEach(operatorNames);
@@ -85,8 +88,8 @@ before(async () => {
 });
 
 describe('the JSX placement, with every UI operator excluded', () => {
-  for (const [index, { name }] of corpus.entries()) {
-    const file = name.split(/[\\/]/).pop();
+  corpus.forEach(({ name }, index) => {
+    const file = basename(name);
 
     it(`gives the stock output once mutant ids are masked, for ${file}`, () => {
       assert.equal(
@@ -101,7 +104,7 @@ describe('the JSX placement, with every UI operator excluded', () => {
         builtIns(defined(stock[index]).mutants),
       );
     });
-  }
+  });
 
   it('reports each excluded UI mutant as Ignored', () => {
     const ui = excluded.flatMap(({ mutants }) =>
@@ -127,18 +130,13 @@ describe('the JSX placement, with every UI operator excluded', () => {
 });
 
 describe('the JSX placement, with the UI operators on', () => {
-  for (const [index, { name }] of corpus.entries()) {
+  corpus.forEach(({ name }, index) => {
     if (name.endsWith('.tsx')) {
-      it(`instruments ${name.split(/[\\/]/).pop()} to TSX that Babel parses again`, () => {
-        assert.doesNotThrow(() =>
-          parse(firstContent(on[index]), {
-            sourceType: 'module',
-            plugins: ['typescript', 'jsx'],
-          }),
-        );
+      it(`instruments ${basename(name)} to TSX that Babel parses again`, () => {
+        assert.doesNotThrow(() => parseTsx(firstContent(on[index])));
       });
     }
-  }
+  });
 
   it('gives the stock built-in mutants with the UI operators on, for each corpus file', () => {
     assert.deepEqual(
@@ -169,9 +167,7 @@ describe('the JSX placement, with the UI operators on', () => {
       code,
       /<\/p>\{stryMutAct_9fa48\("\d+"\) \? <span>Go<\/span> : \(stryCov_9fa48\("\d+"\), <button>/,
     );
-    assert.doesNotThrow(() =>
-      parse(code, { sourceType: 'module', plugins: ['typescript', 'jsx'] }),
-    );
+    assert.doesNotThrow(() => parseTsx(code));
   });
 
   it('places an attribute, a text and an element switch on one <a href> at once', async () => {
@@ -187,11 +183,6 @@ describe('the JSX placement, with the UI operators on', () => {
       'LzTextLiteral',
       'LzUrlAttribute',
     ]);
-    assert.doesNotThrow(() =>
-      parse(defined(files[0]).content, {
-        sourceType: 'module',
-        plugins: ['typescript', 'jsx'],
-      }),
-    );
+    assert.doesNotThrow(() => parseTsx(defined(files[0]).content));
   });
 });

@@ -87,7 +87,8 @@ The prototype also covers attributes that the design does not list: `formAction`
 - **A `button` always gets `ElementToSpan`**. realworld-1 and realworld-6 left it out.
 - **A case lists every UI mutant of its snippet, because the harness compares the full set.** Some row pairs
   share one snippet and each row named only one of its mutants: realworld-12 and realworld-13, hello-2 and
-  hello-3, hello-4 and hello-5. Both cases in each pair now carry the same full set.
+  hello-3, hello-4 and hello-5. Each pair is now one case that carries the full set, with both row numbers in its
+  id: realworld-12+13, hello-2+3 and hello-4+5.
 - **demo-12**: the snippet's `<input aria-label="x" />` also gives `LabelAttribute` `aria-label=""`.
 - **The printed `TextLiteral` replacement is the empty `JSXText` (`''`), not `{null}` or `<h1></h1>`.** The
   placer turns it into `null` when it places the mutant, but `replacement` reports the empty text.

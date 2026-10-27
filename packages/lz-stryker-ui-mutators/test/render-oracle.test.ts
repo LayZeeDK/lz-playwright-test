@@ -183,7 +183,7 @@ declare global {
 const namespace: { activeMutant?: string | undefined } = {};
 globalThis.__renderOracle__ = namespace;
 
-/** Each mutant's render through the build and through the hand-applied source, `undefined` id for the baseline. */
+/** Each mutant's render through the build and through the hand-applied source. */
 async function renders(mutant: InstrumentedMutant) {
   const start = offsetOf(
     mutant.location.start.line,

@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path';
 import { describe, it, type TestContext } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-import { parseSync, traverse, types, type NodePath } from '@babel/core';
+import { types } from '@babel/core';
 
 import {
   corePackageJson,
@@ -31,7 +31,7 @@ import {
   type Operator,
 } from '../src/mutator.ts';
 import type { MutantPlacerLike } from '../src/placer.ts';
-import { defined } from './support/defined.ts';
+import { firstPath, parse } from './support/babel.ts';
 import { exported, exportedFunction } from './support/exports.ts';
 
 const OWN = Symbol.for('@layzee/lz-stryker-ui-mutators');
@@ -492,20 +492,6 @@ describe('resolveFromCore against a fake instrumenter', () => {
     );
   }
 
-  function programPath(): NodePath {
-    const file = parseSync('x;', { configFile: false, babelrc: false });
-    assert.ok(file);
-    const paths: NodePath[] = [];
-
-    traverse(file, {
-      Program(path) {
-        paths.push(path);
-      },
-    });
-
-    return defined(paths[0]);
-  }
-
   /**
    * A core, an instrumenter whose `Instrumenter.instrument` records the logger, files and options it got in its
    * module's `calls`, and a Babel core that re-exports the real types, as node_modules under a fresh directory that
@@ -682,7 +668,7 @@ describe('resolveFromCore against a fake instrumenter', () => {
         'export const allMutantPlacers = [placer];',
     });
     const { original } = (await resolveFromCore(corePackage)).expressionPlacer;
-    const path = programPath();
+    const path = firstPath(parse('x;'), 'Program');
     const applied = new Map<unknown, types.Node>();
 
     const placed = original.canPlace(path);
@@ -702,7 +688,7 @@ describe('resolveFromCore against a fake instrumenter', () => {
       ]),
     });
     const { original } = (await resolveFromCore(corePackage)).expressionPlacer;
-    const path = programPath();
+    const path = firstPath(parse('x;'), 'Program');
 
     assert.throws(() => original.canPlace(path), {
       message: `lz-stryker-ui-mutators: the instrumenter 9.9.8 in ${dir} has an expressionMutantPlacer whose canPlace returned a number, not a boolean.`,
