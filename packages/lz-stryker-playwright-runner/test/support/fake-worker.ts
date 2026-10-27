@@ -40,6 +40,43 @@ interface FakeFrame {
   detached?: boolean;
 }
 
+function frame({
+  name,
+  evaluate,
+  detached = false,
+}: FakeFrame = {}): HookedFrame {
+  return {
+    evaluate: (fn, asked) =>
+      evaluate ? evaluate(fn, asked) : Promise.resolve(fn(name ?? asked)),
+    isDetached: () => detached,
+  };
+}
+
+function page(frames: HookedFrame[] = [frame()]) {
+  const closed: unknown[] = [];
+  const created: HookedPage = {
+    frames: () => frames,
+    close: async (options) => {
+      closed.push(options);
+    },
+  };
+
+  return { page: created, closed };
+}
+
+function browser() {
+  const contexts: HookedContext[] = [];
+  const closed: unknown[] = [];
+  const created: HookedBrowser = {
+    contexts: () => contexts,
+    close: async (options) => {
+      closed.push(options);
+    },
+  };
+
+  return { browser: created, contexts, closed };
+}
+
 /**
  * Installs the hook with a fake Playwright and a namespace no other code in this process uses. The
  * namespace stands in for the worker's and for every fake page's, since the fake frames read it here.
@@ -125,41 +162,11 @@ export function fakeInstall(
   assert.ok(listener);
   const hooks = listener;
 
-  function frame({
-    name,
-    evaluate,
-    detached = false,
-  }: FakeFrame = {}): HookedFrame {
-    return {
-      evaluate: (fn, asked) =>
-        evaluate ? evaluate(fn, asked) : Promise.resolve(fn(name ?? asked)),
-      isDetached: () => detached,
-    };
-  }
+  function read() {
+    const [file, ...more] = readdirSync(outDir);
+    assert.ok(file !== undefined && more.length === 0, 'one snapshot file');
 
-  function page(frames: HookedFrame[] = [frame()]) {
-    const closed: unknown[] = [];
-    const created: HookedPage = {
-      frames: () => frames,
-      close: async (options) => {
-        closed.push(options);
-      },
-    };
-
-    return { page: created, closed };
-  }
-
-  function browser() {
-    const contexts: HookedContext[] = [];
-    const closed: unknown[] = [];
-    const created: HookedBrowser = {
-      contexts: () => contexts,
-      close: async (options) => {
-        closed.push(options);
-      },
-    };
-
-    return { browser: created, contexts, closed };
+    return readFileSync(path.join(outDir, file), 'utf8');
   }
 
   /** A context as Playwright creates it, which the hook sees through the instrumentation. */
@@ -204,12 +211,8 @@ export function fakeInstall(
     },
     hooks,
     files: () => readdirSync(outDir),
-    read: () => {
-      const [file, ...more] = readdirSync(outDir);
-      assert.ok(file !== undefined && more.length === 0, 'one snapshot file');
-
-      return readFileSync(path.join(outDir, file), 'utf8');
-    },
+    read,
+    lines: () => parsedLines(read()),
     /** `runs` is what Playwright's timeout manager runs for that test: its body by default. */
     setTest: (id: string | undefined, runs: Runnable = { type: 'test' }) => {
       running = id;
@@ -223,7 +226,7 @@ export function fakeInstall(
   };
 }
 
-export function parsedLines(content: string) {
+function parsedLines(content: string) {
   return content
     .split('\n')
     .filter(Boolean)

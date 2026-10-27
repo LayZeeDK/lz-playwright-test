@@ -20,12 +20,12 @@ function fakeModules(
   answers: Readonly<Record<string, unknown>> = {},
 ) {
   class TestRunner {}
-
-  for (const method of methods) {
-    Object.assign(TestRunner.prototype, {
-      [method]: async () => answers[method],
-    });
-  }
+  Object.assign(
+    TestRunner.prototype,
+    Object.fromEntries(
+      methods.map((method) => [method, async () => answers[method]]),
+    ),
+  );
 
   return {
     runner: { testRunner: { TestRunner } },
@@ -86,34 +86,31 @@ test('the probe names every internal when one is missing', () => {
   };
   const missingRunner = { ...fakeModules(), runner: {} };
 
-  for (const modules of [
-    missingMethod,
-    missingLoader,
-    missingUtil,
-    missingRunner,
-  ]) {
-    assert.throws(() => probeInternals('1.99.0', modules), {
-      message:
-        /^Playwright 1\.99\.0 changed the internals this runner calls \(playwright\/lib\/runner TestRunner with initialize, .*stopTests; playwright\/lib\/common configLoader; playwright-core coreBundle isURLAvailable\)\.$/,
-    });
-  }
+  [missingMethod, missingLoader, missingUtil, missingRunner].forEach(
+    (modules) => {
+      assert.throws(() => probeInternals('1.99.0', modules), {
+        message:
+          /^Playwright 1\.99\.0 changed the internals this runner calls \(playwright\/lib\/runner TestRunner with initialize, .*stopTests; playwright\/lib\/common configLoader; playwright-core coreBundle isURLAvailable\)\.$/,
+      });
+    },
+  );
 });
 
 test('the probe names every internal when a module or a step on the path to an internal is not an object', () => {
   const arrowRunner = () => undefined;
 
-  for (const modules of [
+  [
     { ...fakeModules(), runner: undefined },
     { ...fakeModules(), common: undefined },
     { ...fakeModules(), coreBundle: undefined },
     { ...fakeModules(), coreBundle: {} },
     { ...fakeModules(), runner: { testRunner: { TestRunner: arrowRunner } } },
-  ]) {
+  ].forEach((modules) => {
     assert.throws(() => probeInternals('1.99.0', modules), {
       message:
         /^Playwright 1\.99\.0 changed the internals this runner calls \(playwright\/lib\/runner TestRunner with initialize, /,
     });
-  }
+  });
 });
 
 test("the probe's URL check passes the URL and the HTTPS flag on, and counts only true as available", async () => {
@@ -151,6 +148,15 @@ function testRunnerAnswering(answers: Readonly<Record<string, unknown>>) {
     '1.99.0',
     fakeModules(TEST_RUNNER_METHODS, answers),
   ).createTestRunner(undefined, {});
+}
+
+/** Calls each status method of the test runner with arguments it accepts. */
+function statusCalls(runner: Awaited<ReturnType<typeof testRunnerAnswering>>) {
+  return {
+    listTests: () => runner.listTests({}, {}),
+    runGlobalSetup: () => runner.runGlobalSetup([]),
+    runTests: () => runner.runTests({}, { locations: [] }),
+  };
 }
 
 test('the test runner resolves loadConfig to the project and web server fields the runner reads', async () => {
@@ -215,7 +221,7 @@ const validServer = {
   ignoreHTTPSErrors: true,
 };
 
-for (const [title, config] of [
+const refusedConfigs = [
   ['is no object', null],
   ['has no projects array', { projects: {}, webServers: [] }],
   ['has no webServers array', { projects: [], webServers: {} }],
@@ -266,7 +272,9 @@ for (const [title, config] of [
     'has a web server with no boolean ignoreHTTPSErrors',
     { projects: [], webServers: [{ ...validServer, ignoreHTTPSErrors: 1 }] },
   ],
-] as const) {
+] as const;
+
+refusedConfigs.forEach(([title, config]) => {
   test(`the test runner refuses a loaded config that ${title}`, async () => {
     const runner = await testRunnerAnswering({ loadConfig: config });
 
@@ -276,7 +284,7 @@ for (const [title, config] of [
         'project.name, project.timeout and expect.timeout, and webServers[].url, port and ignoreHTTPSErrors.',
     });
   });
-}
+});
 
 test('the test runner resolves listTests, runGlobalSetup and runTests to their status alone, and listTests also to undefined', async () => {
   const runner = await testRunnerAnswering({
@@ -288,13 +296,16 @@ test('the test runner resolves listTests, runGlobalSetup and runTests to their s
     runTests: { status: 'interrupted' },
   });
 
+  const calls = statusCalls(runner);
+  const interruptedCalls = statusCalls(interrupted);
+
   assert.deepEqual(
     [
-      await runner.listTests({}, {}),
-      await runner.runGlobalSetup([]),
-      await runner.runTests({}, { locations: [] }),
-      await interrupted.runTests({}, { locations: [] }),
-      await interrupted.listTests({}, {}),
+      await calls.listTests(),
+      await calls.runGlobalSetup(),
+      await calls.runTests(),
+      await interruptedCalls.runTests(),
+      await interruptedCalls.listTests(),
     ],
     [
       { status: 'passed' },
@@ -306,22 +317,17 @@ test('the test runner resolves listTests, runGlobalSetup and runTests to their s
   );
 });
 
-for (const method of ['listTests', 'runGlobalSetup', 'runTests'] as const) {
-  for (const answer of [null, {}, { status: 'done' }]) {
+(['listTests', 'runGlobalSetup', 'runTests'] as const).forEach((method) => {
+  [null, {}, { status: 'done' }].forEach((answer) => {
     test(`the test runner refuses a ${method} that resolves to ${JSON.stringify(answer)}`, async () => {
       const runner = await testRunnerAnswering({ [method]: answer });
-      const calls = {
-        listTests: () => runner.listTests({}, {}),
-        runGlobalSetup: () => runner.runGlobalSetup([]),
-        runTests: () => runner.runTests({}, { locations: [] }),
-      };
 
-      await assert.rejects(calls[method](), {
+      await assert.rejects(statusCalls(runner)[method](), {
         message: `Playwright 1.99.0 changed what TestRunner.${method}() resolves to; this runner reads its status: passed, failed, timedout or interrupted.`,
       });
     });
-  }
-}
+  });
+});
 
 test('the test runner calls each method on the instance Playwright constructed, with the arguments it was given', async () => {
   const seen: unknown[][] = [];
@@ -334,7 +340,7 @@ test('the test runner calls each method on the instance Playwright constructed, 
     }
   }
 
-  for (const method of TEST_RUNNER_METHODS) {
+  TEST_RUNNER_METHODS.forEach((method) => {
     Object.assign(TestRunner.prototype, {
       async [method](this: unknown, ...args: unknown[]) {
         seen.push([method, this, ...args]);
@@ -344,7 +350,7 @@ test('the test runner calls each method on the instance Playwright constructed, 
           : { status: 'passed' };
       },
     });
-  }
+  });
 
   const reporter = {};
   const runner = await probeInternals('1.99.0', {
@@ -392,12 +398,12 @@ test('the instrumentation is the one playwright-core exports, and its absence fa
   assert.equal(listeners.length, 1);
   assert.equal(listeners[0], listener);
 
-  for (const core of [undefined, {}, { _instrumentation: {} }]) {
+  [undefined, {}, { _instrumentation: {} }].forEach((core) => {
     assert.throws(() => instrumentationOf(core), {
       message:
         /^Playwright changed the internals this runner calls \(playwright-core _instrumentation\.addListener\)\.$/,
     });
-  }
+  });
 });
 
 test('the describe mode is read from the suite, and its absence fails loudly', () => {
@@ -430,7 +436,7 @@ test("the running slot is read from the TestInfo's timeout manager", () => {
 });
 
 test("every runnable type of Playwright's timeout manager is a slot", () => {
-  for (const type of [
+  [
     'test',
     'beforeEach',
     'afterEach',
@@ -441,7 +447,7 @@ test("every runnable type of Playwright's timeout manager is a slot", () => {
     'slow',
     'fail',
     'fixme',
-  ]) {
+  ].forEach((type) => {
     assert.deepEqual(
       runningSlotOf(
         { _timeoutManager: { _running: { runnable: { type } } } },
@@ -449,35 +455,35 @@ test("every runnable type of Playwright's timeout manager is a slot", () => {
       ),
       { type, inFixture: false },
     );
-  }
+  });
 });
 
 test('no TestInfo, or a timeout manager that runs nothing, has no running slot', () => {
-  for (const testInfo of [
+  [
     undefined,
     null,
     { _timeoutManager: {} },
     { _timeoutManager: { _running: null } },
     { _timeoutManager: { _running: {} } },
     { _timeoutManager: { _running: { runnable: null } } },
-  ]) {
+  ].forEach((testInfo) => {
     assert.equal(
       runningSlotOf(testInfo, '1.64.1'),
       undefined,
       JSON.stringify(testInfo),
     );
-  }
+  });
 });
 
 test('a TestInfo without an object timeout manager, or running an unknown slot type, fails loudly, naming the internal and the version', () => {
-  for (const testInfo of [
+  [
     {},
     { _timeoutManager: null },
     { _timeoutManager: 'manager' },
     { _timeoutManager: { _running: { runnable: {} } } },
     { _timeoutManager: { _running: { runnable: { type: 1 } } } },
     { _timeoutManager: { _running: { runnable: { type: 'beforeSome' } } } },
-  ]) {
+  ].forEach((testInfo) => {
     assert.throws(
       () => runningSlotOf(testInfo, '1.99.0'),
       {
@@ -486,7 +492,7 @@ test('a TestInfo without an object timeout manager, or running an unknown slot t
       },
       JSON.stringify(testInfo),
     );
-  }
+  });
 });
 
 test('only playwright-internals.ts names a Playwright internal', () => {

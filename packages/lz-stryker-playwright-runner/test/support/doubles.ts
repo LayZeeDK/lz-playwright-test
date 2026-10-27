@@ -1,3 +1,8 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import type { TestContext } from 'node:test';
+
 import type { TestCase, TestResult } from '@playwright/test/reporter';
 import type { Logger } from '@stryker-mutator/api/logging';
 import type {
@@ -11,6 +16,22 @@ import type { DryRunRequest, MutantRunRequest } from '../../src/run-request.ts';
 import { DRY_RUN_BUDGET } from '../../src/timeouts.ts';
 
 export type Outcome = ReturnType<TestCase['outcome']>;
+
+/** A temp dir holding `files` by relative path, removed after the test. */
+export function tempTree(
+  t: TestContext,
+  prefix: string,
+  files: Readonly<Record<string, string>>,
+): string {
+  const dir = mkdtempSync(path.join(tmpdir(), prefix));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  Object.entries(files).forEach(([file, content]) => {
+    mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    writeFileSync(path.join(dir, file), content);
+  });
+
+  return dir;
+}
 
 /** A test with no attempts yet. */
 export function fakeTestCase(
