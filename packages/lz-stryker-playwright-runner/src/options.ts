@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { isRecord } from './playwright-internals.ts';
+import { isRecord } from './is-record.ts';
 
 export interface LzStrykerPlaywrightOptions {
   configFile?: string;

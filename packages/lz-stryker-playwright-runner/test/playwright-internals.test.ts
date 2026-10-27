@@ -507,5 +507,5 @@ test('playwright-internals.ts imports no runner code at run time', () => {
     ),
   ].map(([, specifier]) => specifier);
 
-  assert.deepEqual(runtimeImports, ['node:module']);
+  assert.deepEqual(runtimeImports, ['node:module', './is-record.ts']);
 });

@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import type { MutantCoverage } from '@stryker-mutator/api/core';
 
-import { isRecord } from './playwright-internals.ts';
+import { isRecord } from './is-record.ts';
 
 export const RUN_SETTINGS = 'LZ_STRYKER_PLAYWRIGHT_RUN';
 

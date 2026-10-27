@@ -7,13 +7,13 @@ import type { TestContext } from 'node:test';
 
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
+import { isRecord } from '../../src/is-record.ts';
 import {
   type HookedBrowser,
   type HookedContext,
   type HookedFrame,
   type HookedPage,
   type Instrumentation,
-  isRecord,
   type SlotType,
 } from '../../src/playwright-internals.ts';
 import type { RunSettings } from '../../src/protocol.ts';

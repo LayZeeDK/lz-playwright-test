@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 
 import type { FullResult, Reporter } from '@playwright/test/reporter';
 
+import { fieldOf, isRecord } from './is-record.ts';
 import type { PageSettings } from './worker-hook.ts';
 
 type Status = FullResult['status'];
@@ -151,18 +152,18 @@ export function probeInternals(
   },
 ): Playwright {
   const { runner, common, coreBundle } = modules;
-  const testRunner = isRecord(runner) ? runner.testRunner : undefined;
-  const TestRunner = isRecord(testRunner) ? testRunner.TestRunner : undefined;
-  const configLoader = isRecord(common) ? common.configLoader : undefined;
-  const resolveConfigLocation = isRecord(configLoader)
-    ? configLoader.resolveConfigLocation
-    : undefined;
-  const utils = isRecord(coreBundle) ? coreBundle.utils : undefined;
-  const isURLAvailable = isRecord(utils) ? utils.isURLAvailable : undefined;
+  const TestRunner = fieldOf(fieldOf(runner, 'testRunner'), 'TestRunner');
+  const configLoader = fieldOf(common, 'configLoader');
+  const resolveConfigLocation = fieldOf(configLoader, 'resolveConfigLocation');
+  const isURLAvailable = fieldOf(
+    fieldOf(coreBundle, 'utils'),
+    'isURLAvailable',
+  );
 
   const changed = () =>
-    new Error(
-      `Playwright ${version} changed the internals this runner calls (playwright/lib/runner TestRunner with ${TEST_RUNNER_METHODS.join(', ')}; playwright/lib/common configLoader; playwright-core coreBundle isURLAvailable).`,
+    internalsChanged(
+      version,
+      `playwright/lib/runner TestRunner with ${TEST_RUNNER_METHODS.join(', ')}; playwright/lib/common configLoader; playwright-core coreBundle isURLAvailable`,
     );
 
   if (
@@ -175,7 +176,7 @@ export function probeInternals(
 
   const prototype: unknown = TestRunner.prototype;
   const methodOf = (name: keyof TestRunner) => {
-    const method = isRecord(prototype) ? prototype[name] : undefined;
+    const method = fieldOf(prototype, name);
 
     if (typeof method !== 'function') {
       throw changed();
@@ -183,15 +184,7 @@ export function probeInternals(
 
     return method;
   };
-  const methods = {
-    initialize: methodOf('initialize'),
-    loadConfig: methodOf('loadConfig'),
-    listTests: methodOf('listTests'),
-    runGlobalSetup: methodOf('runGlobalSetup'),
-    runGlobalTeardown: methodOf('runGlobalTeardown'),
-    runTests: methodOf('runTests'),
-    stopTests: methodOf('stopTests'),
-  };
+  TEST_RUNNER_METHODS.forEach(methodOf);
 
   return {
     version,
@@ -205,37 +198,23 @@ export function probeInternals(
         configLocation,
         overrides,
       ]);
+      const call = (
+        name: keyof TestRunner,
+        args: readonly unknown[],
+      ): unknown => Reflect.apply(methodOf(name), created, args);
       const status = async (
         method: 'listTests' | 'runGlobalSetup' | 'runTests',
         args: readonly unknown[],
-      ) => {
-        const result: unknown = await Reflect.apply(
-          methods[method],
-          created,
-          args,
-        );
-
-        return parseStatus(result, method, version);
-      };
+      ) => parseStatus(await call(method, args), method, version);
       const runner: TestRunner = {
         async initialize(params) {
-          await Reflect.apply(methods.initialize, created, [params]);
+          await call('initialize', [params]);
         },
         async loadConfig() {
-          const config: unknown = await Reflect.apply(
-            methods.loadConfig,
-            created,
-            [],
-          );
-
-          return parseConfig(config, version);
+          return parseConfig(await call('loadConfig', []), version);
         },
         async listTests(reporter, params) {
-          const result: unknown = await Reflect.apply(
-            methods.listTests,
-            created,
-            [reporter, params],
-          );
+          const result = await call('listTests', [reporter, params]);
 
           return result === undefined
             ? undefined
@@ -243,11 +222,11 @@ export function probeInternals(
         },
         runGlobalSetup: (reporters) => status('runGlobalSetup', [reporters]),
         async runGlobalTeardown() {
-          await Reflect.apply(methods.runGlobalTeardown, created, []);
+          await call('runGlobalTeardown', []);
         },
         runTests: (reporter, params) => status('runTests', [reporter, params]),
         async stopTests() {
-          await Reflect.apply(methods.stopTests, created, []);
+          await call('stopTests', []);
         },
       };
       await runner.initialize({});
@@ -278,7 +257,7 @@ function parseStatus(
   method: string,
   version: string,
 ): { status: Status } {
-  const status = isRecord(value) ? value.status : undefined;
+  const status = fieldOf(value, 'status');
   const known = statuses.find((candidate) => candidate === status);
 
   if (known === undefined) {
@@ -299,8 +278,8 @@ function parseConfig(
       `Playwright ${version} changed what TestRunner.loadConfig() resolves to; this runner reads projects[].default, ` +
         'project.name, project.timeout and expect.timeout, and webServers[].url, port and ignoreHTTPSErrors.',
     );
-  const projects = isRecord(value) ? value.projects : undefined;
-  const webServers = isRecord(value) ? value.webServers : undefined;
+  const projects = fieldOf(value, 'projects');
+  const webServers = fieldOf(value, 'webServers');
 
   if (!Array.isArray(projects) || !Array.isArray(webServers)) {
     throw changed();
@@ -308,9 +287,9 @@ function parseConfig(
 
   return {
     projects: projects.map((project: unknown): ConfigProject => {
-      const settings = isRecord(project) ? project.project : undefined;
-      const expect = isRecord(project) ? project.expect : undefined;
-      const expectTimeout = isRecord(expect) ? expect.timeout : undefined;
+      const settings = fieldOf(project, 'project');
+      const expect = fieldOf(project, 'expect');
+      const expectTimeout = fieldOf(expect, 'timeout');
 
       if (
         !isRecord(project) ||
@@ -362,7 +341,7 @@ export function loadPlaywright(configFile: string | undefined): Playwright {
     testRequire.resolve('playwright/package.json'),
   );
   const manifest: unknown = playwrightRequire('./package.json');
-  const version = String(isRecord(manifest) ? manifest.version : undefined);
+  const version = String(fieldOf(manifest, 'version'));
 
   if (!supportsPlaywright(version)) {
     throw new Error(
@@ -379,10 +358,8 @@ export function loadPlaywright(configFile: string | undefined): Playwright {
 
 /** The instrumentation of the `playwright-core` module a worker loads. */
 export function instrumentationOf(core: unknown): Instrumentation {
-  const instrumentation = isRecord(core) ? core._instrumentation : undefined;
-  const addListener = isRecord(instrumentation)
-    ? instrumentation.addListener
-    : undefined;
+  const instrumentation = fieldOf(core, '_instrumentation');
+  const addListener = fieldOf(instrumentation, 'addListener');
 
   if (typeof addListener !== 'function') {
     throw new Error(
@@ -438,8 +415,7 @@ export function runningSlotOf(
     throw timeoutManagerChanged(version);
   }
 
-  const running = manager._running;
-  const runnable = isRecord(running) ? running.runnable : undefined;
+  const runnable = fieldOf(manager._running, 'runnable');
 
   if (!isRecord(runnable)) {
     return undefined;
@@ -453,8 +429,15 @@ export function runningSlotOf(
 }
 
 function timeoutManagerChanged(version: string): Error {
+  return internalsChanged(
+    version,
+    'TestInfo._timeoutManager, which tells a test from the hooks and fixtures that serve a group',
+  );
+}
+
+function internalsChanged(version: string, what: string): Error {
   return new Error(
-    `Playwright ${version} changed the internals this runner calls (TestInfo._timeoutManager, which tells a test from the hooks and fixtures that serve a group).`,
+    `Playwright ${version} changed the internals this runner calls (${what}).`,
   );
 }
 
@@ -462,12 +445,8 @@ function isSlotType(value: unknown): value is SlotType {
   return SLOT_TYPES.some((type) => type === value);
 }
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
 export function isSerialSuite(suite: unknown): boolean {
-  const mode = isRecord(suite) ? suite._parallelMode : undefined;
+  const mode = fieldOf(suite, '_parallelMode');
 
   if (typeof mode !== 'string') {
     throw new Error(

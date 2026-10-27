@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { isRecord } from './playwright-internals.ts';
+import { isRecord } from './is-record.ts';
 
 /**
  * Playwright deletes and recreates `outputDir` in global setup, so both directories live in a root it

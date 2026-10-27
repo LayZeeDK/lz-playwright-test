@@ -1,8 +1,5 @@
-import {
-  isRecord,
-  isSerialSuite,
-  type TestRunner,
-} from './playwright-internals.ts';
+import { isRecord } from './is-record.ts';
+import { isSerialSuite, type TestRunner } from './playwright-internals.ts';
 import { LzStrykerCollectingReporter, type ReportedTest } from './reporter.ts';
 
 /** The ids of a describe.serial group's tests, by the id of each test in it. */

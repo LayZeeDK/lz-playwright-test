@@ -6,13 +6,13 @@ import { isMainThread } from 'node:worker_threads';
 
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
+import { fieldOf, isRecord } from './is-record.ts';
 import {
   type HookedBrowser,
   type HookedContext,
   type HookedFrame,
   type HookedPage,
   instrumentationOf,
-  isRecord,
   type RunningSlot,
   runningSlotOf,
   type SlotType,
@@ -79,8 +79,7 @@ function currentTestOf(playwrightTest: unknown): CurrentTest {
       return undefined;
     }
 
-    const config = isRecord(found) ? found.config : undefined;
-    const version = isRecord(config) ? config.version : undefined;
+    const version = fieldOf(fieldOf(found, 'config'), 'version');
 
     if (
       !isRecord(found) ||
@@ -275,6 +274,10 @@ export function recordNodeCoverage(
 ): void {
   let written = false;
   const writeOnce = () => {
+    if (written) {
+      return;
+    }
+
     written = true;
 
     // After a failure that reaches maxFailures the runner may have read and removed the run's
@@ -301,7 +304,7 @@ export function recordNodeCoverage(
       set: (value: number) => {
         hits = value;
 
-        if (hits > hitLimit && !written) {
+        if (hits > hitLimit) {
           writeOnce();
         }
       },
@@ -313,7 +316,7 @@ export function recordNodeCoverage(
   }
 
   onExit(() => {
-    if (written || (ns.mutantCoverage === undefined && !ns.hitCount)) {
+    if (ns.mutantCoverage === undefined && !ns.hitCount) {
       return;
     }
 

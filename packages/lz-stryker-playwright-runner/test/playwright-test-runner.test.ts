@@ -17,7 +17,7 @@ import {
 
 import { strykerPlugins, strykerValidationSchema } from '../src/index.ts';
 import { OPTION_PROPERTIES } from '../src/options.ts';
-import { isRecord } from '../src/playwright-internals.ts';
+import { isRecord } from '../src/is-record.ts';
 import { INSTALL_ERROR_SUFFIX } from '../src/protocol.ts';
 import {
   acceptsConnections,
