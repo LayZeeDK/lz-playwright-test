@@ -18,6 +18,7 @@ import {
   type RunnerStrykerOptions,
 } from './options.ts';
 import {
+  type ConfigWebServer,
   loadPlaywright,
   NO_COPY_PROMPT_ENV,
   type Playwright,
@@ -375,7 +376,7 @@ async function runGlobalSetup(playwright: TestRunner) {
 }
 
 function serverCheck(
-  server: { url?: string; port?: number; ignoreHTTPSErrors?: boolean },
+  server: ConfigWebServer,
   isURLAvailable: Playwright['isURLAvailable'],
 ): ServerCheck[] {
   if (server.url) {

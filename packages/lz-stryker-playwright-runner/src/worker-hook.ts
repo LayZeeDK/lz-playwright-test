@@ -4,7 +4,6 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { isMainThread } from 'node:worker_threads';
 
-import type { TestInfo, TestType } from '@playwright/test';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
 import {
@@ -14,6 +13,7 @@ import {
   type HookedPage,
   instrumentationOf,
   isRecord,
+  type RunningSlot,
   runningSlotOf,
   type SlotType,
   WORKER_ENTRY,
@@ -42,26 +42,53 @@ export interface PageSettings {
   hitLimit?: number | undefined;
 }
 
-type Test = Pick<TestType<object, object>, 'info'>;
+interface RunningTest {
+  readonly testId: string;
+  readonly slot: RunningSlot | undefined;
+}
 
-/** The `test` of playwright/test; the check covers that `test.info` is a function, not what it returns. */
-function testOf(playwrightTest: unknown): Test {
+/** The test that runs now, read through test.info(); undefined while none runs. */
+type CurrentTest = () => RunningTest | undefined;
+
+/** Reads test.info() of playwright/test's `test`, and parses what it returns. */
+function currentTestOf(playwrightTest: unknown): CurrentTest {
   const test = isRecord(playwrightTest) ? playwrightTest.test : undefined;
+  const info: unknown =
+    typeof test === 'function' || isRecord(test)
+      ? Reflect.get(test, 'info')
+      : undefined;
 
-  if (!hasInfo(test)) {
+  if (typeof info !== 'function') {
     throw new Error(
       'The worker hook needs test.info() from playwright/test, which tells it the test that runs.',
     );
   }
 
-  return test;
-}
+  return () => {
+    let found: unknown;
 
-function hasInfo(value: unknown): value is Test {
-  return (
-    (typeof value === 'function' || isRecord(value)) &&
-    typeof Reflect.get(value, 'info') === 'function'
-  );
+    try {
+      found = Reflect.apply(info, test, []);
+    } catch {
+      // test.info() throws while no test runs.
+      return undefined;
+    }
+
+    const config = isRecord(found) ? found.config : undefined;
+    const version = isRecord(config) ? config.version : undefined;
+
+    if (
+      !isRecord(found) ||
+      typeof found.testId !== 'string' ||
+      typeof version !== 'string'
+    ) {
+      throw new Error(
+        "The worker hook needs test.info() from playwright/test to return the running test's testId and config.version.",
+      );
+    }
+
+    return { testId: found.testId, slot: runningSlotOf(found, version) };
+  };
 }
 
 // Undefined under `node -e`, which a worker's NODE_OPTIONS can reach; RegExp.test reads it as "undefined".
@@ -88,7 +115,7 @@ export function install(
   { outDir, perTest, hitLimit }: RunSettings,
   ns: string = INSTRUMENTER_CONSTANTS.NAMESPACE,
 ): void {
-  const test = testOf(playwrightRequire('playwright/test'));
+  const test = currentTestOf(playwrightRequire('playwright/test'));
   const instrumentation = instrumentationOf(
     playwrightRequire('playwright-core'),
   );
@@ -283,17 +310,17 @@ const PER_TEST_SLOTS: ReadonlySet<SlotType> = new Set([
 const GROUP_HOOKS: ReadonlySet<SlotType> = new Set(['beforeAll', 'afterAll']);
 
 /** The test that Node code running now belongs to: none in a beforeAll or afterAll hook or a fixture. */
-function nodeTestId(test: Test): string | undefined {
-  const info = testInfoOf(test);
+function nodeTestId(test: CurrentTest): string | undefined {
+  const running = test();
 
-  if (info === undefined) {
+  if (running === undefined) {
     return undefined;
   }
 
-  const slot = runningSlotOf(info, info.config.version);
+  const { slot } = running;
 
   return slot && !slot.inFixture && PER_TEST_SLOTS.has(slot.type)
-    ? info.testId
+    ? running.testId
     : undefined;
 }
 
@@ -301,19 +328,13 @@ function nodeTestId(test: Test): string | undefined {
  * The test a context opened or closed now belongs to: none in a beforeAll or afterAll hook. A fixture's
  * context, a worker fixture's too, gets the current test until it outlives that test.
  */
-function contextTestId(test: Test): string | undefined {
-  const info = testInfoOf(test);
-  const type = info && runningSlotOf(info, info.config.version)?.type;
+function contextTestId(test: CurrentTest): string | undefined {
+  const running = test();
+  const type = running?.slot?.type;
 
-  return type !== undefined && GROUP_HOOKS.has(type) ? undefined : info?.testId;
-}
-
-function testInfoOf(test: Test): TestInfo | undefined {
-  try {
-    return test.info();
-  } catch {
-    return undefined;
-  }
+  return type !== undefined && GROUP_HOOKS.has(type)
+    ? undefined
+    : running?.testId;
 }
 
 async function readPages(

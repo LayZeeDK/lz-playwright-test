@@ -51,10 +51,13 @@ export function fakeInstall(
   {
     activeMutant,
     prepare,
+    info,
   }: {
     activeMutant?: string;
     /** Runs before install, as the worker's earlier code would. */
     prepare?: (outDir: string, ns: string) => void;
+    /** Replaces test.info(), as a Playwright whose TestInfo changed would. */
+    info?: () => unknown;
   } = {},
 ) {
   const ns = `__hookTest${Math.random().toString(36).slice(2)}__`;
@@ -67,19 +70,21 @@ export function fakeInstall(
   let runnable: Runnable = { type: 'test' };
   let listener: Listener | undefined;
   const test = {
-    info: () => {
-      if (running === undefined) {
-        throw new Error(
-          'test.info() can only be called while a test is running',
-        );
-      }
+    info:
+      info ??
+      (() => {
+        if (running === undefined) {
+          throw new Error(
+            'test.info() can only be called while a test is running',
+          );
+        }
 
-      return {
-        testId: running,
-        config: { version: '1.64.1' },
-        _timeoutManager: { _running: { runnable } },
-      };
-    },
+        return {
+          testId: running,
+          config: { version: '1.64.1' },
+          _timeoutManager: { _running: { runnable } },
+        };
+      }),
   };
   const modules: Record<string, unknown> = {
     'playwright/test': { test },

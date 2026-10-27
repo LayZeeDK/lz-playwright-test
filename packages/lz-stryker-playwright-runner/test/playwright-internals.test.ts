@@ -14,11 +14,17 @@ import {
 
 const src = new URL('../src/', import.meta.url);
 
-function fakeModules(methods = TEST_RUNNER_METHODS) {
+/** `answers` holds what each TestRunner method resolves to, by method name. */
+function fakeModules(
+  methods = TEST_RUNNER_METHODS,
+  answers: Readonly<Record<string, unknown>> = {},
+) {
   class TestRunner {}
 
   for (const method of methods) {
-    Object.assign(TestRunner.prototype, { [method]: () => undefined });
+    Object.assign(TestRunner.prototype, {
+      [method]: async () => answers[method],
+    });
   }
 
   return {
@@ -136,6 +142,233 @@ test("the probe's URL check passes the URL and the HTTPS flag on, and counts onl
   assert.deepEqual(calls, [
     [url, true],
     [url, false],
+  ]);
+});
+
+function testRunnerAnswering(answers: Readonly<Record<string, unknown>>) {
+  return probeInternals(
+    '1.99.0',
+    fakeModules(TEST_RUNNER_METHODS, answers),
+  ).createTestRunner(undefined, {});
+}
+
+test('the test runner resolves loadConfig to the project and web server fields the runner reads', async () => {
+  const runner = await testRunnerAnswering({
+    loadConfig: {
+      projects: [
+        {
+          default: true,
+          expect: { timeout: 5, toPass: {} },
+          project: { name: 'a', timeout: 1, retries: 0 },
+          deps: [],
+        },
+        { default: false, expect: {}, project: { name: 'b', timeout: 0 } },
+        { default: true, project: { name: 'c', timeout: 2 } },
+      ],
+      webServers: [
+        {
+          url: 'http://localhost:3000',
+          port: 3000,
+          ignoreHTTPSErrors: true,
+          command: 'serve',
+        },
+        {},
+      ],
+      workers: 1,
+    },
+  });
+
+  assert.deepEqual(await runner.loadConfig(), {
+    projects: [
+      {
+        default: true,
+        expect: { timeout: 5 },
+        project: { name: 'a', timeout: 1 },
+      },
+      {
+        default: false,
+        expect: { timeout: undefined },
+        project: { name: 'b', timeout: 0 },
+      },
+      {
+        default: true,
+        expect: undefined,
+        project: { name: 'c', timeout: 2 },
+      },
+    ],
+    webServers: [
+      { url: 'http://localhost:3000', port: 3000, ignoreHTTPSErrors: true },
+      { url: undefined, port: undefined, ignoreHTTPSErrors: undefined },
+    ],
+  });
+});
+
+const validProject = {
+  default: true,
+  expect: { timeout: 5 },
+  project: { name: 'a', timeout: 1 },
+};
+const validServer = {
+  url: 'http://localhost',
+  port: 1,
+  ignoreHTTPSErrors: true,
+};
+
+for (const [title, config] of [
+  ['is no object', null],
+  ['has no projects array', { projects: {}, webServers: [] }],
+  ['has no webServers array', { projects: [], webServers: {} }],
+  ['has a project that is no object', { projects: [null], webServers: [] }],
+  [
+    'has a project with no boolean default',
+    { projects: [{ ...validProject, default: 'yes' }], webServers: [] },
+  ],
+  [
+    'has a project with no project object',
+    { projects: [{ ...validProject, project: null }], webServers: [] },
+  ],
+  [
+    'has a project with no string project.name',
+    {
+      projects: [{ ...validProject, project: { name: 1, timeout: 1 } }],
+      webServers: [],
+    },
+  ],
+  [
+    'has a project with no number project.timeout',
+    {
+      projects: [{ ...validProject, project: { name: 'a', timeout: '1' } }],
+      webServers: [],
+    },
+  ],
+  [
+    'has a project whose expect is no object',
+    { projects: [{ ...validProject, expect: 5 }], webServers: [] },
+  ],
+  [
+    'has a project with no number expect.timeout',
+    {
+      projects: [{ ...validProject, expect: { timeout: '5' } }],
+      webServers: [],
+    },
+  ],
+  ['has a web server that is no object', { projects: [], webServers: [null] }],
+  [
+    'has a web server with no string url',
+    { projects: [], webServers: [{ ...validServer, url: 1 }] },
+  ],
+  [
+    'has a web server with no number port',
+    { projects: [], webServers: [{ ...validServer, port: '1' }] },
+  ],
+  [
+    'has a web server with no boolean ignoreHTTPSErrors',
+    { projects: [], webServers: [{ ...validServer, ignoreHTTPSErrors: 1 }] },
+  ],
+] as const) {
+  test(`the test runner refuses a loaded config that ${title}`, async () => {
+    const runner = await testRunnerAnswering({ loadConfig: config });
+
+    await assert.rejects(runner.loadConfig(), {
+      message:
+        'Playwright 1.99.0 changed what TestRunner.loadConfig() resolves to; this runner reads projects[].default, ' +
+        'project.name, project.timeout and expect.timeout, and webServers[].url, port and ignoreHTTPSErrors.',
+    });
+  });
+}
+
+test('the test runner resolves listTests, runGlobalSetup and runTests to their status alone, and listTests also to undefined', async () => {
+  const runner = await testRunnerAnswering({
+    listTests: { status: 'passed', suite: {} },
+    runGlobalSetup: { status: 'failed' },
+    runTests: { status: 'timedout' },
+  });
+  const interrupted = await testRunnerAnswering({
+    runTests: { status: 'interrupted' },
+  });
+
+  assert.deepEqual(
+    [
+      await runner.listTests({}, {}),
+      await runner.runGlobalSetup([]),
+      await runner.runTests({}, { locations: [] }),
+      await interrupted.runTests({}, { locations: [] }),
+      await interrupted.listTests({}, {}),
+    ],
+    [
+      { status: 'passed' },
+      { status: 'failed' },
+      { status: 'timedout' },
+      { status: 'interrupted' },
+      undefined,
+    ],
+  );
+});
+
+for (const method of ['listTests', 'runGlobalSetup', 'runTests'] as const) {
+  for (const answer of [null, {}, { status: 'done' }]) {
+    test(`the test runner refuses a ${method} that resolves to ${JSON.stringify(answer)}`, async () => {
+      const runner = await testRunnerAnswering({ [method]: answer });
+      const calls = {
+        listTests: () => runner.listTests({}, {}),
+        runGlobalSetup: () => runner.runGlobalSetup([]),
+        runTests: () => runner.runTests({}, { locations: [] }),
+      };
+
+      await assert.rejects(calls[method](), {
+        message: `Playwright 1.99.0 changed what TestRunner.${method}() resolves to; this runner reads its status: passed, failed, timedout or interrupted.`,
+      });
+    });
+  }
+}
+
+test('the test runner calls each method on the instance Playwright constructed, with the arguments it was given', async () => {
+  const seen: unknown[][] = [];
+
+  class TestRunner {
+    readonly args: unknown[];
+
+    constructor(...args: unknown[]) {
+      this.args = args;
+    }
+  }
+
+  for (const method of TEST_RUNNER_METHODS) {
+    Object.assign(TestRunner.prototype, {
+      async [method](this: unknown, ...args: unknown[]) {
+        seen.push([method, this, ...args]);
+
+        return method === 'loadConfig'
+          ? { projects: [], webServers: [] }
+          : { status: 'passed' };
+      },
+    });
+  }
+
+  const reporter = {};
+  const runner = await probeInternals('1.99.0', {
+    ...fakeModules(),
+    common: { configLoader: { resolveConfigLocation: () => 'location' } },
+    runner: { testRunner: { TestRunner } },
+  }).createTestRunner('playwright.config.ts', { workers: 1 });
+  await runner.loadConfig();
+  await runner.listTests(reporter, { projects: ['a'] });
+  await runner.runGlobalSetup([reporter]);
+  await runner.runTests(reporter, { locations: [] });
+  await runner.stopTests();
+  await runner.runGlobalTeardown();
+
+  const [[, instance]] = seen;
+  assert.ok(instance instanceof TestRunner);
+  assert.deepEqual(instance.args, ['location', { workers: 1 }]);
+  assert.deepEqual(seen, [
+    ['initialize', instance, {}],
+    ['loadConfig', instance],
+    ['listTests', instance, reporter, { projects: ['a'] }],
+    ['runGlobalSetup', instance, [reporter]],
+    ['runTests', instance, reporter, { locations: [] }],
+    ['stopTests', instance],
+    ['runGlobalTeardown', instance],
   ]);
 });
 

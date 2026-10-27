@@ -451,6 +451,29 @@ test("the worker's namespace names no test in a beforeAll or afterAll hook, a fi
   }
 });
 
+const running = {
+  _timeoutManager: { _running: { runnable: { type: 'test' } } },
+};
+
+for (const [title, info] of [
+  ['is no object', null],
+  ['has no string testId', { ...running, testId: 1, config: { version: '1' } }],
+  ['has no config', { ...running, testId: 't1' }],
+  [
+    'has no string config.version',
+    { ...running, testId: 't1', config: { version: 1 } },
+  ],
+] as const) {
+  test(`the worker hook refuses a test.info() that ${title}`, (t) => {
+    const hooked = installed(t, { perTest: true }, { info: () => info });
+
+    assert.throws(() => hooked.namespace().currentTestId, {
+      message:
+        "The worker hook needs test.info() from playwright/test to return the running test's testId and config.version.",
+    });
+  });
+}
+
 test('at exit the worker writes its Node coverage to its snapshot file', (t) => {
   const hooked = installed(t, { perTest: false });
   hooked.namespace().mutantCoverage = { static: { '1': 1 }, perTest: {} };

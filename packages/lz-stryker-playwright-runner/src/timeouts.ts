@@ -16,7 +16,7 @@ export interface ConfigTimeouts {
 
 export function configTimeouts(
   projects: readonly {
-    expect?: { timeout?: number };
+    expect?: { timeout?: number | undefined } | undefined;
     project: { timeout: number };
   }[],
 ): ConfigTimeouts {

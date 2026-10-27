@@ -16,15 +16,26 @@ export interface RunTestsParams {
   disableConfigReporters?: boolean;
 }
 
+/** The fields of a project of Playwright's loaded config that the runner reads. */
+export interface ConfigProject {
+  default: boolean;
+  expect?: { timeout?: number | undefined } | undefined;
+  project: { name: string; timeout: number };
+}
+
+/** The fields of a webServer of Playwright's loaded config that the runner reads. */
+export interface ConfigWebServer {
+  url?: string | undefined;
+  port?: number | undefined;
+  ignoreHTTPSErrors?: boolean | undefined;
+}
+
+/** The runner's calls into Playwright's TestRunner, each result parsed to what the runner reads. */
 export interface TestRunner {
   initialize(params: Record<string, never>): Promise<void>;
   loadConfig(): Promise<{
-    projects: {
-      default: boolean;
-      expect?: { timeout?: number };
-      project: { name: string; timeout: number };
-    }[];
-    webServers: { url?: string; port?: number; ignoreHTTPSErrors?: boolean }[];
+    projects: ConfigProject[];
+    webServers: ConfigWebServer[];
   }>;
   // Resolves to undefined when Playwright throws, after printing the error to stderr.
   listTests(
@@ -32,7 +43,7 @@ export interface TestRunner {
     params: { projects?: string[] },
   ): Promise<{ status: Status } | undefined>;
   runGlobalSetup(reporters: Reporter[]): Promise<{ status: Status }>;
-  runGlobalTeardown(): Promise<unknown>;
+  runGlobalTeardown(): Promise<void>;
   runTests(
     reporter: Reporter,
     params: RunTestsParams,
@@ -50,15 +61,6 @@ const TEST_RUNNER_METHOD_SET: Record<keyof TestRunner, true> = {
   stopTests: true,
 };
 export const TEST_RUNNER_METHODS = Object.keys(TEST_RUNNER_METHOD_SET);
-
-export interface RunnerModule {
-  testRunner: {
-    TestRunner: new (
-      configLocation: unknown,
-      overrides: Record<string, unknown>,
-    ) => TestRunner;
-  };
-}
 
 export interface CoreBundleModule {
   utils: {
@@ -138,8 +140,8 @@ export function supportsPlaywright(version: string): boolean {
 }
 
 /**
- * Checks each internal the runner calls; what is left unchecked is the signature of the TestRunner
- * methods, which only a run can tell.
+ * Checks each internal the runner calls, and parses what each TestRunner method resolves to where the
+ * runner reads it; whether a method takes the arguments it is given only a run can tell.
  */
 export function probeInternals(
   version: string,
@@ -159,15 +161,38 @@ export function probeInternals(
   const utils = isRecord(coreBundle) ? coreBundle.utils : undefined;
   const isURLAvailable = isRecord(utils) ? utils.isURLAvailable : undefined;
 
+  const changed = () =>
+    new Error(
+      `Playwright ${version} changed the internals this runner calls (playwright/lib/runner TestRunner with ${TEST_RUNNER_METHODS.join(', ')}; playwright/lib/common configLoader; playwright-core coreBundle isURLAvailable).`,
+    );
+
   if (
-    !isTestRunnerClass(TestRunner) ||
+    typeof TestRunner !== 'function' ||
     typeof resolveConfigLocation !== 'function' ||
     typeof isURLAvailable !== 'function'
   ) {
-    throw new Error(
-      `Playwright ${version} changed the internals this runner calls (playwright/lib/runner TestRunner with ${TEST_RUNNER_METHODS.join(', ')}; playwright/lib/common configLoader; playwright-core coreBundle isURLAvailable).`,
-    );
+    throw changed();
   }
+
+  const prototype: unknown = TestRunner.prototype;
+  const methodOf = (name: keyof TestRunner) => {
+    const method = isRecord(prototype) ? prototype[name] : undefined;
+
+    if (typeof method !== 'function') {
+      throw changed();
+    }
+
+    return method;
+  };
+  const methods = {
+    initialize: methodOf('initialize'),
+    loadConfig: methodOf('loadConfig'),
+    listTests: methodOf('listTests'),
+    runGlobalSetup: methodOf('runGlobalSetup'),
+    runGlobalTeardown: methodOf('runGlobalTeardown'),
+    runTests: methodOf('runTests'),
+    stopTests: methodOf('stopTests'),
+  };
 
   return {
     version,
@@ -177,10 +202,58 @@ export function probeInternals(
         configLoader,
         [configFile],
       );
-      const created = new TestRunner(configLocation, overrides);
-      await created.initialize({});
+      const created: unknown = Reflect.construct(TestRunner, [
+        configLocation,
+        overrides,
+      ]);
+      const status = async (
+        method: 'listTests' | 'runGlobalSetup' | 'runTests',
+        args: readonly unknown[],
+      ) => {
+        const result: unknown = await Reflect.apply(
+          methods[method],
+          created,
+          args,
+        );
 
-      return created;
+        return parseStatus(result, method, version);
+      };
+      const runner: TestRunner = {
+        async initialize(params) {
+          await Reflect.apply(methods.initialize, created, [params]);
+        },
+        async loadConfig() {
+          const config: unknown = await Reflect.apply(
+            methods.loadConfig,
+            created,
+            [],
+          );
+
+          return parseConfig(config, version);
+        },
+        async listTests(reporter, params) {
+          const result: unknown = await Reflect.apply(
+            methods.listTests,
+            created,
+            [reporter, params],
+          );
+
+          return result === undefined
+            ? undefined
+            : parseStatus(result, 'listTests', version);
+        },
+        runGlobalSetup: (reporters) => status('runGlobalSetup', [reporters]),
+        async runGlobalTeardown() {
+          await Reflect.apply(methods.runGlobalTeardown, created, []);
+        },
+        runTests: (reporter, params) => status('runTests', [reporter, params]),
+        async stopTests() {
+          await Reflect.apply(methods.stopTests, created, []);
+        },
+      };
+      await runner.initialize({});
+
+      return runner;
     },
     async isURLAvailable(url, ignoreHTTPSErrors) {
       const available: unknown = await Reflect.apply(
@@ -194,18 +267,88 @@ export function probeInternals(
   };
 }
 
-function isTestRunnerClass(
+const statuses: readonly Status[] = [
+  'passed',
+  'failed',
+  'timedout',
+  'interrupted',
+];
+
+function parseStatus(
   value: unknown,
-): value is RunnerModule['testRunner']['TestRunner'] {
-  if (typeof value !== 'function') {
-    return false;
+  method: string,
+  version: string,
+): { status: Status } {
+  const status = isRecord(value) ? value.status : undefined;
+  const known = statuses.find((candidate) => candidate === status);
+
+  if (known === undefined) {
+    throw new Error(
+      `Playwright ${version} changed what TestRunner.${method}() resolves to; this runner reads its status: passed, failed, timedout or interrupted.`,
+    );
   }
 
-  const prototype: unknown = value.prototype;
+  return { status: known };
+}
 
-  return TEST_RUNNER_METHODS.every(
-    (method) => isRecord(prototype) && typeof prototype[method] === 'function',
-  );
+function parseConfig(
+  value: unknown,
+  version: string,
+): Awaited<ReturnType<TestRunner['loadConfig']>> {
+  const changed = () =>
+    new Error(
+      `Playwright ${version} changed what TestRunner.loadConfig() resolves to; this runner reads projects[].default, ` +
+        'project.name, project.timeout and expect.timeout, and webServers[].url, port and ignoreHTTPSErrors.',
+    );
+  const projects = isRecord(value) ? value.projects : undefined;
+  const webServers = isRecord(value) ? value.webServers : undefined;
+
+  if (!Array.isArray(projects) || !Array.isArray(webServers)) {
+    throw changed();
+  }
+
+  return {
+    projects: projects.map((project: unknown): ConfigProject => {
+      const settings = isRecord(project) ? project.project : undefined;
+      const expect = isRecord(project) ? project.expect : undefined;
+      const expectTimeout = isRecord(expect) ? expect.timeout : undefined;
+
+      if (
+        !isRecord(project) ||
+        typeof project.default !== 'boolean' ||
+        !isRecord(settings) ||
+        typeof settings.name !== 'string' ||
+        typeof settings.timeout !== 'number' ||
+        (expect !== undefined && !isRecord(expect)) ||
+        (expectTimeout !== undefined && typeof expectTimeout !== 'number')
+      ) {
+        throw changed();
+      }
+
+      return {
+        default: project.default,
+        expect: expect === undefined ? undefined : { timeout: expectTimeout },
+        project: { name: settings.name, timeout: settings.timeout },
+      };
+    }),
+    webServers: webServers.map((server: unknown): ConfigWebServer => {
+      if (
+        !isRecord(server) ||
+        (server.url !== undefined && typeof server.url !== 'string') ||
+        (server.port !== undefined && typeof server.port !== 'number') ||
+        (server.ignoreHTTPSErrors !== undefined &&
+          typeof server.ignoreHTTPSErrors !== 'boolean')
+      ) {
+        throw changed();
+      }
+
+      return {
+        url: server.url,
+        port: server.port,
+        ignoreHTTPSErrors: server.ignoreHTTPSErrors,
+      };
+    }),
+  };
 }
 
 export function loadPlaywright(configFile: string | undefined): Playwright {
