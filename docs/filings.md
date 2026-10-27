@@ -138,6 +138,15 @@ score. Where it compiles, a test must kill it. This decided which tests the work
 neither `lz-red` nor `lz-tpp` mentions it. Evidence: the same notes file, which names the test meant to kill each
 compiling mutant.
 
+**O17. Neither skill says how many reds a multi-field parser needs.** A worker replaced two casts with parsers
+that check several fields each and throw on the first bad one (2026-10-27). `lz-tpp` sees one "(unconditional ->
+if)" step for the whole parser. Under a 100% mutation score each field's check needs its own failing test, since
+one red per parser leaves every other field's condition mutant alive. Neither skill says to split the reds by
+field. Evidence: `.audit/types/step4-notes.md` (local, gitignored), "lz-tdd friction".
+
+O3 and O4 held again in the same run: both skills said to coach and not to write or run the code, against the
+brief, and `lz-red`'s mechanics leaf is still Vitest-only in a `node:test` repo.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -192,6 +201,10 @@ its error, and the choice that matters is where the parse happens, not which tra
 
 **S15 (from O16).** In `lz-red`, for a repo with a mutation score and a type checker, say to write a test for each
 guard mutant that compiles and to leave out the ones the checker rejects, and say how to tell the two apart.
+
+**S16 (from O17).** In `lz-red`'s test-selection leaf, say that a parser or guard that checks several fields gets
+one failing test per field, each with only that field wrong, and that this is the test list a mutation score
+asks for.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
