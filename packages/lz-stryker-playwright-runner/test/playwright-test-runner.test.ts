@@ -18,6 +18,7 @@ import {
 import { strykerPlugins, strykerValidationSchema } from '../src/index.ts';
 import { OPTION_PROPERTIES } from '../src/options.ts';
 import { isRecord } from '../src/playwright-internals.ts';
+import { INSTALL_ERROR_SUFFIX } from '../src/protocol.ts';
 import {
   acceptsConnections,
   LzStrykerPlaywrightTestRunner,
@@ -553,6 +554,30 @@ test('a run whose workers wrote no snapshot file reports that the hook never ins
     status: DryRunStatus.Error,
     errorMessage:
       'Tests ran but the Stryker worker hook did not install in any Playwright worker; this Playwright version may have changed its worker entry point.',
+  });
+});
+
+test('a run whose worker failed to install the hook reports the error the worker left', async (t) => {
+  const fake = fakePlaywright(t, {
+    runTests: async (run) => {
+      run.reporter.onTestEnd(finishedTest('a', 'failed'));
+      writeFileSync(
+        path.join(run.settings.outDir, `worker-1${INSTALL_ERROR_SUFFIX}`),
+        'Error: no test.info()',
+      );
+
+      return 'failed';
+    },
+  });
+  const { runner: shell } = runner(fake.configFile);
+  await shell.init();
+
+  const result = await shell.dryRun(dryRunOptions());
+
+  assert.deepEqual(result, {
+    status: DryRunStatus.Error,
+    errorMessage:
+      'The Stryker worker hook failed to install in a Playwright worker: Error: no test.info()',
   });
 });
 

@@ -20,6 +20,7 @@ import {
 } from './playwright-internals.ts';
 import {
   FRAME_READ_TIMEOUT_MS,
+  INSTALL_ERROR_SUFFIX,
   readRunSettings,
   type RunSettings,
   serializeSnapshot,
@@ -50,13 +51,17 @@ interface RunningTest {
 /** The test that runs now, read through test.info(); undefined while none runs. */
 type CurrentTest = () => RunningTest | undefined;
 
+// Playwright's `test` is a function, and playwright/test exports that function as the module itself.
+function memberOf(value: unknown, key: string): unknown {
+  return typeof value === 'function' || isRecord(value)
+    ? Reflect.get(value, key)
+    : undefined;
+}
+
 /** Reads test.info() of playwright/test's `test`, and parses what it returns. */
 function currentTestOf(playwrightTest: unknown): CurrentTest {
-  const test = isRecord(playwrightTest) ? playwrightTest.test : undefined;
-  const info: unknown =
-    typeof test === 'function' || isRecord(test)
-      ? Reflect.get(test, 'info')
-      : undefined;
+  const test = memberOf(playwrightTest, 'test');
+  const info = memberOf(test, 'info');
 
   if (typeof info !== 'function') {
     throw new Error(
@@ -68,7 +73,7 @@ function currentTestOf(playwrightTest: unknown): CurrentTest {
     let found: unknown;
 
     try {
-      found = Reflect.apply(info, test, []);
+      found = info.call(test);
     } catch {
       // test.info() throws while no test runs.
       return undefined;
@@ -107,7 +112,19 @@ if (
   !(INSTALLED in globalThis)
 ) {
   Reflect.set(globalThis, INSTALLED, INSTALLED);
-  install(createRequire(entry), settings);
+
+  try {
+    install(createRequire(entry), settings);
+  } catch (error) {
+    fs.writeFileSync(
+      path.join(
+        settings.outDir,
+        `worker-${process.pid}${INSTALL_ERROR_SUFFIX}`,
+      ),
+      String(error),
+    );
+    throw error;
+  }
 }
 
 export function install(

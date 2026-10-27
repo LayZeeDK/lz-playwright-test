@@ -15,6 +15,7 @@ import { before, type TestContext, test } from 'node:test';
 import type { HookedContext } from '../src/playwright-internals.ts';
 import {
   FRAME_READ_TIMEOUT_MS,
+  readSnapshotDir,
   RUN_SETTINGS,
   type RunSettings,
 } from '../src/protocol.ts';
@@ -88,14 +89,22 @@ test('a Playwright worker outside a Stryker run loads the hook and installs noth
   }
 });
 
+// As Playwright's own playwright/test: the module is its test, a function with info() and `test`.
+const playwrightTestModule = [
+  'const test = Object.assign(() => {}, { info() { throw new Error("no test"); } });',
+  'module.exports = Object.assign(test, { test });',
+].join('\n');
+
 // Starts a fake Playwright worker during a run with the given `--import`s; it prints one line per install.
-function runWorker(t: TestContext, imports: string[]) {
+function runWorker(
+  t: TestContext,
+  imports: string[],
+  playwrightTest = playwrightTestModule,
+) {
   const dir = mkdtempSync(path.join(tmpdir(), 'worker-hook-gate-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const files: Record<string, string> = {
-    // A function with info(), as Playwright exports its test.
-    'node_modules/playwright/test.js':
-      'exports.test = Object.assign(() => {}, { info() { throw new Error("no test"); } });',
+    'node_modules/playwright/test.js': playwrightTest,
     'node_modules/playwright-core/package.json': '{"main":"index.js"}',
     // Every install adds one listener, so each line is one install.
     'node_modules/playwright-core/index.js': [
@@ -156,6 +165,7 @@ function playwrightWith(t: TestContext, playwrightTest: string) {
 }
 
 for (const playwrightTest of [
+  'module.exports = null;',
   'exports.other = {};',
   'exports.test = {};',
   'exports.test = () => {};',
@@ -183,6 +193,19 @@ test('during a run the hook installs in the main thread of a Playwright worker, 
   assert.equal(child.status, 0, child.stderr);
   assert.equal(child.stdout.trim(), 'main');
   assert.equal(readdirSync(outDir).length, 1);
+});
+
+test('a worker whose hook fails to install leaves the error for the run and exits with it', (t) => {
+  const { child, outDir } = runWorker(t, [HOOK_URL], 'exports.test = {};');
+
+  assert.equal(child.status, 1, child.stderr);
+  assert.deepEqual(readSnapshotDir(outDir), {
+    snapshots: [],
+    hookInstalled: false,
+    installErrors: [
+      'Error: The worker hook needs test.info() from playwright/test, which tells it the test that runs.',
+    ],
+  });
 });
 
 test('a second copy of the hook in the same worker installs nothing', (t) => {

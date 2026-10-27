@@ -9,6 +9,9 @@ export const RUN_SETTINGS = 'LZ_STRYKER_PLAYWRIGHT_RUN';
 
 export const SNAPSHOT_SUFFIX = '.ndjson';
 
+/** A worker whose hook failed to install leaves the error in a file of this suffix, as text. */
+export const INSTALL_ERROR_SUFFIX = '.install-error';
+
 export const FRAME_READ_TIMEOUT_MS = 2000;
 
 export interface RunSettings {
@@ -34,6 +37,7 @@ export interface Snapshot {
 export interface SnapshotDir {
   snapshots: Snapshot[];
   hookInstalled: boolean;
+  installErrors: string[];
 }
 
 export function isHitCount(value: unknown): value is number {
@@ -116,17 +120,18 @@ export function parseSnapshotLine(line: string): Snapshot | undefined {
 }
 
 export function readSnapshotDir(dir: string): SnapshotDir {
-  const files = fs
-    .readdirSync(dir)
-    .filter((file) => file.endsWith(SNAPSHOT_SUFFIX));
+  const names = fs.readdirSync(dir);
+  const read = (file: string) => fs.readFileSync(path.join(dir, file), 'utf8');
+  const files = names.filter((file) => file.endsWith(SNAPSHOT_SUFFIX));
   const snapshots = files
-    .flatMap((file) =>
-      fs.readFileSync(path.join(dir, file), 'utf8').split('\n'),
-    )
+    .flatMap((file) => read(file).split('\n'))
     .map(parseSnapshotLine)
     .filter((snapshot) => snapshot !== undefined);
+  const installErrors = names
+    .filter((file) => file.endsWith(INSTALL_ERROR_SUFFIX))
+    .map(read);
 
-  return { snapshots, hookInstalled: files.length > 0 };
+  return { snapshots, hookInstalled: files.length > 0, installErrors };
 }
 
 export function readRunSettings(

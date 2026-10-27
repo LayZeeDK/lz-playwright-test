@@ -38,6 +38,7 @@ export interface RunOutput {
   readonly reporter: LzStrykerCollectingReporter;
   readonly snapshots: Snapshot[];
   readonly hookInstalled: boolean;
+  readonly installErrors: readonly string[];
 }
 
 export interface CoverageGaps {
@@ -93,7 +94,13 @@ export function mayHaveLostItsServer(output: RunOutput): boolean {
 }
 
 export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
-  const { status, reporter, snapshots, hookInstalled } = output;
+  const {
+    status,
+    reporter,
+    snapshots,
+    hookInstalled,
+    installErrors: [installError],
+  } = output;
   const isMutantRun = request.kind === 'mutant';
   const testCases = [...reporter.testCases.values()];
   const tests = testCases.map((test) => toTestResult(test, isMutantRun));
@@ -137,6 +144,14 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
 
   if (tests.length === 0) {
     return emptyRunResult(request);
+  }
+
+  // A worker that dies at the hook's install is to Playwright only a crash; the hook left the cause.
+  if (installError !== undefined) {
+    return {
+      status: DryRunStatus.Error,
+      errorMessage: `The Stryker worker hook failed to install in a Playwright worker: ${installError}`,
+    };
   }
 
   if (

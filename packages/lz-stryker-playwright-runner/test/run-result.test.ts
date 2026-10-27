@@ -78,7 +78,7 @@ function classify(
   } = {},
 ) {
   return toRunResult(
-    { status, reporter, snapshots: [], hookInstalled },
+    { status, reporter, snapshots: [], hookInstalled, installErrors: [] },
     mutant ? mutantRequest({ testFilter }) : dryRequest(),
   );
 }
@@ -93,6 +93,7 @@ function passedRun(lines: Partial<SnapshotLine>[]): RunOutput {
     reporter,
     snapshots: lines.map(parsed),
     hookInstalled: true,
+    installErrors: [],
   };
 }
 
@@ -395,6 +396,7 @@ test('the hit limit counts on a run that is otherwise an error', () => {
     reporter: new LzStrykerCollectingReporter(),
     snapshots: [parsed({ hitCount: 1001 })],
     hookInstalled: true,
+    installErrors: [],
   };
 
   assert.equal(
@@ -441,6 +443,7 @@ test('a deadline stop during config load, before any test, is a Timeout', () => 
     reporter: new LzStrykerCollectingReporter(),
     snapshots: [],
     hookInstalled: false,
+    installErrors: [],
   };
 
   assert.equal(
