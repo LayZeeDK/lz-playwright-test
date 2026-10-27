@@ -23,6 +23,8 @@ step() {
 
 : >/out/summary.txt
 step npm-ci npm ci --no-audit --no-fund
+# Without node_modules, npx would download whatever nx the registry serves.
+[ "$failed" -eq 0 ] || exit "$failed"
 step nx-lint npx nx run-many -t lint --projects=@layzee/lz-stryker-playwright-runner,@layzee/lz-stryker-ui-mutators
 step nx-typecheck npx nx run-many -t typecheck
 step nx-build npx nx run-many -t build --projects=@layzee/lz-stryker-playwright-runner,@layzee/lz-stryker-ui-mutators

@@ -519,7 +519,7 @@ container). The runner's and the operators' test suites also pass on Node 22.23.
 
 `tools/linux-run.sh` runs these steps in the container at the commit you archive: `npm ci`, lint,
 typecheck, build, the three test targets, and the three demo targets. It writes each step's log and exit code
-to the mounted folder and exits with the number of failed steps. It reruns the checks at HEAD, not the Linux
+to the mounted folder and exits with the number of failed steps, or stops after a failed `npm ci`. It reruns the checks at HEAD, not the Linux
 rows at 74df74e, which ran the earlier version of the script. From an empty folder `<out>`:
 
 ```sh
