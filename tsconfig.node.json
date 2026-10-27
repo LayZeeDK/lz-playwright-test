@@ -11,6 +11,7 @@
     "verbatimModuleSyntax": true,
     "noUnusedParameters": true,
     "noUncheckedSideEffectImports": true,
+    "noUncheckedIndexedAccess": true,
     "allowUnreachableCode": false,
     "allowUnusedLabels": false
   }

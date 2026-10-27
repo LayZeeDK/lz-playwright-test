@@ -80,7 +80,9 @@ test('init creates the TestRunner on the resolved config with the run overrides,
 
   await shell.init();
 
-  const [, configLocation, overrides] = fake.calls[0];
+  const [first, ...rest] = fake.calls;
+  assert.ok(first);
+  const [, configLocation, overrides] = first;
   const outputDir = isRecord(overrides) ? overrides.outputDir : undefined;
   assert.ok(typeof outputDir === 'string');
 
@@ -94,7 +96,7 @@ test('init creates the TestRunner on the resolved config with the run overrides,
     /^lz-stryker-playwright-\d+-/,
   );
   assert.equal(path.dirname(path.dirname(outputDir)), fake.tmp);
-  assert.deepEqual(fake.calls.slice(1), [
+  assert.deepEqual(rest, [
     ['initialize', {}],
     ['loadConfig'],
     ['runGlobalSetup'],
@@ -125,7 +127,9 @@ test('without a config file, Playwright is found from the working directory', as
     process.chdir(cwd);
   }
 
-  assert.deepEqual(fake.calls[0][1], { resolved: undefined });
+  const [first] = fake.calls;
+  assert.ok(first);
+  assert.deepEqual(first[1], { resolved: undefined });
 });
 
 for (const version of ['1.62.9', '2.0.0']) {
@@ -193,7 +197,9 @@ test('init removes the temp roots of runners that no longer run, and says so', a
     [false, false],
   );
   assert.equal(lines.length, 1);
-  const [[level, message]] = lines;
+  const [line] = lines;
+  assert.ok(line);
+  const [level, message] = line;
   assert.equal(level, 'debug');
   assert.ok(message.startsWith(prefix), message);
   // In the order the directory lists them, which depends on the file system.
@@ -289,7 +295,9 @@ test('dispose removes the run folders and output before it waits for the workers
   });
   const { runner: shell } = runner(fake.configFile);
   await shell.init();
-  root = path.join(fake.tmp, readdirSync(fake.tmp)[0]);
+  const [rootName] = readdirSync(fake.tmp);
+  assert.ok(rootName);
+  root = path.join(fake.tmp, rootName);
   // Playwright creates the output folder; the runner creates the runs folder.
   mkdirSync(path.join(root, 'output'));
   assert.deepEqual(readdirSync(root).sort(), ['output', OWNER_FILE, 'runs']);
@@ -309,6 +317,7 @@ test('a dry run runs every test with the hook and the run settings in the worker
 
   const result = await shell.dryRun(dryRunOptions({ disableBail: true }));
   const [run] = fake.runs;
+  assert.ok(run);
 
   assert.deepEqual(run.params, {
     locations: [],
@@ -379,8 +388,10 @@ test('a dry run stops at the first failure unless bail is disabled, and asks for
 
   await shell.dryRun(dryRunOptions({ coverageAnalysis: 'all' }));
 
-  assert.equal(fake.runs[0].params.maxFailures, 1);
-  assert.equal(fake.runs[0].settings.perTest, false);
+  const [run] = fake.runs;
+  assert.ok(run);
+  assert.equal(run.params.maxFailures, 1);
+  assert.equal(run.settings.perTest, false);
 });
 
 test('a dry run logs the frames that lost or shared their coverage', async (t) => {
@@ -448,6 +459,7 @@ test('a mutant run activates the mutant and runs its tests with their serial gro
     mutantRunOptions({ testFilter: ['s1'], hitLimit: 5, timeout: 9_000 }),
   );
   const [run] = fake.runs;
+  assert.ok(run);
 
   assert.equal(run.env[ACTIVE_MUTANT], '7');
   assert.deepEqual(run.settings, {
@@ -496,7 +508,9 @@ test('a mutant run that the deadline stops is a Timeout, and the stop is logged'
     status: MutantRunStatus.Timeout,
     reason: "The run reached the runner's deadline before Stryker's timeout",
   });
-  const [, stopTook] = /^deadline stop took (\d+) ms$/.exec(lines[0][1]) ?? [];
+  const [line] = lines;
+  assert.ok(line);
+  const [, stopTook] = /^deadline stop took (\d+) ms$/.exec(line[1]) ?? [];
   assert.ok(
     Number(stopTook) <= Math.ceil(took),
     `stop took ${stopTook} ms of a ${took} ms run`,
@@ -589,11 +603,13 @@ test('each run gets its own run folder, removed after the run', async (t) => {
   await shell.dryRun(dryRunOptions());
   await shell.mutantRun(mutantRunOptions());
 
-  const [first, second] = fake.runs.map((run) => run.settings.outDir);
+  const outDirs = fake.runs.map((run) => run.settings.outDir);
 
-  assert.notEqual(first, second);
-  assert.equal(existsSync(first), false);
-  assert.equal(existsSync(second), false);
+  assert.equal(new Set(outDirs).size, 2);
+  assert.deepEqual(
+    outDirs.map((outDir) => existsSync(outDir)),
+    [false, false],
+  );
 });
 
 test('a webServer url is checked over HTTP, with its HTTPS setting', async (t) => {
