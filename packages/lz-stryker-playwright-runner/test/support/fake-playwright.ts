@@ -32,9 +32,6 @@ export type Status = FullResult['status'];
 export const ACTIVE_MUTANT = INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
 const FAKE = '__fakePlaywright__';
 
-/** The runners of the running test, which its fake's cleanup disposes before it removes the fake. */
-const live: LzStrykerPlaywrightTestRunner[] = [];
-
 interface Project {
   default: boolean;
   expect?: { timeout?: number };
@@ -217,8 +214,10 @@ export function fakePlaywright(
     process.env[name] = tmp;
   }
 
+  const live: LzStrykerPlaywrightTestRunner[] = [];
+
   t.after(async () => {
-    await Promise.all(live.splice(0).map((shell) => shell.dispose()));
+    await Promise.all(live.map((shell) => shell.dispose()));
 
     for (const [name, value] of tmpEnv) {
       if (value === undefined) {
@@ -239,6 +238,26 @@ export function fakePlaywright(
     calls,
     runs,
     names: () => calls.map(([name]) => name),
+    /** A runner on `configFile` that the fake's cleanup disposes, and the lines it logs. */
+    runner: (
+      configFile: string | undefined,
+      {
+        timeoutMS = 10_000,
+        lzStrykerPlaywright = {},
+      }: { timeoutMS?: number; lzStrykerPlaywright?: object } = {},
+    ) => {
+      const { log, lines } = logger();
+      const shell = new LzStrykerPlaywrightTestRunner(
+        strykerOptions({
+          timeoutMS,
+          lzStrykerPlaywright: { configFile, ...lzStrykerPlaywright },
+        }),
+        log,
+      );
+      live.push(shell);
+
+      return { shell, lines };
+    },
     /** Resolves when the runner calls stopTests; each await gets the next call. */
     stopped: () => {
       const { promise } = stopRequested;
@@ -269,25 +288,4 @@ export async function passAll(run: Run): Promise<Status> {
   ]);
 
   return 'passed';
-}
-
-/** A runner on `configFile` that the fake's cleanup disposes, and the lines it logs. */
-export function runner(
-  configFile: string | undefined,
-  {
-    timeoutMS = 10_000,
-    lzStrykerPlaywright = {},
-  }: { timeoutMS?: number; lzStrykerPlaywright?: object } = {},
-) {
-  const { log, lines } = logger();
-  const shell = new LzStrykerPlaywrightTestRunner(
-    strykerOptions({
-      timeoutMS,
-      lzStrykerPlaywright: { configFile, ...lzStrykerPlaywright },
-    }),
-    log,
-  );
-  live.push(shell);
-
-  return { runner: shell, lines };
 }

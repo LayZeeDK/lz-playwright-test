@@ -36,7 +36,6 @@ import {
   ACTIVE_MUTANT,
   fakePlaywright,
   passAll,
-  runner,
   writeSnapshots,
 } from './support/fake-playwright.ts';
 
@@ -64,9 +63,13 @@ test('the package declares the runner as the lz-stryker-playwright test runner, 
 });
 
 test('the runner can reload its environment', () => {
-  assert.deepEqual(runner(undefined).runner.capabilities(), {
-    reloadEnvironment: true,
-  });
+  assert.deepEqual(
+    new LzStrykerPlaywrightTestRunner(
+      strykerOptions({}),
+      logger().log,
+    ).capabilities(),
+    { reloadEnvironment: true },
+  );
 });
 
 test('init creates the TestRunner on the resolved config with the run overrides, then sets up and lists', async (t) => {
@@ -76,7 +79,7 @@ test('init creates the TestRunner on the resolved config with the run overrides,
       { default: false, project: { name: 'manual', timeout: 30_000 } },
     ],
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner(fake.configFile);
 
   await shell.init();
 
@@ -106,7 +109,7 @@ test('init creates the TestRunner on the resolved config with the run overrides,
 
 test('init lists the projects the option names', async (t) => {
   const fake = fakePlaywright(t);
-  const { runner: shell } = runner(fake.configFile, {
+  const { shell } = fake.runner(fake.configFile, {
     lzStrykerPlaywright: { projects: ['manual'] },
   });
 
@@ -118,7 +121,7 @@ test('init lists the projects the option names', async (t) => {
 test('without a config file, Playwright is found from the working directory', async (t) => {
   const fake = fakePlaywright(t);
   const cwd = process.cwd();
-  const { runner: shell } = runner(undefined);
+  const { shell } = fake.runner(undefined);
   process.chdir(fake.dir);
 
   try {
@@ -132,17 +135,17 @@ test('without a config file, Playwright is found from the working directory', as
   assert.deepEqual(first[1], { resolved: undefined });
 });
 
-for (const version of ['1.62.9', '2.0.0']) {
+['1.62.9', '2.0.0'].forEach((version) => {
   test(`init refuses Playwright ${version}`, async (t) => {
     const fake = fakePlaywright(t, {}, version);
-    const { runner: shell } = runner(fake.configFile);
+    const { shell } = fake.runner(fake.configFile);
 
     await assert.rejects(shell.init(), {
       message: `The Playwright test runner needs Playwright 1.63 or a later 1.x release, found ${version}.`,
     });
     assert.deepEqual(fake.calls, []);
   });
-}
+});
 
 test('init refuses a Playwright whose package.json names no version', async (t) => {
   const fake = fakePlaywright(t);
@@ -150,7 +153,7 @@ test('init refuses a Playwright whose package.json names no version', async (t) 
     path.join(fake.dir, 'node_modules', 'playwright', 'package.json'),
     '{"name":"playwright"}',
   );
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner(fake.configFile);
 
   await assert.rejects(shell.init(), {
     message:
@@ -161,11 +164,11 @@ test('init refuses a Playwright whose package.json names no version', async (t) 
 
 test('init warns when timeoutMS is below twice the expect timeout, and only then', async (t) => {
   const fake = fakePlaywright(t);
-  const low = runner(fake.configFile, { timeoutMS: 9_999 });
-  const enough = runner(fake.configFile, { timeoutMS: 10_000 });
+  const low = fake.runner(fake.configFile, { timeoutMS: 9_999 });
+  const enough = fake.runner(fake.configFile, { timeoutMS: 10_000 });
 
-  await low.runner.init();
-  await enough.runner.init();
+  await low.shell.init();
+  await enough.shell.init();
 
   assert.deepEqual(
     low.lines.filter(([level]) => level === 'warn'),
@@ -187,7 +190,7 @@ test('init removes the temp roots of runners that no longer run, and says so', a
     mkdirSync(path.join(fake.tmp, name));
     writeFileSync(path.join(fake.tmp, name, OWNER_FILE), namespaceToken());
   });
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner(fake.configFile);
   const prefix = 'Removed the temp directories of runners that no longer run: ';
 
   await shell.init();
@@ -212,7 +215,7 @@ test('init says which temp roots it removed before it creates its own, so a fail
   const left = `${ROOT_PREFIX}${dead}-abc123`;
   mkdirSync(path.join(fake.tmp, left));
   writeFileSync(path.join(fake.tmp, left, OWNER_FILE), namespaceToken());
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner(fake.configFile);
   t.mock.method(fs, 'mkdtempSync', () => {
     throw new Error('ENOSPC');
   });
@@ -230,7 +233,7 @@ test('init says which temp roots it removed before it creates its own, so a fail
 
 test('the temp root init creates holds the namespace token its sweep matches', async (t) => {
   const fake = fakePlaywright(t);
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner(fake.configFile);
 
   await shell.init();
 
@@ -255,7 +258,7 @@ test('a failed global setup fails init with its errors and output, and cleans up
       throw new Error('teardown broke too');
     },
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner(fake.configFile);
 
   await assert.rejects(shell.init(), {
     message:
@@ -271,7 +274,7 @@ test('a TestRunner that fails to initialize fails init without a teardown, and c
       throw new Error('no config');
     },
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner(fake.configFile);
 
   await assert.rejects(shell.init(), { message: 'no config' });
   assert.deepEqual(fake.names(), ['new', 'initialize']);
@@ -287,14 +290,17 @@ test('a temp root that cannot be removed after a failed init leaves the init err
       throw new Error('no config');
     },
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner(fake.configFile);
 
   await assert.rejects(shell.init(), { message: 'no config' });
   t.mock.restoreAll();
 });
 
 test('a run before init finished fails with a clear error', async () => {
-  const { runner: shell } = runner(undefined);
+  const shell = new LzStrykerPlaywrightTestRunner(
+    strykerOptions({}),
+    logger().log,
+  );
 
   await assert.rejects(shell.dryRun(dryRunOptions()), {
     message: 'The Playwright test runner was used before init() finished.',
@@ -306,7 +312,7 @@ test('a run before init finished fails with a clear error', async () => {
 
 test('dispose stops the tests, tears down and removes the temp root, once', async (t) => {
   const fake = fakePlaywright(t);
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner(fake.configFile);
   await shell.init();
   fake.calls.length = 0;
 
@@ -318,7 +324,10 @@ test('dispose stops the tests, tears down and removes the temp root, once', asyn
 });
 
 test('dispose without init does nothing', async () => {
-  await runner(undefined).runner.dispose();
+  await new LzStrykerPlaywrightTestRunner(
+    strykerOptions({}),
+    logger().log,
+  ).dispose();
 });
 
 test('dispose removes the run folders and output before it waits for the workers', async (t) => {
@@ -329,7 +338,7 @@ test('dispose removes the run folders and output before it waits for the workers
       seen = readdirSync(root);
     },
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner(fake.configFile);
   await shell.init();
   const [rootName] = readdirSync(fake.tmp);
   assert.ok(rootName);
@@ -345,7 +354,7 @@ test('dispose removes the run folders and output before it waits for the workers
 
 test('a dry run runs every test with the hook and the run settings in the workers environment', async (t) => {
   const fake = fakePlaywright(t);
-  const { runner: shell } = runner(fake.configFile, {
+  const { shell } = fake.runner(fake.configFile, {
     lzStrykerPlaywright: { projects: ['chromium'], workers: 3 },
   });
   await shell.init();
@@ -400,9 +409,9 @@ test('the hook is preloaded before the NODE_OPTIONS the runner started with, so 
     }
   });
   delete process.env.NODE_OPTIONS;
-  const bare = runner(fake.configFile).runner;
+  const bare = fake.runner(fake.configFile).shell;
   process.env.NODE_OPTIONS = '--max-old-space-size=100';
-  const based = runner(fake.configFile).runner;
+  const based = fake.runner(fake.configFile).shell;
   process.env.NODE_OPTIONS = '--changed-later';
 
   for (const shell of [bare, based]) {
@@ -419,7 +428,7 @@ test('the hook is preloaded before the NODE_OPTIONS the runner started with, so 
 
 test('a dry run stops at the first failure unless bail is disabled, and asks for coverage only per test', async (t) => {
   const fake = fakePlaywright(t);
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner(fake.configFile);
   await shell.init();
 
   await shell.dryRun(dryRunOptions({ coverageAnalysis: 'all' }));
@@ -446,7 +455,7 @@ test('a dry run logs the frames that lost or shared their coverage', async (t) =
       return 'passed';
     },
   });
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner(fake.configFile);
   await shell.init();
 
   await shell.dryRun(dryRunOptions());
@@ -465,7 +474,7 @@ test('a dry run logs the frames that lost or shared their coverage', async (t) =
 
 test('a dry run with coverage off or no gaps logs nothing', async (t) => {
   const fake = fakePlaywright(t);
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner(fake.configFile);
   await shell.init();
 
   await shell.dryRun(dryRunOptions());
@@ -488,7 +497,7 @@ test('a mutant run activates the mutant and runs its tests with their serial gro
       return 'failed';
     },
   });
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner(fake.configFile);
   await shell.init();
 
   const result = await shell.mutantRun(
@@ -530,7 +539,7 @@ test('a mutant run that the deadline stops is a Timeout, and the stop is logged'
       return 'interrupted';
     },
   });
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner(fake.configFile);
   await shell.init();
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
 
@@ -562,7 +571,7 @@ test('a run that ends on its own after the deadline fired is no deadline stop', 
       return passAll(run);
     },
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner(fake.configFile);
   await shell.init();
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
 
@@ -574,7 +583,7 @@ test('a run that ends on its own after the deadline fired is no deadline stop', 
 
 test('a run that someone else interrupted is no deadline stop', async (t) => {
   const fake = fakePlaywright(t, { runTests: async () => 'interrupted' });
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner(fake.configFile);
   await shell.init();
 
   const result = await shell.mutantRun(mutantRunOptions());
@@ -595,7 +604,7 @@ test('a run whose workers wrote no snapshot file reports that the hook never ins
       return 'passed';
     },
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner(fake.configFile);
   await shell.init();
 
   const result = await shell.dryRun(dryRunOptions());
@@ -619,7 +628,7 @@ test('a run whose worker failed to install the hook reports the error the worker
       return 'failed';
     },
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner(fake.configFile);
   await shell.init();
 
   const result = await shell.dryRun(dryRunOptions());
@@ -633,7 +642,7 @@ test('a run whose worker failed to install the hook reports the error the worker
 
 test('each run gets its own run folder, removed after the run', async (t) => {
   const fake = fakePlaywright(t);
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner(fake.configFile);
   await shell.init();
 
   await shell.dryRun(dryRunOptions());
@@ -655,7 +664,7 @@ test('a webServer url is checked over HTTP, with its HTTPS setting', async (t) =
       { url: 'https://localhost:2/', ignoreHTTPSErrors: true },
     ],
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner(fake.configFile);
   await shell.init();
 
   await shell.dryRun(dryRunOptions());
@@ -686,7 +695,7 @@ test('a webServer that died is restarted through global setup before the run, an
       return 'passed';
     },
   });
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner(fake.configFile);
   await shell.init();
   up = false;
   fake.calls.length = 0;
@@ -726,7 +735,7 @@ test('a run that failed while its server died is rerun once after the restart', 
       return passAll(run);
     },
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner(fake.configFile);
   await shell.init();
 
   const result = await shell.mutantRun(mutantRunOptions());
@@ -745,7 +754,7 @@ test('a failed run whose server still answers is not rerun', async (t) => {
       return 'failed';
     },
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner(fake.configFile);
   await shell.init();
 
   const result = await shell.mutantRun(mutantRunOptions());
@@ -761,7 +770,7 @@ test('a restart whose global setup fails fails the run', async (t) => {
     urlUp: async () => false,
     globalSetup: () => (++setups === 1 ? 'passed' : 'timedout'),
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner(fake.configFile);
   await shell.init();
 
   await assert.rejects(shell.dryRun(dryRunOptions()), {
@@ -776,7 +785,7 @@ test('a webServer port is checked by connecting to it, and one without url or po
   t.after(() => server.close());
   const port = portOf(server);
   const fake = fakePlaywright(t, { webServers: [{ port }, {}] });
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner(fake.configFile);
   await shell.init();
 
   await shell.dryRun(dryRunOptions());
@@ -791,7 +800,7 @@ test('a webServer port that stopped answering is restarted and named by its port
   const port = portOf(server);
   await new Promise((resolve) => server.close(resolve));
   const fake = fakePlaywright(t, { webServers: [{ port }] });
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner(fake.configFile);
   await shell.init();
 
   await shell.dryRun(dryRunOptions());
