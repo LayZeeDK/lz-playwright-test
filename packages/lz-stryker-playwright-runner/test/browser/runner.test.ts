@@ -207,7 +207,9 @@ test('the hook stays out of worker threads that a test starts', () => {
 });
 
 // No test of the group or of the greeting calls `double`, so the mutant survives and the run's test
-// count shows which tests ran.
+// count shows how many tests ran. The `countTo` mutant fails every test that counts, and Playwright
+// skips the rest of a serial group after a failure, so the kill names the group's first test, which
+// the filter left out, and no counting test outside the group.
 test('a mutant run filtered to one test of a describe.serial group runs the whole group, and only that', async () => {
   const doubleMutant = mutant('ArithmeticOperator', 'n / 2');
   const serial = await session.mutantRun(doubleMutant, {
@@ -216,11 +218,16 @@ test('a mutant run filtered to one test of a describe.serial group runs the whol
   const alone = await session.mutantRun(doubleMutant, {
     testFilter: [testId('shows the greeting')],
   });
+  const killed = await session.mutantRun(mutant('EqualityOperator', 'i <= n'), {
+    testFilter: [testId('second user of the shared page')],
+  });
 
   assert.equal(serial.status, MutantRunStatus.Survived, JSON.stringify(serial));
   assert.equal(serial.nrOfTests, 2);
   assert.equal(alone.status, MutantRunStatus.Survived, JSON.stringify(alone));
   assert.equal(alone.nrOfTests, 1);
+  assert.equal(killed.status, MutantRunStatus.Killed, JSON.stringify(killed));
+  assert.deepEqual(killed.killedBy, [testId('first user of the shared page')]);
 });
 
 test('per-test coverage separates tests that reach different code', () => {

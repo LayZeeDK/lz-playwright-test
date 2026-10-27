@@ -39,7 +39,19 @@
   "nx": {
     "tags": [
       "type:lib"
-    ]
+    ],
+    "targets": {
+      "lint": {
+        "dependsOn": [
+          "@layzee/lz-stryker-ui-mutators:generate-roles"
+        ]
+      },
+      "test-browser": {
+        "dependsOn": [
+          "@layzee/lz-stryker-ui-mutators:generate-roles"
+        ]
+      }
+    }
   },
   "scripts": {
     "test": "node --conditions=@layzee/source --test \"test/*.test.ts\"",
