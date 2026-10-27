@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import {
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   rmSync,
@@ -11,7 +10,7 @@ import {
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { test } from 'node:test';
+import { type TestContext, test } from 'node:test';
 
 import {
   createTempRoot,
@@ -22,10 +21,11 @@ import {
   removeLeftRoots,
   rootPid,
 } from '../src/temp-root.ts';
+import { codedError, tempTree } from './support/doubles.ts';
 
 function killError(code: string) {
   return () => {
-    throw Object.assign(new Error(code), { code });
+    throw codedError(code);
   };
 }
 
@@ -90,7 +90,7 @@ test("on Linux without /proc the namespace token is this runner's own, so no oth
   assert.equal(
     namespaceToken(
       () => {
-        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+        throw codedError('ENOENT');
       },
       'ci-host',
       'linux',
@@ -103,7 +103,7 @@ test("on Linux without /proc the namespace token is this runner's own, so no oth
 test('outside Linux the namespace token is the host name, and /proc is not looked up', () => {
   const files: string[] = [];
 
-  for (const platform of ['win32', 'darwin'] as const) {
+  (['win32', 'darwin'] as const).forEach((platform) => {
     assert.equal(
       namespaceToken(
         (file) => {
@@ -116,7 +116,7 @@ test('outside Linux the namespace token is the host name, and /proc is not looke
       ),
       'dev-box',
     );
-  }
+  });
 
   assert.deepEqual(files, []);
 });
@@ -178,7 +178,7 @@ test('on Windows, which has no uids, every real directory counts as ours', () =>
 test('a folder that vanished is not ours', () => {
   assert.equal(
     isOwnDir('d', {}, () => {
-      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      throw codedError('ENOENT');
     }),
     false,
   );
@@ -186,21 +186,27 @@ test('a folder that vanished is not ours', () => {
 
 const TOKEN = 'ns-of-this-runner';
 
-// A temp directory holding the given entries, each a folder with an owner marker that holds `TOKEN`.
-function tmpWith(names: string[]) {
-  const tmp = mkdtempSync(path.join(os.tmpdir(), 'temp-root-test-'));
+// A temp directory holding the given entries, each a folder with an owner marker that holds `TOKEN`, and a
+// `remove` double that records the base names it is given.
+function tmpWith(t: TestContext, names: string[]) {
+  const tmp = tempTree(
+    t,
+    'temp-root-test-',
+    Object.fromEntries(
+      names.map((name) => [path.join(name, OWNER_FILE), TOKEN]),
+    ),
+  );
   const removed: string[] = [];
 
-  for (const name of names) {
-    mkdirSync(path.join(tmp, name));
-    writeFileSync(path.join(tmp, name, OWNER_FILE), TOKEN);
-  }
-
-  return { tmp, removed, cleanup: () => rmSync(tmp, { recursive: true }) };
+  return {
+    tmp,
+    removed,
+    remove: (dir: string) => removed.push(path.basename(dir)),
+  };
 }
 
-test('a dead root is removed only when its owner marker holds the token of this runner', () => {
-  const { tmp, removed, cleanup } = tmpWith([
+test('a dead root is removed only when its owner marker holds the token of this runner', (t) => {
+  const { tmp, removed, remove } = tmpWith(t, [
     'lz-stryker-playwright-100-ours00',
     'lz-stryker-playwright-101-theirs',
     'lz-stryker-playwright-102-nomark',
@@ -214,24 +220,20 @@ test('a dead root is removed only when its owner marker holds the token of this 
   rmSync(path.join(tmp, 'lz-stryker-playwright-103-notxt0', OWNER_FILE));
   mkdirSync(path.join(tmp, 'lz-stryker-playwright-103-notxt0', OWNER_FILE));
 
-  try {
-    const result = removeLeftRoots(tmp, {
-      running: () => false,
-      owned: () => true,
-      remove: (dir) => removed.push(path.basename(dir)),
-      ownPid: 1,
-      token: TOKEN,
-    });
+  const result = removeLeftRoots(tmp, {
+    running: () => false,
+    owned: () => true,
+    remove,
+    ownPid: 1,
+    token: TOKEN,
+  });
 
-    assert.deepEqual(result, ['lz-stryker-playwright-100-ours00']);
-    assert.deepEqual(removed, ['lz-stryker-playwright-100-ours00']);
-  } finally {
-    cleanup();
-  }
+  assert.deepEqual(result, ['lz-stryker-playwright-100-ours00']);
+  assert.deepEqual(removed, ['lz-stryker-playwright-100-ours00']);
 });
 
-test('only the roots of dead runners of this user are removed, and named', () => {
-  const { tmp, removed, cleanup } = tmpWith([
+test('only the roots of dead runners of this user are removed, and named', (t) => {
+  const { tmp, removed, remove } = tmpWith(t, [
     'lz-stryker-playwright-100-dead00',
     'lz-stryker-playwright-200-live00',
     'lz-stryker-playwright-300-own000',
@@ -240,83 +242,67 @@ test('only the roots of dead runners of this user are removed, and named', () =>
     'unrelated-100-x',
   ]);
 
-  try {
-    const result = removeLeftRoots(tmp, {
-      running: (pid) => pid === 200,
-      owned: (dir) => !dir.includes('-400-'),
-      remove: (dir) => removed.push(path.basename(dir)),
-      ownPid: 300,
-      token: TOKEN,
-    });
+  const result = removeLeftRoots(tmp, {
+    running: (pid) => pid === 200,
+    owned: (dir) => !dir.includes('-400-'),
+    remove,
+    ownPid: 300,
+    token: TOKEN,
+  });
 
-    assert.deepEqual(result, ['lz-stryker-playwright-100-dead00']);
-    assert.deepEqual(removed, ['lz-stryker-playwright-100-dead00']);
-  } finally {
-    cleanup();
-  }
+  assert.deepEqual(result, ['lz-stryker-playwright-100-dead00']);
+  assert.deepEqual(removed, ['lz-stryker-playwright-100-dead00']);
 });
 
-test('a root that cannot be removed now is skipped without an error', () => {
-  const { tmp, cleanup } = tmpWith([
+test('a root that cannot be removed now is skipped without an error', (t) => {
+  const { tmp } = tmpWith(t, [
     'lz-stryker-playwright-100-aaaaaa',
     'lz-stryker-playwright-101-bbbbbb',
   ]);
 
-  try {
-    const result = removeLeftRoots(tmp, {
-      running: () => false,
-      owned: () => true,
-      remove: (dir) => {
-        if (dir.endsWith('-aaaaaa')) {
-          throw new Error('EBUSY');
-        }
-      },
-      ownPid: 1,
-      token: TOKEN,
-    });
+  const result = removeLeftRoots(tmp, {
+    running: () => false,
+    owned: () => true,
+    remove: (dir) => {
+      if (dir.endsWith('-aaaaaa')) {
+        throw new Error('EBUSY');
+      }
+    },
+    ownPid: 1,
+    token: TOKEN,
+  });
 
-    assert.deepEqual(result, ['lz-stryker-playwright-101-bbbbbb']);
-  } finally {
-    cleanup();
-  }
+  assert.deepEqual(result, ['lz-stryker-playwright-101-bbbbbb']);
 });
 
-test('a new root is named after the pid of the runner that owns it', () => {
-  const { tmp, cleanup } = tmpWith([]);
+test('a new root is named after the pid of the runner that owns it', (t) => {
+  const { tmp } = tmpWith(t, []);
 
-  try {
-    const root = createTempRoot(tmp, 4242, TOKEN);
+  const root = createTempRoot(tmp, 4242, TOKEN);
 
-    assert.equal(rootPid(path.basename(root.dir)), 4242);
-    assert.deepEqual(readdirSync(root.dir).sort(), [OWNER_FILE, 'runs']);
-    assert.equal(readFileSync(path.join(root.dir, OWNER_FILE), 'utf8'), TOKEN);
-    assert.deepEqual(
-      [root.nextRunDir(), root.nextRunDir()],
-      [path.join(root.dir, 'runs', '0'), path.join(root.dir, 'runs', '1')],
-    );
+  assert.equal(rootPid(path.basename(root.dir)), 4242);
+  assert.deepEqual(readdirSync(root.dir).sort(), [OWNER_FILE, 'runs']);
+  assert.equal(readFileSync(path.join(root.dir, OWNER_FILE), 'utf8'), TOKEN);
+  assert.deepEqual(
+    [root.nextRunDir(), root.nextRunDir()],
+    [path.join(root.dir, 'runs', '0'), path.join(root.dir, 'runs', '1')],
+  );
 
-    root.remove();
+  root.remove();
 
-    assert.equal(existsSync(root.dir), false);
-  } finally {
-    cleanup();
-  }
+  assert.equal(existsSync(root.dir), false);
 });
 
-test('a root whose owner file cannot be written is removed, and the write error is thrown', () => {
-  const { tmp, cleanup } = tmpWith([]);
-  const full = Object.assign(new Error('ENOSPC'), { code: 'ENOSPC' });
+test('a root whose owner file cannot be written is removed, and the write error is thrown', (t) => {
+  const { tmp } = tmpWith(t, []);
+  const full = codedError('ENOSPC');
 
-  try {
-    assert.throws(
-      () =>
-        createTempRoot(tmp, 4242, TOKEN, () => {
-          throw full;
-        }),
-      (error) => error === full,
-    );
-    assert.deepEqual(readdirSync(tmp), []);
-  } finally {
-    cleanup();
-  }
+  assert.throws(
+    () =>
+      createTempRoot(tmp, 4242, TOKEN, () => {
+        throw full;
+      }),
+    (error) => error === full,
+  );
+  assert.deepEqual(readdirSync(tmp), []);
 });

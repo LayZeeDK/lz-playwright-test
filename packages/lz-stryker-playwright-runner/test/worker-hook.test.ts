@@ -14,7 +14,7 @@ import {
 } from '../src/protocol.ts';
 import type * as Hook from '../src/worker-hook.ts';
 import type { StrykerNamespace } from '../src/worker-hook.ts';
-import { tempTree } from './support/doubles.ts';
+import { codedError, tempTree } from './support/doubles.ts';
 import { fakeInstall, type Runnable } from './support/fake-worker.ts';
 
 let hook: typeof Hook;
@@ -305,7 +305,7 @@ test('a write that fails at exit does not throw out of the exit listener', () =>
     { perTest: false },
     {
       write: () => {
-        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+        throw codedError('ENOENT');
       },
     },
   );

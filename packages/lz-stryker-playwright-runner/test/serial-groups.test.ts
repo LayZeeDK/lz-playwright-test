@@ -42,12 +42,18 @@ test('serial grouping fails loudly when Playwright suites lose _parallelMode', (
   );
 });
 
-// Stands in for Playwright's TestRunner: reports the given errors and tests, then resolves to result.
-function listing(
-  result: { status: FullResult['status'] } | undefined,
-  errors: string[] = [],
-  tests: ReportedTest[] = [],
-) {
+// Stands in for Playwright's TestRunner: reports the given errors and tests, then resolves to the status, or to
+// undefined when there is none, as when Playwright throws.
+function listing({
+  status,
+  errors = [],
+  tests = [],
+}: {
+  status?: FullResult['status'];
+  errors?: string[];
+  tests?: ReportedTest[];
+}) {
+  const result = status === undefined ? undefined : { status };
   const calls: string[][] = [];
   const playwright = {
     async listTests(
@@ -82,7 +88,7 @@ test('listing passes the projects to Playwright and groups the describe.serial t
   const tests = ['create', 'edit'].map((id) =>
     fakeTestCase(id, { parent: serial }),
   );
-  const { playwright, calls } = listing({ status: 'passed' }, [], tests);
+  const { playwright, calls } = listing({ status: 'passed', tests });
 
   const groups = await listSerialGroups(playwright, ['chromium']);
 
@@ -91,10 +97,10 @@ test('listing passes the projects to Playwright and groups the describe.serial t
 });
 
 test('listing fails when a test file does not load, though the status says passed', async () => {
-  const { playwright } = listing({ status: 'passed' }, [
-    'SyntaxError in a.spec.ts',
-    'SyntaxError in b.spec.ts',
-  ]);
+  const { playwright } = listing({
+    status: 'passed',
+    errors: ['SyntaxError in a.spec.ts', 'SyntaxError in b.spec.ts'],
+  });
 
   await assert.rejects(listSerialGroups(playwright, []), {
     message:
@@ -103,10 +109,10 @@ test('listing fails when a test file does not load, though the status says passe
 });
 
 test('listing fails with the status Playwright reports', async () => {
-  const { playwright } = listing({ status: 'failed' }, [
-    'config error',
-    'second error',
-  ]);
+  const { playwright } = listing({
+    status: 'failed',
+    errors: ['config error', 'second error'],
+  });
 
   await assert.rejects(listSerialGroups(playwright, []), {
     message:
@@ -115,7 +121,7 @@ test('listing fails with the status Playwright reports', async () => {
 });
 
 test('listing fails and points at the trace log when Playwright throws', async () => {
-  const { playwright } = listing(undefined);
+  const { playwright } = listing({});
 
   await assert.rejects(listSerialGroups(playwright, []), {
     message: /--logLevel trace/,

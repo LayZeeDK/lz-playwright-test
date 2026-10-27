@@ -22,6 +22,13 @@ const readmeOptions = readme
   .split(/^## /m)
   .find((section) => section.startsWith('Options\n'));
 
+const defaults = {
+  configFile: undefined,
+  projects: undefined,
+  workers: 1,
+  strykerTimeoutMS: 10_000,
+};
+
 test('the runner options resolve the config file and take the schema default for workers', () => {
   assert.deepEqual(
     readRunnerOptions(
@@ -29,12 +36,7 @@ test('the runner options resolve the config file and take the schema default for
         lzStrykerPlaywright: { configFile: 'e2e/playwright.config.ts' },
       }),
     ),
-    {
-      configFile: path.resolve('e2e/playwright.config.ts'),
-      projects: undefined,
-      workers: 1,
-      strykerTimeoutMS: 10_000,
-    },
+    { ...defaults, configFile: path.resolve('e2e/playwright.config.ts') },
   );
 });
 
@@ -58,7 +60,7 @@ test('the runner options refuse --testFiles', () => {
 });
 
 test('the runner options refuse lzStrykerPlaywright options that are not an object or have a field of the wrong type', () => {
-  for (const lzStrykerPlaywright of [
+  [
     'chromium',
     [],
     { workers: null },
@@ -66,24 +68,17 @@ test('the runner options refuse lzStrykerPlaywright options that are not an obje
     { projects: 'chromium' },
     { projects: ['chromium', 1] },
     { workers: '2' },
-  ]) {
+  ].forEach((lzStrykerPlaywright) => {
     assert.throws(
       () => readRunnerOptions(strykerOptions({ lzStrykerPlaywright })),
       {
         message: `The lzStrykerPlaywright options do not match their schema: ${JSON.stringify(lzStrykerPlaywright)}`,
       },
     );
-  }
+  });
 });
 
 test('without lzStrykerPlaywright options or with an empty --testFiles the runner takes its defaults', () => {
-  const defaults = {
-    configFile: undefined,
-    projects: undefined,
-    workers: 1,
-    strykerTimeoutMS: 10_000,
-  };
-
   assert.deepEqual(readRunnerOptions(strykerOptions({})), defaults);
   assert.deepEqual(
     readRunnerOptions(strykerOptions({ testFiles: [] })),
@@ -126,28 +121,28 @@ test("Stryker's check of the options fills in the defaults", () => {
 });
 
 test("Stryker's check of the options refuses wrong types, workers below 1 and unknown options", () => {
-  for (const lzStrykerPlaywright of [
+  [
     { configFile: 1 },
     { projects: 'chromium' },
     { projects: [1] },
     { workers: 1.5 },
     { workers: 0 },
     { browser: 'chromium' },
-  ]) {
+  ].forEach((lzStrykerPlaywright) => {
     assert.equal(
       validate({ lzStrykerPlaywright }).valid,
       false,
       JSON.stringify(lzStrykerPlaywright),
     );
-  }
+  });
 
   assert.equal(validate({ lzStrykerPlaywright: [] }).valid, false);
 });
 
 test('every option says what it is for', () => {
-  for (const [name, { description }] of Object.entries(OPTION_PROPERTIES)) {
+  Object.entries(OPTION_PROPERTIES).forEach(([name, { description }]) => {
     assert.match(description, /^[A-Z].{20,}\.$/, name);
-  }
+  });
 
   assert.equal(
     strykerValidationSchema.$schema,

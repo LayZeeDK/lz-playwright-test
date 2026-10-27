@@ -11,6 +11,7 @@ import {
 } from '../src/run-request.ts';
 import {
   dryRequest,
+  dryRunOptions,
   mutantRequest,
   mutantRunOptions,
 } from './support/doubles.ts';
@@ -42,19 +43,12 @@ test('a mutant run request widens its filter to serial groups and gets its budge
 });
 
 test('a dry run request keeps the config timeouts', () => {
-  assert.deepEqual(
-    dryRunRequest({
-      timeout: 60_000,
-      disableBail: false,
-      coverageAnalysis: 'all',
-    }),
-    {
-      kind: 'dry',
-      disableBail: false,
-      coverageAnalysis: 'all',
-      budget: { testTimeout: undefined, deadlineMs: undefined },
-    },
-  );
+  assert.deepEqual(dryRunRequest(dryRunOptions({ coverageAnalysis: 'all' })), {
+    kind: 'dry',
+    disableBail: false,
+    coverageAnalysis: 'all',
+    budget: { testTimeout: undefined, deadlineMs: undefined },
+  });
 });
 
 test('a dry run plan runs every test with no active mutant, and collects per-test coverage only for perTest', () => {

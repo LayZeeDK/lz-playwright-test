@@ -50,6 +50,11 @@ export function stubEnv(
   setEnv(values);
 }
 
+/** An Error with a Node.js system error `code`, such as `ENOENT`. */
+export function codedError(code: string): Error & { code: string } {
+  return Object.assign(new Error(code), { code });
+}
+
 // Coverage maps have no prototype, which deepEqual tells apart from object literals; the JSON copy compares their content.
 export function plain(value: unknown): unknown {
   return JSON.parse(JSON.stringify(value));
