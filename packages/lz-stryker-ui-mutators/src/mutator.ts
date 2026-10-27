@@ -1,6 +1,54 @@
 import type { NodePath, types } from '@babel/core';
 
-export type BabelTypes = typeof types;
+// `as const` on purpose, though Stryker leaves it unmutated: the compiler fails the build when the code calls a
+// member this list lacks, which no test of the list could do.
+export const babelTypeMembers = [
+  'booleanLiteral',
+  'cloneNode',
+  'conditionalExpression',
+  'identifier',
+  'isBinaryExpression',
+  'isBooleanLiteral',
+  'isCallExpression',
+  'isConditionalExpression',
+  'isFunction',
+  'isIdentifier',
+  'isJSXAttribute',
+  'isJSXElement',
+  'isJSXEmptyExpression',
+  'isJSXExpressionContainer',
+  'isJSXFragment',
+  'isJSXIdentifier',
+  'isJSXText',
+  'isLiteral',
+  'isLogicalExpression',
+  'isMemberExpression',
+  'isNullLiteral',
+  'isOptionalCallExpression',
+  'isOptionalMemberExpression',
+  'isStringLiteral',
+  'isTSAsExpression',
+  'isTSNonNullExpression',
+  'isTSSatisfiesExpression',
+  'jsxAttribute',
+  'jsxClosingElement',
+  'jsxElement',
+  'jsxExpressionContainer',
+  'jsxIdentifier',
+  'jsxOpeningElement',
+  'jsxText',
+  'nullLiteral',
+  'stringLiteral',
+  'unaryExpression',
+] as const satisfies readonly (keyof typeof types)[];
+
+/** The members of Babel's `types` this package calls; their signatures are those of the Babel it was built with. */
+export type BabelTypes = Pick<
+  typeof types,
+  (typeof babelTypeMembers)[number]
+> & {
+  readonly react: Pick<typeof types.react, 'buildChildren'>;
+};
 
 export interface Operator {
   readonly name: string;

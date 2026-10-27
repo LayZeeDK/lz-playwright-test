@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path';
 import { after, describe, it } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-import { types } from '@babel/core';
+import { parseSync, traverse, types, type NodePath } from '@babel/core';
 
 import {
   corePackageJson,
@@ -25,8 +25,13 @@ import {
   type Instrumenter,
   type SourceFile,
 } from '../src/install.ts';
-import type { NodeMutatorLike, Operator } from '../src/mutator.ts';
+import {
+  babelTypeMembers,
+  type NodeMutatorLike,
+  type Operator,
+} from '../src/mutator.ts';
 import type { MutantPlacerLike } from '../src/placer.ts';
+import { defined } from './support/defined.ts';
 import { exportedFunction } from './support/exports.ts';
 
 const OWN = Symbol.for('@layzee/lz-stryker-ui-mutators');
@@ -66,7 +71,7 @@ function setup({
     version,
     types,
     allMutators,
-    expressionPlacer,
+    expressionPlacer: { target: expressionPlacer, original: expressionPlacer },
     async instrument(files) {
       instrumented.push([...files]);
       const mutants = allMutators
@@ -405,7 +410,10 @@ describe('resolveFromCore', () => {
     assert.ok(
       instrumenter.allMutators.some(({ name }) => name === 'StringLiteral'),
     );
-    assert.equal(instrumenter.expressionPlacer.name, 'expressionMutantPlacer');
+    assert.equal(
+      Reflect.get(instrumenter.expressionPlacer.target, 'name'),
+      'expressionMutantPlacer',
+    );
     assert.equal(
       instrumenter.types.isJSXText(instrumenter.types.jsxText('x')),
       true,
@@ -438,6 +446,39 @@ describe('resolveFromCore against a fake instrumenter', () => {
     `export const allMutantPlacers = [${placers.join(', ')}];`;
   const mutatorsFile = (mutators: readonly string[]) =>
     `export const allMutators = [${mutators.join(', ')}];`;
+  const babel = import.meta.resolve('@babel/core');
+  const babelFile = (members: string) =>
+    `import { types as real } from ${JSON.stringify(babel)};\n` +
+    `export const types = { ...real, ${members} };`;
+  const instrumenterFile = (result: unknown) =>
+    `export class Instrumenter { async instrument() { return ${JSON.stringify(result)}; } }`;
+  const placersPath =
+    '@stryker-mutator/instrumenter/dist/src/mutant-placers/index.js';
+  const indexPath = '@stryker-mutator/instrumenter/dist/src/index.js';
+
+  /** The array a fake module at `path` under the instrumenter's dir exports as `calls`, from the same module instance. */
+  async function callsOf(dir: string, path: string): Promise<unknown> {
+    const namespace: unknown = await import(
+      pathToFileURL(join(dir, 'dist', 'src', path)).href
+    );
+    assert.ok(typeof namespace === 'object' && namespace !== null);
+
+    return Reflect.get(namespace, 'calls');
+  }
+
+  function programPath(): NodePath {
+    const file = parseSync('x;', { configFile: false, babelrc: false });
+    assert.ok(file);
+    const paths: NodePath[] = [];
+
+    traverse(file, {
+      Program(path) {
+        paths.push(path);
+      },
+    });
+
+    return defined(paths[0]);
+  }
 
   after(() => {
     for (const root of roots) {
@@ -446,9 +487,9 @@ describe('resolveFromCore against a fake instrumenter', () => {
   });
 
   /**
-   * A core, an instrumenter whose `Instrumenter.instrument` returns the logger and options it got, and a Babel core,
-   * as node_modules under a fresh directory; `replace` swaps the content of any of those files. Returns core's
-   * package.json and the instrumenter's dir.
+   * A core, an instrumenter whose `Instrumenter.instrument` records the logger, files and options it got in its
+   * module's `calls`, and a Babel core that re-exports the real types, as node_modules under a fresh directory;
+   * `replace` swaps the content of any of those files. Returns core's package.json and the instrumenter's dir.
    */
   function fakeCore(
     placers: readonly string[],
@@ -472,15 +513,18 @@ describe('resolveFromCore against a fake instrumenter', () => {
               `{ name: ${JSON.stringify(name)}, canPlace() { return false; }, place() {} }`,
           ),
         ),
-      '@stryker-mutator/instrumenter/dist/src/index.js':
+      [indexPath]:
+        'export const calls = [];\n' +
         'export class Instrumenter {\n' +
         '  constructor(logger) { this.logger = logger; }\n' +
-        '  async instrument(files, options) { return { files, mutants: [], logger: this.logger, options }; }\n' +
+        '  async instrument(files, options) {\n' +
+        '    calls.push({ logger: this.logger, files, options });\n' +
+        '    return { files: [], mutants: [] };\n' +
+        '  }\n' +
         '}',
       '@babel/core/package.json':
         '{ "name": "@babel/core", "type": "module", "main": "index.js" }',
-      '@babel/core/index.js':
-        "export const types = { fake: 'babel types', isJSXText: () => true };",
+      '@babel/core/index.js': `export { types } from ${JSON.stringify(babel)};`,
       ...replace,
     };
 
@@ -551,11 +595,26 @@ describe('resolveFromCore against a fake instrumenter', () => {
       'export class Instrumenter {}',
     ],
     [
-      'Babel types',
+      `Babel types with ${[...babelTypeMembers, 'react.buildChildren'].join(', ')}`,
       '@babel/core/index.js',
-      "export const types = { fake: 'babel types' };",
+      'export const other = {};',
     ],
-    ['Babel types', '@babel/core/index.js', 'export const other = {};'],
+    ...babelTypeMembers.map(
+      (member) =>
+        [
+          `Babel types with ${member}`,
+          '@babel/core/index.js',
+          babelFile(`${member}: 1`),
+        ] as const,
+    ),
+    ...['react: null', 'react: {}', 'react: { buildChildren: 1 }'].map(
+      (react) =>
+        [
+          'Babel types with react.buildChildren',
+          '@babel/core/index.js',
+          babelFile(react),
+        ] as const,
+    ),
   ] as const) {
     it(`throws, naming the version and dir, when the instrumenter has no ${missing} (${content})`, async () => {
       const { corePackage, dir } = fakeCore(['expressionMutantPlacer'], {
@@ -575,37 +634,180 @@ describe('resolveFromCore against a fake instrumenter', () => {
     ]);
 
     const instrumenter = await resolveFromCore(corePackage);
+    const placer: unknown = Reflect.get(
+      instrumenter.expressionPlacer.target,
+      'name',
+    );
 
     assert.deepEqual(
       {
         dir: instrumenter.dir,
         version: instrumenter.version,
-        types: Object.keys(instrumenter.types),
-        placer: instrumenter.expressionPlacer.name,
+        placer,
       },
       {
         dir,
         version: '9.9.8',
-        types: ['fake', 'isJSXText'],
         placer: 'expressionMutantPlacer',
+      },
+    );
+    assert.equal(instrumenter.types, types);
+  });
+
+  it("calls the placer's own canPlace and place on the placer, with the arguments it was given", async () => {
+    const { corePackage, dir } = fakeCore([], {
+      [placersPath]:
+        'export const calls = [];\n' +
+        'const placer = {\n' +
+        "  name: 'expressionMutantPlacer',\n" +
+        "  canPlace(...args) { calls.push(['canPlace', this === placer, ...args]); return true; },\n" +
+        "  place(...args) { calls.push(['place', this === placer, ...args]); },\n" +
+        '};\n' +
+        'export const allMutantPlacers = [placer];',
+    });
+    const { original } = (await resolveFromCore(corePackage)).expressionPlacer;
+    const path = programPath();
+    const applied = new Map<unknown, types.Node>();
+
+    const placed = original.canPlace(path);
+    original.place(path, applied);
+
+    assert.equal(placed, true);
+    assert.deepEqual(await callsOf(dir, 'mutant-placers/index.js'), [
+      ['canPlace', true, path],
+      ['place', true, path, applied],
+    ]);
+  });
+
+  it('throws, naming the version and dir, when the placer gives canPlace a value that is not a boolean', async () => {
+    const { corePackage, dir } = fakeCore([], {
+      [placersPath]: placersFile([
+        "{ name: 'expressionMutantPlacer', canPlace() { return 1; }, place() {} }",
+      ]),
+    });
+    const { original } = (await resolveFromCore(corePackage)).expressionPlacer;
+    const path = programPath();
+
+    assert.throws(() => original.canPlace(path), {
+      message: `lz-stryker-ui-mutators: the instrumenter 9.9.8 in ${dir} has an expressionMutantPlacer whose canPlace returned a number, not a boolean.`,
+    });
+  });
+
+  const mutant = {
+    id: '1',
+    fileName: 'a.tsx',
+    mutatorName: 'StringLiteral',
+    replacement: '""',
+    location: { start: { line: 1, column: 2 }, end: { line: 1, column: 5 } },
+  };
+  const withMutant = (fields: Readonly<Record<string, unknown>>) => ({
+    files: [],
+    mutants: [{ ...mutant, ...fields }],
+  });
+
+  it('instruments to new objects of the fields the package reads, with the status or undefined', async () => {
+    const { corePackage } = fakeCore(['expressionMutantPlacer'], {
+      [indexPath]: instrumenterFile({
+        files: [{ name: 'a.tsx', content: 'x', mutate: true }],
+        mutants: [
+          { ...mutant, status: 'Ignored', static: false },
+          { ...mutant, id: '2' },
+        ],
+        extra: true,
+      }),
+    });
+    const instrumenter = await resolveFromCore(corePackage);
+
+    assert.deepEqual(
+      await instrumenter.instrument([{ name: 'a.tsx', content: 'x' }]),
+      {
+        files: [{ name: 'a.tsx', content: 'x' }],
+        mutants: [
+          { ...mutant, status: 'Ignored' },
+          { ...mutant, id: '2', status: undefined },
+        ],
       },
     );
   });
 
+  for (const [what, result] of [
+    ['files', null],
+    ['files', { mutants: [] }],
+    ['files[].name', { files: [null], mutants: [] }],
+    ['files[].name', { files: [{ name: 1, content: 'x' }], mutants: [] }],
+    ['files[].content', { files: [{ name: 'a.tsx' }], mutants: [] }],
+    ['mutants', { files: [] }],
+    ['mutants[].id', { files: [], mutants: [null] }],
+    ['mutants[].id', withMutant({ id: 1 })],
+    ['mutants[].fileName', withMutant({ fileName: 1 })],
+    ['mutants[].mutatorName', withMutant({ mutatorName: 1 })],
+    ['mutants[].replacement', withMutant({ replacement: 1 })],
+    ['mutants[].location.start.line', withMutant({ location: null })],
+    [
+      'mutants[].location.start.line',
+      withMutant({ location: { ...mutant.location, start: null } }),
+    ],
+    [
+      'mutants[].location.start.line',
+      withMutant({
+        location: { ...mutant.location, start: { line: '1', column: 2 } },
+      }),
+    ],
+    [
+      'mutants[].location.start.column',
+      withMutant({
+        location: { ...mutant.location, start: { line: 1, column: '2' } },
+      }),
+    ],
+    [
+      'mutants[].location.end.line',
+      withMutant({ location: { ...mutant.location, end: null } }),
+    ],
+    [
+      'mutants[].location.end.line',
+      withMutant({
+        location: { ...mutant.location, end: { line: '1', column: 5 } },
+      }),
+    ],
+    [
+      'mutants[].location.end.column',
+      withMutant({
+        location: { ...mutant.location, end: { line: 1, column: '5' } },
+      }),
+    ],
+    ['mutants[].status', withMutant({ status: 'Done' })],
+    ['mutants[].status', withMutant({ status: null })],
+  ] as const) {
+    it(`throws, naming the version and dir, when the instrumenter resolves instrument() to a wrong ${what} (${JSON.stringify(result)})`, async () => {
+      const { corePackage, dir } = fakeCore(['expressionMutantPlacer'], {
+        [indexPath]: instrumenterFile(result),
+      });
+      const instrumenter = await resolveFromCore(corePackage);
+
+      await assert.rejects(
+        instrumenter.instrument([{ name: 'a.tsx', content: 'x' }]),
+        {
+          message: `lz-stryker-ui-mutators: the instrumenter 9.9.8 in ${dir} resolved Instrumenter.instrument() to a value whose ${what} is missing or of the wrong type.`,
+        },
+      );
+    });
+  }
+
   it('instruments every file with mutate set, no plugins, no ignorers and no exclusions, through a silent logger', async () => {
-    const { corePackage } = fakeCore(['expressionMutantPlacer']);
+    const { corePackage, dir } = fakeCore(['expressionMutantPlacer']);
     const instrumenter = await resolveFromCore(corePackage);
 
-    // The fake core's Instrumenter resolves to what it was given, not to an InstrumentResult.
-    const result: unknown = await instrumenter.instrument([
-      { name: 'a.tsx', content: 'x' },
-    ]);
-    assert.ok(typeof result === 'object' && result !== null);
+    await instrumenter.instrument([{ name: 'a.tsx', content: 'x' }]);
+
+    const calls = await callsOf(dir, 'index.js');
+    assert.ok(Array.isArray(calls) && calls.length === 1);
+    const call: unknown = calls[0];
+    assert.ok(typeof call === 'object' && call !== null);
     const {
       files,
       options,
       logger,
-    }: { files?: unknown; options?: unknown; logger?: unknown } = result;
+    }: { files?: unknown; options?: unknown; logger?: unknown } = call;
     assert.ok(typeof logger === 'object' && logger !== null);
 
     assert.deepEqual(files, [{ name: 'a.tsx', content: 'x', mutate: true }]);
