@@ -65,7 +65,7 @@ export function logger({
   onLine,
 }: {
   debug?: boolean;
-  onLine?: (level: string, ...args: unknown[]) => void;
+  onLine?: ((level: string, ...args: unknown[]) => void) | undefined;
 } = {}) {
   const lines: [string, string][] = [];
   const record =

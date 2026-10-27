@@ -33,16 +33,16 @@ import {
 type FrameRead = Omit<SnapshotLine, 'outlivedItsTest'>;
 
 interface ContextState {
-  testId?: string;
+  testId?: string | undefined;
   closedPageSnapshots: FrameRead[];
   collected: boolean;
 }
 
 export interface PageSettings {
   ns: string;
-  activeMutant?: string;
-  testId?: string;
-  hitLimit?: number;
+  activeMutant?: string | undefined;
+  testId?: string | undefined;
+  hitLimit?: number | undefined;
 }
 
 type Test = TestType<object, object>;
@@ -197,7 +197,7 @@ function workerNamespace(name: string): StrykerNamespace {
 
 export function recordNodeCoverage(
   ns: StrykerNamespace,
-  { perTest, hitLimit }: { perTest: boolean; hitLimit?: number },
+  { perTest, hitLimit }: { perTest: boolean; hitLimit?: number | undefined },
   currentTestId: () => string | undefined,
   write: (line: string) => void,
   onExit: (listener: () => void) => void = (listener) => {

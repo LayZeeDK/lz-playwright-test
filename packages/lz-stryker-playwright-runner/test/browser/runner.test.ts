@@ -131,12 +131,11 @@ function mutantsReached(called: string[], pageLoad = true): string[] {
 
 function mutantRun(
   m: Mutant,
-  { testFilter, hitLimit }: { testFilter?: string[]; hitLimit?: number } = {},
+  filter: { testFilter?: string[]; hitLimit?: number } = {},
 ) {
   return runner.mutantRun({
     activeMutant: m,
-    testFilter,
-    hitLimit,
+    ...filter,
     // Kills and survivors end when their tests do; a wide budget keeps a loaded machine from turning them into timeouts.
     timeout: 60_000,
     disableBail: false,

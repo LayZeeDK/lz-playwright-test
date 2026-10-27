@@ -14,7 +14,7 @@ export const FRAME_READ_TIMEOUT_MS = 2000;
 export interface RunSettings {
   outDir: string;
   perTest: boolean;
-  hitLimit?: number;
+  hitLimit?: number | undefined;
 }
 
 export interface SnapshotLine {

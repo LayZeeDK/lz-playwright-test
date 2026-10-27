@@ -297,7 +297,7 @@ const cookieHeader = (value: string, maxAge: number) => ({
 
 export function createApiServer({
   stateFile = process.env.STATE_FILE,
-}: { stateFile?: string } = {}) {
+}: { stateFile?: string | undefined } = {}) {
   const db = loadDb(stateFile);
   const issue = (user: User) => issueToken(db.secret, user);
   const userById = (id: number) => db.users.find((u) => u.id === id) as User;

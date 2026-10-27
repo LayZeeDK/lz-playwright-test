@@ -54,13 +54,14 @@ try {
       onError,
     };
     t0 = performance.now();
-    const params: RunTestsParams & { connectWsEndpoint?: string } = {
-      locations: [],
-      testIds: testIds.length ? testIds : undefined,
-      workers: 1,
-      connectWsEndpoint: browserServer?.wsEndpoint(),
-      disableConfigReporters: true,
-    };
+    const params: RunTestsParams & { connectWsEndpoint?: string | undefined } =
+      {
+        locations: [],
+        testIds: testIds.length ? testIds : undefined,
+        workers: 1,
+        connectWsEndpoint: browserServer?.wsEndpoint(),
+        disableConfigReporters: true,
+      };
     const { status } = await runner.runTests(reporter, params);
     console.log(
       `run ${i}: ${status} load ${marks.loaded} ms, first test begins ${marks.firstTest} ms, last test ends ${marks.lastTestEnd} ms, done ${ms()} ms`,

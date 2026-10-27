@@ -176,8 +176,8 @@ function offsetOf(line: number, column: number): number {
 }
 
 // The instrumented header caches the namespace object, so the test changes it in place rather than replacing it.
-const namespace: { activeMutant?: string } = ((
-  globalThis as { __renderOracle__?: { activeMutant?: string } }
+const namespace: { activeMutant?: string | undefined } = ((
+  globalThis as { __renderOracle__?: { activeMutant?: string | undefined } }
 ).__renderOracle__ ??= {});
 
 /** Each mutant's render through the build and through the hand-applied source, `undefined` id for the baseline. */

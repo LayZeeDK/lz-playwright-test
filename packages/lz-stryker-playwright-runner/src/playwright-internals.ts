@@ -7,11 +7,11 @@ type Status = FullResult['status'];
 
 export interface RunTestsParams {
   locations: string[];
-  testIds?: string[];
-  projects?: string[];
+  testIds?: string[] | undefined;
+  projects?: string[] | undefined;
   workers?: number;
-  maxFailures?: number;
-  timeout?: number;
+  maxFailures?: number | undefined;
+  timeout?: number | undefined;
   disableConfigReporters?: boolean;
 }
 

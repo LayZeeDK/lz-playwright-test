@@ -71,7 +71,6 @@ function setup({
             mutatorName: mutator.name,
             replacement: '',
             location: LOCATION,
-            status: undefined,
           }),
         );
 
