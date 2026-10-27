@@ -85,20 +85,22 @@ function valueExpression(
   attribute: types.Node,
   t: BabelTypes,
 ): types.Expression {
-  const value = t.isJSXAttribute(attribute)
-    ? decodeValue(attribute.value, t)
-    : undefined;
+  if (!t.isJSXAttribute(attribute)) {
+    throw unplaceable('JSXAttribute');
+  }
 
-  if (value?.kind === 'bare') {
+  const value = decodeValue(attribute.value, t);
+
+  if (value.kind === 'bare') {
     return t.booleanLiteral(true);
   }
 
   // A fresh StringLiteral drops the `extra.raw` that holds undecoded entities such as `&amp;`.
-  if (value?.kind === 'string') {
+  if (value.kind === 'string') {
     return t.stringLiteral(value.text);
   }
 
-  if (value?.kind === 'expression') {
+  if (value.kind === 'expression') {
     return value.expression;
   }
 

@@ -100,7 +100,7 @@ export interface ElementSite {
   readonly node: types.JSXElement;
 }
 
-type Replacement = 'empty' | 'remove' | 'false' | 'negate' | 'flip';
+type Replacement = NonNullable<AttributeRule['on'][keyof AttributeRule['on']]>;
 
 export interface NodeMutatorLike {
   readonly name: string;
@@ -120,27 +120,32 @@ export function toNodeMutator(
       const site = attributeSite(path, t);
 
       for (const rule of operator.rules) {
-        if (rule.kind === 'node') {
-          yield* rule.mutate(path, t);
-          continue;
-        }
-
-        if (
-          site === undefined ||
-          !matches(rule.attributes, site.name) ||
-          rule.skip?.(site, t) === true
-        ) {
-          continue;
-        }
-
-        const replacement: Replacement | undefined = rule.on[site.value.kind];
-
-        if (replacement !== undefined) {
-          yield* replaced(site, replacement, t);
-        }
+        yield* rule.kind === 'node'
+          ? rule.mutate(path, t)
+          : attributeMutants(rule, site, t);
       }
     },
   };
+}
+
+function* attributeMutants(
+  rule: AttributeRule,
+  site: AttributeSite | undefined,
+  t: BabelTypes,
+): Iterable<types.JSXAttribute> {
+  if (
+    site === undefined ||
+    !matches(rule.attributes, site.name) ||
+    rule.skip?.(site, t) === true
+  ) {
+    return;
+  }
+
+  const replacement = rule.on[site.value.kind];
+
+  if (replacement !== undefined) {
+    yield* replaced(site, replacement, t);
+  }
 }
 
 function matches(
@@ -177,17 +182,22 @@ export function elementSiteOf(
   }
 
   const { name, attributes } = node.openingElement;
-  const names = attributes.flatMap((entry) =>
-    t.isJSXAttribute(entry) && t.isJSXIdentifier(entry.name)
-      ? [entry.name.name]
-      : [],
-  );
+  const names = attributes.flatMap((entry) => attributeName(entry, t) ?? []);
 
   return {
     name: t.isJSXIdentifier(name) ? name.name : undefined,
     attributes: new Set(names),
     node,
   };
+}
+
+export function attributeName(
+  entry: types.JSXOpeningElement['attributes'][number],
+  t: BabelTypes,
+): string | undefined {
+  return t.isJSXAttribute(entry) && t.isJSXIdentifier(entry.name)
+    ? entry.name.name
+    : undefined;
 }
 
 export function decodeValue(
@@ -273,10 +283,7 @@ function* replaced(
 
     case 'flip': {
       if (value.kind === 'string') {
-        yield t.jsxAttribute(
-          name,
-          t.stringLiteral(value.text === 'true' ? 'false' : 'true'),
-        );
+        yield t.jsxAttribute(name, t.stringLiteral(flipped(value.text)));
       }
 
       return;
@@ -305,7 +312,7 @@ function negation(
   }
 
   if (t.isStringLiteral(value)) {
-    return t.stringLiteral(value.value === 'true' ? 'false' : 'true');
+    return t.stringLiteral(flipped(value.value));
   }
 
   if (t.isBooleanLiteral(value)) {
@@ -321,6 +328,10 @@ function negation(
   }
 
   return t.unaryExpression('!', t.cloneNode(expression, true));
+}
+
+function flipped(text: string): string {
+  return text === 'true' ? 'false' : 'true';
 }
 
 function withoutTypeWrapper(

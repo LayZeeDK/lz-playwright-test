@@ -1,6 +1,7 @@
 import type { types } from '@babel/core';
 
 import {
+  attributeName,
   elementSiteOf,
   isJsxChild,
   operatorTable,
@@ -36,7 +37,11 @@ const LABELABLE: ReadonlySet<string | undefined> = new Set([
   'textarea',
 ]);
 /** A span cannot take these under @types/react 19.3.0 (TS2322); a span ignores them at run time. */
-const NOT_ON_SPAN: ReadonlySet<string> = new Set(['href', 'type', 'disabled']);
+const NOT_ON_SPAN: ReadonlySet<string | undefined> = new Set([
+  'href',
+  'type',
+  'disabled',
+]);
 /**
  * The roles Playwright 1.64.1's `getByRole` gives a tag in any context (`getImplicitAriaRole` in
  * playwright-core/lib/coreBundle.js); an explicit equal `role` restates them. `a` is `link` only with `href`.
@@ -242,23 +247,7 @@ export const operators = operatorTable([
             return;
           }
 
-          const span = t.cloneNode(element.node, true);
-          span.openingElement.name = t.jsxIdentifier('span');
-          span.openingElement.attributes =
-            span.openingElement.attributes.filter(
-              (attribute) =>
-                !(
-                  t.isJSXAttribute(attribute) &&
-                  t.isJSXIdentifier(attribute.name) &&
-                  NOT_ON_SPAN.has(attribute.name.name)
-                ),
-            );
-
-          if (span.closingElement) {
-            span.closingElement.name = t.jsxIdentifier('span');
-          }
-
-          yield span;
+          yield asSpan(element, t);
         },
       },
     ],
@@ -325,6 +314,20 @@ function swapsToSpan(element: ElementSite): boolean {
     element.name === 'button' ||
     (element.name === 'a' && element.attributes.has('href'))
   );
+}
+
+function asSpan(element: ElementSite, t: BabelTypes): types.JSXElement {
+  const span = t.cloneNode(element.node, true);
+  span.openingElement.name = t.jsxIdentifier('span');
+  span.openingElement.attributes = span.openingElement.attributes.filter(
+    (attribute) => !NOT_ON_SPAN.has(attributeName(attribute, t)),
+  );
+
+  if (span.closingElement) {
+    span.closingElement.name = t.jsxIdentifier('span');
+  }
+
+  return span;
 }
 
 function implicitRole(element: ElementSite): string | undefined {
