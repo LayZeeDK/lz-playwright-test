@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs inside mcr.microsoft.com/playwright:v1.64.1-noble with /out mounted. /out/head.tar is `git archive HEAD`.
-# Exits with the number of failed steps; /out/summary.txt has each step's exit code and time.
+# Exits with the number of failed steps, or 1 when the archive cannot be unpacked; /out/summary.txt has each
+# step's exit code and time.
 set -uo pipefail
 
 mkdir /w && tar -C /w -xf /out/head.tar && cd /w || exit 1
