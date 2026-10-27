@@ -5,7 +5,7 @@ nothing in this file has been filed.
 
 ## LayZeeDK/lz-engineering-claude-plugins: lz-tdd findings from first real use
 
-Status: open ledger, nothing filed (started 2026-10-26, last updated 2026-10-26). Plugin: `lz-tdd` 0.0.3
+Status: open ledger, nothing filed (started 2026-10-26, last updated 2026-10-27). Plugin: `lz-tdd` 0.0.3
 (`lz-red`, `lz-tpp`, `lz-refactor`), in its first real use outside its evals: the production hardening of
 `@layzee/stryker-playwright-runner` and `@layzee/stryker-ui-mutators` by four agent workers (Opus 5.5), each
 following an implementation brief. Workers record findings in their progress files
@@ -154,6 +154,115 @@ code before its reds could be generated, which runs against the first of the Thr
 stripping, tests that used the not-yet-written API failed as TypeErrors at the point of use, which `lz-red` counts
 as a valid but blunter red. Evidence: `.audit/types/step3b-notes.md` (local, gitignored), "lz-tdd friction".
 
+**O19. `lz-refactor` step 4 has no line for mutation cost.** In a code smell review of both packages (2026-10-27),
+every reviewer counted mutants added and removed outside the skill, because in this repo the mutation score decides
+whether a refactoring pays. Step 4 counts classes, types, files and indirection only. Two fixes showed costs the
+count misses. Merging three consistent `toLowerCase` calls into one helper turned a killed mutant into a survivor,
+because the tests had relied on the copies disagreeing. The cost of a narrowing helper depended on how many of its
+mutants the TypeScript checker turns into compile errors. Evidence: `.audit/refactor/round1-synthesis.md`, item 1;
+the "lz-tdd friction" sections of `chunk-a.md` to `chunk-e.md`, `chunk-f1.md`, `chunk-f4.md`, `fixF2-notes.md` and
+`fixTF2-notes.md` in the same folder (local, gitignored).
+
+**O20. `lz-refactor` has no read-only survey mode.** The review briefs asked for suggestions across whole files and
+forbade running tests, nx or Stryker. The coach procedure assumes one smell, a developer waiting to apply it, and a
+coach that may run the tests. The whole-package sweep applies its changes. Four reviewers borrowed coach mode one
+smell at a time, and the skill gave them no way to mark each effect as unverified. The step-5 loop audit is framed
+around code the skill refactored, so in this mode it had nothing to compare against and ran on the files as read.
+Evidence: `round1-synthesis.md`, items 2 and 4; `chunk-a.md` to `chunk-d.md` (local, gitignored).
+
+**O21. "Run the tests after each step" does not fit steps that compile only together.** Two fix workers moved a
+function whose old export and about 30 callers had to change at once. Splitting the move would have meant a
+temporary shim export. A unit-test run goes through `nx run-many` and takes about 30 seconds, so both workers ran
+the full check once after all steps. A third worker could not run the browser tests while another session held the
+machine lock, and checked each step by type-check and lint only. `lz-refactor` step 5 has no case for any of these.
+Evidence: `fixTF1a-notes.md`, `fixTF1b-notes.md`, `fixTF5-notes.md` (local, gitignored).
+
+**O22. Step 4's count cannot rank or break ties, and it misses costs outside the structure.** Nearly every Extract
+Function "adds 1 function", so the verdict turns on how a reviewer weighs a duplicated rule against a function. The
+procedure does not define that weight. "Obscurity clarified" counts as a removal with no unit. Several APPLY
+verdicts in one review had no order. The tie rule declined one-for-one extractions that would have made a
+`try`/`finally` clearer. For a mechanical Extract Function over test duplication, the verdict is always APPLY and
+says little. Fix workers that got already-triaged verdicts used only the apply mechanics. The count also has no
+place for churn (a move that rewrites about 50 tests to `async` still scores APPLY), for a lost one-to-one trace
+from test rows to their source rows, or for parameter defaults that the extraction makes dead. For Remove Flag
+Argument against Inline Function, the skill gave no tie-break when the wrapper carries a default that differs from
+the factory's. Evidence: `round1-synthesis.md`, items 3 and 11; `chunk-a.md`, `chunk-b.md`, `chunk-e.md`,
+`chunk-f2.md`, `chunk-f3.md`, `chunk-f5.md`, `fixF1-notes.md`, `fixF5-notes.md`, `fixTF2-notes.md`,
+`fixTF4-notes.md` (local, gitignored).
+
+**O23. The loop audit ignores the project's own rules and settings.** Step 5's loop audit marks a loop with a side
+effect "no" and leaves `for...of` in place. The house rule in this repo asks for `forEach` there. Test files are
+full of such loops, because registering one test per row is a side effect. Reviewers split the verdict in two, and
+fix workers followed the house rule against the audit. The audit's only exemption is a measured hot path. It has no
+outcome for a path that is probably hot but never measured, or for a loop the lead kept by ruling. Its pipeline
+targets skip the project's `lib` setting (`Map.groupBy` needs ES2024, and the repo has `lib: ["es2022"]`). They
+also skip the type checker. The review synthesis proposed a `.filter(...).forEach(...)` that does not narrow the
+destructured `coverage`. On an audit-only pass, the skill does not say whether the audit covers every loop in scope.
+Evidence: `round1-synthesis.md`, item 4; `chunk-b.md`, `chunk-c.md`, `chunk-e.md`, `chunk-f2.md` to `chunk-f5.md`,
+`fixF3-notes.md`, `fixF4-notes.md`, `fixTF3-notes.md`, `fixTF4-notes.md`, `fixTF6-notes.md` (local, gitignored).
+
+**O24. The smell index misses several production-code cases.** No entry fits a helper whose name promises an
+invariant that its callers enforce. Inline code next to a helper that already does the same work lands under
+Duplicated Code, whose leaf leads to Extract Function and not to Replace Inline Code with Function Call. In one fix,
+the step that removed the most code reused an existing helper (`tempTree`) as the target of Move Statements into
+Function, and no entry covers that reuse. The catalogs are value-level and say nothing about type-level
+duplication. The Decompose Conditional leaf assumes `if`/`else` and has no note on a generator with `yield*`
+delegation as the extracted function. Evidence: `round1-synthesis.md`, item 5; `chunk-a.md`, `chunk-d.md`,
+`chunk-e.md`, `fixF4-notes.md`, `fixTF4-notes.md` (local, gitignored).
+
+**O25. `lz-refactor` treats the tests as a fixed oracle, which fails when the refactoring touches them.** For test
+code, the only check that a refactoring keeps the tests' killing power is the mutation run (the test-code score and
+the `src` score). The skill does not say so. Workers kept assertions identical or compared assertion counts
+instead. Three test refactorings left the skill silent. A Substitute Algorithm on a test replaced its assertions. A
+refactoring changed the fixture a test runs in (a hand-built page without `sessionStorage` became the shared one)
+and kept the oracle. A behaviour-preserving Move Function turned a structural test red that pins the module graph,
+and the skill does not say whether a refactor step may edit such a test. In a test, a copied literal can be the
+oracle (the `OWN` symbol key), yet Duplicated Code leads straight to Extract Variable, which would weaken the test.
+How the Stryker test runner assigns coverage from hooks decided one move from a hook to per-test setup, and the
+skill leaves it out. Evidence: `round1-synthesis.md`, items 9 and 10; `chunk-f1.md`, `chunk-f3.md`, `chunk-f4.md`,
+`chunk-f5.md`, `fixF1-notes.md`, `fixTF1a-notes.md`, `fixTF3-notes.md`, `fixTF5-notes.md` (local, gitignored).
+
+**O26. Step 5's public-API pause does not separate module exports from package exports.** It speaks of exported
+symbols. In this repo the line that matters is the package entry point, `src/index.ts`. Evidence:
+`round1-synthesis.md`, item 6; `chunk-c.md` (local, gitignored).
+
+**O27. No skill covers a change that undoes an earlier behaviour change.** A fix restored behaviour that an earlier
+refactoring had changed. `lz-refactor` says to write a characterization test that passes on the old code first, but
+this pinning test had to fail on the current code. The change is neither a green step for `lz-tpp` nor a pure
+refactoring. Evidence: `fixF5-notes.md`, A2b (local, gitignored).
+
+**O28. A data-driven first test admits no small transformation.** A worker built a parser whose first test reads 53
+entries from three real fixtures. All three parse to the same table, so a hard-coded constant table would pass. The
+worker took the whole parser as one `lz-tpp` step and pinned its regex details with synthetic inputs instead of
+triangulating them one at a time. A second worker took a script in one step for the same reason. A stub that writes
+a constant file would pass its success case only by copying the fixture's table. That case's red was the import of
+a missing output file inside the test body. `lz-red` accepts that red, and a sharper one needs a stub that writes a
+wrong file, which is code written only to fail. Evidence: `fixF7a-notes.md`, `fixF7b-notes.md` (local, gitignored).
+
+O1 held again in the same two fixes. Most mutant-killing tests were pins that passed on their first run, because a
+larger green step had already brought their behaviour. `lz-red` calls a first-run pass on new behaviour a false
+green. The workers showed each red by applying the mutant by hand. Evidence: `fixF7a-notes.md`, `fixF7b-notes.md`.
+
+O3 held again. `lz-red` and `lz-tpp` both defaulted to coaching only, and the brief overrode them. The skills allow
+writing on an explicit command but phrase it as "write the failing test and then stop". Evidence: `fixF7a-notes.md`.
+
+O4 held again on `node:test` mechanics. An extraction that moved a `t.after` registration needed a separate check of
+the `node:test` hook order, and the skills do not cover cleanup order. Evidence: `fixTF1b-notes.md`.
+
+O5 held again for test code, in more detail. The catalog has no test smells. Shared fixture state in a hook, a
+missing per-test setup, a hand-built double that bypasses the shared one, Mystery Guest, assertion idioms that hide
+the failure, and duplicate test rows were filed under Global Data, Mutable Data, Duplicated Code or Oddball
+Solution. Meszaros's names (General Fixture, Obscure Test, Test Code Duplication, Mystery Guest) fit better. The
+move from a hook to per-test setup with `t.after` cleanup has no named refactoring and borrowed Move Statements into
+Function. Evidence: `round1-synthesis.md`, items 7 and 8; `chunk-f1.md` to `chunk-f5.md`.
+
+O6 held again for test data. Removing a twin test row borrowed Remove Dead Code, though a twin is redundant
+coverage and not unreachable code. Evidence: `chunk-f5.md`.
+
+O17 held again for a Substitute Algorithm. The new condition joins two operands with `&&`, and one operand had no
+test that fails when only that operand is wrong. `lz-refactor`'s advice to write characterization tests does not ask
+for one test per operand. Evidence: `fixF2-notes.md`, D6.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -215,6 +324,48 @@ asks for.
 
 **S17 (from O18).** Give `lz-red` a case for a table-driven test list: write the table as test data first, run its
 reds as one batch, and say whether the table belongs in the test or in the code under test.
+
+**S18 (from O19).** Add an optional mutation line to step 4's count for repos with a mutation-score gate: mutants
+removed, mutants added, and tests that must change. Warn that merging copies of a rule into one site can let a
+mutant survive that the copies' disagreement used to kill. Say that a type checker turns some added mutants into
+compile errors, which do not count.
+
+**S19 (from O20).** Add a survey mode to `lz-refactor`. It lists smells and verdicts across files, applies nothing,
+runs nothing, and marks each effect as unverified. Say whether the loop audit runs on the code as read in that mode.
+
+**S20 (from O21).** In step 5, allow a step to be a group of edits that compile only together. Allow one test run
+after a group of steps when a run is slow or not available, and have the record name the check used instead
+(type-check, lint).
+
+**S21 (from O22).** Give step 4 a tie-break and an order. Say how to weigh a duplicated rule against a new function,
+give "obscurity clarified" a unit or drop it, and say how to rank several APPLY verdicts. Count churn (call sites
+touched) and lost traceability on the added side, and defaults the extraction makes dead on the removed side. Allow
+a short form for mechanical Extract Function and for refactorings that arrive already triaged.
+
+**S22 (from O23).** Let the loop audit defer to a stated house rule (`forEach` for side-effect loops, test
+registration included) and to an owner's ruling, and add "probably hot, not measured" as its own outcome. Check each
+proposed pipeline against the project's `lib` setting and the type checker before suggesting it. Say that an
+audit-only pass covers every loop in scope.
+
+**S23 (from O24).** Add smell index entries for a helper whose name promises an invariant its callers enforce, for
+inline code next to a helper that does the same work (Replace Inline Code with Function Call, with an existing
+helper as a possible move target), and for type-level duplication. Add a generator note to Decompose Conditional.
+
+**S24 (from O25).** Add a section on refactoring tests. The check is the mutation run on the test code and on
+`src`, or unchanged assertions when that run is not available. Say when a changed fixture or a replaced assertion
+still counts as behaviour-preserving, and whether a refactor step may edit a structural test. Warn that a
+duplicated literal in a test can be the oracle. Note that how the mutation tool's test runner assigns coverage from
+hooks can decide a setup move.
+
+**S25 (from O26).** In step 5, separate module exports from package exports, and tie the pause to what the package
+entry point exposes.
+
+**S26 (from O27).** Add a case for a change that restores earlier behaviour. Its pinning test fails on the current
+code, so it runs as a red-green fix with `lz-red` and `lz-tpp`, not as a refactoring.
+
+**S27 (from O28).** Give `lz-tpp` a case for a first test that only the whole implementation passes, such as
+fixtures that parse to one table. Take that step whole, then pin the details with synthetic inputs. In `lz-red`,
+say whether a stub written only to sharpen a red is worth its code.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
