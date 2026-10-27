@@ -36,6 +36,12 @@ function dependencyChecks(ignoredDependencies) {
   ];
 }
 
+// Type-aware rules for the packages and the tools; tools/eslint.config.mjs applies them with its own tsconfig.
+export const typeSafetyRules = {
+  '@typescript-eslint/switch-exhaustiveness-check': 'error',
+  '@typescript-eslint/use-unknown-in-catch-callback-variable': 'error',
+};
+
 export default [
   ...nx.configs['flat/base'],
   ...nx.configs['flat/typescript'],
@@ -87,8 +93,23 @@ export default [
       '**/*.cjs',
       '**/*.mjs',
     ],
-    // Override or add rules here
-    rules: {},
+    rules: {
+      // Deprecated; their replacements, no-empty-object-type and no-global-assign, are on.
+      '@typescript-eslint/no-empty-interface': 'off',
+      'no-native-reassign': 'off',
+    },
+  },
+  {
+    files: ['packages/**/*.ts', 'packages/**/*.tsx'],
+    // Fixture input for the operators, in no tsconfig.
+    ignores: ['packages/lz-stryker-ui-mutators/test/corpus/**'],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: typeSafetyRules,
   },
   {
     files: ['**/*.spec.ts', '**/playwright*.config.{ts,mts}'],
