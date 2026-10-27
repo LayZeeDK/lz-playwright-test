@@ -71,6 +71,11 @@ async page => {
     playwright-cli "-s=$session" open about:blank | Out-Null
     $raw = (playwright-cli "-s=$session" run-code "--filename=$probe") -join "`n"
     playwright-cli "-s=$session" screenshot "--filename=$out/$name.png" | Out-Null
+
+    if ($LASTEXITCODE -ne 0) {
+      $failed++
+    }
+
     playwright-cli "-s=$session" close | Out-Null
 
     if ($LASTEXITCODE -ne 0) {
