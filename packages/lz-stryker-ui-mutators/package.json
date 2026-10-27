@@ -26,18 +26,76 @@
     "node": ">=22.0.0"
   },
   "peerDependencies": {
-    "@stryker-mutator/core": "~10.1.0"
+    "@stryker-mutator/core": "~10.1.0",
+    "playwright-core": ">=1.63.0 <2"
+  },
+  "peerDependenciesMeta": {
+    "playwright-core": {
+      "optional": true
+    }
   },
   "dependencies": {
     "@stryker-mutator/api": "10.1.1"
   },
   "devDependencies": {
-    "@babel/core": "8.0.9"
+    "@babel/core": "8.0.9",
+    "playwright-core": "1.64.1"
   },
   "nx": {
     "tags": [
       "type:lib"
-    ]
+    ],
+    "targets": {
+      "generate-roles": {
+        "command": "node scripts/generate-roles.ts",
+        "options": {
+          "cwd": "{projectRoot}"
+        },
+        "cache": true,
+        "inputs": [
+          "{projectRoot}/scripts/**/*",
+          "{projectRoot}/src/**/*.ts",
+          "!{projectRoot}/src/bundled-roles.ts",
+          {
+            "env": "LZ_UI_MUTATORS_ROLES_FROM"
+          },
+          {
+            "env": "LZ_UI_MUTATORS_ROLES_OUT"
+          },
+          {
+            "externalDependencies": [
+              "playwright-core"
+            ]
+          }
+        ],
+        "outputs": [
+          "{projectRoot}/src/bundled-roles.ts"
+        ]
+      },
+      "build": {
+        "dependsOn": [
+          "^build",
+          "generate-roles"
+        ]
+      },
+      "typecheck": {
+        "dependsOn": [
+          "build",
+          "^typecheck",
+          "generate-roles"
+        ]
+      },
+      "lint": {
+        "dependsOn": [
+          "generate-roles"
+        ]
+      },
+      "test": {
+        "dependsOn": [
+          "generate-roles"
+        ]
+      }
+    }
   },
   "scripts": {
     "test": "node --conditions=@layzee/source --test test/*.test.ts"

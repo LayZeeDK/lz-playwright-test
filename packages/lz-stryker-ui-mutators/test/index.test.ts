@@ -5,16 +5,18 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
-import { TESTED_VERSION } from '../src/install.ts';
 import { operatorNames } from '../src/operators.ts';
 
 const ENTRY = join(import.meta.dirname, 'fixture', 'entry.ts');
 
-function runEntry(worker: boolean, ...args: string[]) {
+function runEntry(
+  extraEnv: Readonly<Record<string, string>>,
+  ...args: string[]
+) {
   const { STRYKER_MUTATOR_WORKER: _ignored, ...env } = process.env;
   const child = spawnSync(process.execPath, [ENTRY, ...args], {
     encoding: 'utf8',
-    env: worker ? { ...env, STRYKER_MUTATOR_WORKER: '1' } : env,
+    env: { ...env, ...extraEnv },
   });
 
   return { status: child.status, stdout: child.stdout, stderr: child.stderr };
@@ -22,7 +24,7 @@ function runEntry(worker: boolean, ...args: string[]) {
 
 describe('index.ts', () => {
   it('registers every operator of the table, wraps the placer, and exports an ignorer that ignores nothing', () => {
-    const { status, stdout, stderr } = runEntry(false);
+    const { status, stdout, stderr } = runEntry({});
 
     assert.equal(status, 0, stderr);
     assert.deepEqual(JSON.parse(stdout), {
@@ -33,7 +35,9 @@ describe('index.ts', () => {
   });
 
   it("installs nothing in a worker, and the ignorer factory throws 'install did not run'", () => {
-    const { status, stdout, stderr } = runEntry(true);
+    const { status, stdout, stderr } = runEntry({
+      STRYKER_MUTATOR_WORKER: '1',
+    });
 
     assert.equal(status, 0, stderr);
     assert.deepEqual(JSON.parse(stdout), {
@@ -45,17 +49,14 @@ describe('index.ts', () => {
     });
   });
 
-  it("rejects its import with the operator's name when an operator's sample gives no mutant", () => {
-    const { status, stdout, stderr } = runEntry(false, 'broken');
+  it("rejects its import with install's error when another mutator has an operator's name", () => {
+    const { status, stdout, stderr } = runEntry({}, 'taken');
 
     assert.notEqual(status, 0);
     assert.equal(stdout, '');
     assert.match(
       stderr,
-      new RegExp(
-        `lz-stryker-ui-mutators: the instrumenter ${TESTED_VERSION.replaceAll('.', '\\.')} in .+ made no mutants ` +
-          'of LzTextLiteral from their samples',
-      ),
+      /lz-stryker-ui-mutators: another mutator already has the name LzTextLiteral\./,
     );
   });
 });

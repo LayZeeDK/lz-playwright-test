@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { parseSync, traverse, types as t, type NodePath } from '@babel/core';
+import { traverse, types as t, type NodePath } from '@babel/core';
 
 import {
   isJsxChild,
@@ -11,17 +11,7 @@ import {
   type AttributeSite,
   type Operator,
 } from '../src/mutator.ts';
-
-function parse(code: string): t.File {
-  const file = parseSync(code, {
-    configFile: false,
-    babelrc: false,
-    parserOpts: { plugins: ['jsx', 'typescript'] },
-  });
-  assert.ok(file);
-
-  return file;
-}
+import { parse } from './support/babel.ts';
 
 function firstElement(file: t.File): t.JSXElement {
   const [statement] = file.program.body;

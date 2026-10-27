@@ -29,7 +29,7 @@ before(async () => {
   result = await instrumenter.instrument(files);
 });
 
-for (const [index, testCase] of cases.entries()) {
+cases.forEach((testCase, index) => {
   test(`${testCase.id}: ${testCase.title}`, () => {
     const file = defined(files[index]).name;
     const actual = result.mutants
@@ -54,4 +54,4 @@ for (const [index, testCase] of cases.entries()) {
       assert.ok(content.includes(testCase.instrumented), content);
     }
   });
-}
+});

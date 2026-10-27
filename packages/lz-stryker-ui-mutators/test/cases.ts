@@ -6,7 +6,7 @@ import type { OperatorName } from '../src/operators.ts';
 export interface Case {
   readonly id: string;
   readonly title: string;
-  // `<repo>@<commit>:<path>:<line>`, the shape this case reproduces; `design:<section>` for a design rule.
+  // `<repo>@<commit>:<path>:<line>[,<line>]`, the shape this case reproduces; `design:<section>` for a design rule.
   readonly origin: string;
   // Module code before the component, for shapes that need a same-file declaration.
   readonly setup?: string;
@@ -24,6 +24,7 @@ const ANALOG = 'analog@a377078ec:';
 const HELLO = 'stryker-playwright-hello-world@fa6dd64:';
 const DEMO = 'lz-stryker-playwright-runner@f00806e:apps/demo-app/src/app/';
 const RULES = 'design:Rules the synthetic cases settled';
+const release = 'design:Operators in the first release';
 
 export const cases: readonly Case[] = [
   {
@@ -132,20 +133,10 @@ export const cases: readonly Case[] = [
     ],
   },
   {
-    id: 'realworld-12',
-    title: 'a logical disabled expression is forced off',
-    origin: `${RW}libs/auth/feature-auth/src/login/login.component.html:36`,
-    jsx: '<button data-testid="sign-in" disabled={form.invalid || form.pending} type="submit">Sign in</button>',
-    expect: [
-      ['LzElementRole', '<span data-testid="sign-in">Sign in</span>'],
-      ['LzDisabledAttribute', 'disabled={false}'],
-      ['LzTextLiteral', ''],
-    ],
-  },
-  {
-    id: 'realworld-13',
-    title: 'a submit button is swapped for a span',
-    origin: `${RW}libs/auth/feature-auth/src/login/login.component.html:33`,
+    id: 'realworld-12+13',
+    title:
+      'a submit button is swapped for a span, its logical disabled expression is forced off and its text is emptied',
+    origin: `${RW}libs/auth/feature-auth/src/login/login.component.html:33,36`,
     jsx: '<button data-testid="sign-in" disabled={form.invalid || form.pending} type="submit">Sign in</button>',
     expect: [
       ['LzElementRole', '<span data-testid="sign-in">Sign in</span>'],
@@ -687,8 +678,8 @@ export const cases: readonly Case[] = [
     expect: [['LzTextLiteral', '']],
   },
   {
-    id: 'hello-2',
-    title: 'a label text is emptied',
+    id: 'hello-2+3',
+    title: 'a label loses its htmlFor and its text',
     origin: `${HELLO}index.html:10`,
     jsx: '<label htmlFor="amount">Betrag</label>',
     expect: [
@@ -697,28 +688,8 @@ export const cases: readonly Case[] = [
     ],
   },
   {
-    id: 'hello-3',
-    title: 'a label htmlFor is emptied',
-    origin: `${HELLO}index.html:10`,
-    jsx: '<label htmlFor="amount">Betrag</label>',
-    expect: [
-      ['LzLabelAttribute', 'htmlFor=""'],
-      ['LzTextLiteral', ''],
-    ],
-  },
-  {
-    id: 'hello-4',
-    title: 'a button text is emptied',
-    origin: `${HELLO}index.html:13`,
-    jsx: '<button id="btn">Berechnen</button>',
-    expect: [
-      ['LzElementRole', '<span id="btn">Berechnen</span>'],
-      ['LzTextLiteral', ''],
-    ],
-  },
-  {
-    id: 'hello-5',
-    title: 'a button is swapped for a span',
+    id: 'hello-4+5',
+    title: 'a button is swapped for a span and its text is emptied',
     origin: `${HELLO}index.html:13`,
     jsx: '<button id="btn">Berechnen</button>',
     expect: [
@@ -974,7 +945,7 @@ export const cases: readonly Case[] = [
   {
     id: 'design-8',
     title: 'a string state value is flipped',
-    origin: 'design:Operators in the first release, LzStateAttribute',
+    origin: `${release}, LzStateAttribute`,
     jsx: '<div role="tab" aria-selected="true" aria-expanded="false">Tab</div>',
     expect: [
       ['LzElementRole', 'role={undefined}'],
@@ -987,7 +958,7 @@ export const cases: readonly Case[] = [
     id: 'design-9',
     title:
       'aria-hidden on an i or img icon is skipped; hidden on an svg is not',
-    origin: 'design:Operators in the first release, LzHiddenAttribute',
+    origin: `${release}, LzHiddenAttribute`,
     jsx: '<p><i className="icon" aria-hidden="true" /><img src="x.png" aria-hidden={hide} /><svg hidden /></p>',
     expect: [['LzHiddenAttribute', 'hidden={undefined}']],
   },
@@ -1012,7 +983,7 @@ export const cases: readonly Case[] = [
     id: 'design-12',
     title:
       'a function declared in the file but referenced twice keeps its handler mutants',
-    origin: 'design:Operators in the first release, LzEventHandler',
+    origin: `${release}, LzEventHandler`,
     setup: 'function save() {}\nexport const again = save;',
     jsx: '<form onSubmit={save}></form>',
     expect: [['LzEventHandler', 'onSubmit={undefined}']],
@@ -1021,7 +992,7 @@ export const cases: readonly Case[] = [
     id: 'design-13',
     title:
       'a let handler referenced once keeps its handler mutant, as only a const or a declaration is skipped',
-    origin: 'design:Operators in the first release, LzEventHandler',
+    origin: `${release}, LzEventHandler`,
     setup: 'let save = () => {};',
     jsx: '<form onSubmit={save}></form>',
     expect: [['LzEventHandler', 'onSubmit={undefined}']],
@@ -1063,14 +1034,14 @@ export const cases: readonly Case[] = [
     id: 'design-15',
     title:
       'a String() or template-literal state gets no negation, which would be a constant false',
-    origin: 'design:Operators in the first release, LzStateAttribute',
+    origin: `${release}, LzStateAttribute`,
     jsx: '<div><div aria-expanded={String(open)} /><div aria-checked={`${checked}`} /></div>',
     expect: [],
   },
   {
     id: 'design-16',
     title: 'a boolean state expression is negated',
-    origin: 'design:Operators in the first release, LzStateAttribute',
+    origin: `${release}, LzStateAttribute`,
     jsx: '<div aria-expanded={open} aria-selected={tab === current} />',
     expect: [
       ['LzStateAttribute', 'aria-expanded={!open}'],
@@ -1080,7 +1051,7 @@ export const cases: readonly Case[] = [
   {
     id: 'design-17',
     title: 'a boolean-literal ternary state flips each branch',
-    origin: 'design:Operators in the first release, LzStateAttribute',
+    origin: `${release}, LzStateAttribute`,
     jsx: '<div aria-pressed={on ? true : false} />',
     expect: [['LzStateAttribute', 'aria-pressed={on ? false : true}']],
   },
@@ -1088,7 +1059,7 @@ export const cases: readonly Case[] = [
     id: 'design-18',
     title:
       'a .toString() state gets no negation; another method call is negated',
-    origin: 'design:Operators in the first release, LzStateAttribute',
+    origin: `${release}, LzStateAttribute`,
     jsx: '<div aria-expanded={open.toString()} aria-checked={state.get()} aria-selected={isOpen()} />',
     expect: [
       ['LzStateAttribute', 'aria-checked={!state.get()}'],
@@ -1099,7 +1070,7 @@ export const cases: readonly Case[] = [
     id: 'design-19',
     title:
       'a ternary state with no negatable branch gets no mutant; one with a single negatable branch flips only that one',
-    origin: 'design:Operators in the first release, LzStateAttribute',
+    origin: `${release}, LzStateAttribute`,
     jsx: "<div><div aria-pressed={c ? undefined : String(x)} /><div aria-expanded={c ? 'true' : undefined} /></div>",
     expect: [['LzStateAttribute', 'aria-expanded={c ? "false" : undefined}']],
   },
@@ -1107,7 +1078,7 @@ export const cases: readonly Case[] = [
     id: 'design-43',
     title:
       'a string ternary state inside as, satisfies or ! flips each branch and drops the type wrapper',
-    origin: 'design:Operators in the first release, LzStateAttribute',
+    origin: `${release}, LzStateAttribute`,
     jsx:
       "<div><div aria-pressed={(s ? 'true' : 'false') as 'true' | 'false'} />" +
       "<div aria-expanded={(s ? 'true' : 'false') satisfies string} />" +
@@ -1123,7 +1094,7 @@ export const cases: readonly Case[] = [
   {
     id: 'design-44',
     title: 'a boolean state inside as is negated with its type wrapper',
-    origin: 'design:Operators in the first release, LzStateAttribute',
+    origin: `${release}, LzStateAttribute`,
     jsx: '<div aria-pressed={flag as boolean} />',
     expect: [['LzStateAttribute', 'aria-pressed={!(flag as boolean)}']],
   },
@@ -1131,7 +1102,7 @@ export const cases: readonly Case[] = [
     id: 'design-45',
     title:
       'an optional .toString() state gets no negation, which would be a constant false',
-    origin: 'design:Operators in the first release, LzStateAttribute',
+    origin: `${release}, LzStateAttribute`,
     jsx: '<div><div aria-expanded={s?.toString()} /><div aria-checked={s.toString?.()} /></div>',
     expect: [],
   },
@@ -1139,7 +1110,7 @@ export const cases: readonly Case[] = [
     id: 'design-46',
     title:
       'a literal or undefined state inside as or ! gets no negation, as it gets none unwrapped',
-    origin: 'design:Operators in the first release, LzStateAttribute',
+    origin: `${release}, LzStateAttribute`,
     jsx:
       '<div><div aria-expanded={0 as any} /><div aria-checked={null!} />' +
       '<div aria-pressed={undefined as any} /><div aria-selected={0} /></div>',
@@ -1148,7 +1119,7 @@ export const cases: readonly Case[] = [
   {
     id: 'design-20',
     title: 'a rendered value among the children of a fragment is removed',
-    origin: 'design:Operators in the first release, LzChildExpression',
+    origin: `${release}, LzChildExpression`,
     jsx: '<>{user.name}</>',
     expect: [['LzChildExpression', 'null']],
   },
@@ -1156,7 +1127,7 @@ export const cases: readonly Case[] = [
     id: 'design-21',
     title:
       'a member-named element is never swapped to a span, and its role has no implicit equal',
-    origin: 'design:Operators in the first release, LzElementRole',
+    origin: `${release}, LzElementRole`,
     jsx: '<div><UI.Button>Go</UI.Button><UI.Dialog role="dialog" /></div>',
     expect: [
       ['LzElementRole', 'role={undefined}'],
@@ -1165,23 +1136,27 @@ export const cases: readonly Case[] = [
   },
   {
     id: 'design-22',
-    title: 'an href on an element other than a is not swapped to a span',
-    origin: 'design:Operators in the first release, LzElementRole',
+    title:
+      "an area with an href is swapped to a span, as Playwright's role table gives it the link role",
+    origin: `${release}, LzElementRole`,
     jsx: '<area href="/x" />',
-    expect: [['LzUrlAttribute', 'href=""']],
+    expect: [
+      ['LzUrlAttribute', 'href=""'],
+      ['LzElementRole', '<span />'],
+    ],
   },
   {
     id: 'design-23',
     title:
       'a guard whose test is an ===, < or >= comparison is left to the built-in ConditionalExpression',
-    origin: 'design:Operators in the first release, LzConditionalElement',
+    origin: `${release}, LzConditionalElement`,
     jsx: '<div>{a == b && <p />}{a != b && <p />}{a === b && <p />}{a < b && <p />}{a <= b && <p />}{a >= b && <p />}</div>',
     expect: [],
   },
   {
     id: 'design-24',
     title: 'a filter call among the children is left to ListExpression',
-    origin: 'design:Operators in the first release, LzChildExpression',
+    origin: `${release}, LzChildExpression`,
     jsx: '<ul>{items.filter(visible)}{groups.flatMap(rows)}</ul>',
     expect: [],
   },
@@ -1189,14 +1164,14 @@ export const cases: readonly Case[] = [
     id: 'design-25',
     title:
       'htmlFor on a label that wraps a select, or an input inside a fragment, is skipped',
-    origin: 'design:Operators in the first release, LzLabelAttribute',
+    origin: `${release}, LzLabelAttribute`,
     jsx: '<div><label htmlFor="a"><select /></label><label htmlFor="b"><><input /></></label><label htmlFor="c"><textarea /></label></div>',
     expect: [],
   },
   {
     id: 'design-29',
     title: 'htmlFor on a label whose children hold no form control is emptied',
-    origin: 'design:Operators in the first release, LzLabelAttribute',
+    origin: `${release}, LzLabelAttribute`,
     jsx: '<label htmlFor="d"><span>Name</span></label>',
     expect: [
       ['LzLabelAttribute', 'htmlFor=""'],
@@ -1207,7 +1182,7 @@ export const cases: readonly Case[] = [
     id: 'design-30',
     title:
       'a negated state holds no built-in mutant of its own expression in the instrumented file',
-    origin: 'design:Operators in the first release, LzStateAttribute',
+    origin: `${release}, LzStateAttribute`,
     jsx: '<div aria-expanded={isOpen(a && b)} />',
     expect: [['LzStateAttribute', 'aria-expanded={!isOpen(a && b)}']],
     instrumented: '? !isOpen(a && b) : (stryCov_9fa48(',
@@ -1216,7 +1191,7 @@ export const cases: readonly Case[] = [
     id: 'design-31',
     title:
       'a flipped ternary state holds no built-in mutant of its test in the instrumented file',
-    origin: 'design:Operators in the first release, LzStateAttribute',
+    origin: `${release}, LzStateAttribute`,
     jsx: "<div aria-pressed={isOpen(a && b) ? 'true' : 'false'} />",
     expect: [
       ['LzStateAttribute', 'aria-pressed={isOpen(a && b) ? "false" : "true"}'],
@@ -1227,7 +1202,7 @@ export const cases: readonly Case[] = [
     id: 'design-32',
     title:
       'a ternary state keeps its unflipped consequent free of built-in mutants in the instrumented file',
-    origin: 'design:Operators in the first release, LzStateAttribute',
+    origin: `${release}, LzStateAttribute`,
     jsx: "<div aria-expanded={c ? String(a && b) : 'true'} />",
     expect: [
       ['LzStateAttribute', 'aria-expanded={c ? String(a && b) : "false"}'],
@@ -1238,7 +1213,7 @@ export const cases: readonly Case[] = [
     id: 'design-33',
     title:
       'a ternary state keeps its unflipped alternate free of built-in mutants in the instrumented file',
-    origin: 'design:Operators in the first release, LzStateAttribute',
+    origin: `${release}, LzStateAttribute`,
     jsx: "<div aria-expanded={c ? 'true' : String(a && b)} />",
     expect: [
       ['LzStateAttribute', 'aria-expanded={c ? "false" : String(a && b)}'],
@@ -1249,7 +1224,7 @@ export const cases: readonly Case[] = [
     id: 'design-34',
     title:
       'a guard whose test is a ?? expression is removed, as built-in ConditionalExpression leaves ?? alone',
-    origin: 'design:Operators in the first release, LzConditionalElement',
+    origin: `${release}, LzConditionalElement`,
     jsx: '<div>{(a ?? b) && <p />}</div>',
     expect: [['LzConditionalElement', '<p />']],
   },
@@ -1257,7 +1232,7 @@ export const cases: readonly Case[] = [
     id: 'design-35',
     title:
       'a label other than htmlFor, and htmlFor on an element other than label, are emptied though a control is inside',
-    origin: 'design:Operators in the first release, LzLabelAttribute',
+    origin: `${release}, LzLabelAttribute`,
     jsx: '<div><div aria-label="Search"><input /></div><output htmlFor="a"><input /></output><label title="Name"><input /></label></div>',
     expect: [
       ['LzLabelAttribute', 'aria-label=""'],
@@ -1269,21 +1244,21 @@ export const cases: readonly Case[] = [
     id: 'design-36',
     title:
       'an attribute with on inside its name, not at its start, is no handler',
-    origin: 'design:Operators in the first release, LzEventHandler',
+    origin: `${release}, LzEventHandler`,
     jsx: '<Card buttonColor={color} />',
     expect: [],
   },
   {
     id: 'design-37',
     title: 'an || fallback is not a guard',
-    origin: 'design:Operators in the first release, LzConditionalElement',
+    origin: `${release}, LzConditionalElement`,
     jsx: '<div>{fallback || <p />}</div>',
     expect: [],
   },
   {
     id: 'design-38',
     title: 'a ternary with one JSX branch switches to either branch',
-    origin: 'design:Operators in the first release, LzConditionalElement',
+    origin: `${release}, LzConditionalElement`,
     jsx: "<div>{open ? <p /> : 'none'}</div>",
     expect: [
       ['LzConditionalElement', '<p />'],
@@ -1294,7 +1269,7 @@ export const cases: readonly Case[] = [
     id: 'design-39',
     title:
       'a removed guard holds no built-in mutant of its element in the instrumented file',
-    origin: 'design:Operators in the first release, LzConditionalElement',
+    origin: `${release}, LzConditionalElement`,
     jsx: '<div>{open && <p>{a + b}</p>}</div>',
     expect: [['LzConditionalElement', '<p>{a + b}</p>']],
     instrumented: '? <p>{a + b}</p> : stryMutAct_9fa48(',
@@ -1303,7 +1278,7 @@ export const cases: readonly Case[] = [
     id: 'design-40',
     title:
       'a ternary switched to its consequent holds no built-in mutant of it in the instrumented file',
-    origin: 'design:Operators in the first release, LzConditionalElement',
+    origin: `${release}, LzConditionalElement`,
     jsx: '<div>{open ? <i>{c + d}</i> : <b />}</div>',
     expect: [
       ['LzConditionalElement', '<i>{c + d}</i>'],
@@ -1315,7 +1290,7 @@ export const cases: readonly Case[] = [
     id: 'design-41',
     title:
       'a ternary switched to its alternate holds no built-in mutant of it in the instrumented file',
-    origin: 'design:Operators in the first release, LzConditionalElement',
+    origin: `${release}, LzConditionalElement`,
     jsx: '<div>{open ? <i /> : <b>{e + f}</b>}</div>',
     expect: [
       ['LzConditionalElement', '<i />'],
@@ -1327,7 +1302,7 @@ export const cases: readonly Case[] = [
     id: 'design-42',
     title:
       'action, readOnly and an aria-hidden expression are mutated; aria-hidden on a member-named element is not skipped',
-    origin: 'design:Operators in the first release',
+    origin: release,
     jsx: '<form action="/save"><input readOnly /><div aria-hidden={hide} /><UI.Icon aria-hidden="true" /></form>',
     expect: [
       ['LzUrlAttribute', 'action=""'],
@@ -1340,7 +1315,7 @@ export const cases: readonly Case[] = [
     id: 'design-26',
     title:
       'a guard or a ternary whose branches are not JSX gives no LzConditionalElement mutant',
-    origin: 'design:Operators in the first release, LzConditionalElement',
+    origin: `${release}, LzConditionalElement`,
     jsx: "<div>{open && label}{open ? 'a' : 'b'}</div>",
     expect: [],
   },
@@ -1348,7 +1323,7 @@ export const cases: readonly Case[] = [
     id: 'design-27',
     title:
       'a const handler that is not a function keeps its mutant; a const function expression is skipped',
-    origin: 'design:Operators in the first release, LzEventHandler',
+    origin: `${release}, LzEventHandler`,
     setup: 'const onSave = makeHandler();\nconst onReset = function () {};',
     jsx: '<form onSubmit={onSave} onReset={onReset}></form>',
     expect: [['LzEventHandler', 'onSubmit={undefined}']],
