@@ -53,6 +53,27 @@ exports as `strykerValidationSchema`.
 - `workers`: the Playwright workers per Stryker test runner process. The default is 1. The `workers`
   value in the Playwright config has no effect.
 
+## Faster killed mutants
+
+Most of a mutation run's time goes to killed mutants. A killed mutant's failing assertion waits out
+`expect.timeout` before it fails, and Playwright's default is 5 s. Stryker sets `STRYKER_MUTATOR_WORKER`
+in each test runner process, and Playwright's own processes inherit it. So the Playwright config can use
+a shorter wait under Stryker only:
+
+```ts
+export default defineConfig({
+  expect: { timeout: process.env['STRYKER_MUTATOR_WORKER'] === undefined ? 5000 : 1000 },
+  // ...
+});
+```
+
+On this repository's demo, 1000 ms cut a component-test run from a median of 58 s to 29 s, and an e2e
+run from 111 s to 56 s. Those are 5 runs per side, interleaved, at concurrency 3. No mutant changed
+between Killed and Survived. If the page needs longer than the shorter wait to show the right result,
+the assertion fails without any mutant at fault, and the mutant counts as killed. So run once with each
+setting and compare the statuses in the two JSON reports before you keep the shorter wait. Keep `timeoutMS` at least twice the expect timeout; the runner warns
+at startup when it is lower.
+
 ## What the runner changes in the Playwright config
 
 On every run, these settings replace the ones in the Playwright config, except where a line says

@@ -321,16 +321,50 @@ rejected Stryker's instrumented file until type checking was turned off for the 
 
 ## What a mutant costs, and why
 
-A mutant run costs about 2.7 s of fixed Playwright overhead (config load 1.4 s, worker start to first
-test 1.3 s, measured with `tools/bench-playwright-runs.ts`) plus the selected tests. Sharing one
-browser across runs through `connectWsEndpoint` saved nothing measurable, so browser launch is not the
-cost. That shared-browser result is from the decision log and was not rerun.
+A mutant run costs about 1.4 s of fixed Playwright overhead plus the selected tests. That figure is from
+`tools/bench-playwright-runs.ts` on the demo e2e config, 3 runs, 2026-10-27. Config load and test
+collection took 724 to 790 ms, and the first test began at 1417 to 1458 ms. Playwright's debug trace
+splits one run as follows:
+
+- 401 ms to fork the test-loader process;
+- 292 ms for it to import the config and the first spec;
+- 399 ms to fork the worker;
+- 299 ms for the worker to reach its first test.
+
+Earlier runs measured more: 1.8 s to the first test on 2026-10-26 and 2.7 s on 2026-10-24. What causes the
+spread was not measured. Sharing one browser
+across runs through `connectWsEndpoint` saved nothing measurable, so browser launch is not the cost. That
+shared-browser result is from the decision log and was not rerun. The runner's own code is not the cost
+either. In a CPU profile of a demo e2e run, its worker hook took 0.09% of the Playwright workers' busy time.
 
 A killed mutant usually costs more than a surviving one: the failing test waits out its auto-waiting
 assertion (`expect.timeout`, 5 s by default) before it fails. Stryker sizes its timeout from passing
 tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In the first CT run, 8 of
 11 mutants timed out. That count is from the decision log, and the run's own log was not kept. Set
 `timeoutMS` to at least twice the expect timeout. The runner warns at startup when it is lower.
+
+That wait is most of a run. At concurrency 1, one run each, 2026-10-27:
+
+| Run      | Killed mutants: count, median time each, share of the run | Survivors: count, median time each |
+| -------- | --------------------------------------------------------- | ---------------------------------- |
+| demo e2e | 27, 8.4 s, 90%                                            | 5, 5.2 s                           |
+| demo CT  | 21, 6.6 s, 92%                                            | 6, 2.0 s                           |
+
+Lowering `expect.timeout` to 1000 ms under Stryker (the runner README, "Faster killed mutants") halved both
+runs. That is 5 runs per side, interleaved A and B, at concurrency 3:
+
+| Run      | Default (5 s): median (range) | 1000 ms: median (range) |
+| -------- | ----------------------------- | ----------------------- |
+| demo CT  | 58 s (58 to 59)               | 29 s (28 to 30)         |
+| demo e2e | 111 s (89 to 150)             | 56 s (54 to 92)         |
+
+- Each 1000 ms run was faster than its paired default run.
+- The e2e gain, 55 s, is smaller than the default side's own range. The slowest runs on both sides were in
+  the first two pairs. Light checks from other sessions ran during the slot, but they were not isolated as
+  the cause.
+- No mutant moved between Killed and Survived in any of the 20 runs.
+- One e2e run on each side had one mutant report Timeout instead of Killed. Both count as detected.
+- The demo configs keep the default, so the counts above still come from it.
 
 ## Limits
 
