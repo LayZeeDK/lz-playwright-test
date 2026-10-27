@@ -97,7 +97,10 @@ export function consumerRoles(
   }
 }
 
-/** The tags whose implicit role is button or link, which LzElementRole's span swap and redundant-role skip read. */
+/**
+ * The tags whose implicit role is button or link, which LzElementRole's span swap needs. The redundant-role skip
+ * reads whatever entries the table holds.
+ */
 const readTags: readonly string[] = ['a', 'area', 'button'];
 const start = 'kImplicitRoleByTagName = {';
 // The table sits in playwright-core/lib/coreBundle.js inside one string literal, so its line breaks are the two

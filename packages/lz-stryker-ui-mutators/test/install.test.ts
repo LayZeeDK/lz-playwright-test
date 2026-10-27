@@ -36,7 +36,7 @@ import { exported, exportedFunction } from './support/exports.ts';
 
 const OWN = Symbol.for('@layzee/lz-stryker-ui-mutators');
 const LOCATION = { start: { line: 0, column: 0 }, end: { line: 0, column: 1 } };
-const stryker = ['StringLiteral', 'BooleanLiteral'] as const;
+const strykerMutators = ['StringLiteral', 'BooleanLiteral'] as const;
 
 function operator(name: string): Operator {
   return {
@@ -54,7 +54,7 @@ function setup({
   readonly silent?: readonly string[];
   readonly version?: string;
 } = {}) {
-  const allMutators: NodeMutatorLike[] = stryker.map((name) => ({
+  const allMutators: NodeMutatorLike[] = strykerMutators.map((name) => ({
     name,
     mutate: () => [],
   }));
@@ -105,7 +105,7 @@ describe('install', () => {
 
     await run([operator('Alpha'), operator('Beta')]);
 
-    assert.deepEqual(names(), [...stryker, 'Alpha', 'Beta']);
+    assert.deepEqual(names(), [...strykerMutators, 'Alpha', 'Beta']);
     assert.deepEqual(instrumented, [
       [
         { name: 'Alpha.self-check.tsx', content: 'export const alpha = 1;\n' },
@@ -133,7 +133,7 @@ describe('install', () => {
     const { canPlace, place } = expressionPlacer;
     await run([operator('Alpha'), operator('Beta')]);
 
-    assert.deepEqual(names(), [...stryker, 'Alpha', 'Beta']);
+    assert.deepEqual(names(), [...strykerMutators, 'Alpha', 'Beta']);
     assert.equal(expressionPlacer.canPlace, canPlace);
     assert.equal(expressionPlacer.place, place);
   });
@@ -144,7 +144,7 @@ describe('install', () => {
     await run([operator('Alpha')]);
     await run([operator('Alpha'), operator('Beta')]);
 
-    assert.deepEqual(names(), [...stryker, 'Alpha', 'Beta']);
+    assert.deepEqual(names(), [...strykerMutators, 'Alpha', 'Beta']);
   });
 
   it('adds nothing and wraps once when a second copy of install.ts installs', async () => {
@@ -161,7 +161,7 @@ describe('install', () => {
       (message: string) => warnings.push(message),
     ]);
 
-    assert.deepEqual(names(), [...stryker, 'Alpha']);
+    assert.deepEqual(names(), [...strykerMutators, 'Alpha']);
     assert.equal(expressionPlacer.canPlace, canPlace);
   });
 
@@ -202,14 +202,14 @@ describe('install', () => {
         message: `lz-stryker-ui-mutators: another mutator already has the name ${taken}.`,
       });
 
-      assert.deepEqual(names(), stryker);
+      assert.deepEqual(names(), strykerMutators);
       assert.deepEqual(instrumented, []);
       assert.equal(expressionPlacer.canPlace, canPlace);
       assert.equal(OWN in expressionPlacer, false);
     });
   });
 
-  it('compares names in lower case, as a name of Stryker that only lowercases to an operator name collides', async () => {
+  it("treats a Stryker mutator whose name lowercases to an operator's name as a collision", async () => {
     const { run, instrumenter } = setup();
     const kelvinSign = 'K';
     instrumenter.allMutators.push({ name: kelvinSign, mutate: () => [] });
@@ -226,7 +226,7 @@ describe('install', () => {
     await run([operator('Alpha')]);
     await run([operator('Alpha')]);
 
-    assert.deepEqual(names(), [...stryker, 'Alpha']);
+    assert.deepEqual(names(), [...strykerMutators, 'Alpha']);
   });
 
   it('refuses a name that is not letters only, naming every such name, before it changes anything', async () => {
@@ -245,7 +245,7 @@ describe('install', () => {
           '"Text1", "Text-Literal", ""',
       },
     );
-    assert.deepEqual(names(), stryker);
+    assert.deepEqual(names(), strykerMutators);
   });
 
   it('throws, naming the instrumenter version and dir and every operator whose sample gave no mutant', async () => {
@@ -314,7 +314,7 @@ describe('install', () => {
 
       await run([operator('Alpha')]);
 
-      assert.deepEqual(names(), [...stryker, 'Alpha']);
+      assert.deepEqual(names(), [...strykerMutators, 'Alpha']);
       assert.deepEqual(warnings, [
         `lz-stryker-ui-mutators was tested with @stryker-mutator/instrumenter ${TESTED_VERSION}, not ${version} in ` +
           '/stryker/instrumenter; its self-check passed.',

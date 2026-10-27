@@ -42,7 +42,7 @@ When the plugin loads, it reads the table from the `playwright-core` it resolves
 - Without `playwright-core`, the plugin uses the table it bundles, and prints nothing.
 - If `playwright-core` is installed but the plugin cannot read its table, the plugin prints one warning
   and uses the bundled table. A table that lacks the entry for `a`, `area` or `button` counts as
-  unreadable, because the span swap and the role skip read them. The warning names the version and path
+  unreadable, because the span swap needs them. The role skip uses whatever entries the table holds. The warning names the version and path
   it found (only the path of `package.json` when that file cannot be read), the reason, and the version
   of the bundled table:
 

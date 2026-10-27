@@ -143,6 +143,7 @@ describe('consumerRoles', () => {
 
     return { messages, warn: (message: string) => messages.push(message) };
   }
+
   it("reads the consumer's table, and warns about nothing", (t) => {
     const { resolve } = fakePlaywrightCore(t, '1.63.0', excerpt('1.63.0'));
     const { messages, warn } = recorder();
