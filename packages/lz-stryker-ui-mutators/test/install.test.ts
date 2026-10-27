@@ -223,6 +223,17 @@ describe('install', () => {
     });
   }
 
+  it('compares names in lower case, as a name of Stryker that only lowercases to an operator name collides', async () => {
+    const { run, instrumenter } = setup();
+    const kelvinSign = 'K';
+    instrumenter.allMutators.push({ name: kelvinSign, mutate: () => [] });
+
+    await assert.rejects(run([operator('k')]), {
+      message:
+        'lz-stryker-ui-mutators: another mutator already has the name k.',
+    });
+  });
+
   it('does not count its own registered operators as collisions on a second install', async () => {
     const { run, names } = setup();
 
@@ -284,6 +295,29 @@ describe('install', () => {
 
     await assert.rejects(
       run([operator('Alpha')], misplaced),
+      /made no mutants of Alpha from their samples/,
+    );
+  });
+
+  it('counts a mutant in the sample file of an operator only when that operator made it', async () => {
+    const { run, instrumenter } = setup();
+    const foreign: Instrumenter = {
+      ...instrumenter,
+      async instrument(files) {
+        const { mutants } = await instrumenter.instrument(files);
+
+        return {
+          files,
+          mutants: mutants.map((mutant) => ({
+            ...mutant,
+            mutatorName: 'StringLiteral',
+          })),
+        };
+      },
+    };
+
+    await assert.rejects(
+      run([operator('Alpha')], foreign),
       /made no mutants of Alpha from their samples/,
     );
   });

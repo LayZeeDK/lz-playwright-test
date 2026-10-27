@@ -113,14 +113,15 @@ function checkNames(
   }
 
   // Stryker's directives match mutator names ignoring case (directive-bookkeeper.ts:63, :73).
-  const keys = names.map((name) => name.toLowerCase());
+  const keyOf = (name: string): string => name.toLowerCase();
+  const keys = names.map(keyOf);
   const others = new Set(
     present
       .filter((mutator) => !(OWN in mutator))
-      .map(({ name }) => name.toLowerCase()),
+      .map(({ name }) => keyOf(name)),
   );
   const taken = names.filter((name, index) => {
-    const key = name.toLowerCase();
+    const key = keyOf(name);
 
     return keys.indexOf(key) !== index || others.has(key);
   });
@@ -137,10 +138,7 @@ function register(
   operators: readonly Operator[],
 ): void {
   const { allMutators, expressionPlacer, types } = instrumenter;
-  const registered = new Set(
-    // Stryker disable next-line MethodExpression: equivalent, as checkNames has thrown for any operator whose name an unmarked mutator has
-    allMutators.filter((mutator) => OWN in mutator).map(({ name }) => name),
-  );
+  const registered = new Set(allMutators.map(({ name }) => name));
 
   allMutators.push(
     ...operators
@@ -168,12 +166,15 @@ async function selfCheck(
       content: sample,
     })),
   );
-  const made = new Set(
-    mutants.map(({ fileName, mutatorName }) => `${fileName}\n${mutatorName}`),
-  );
   const silent = operators
     .map(({ name }) => name)
-    .filter((name) => !made.has(`${fileOf(name)}\n${name}`));
+    .filter(
+      (name) =>
+        !mutants.some(
+          ({ fileName, mutatorName }) =>
+            fileName === fileOf(name) && mutatorName === name,
+        ),
+    );
 
   if (silent.length > 0) {
     throw new Error(
@@ -212,7 +213,7 @@ export async function resolveFromCore(
   );
   const dir = dirname(packageJson);
   const manifest: unknown = fromCore(packageJson);
-  const version = String(isRecord(manifest) ? manifest.version : undefined);
+  const version = String(fieldOf(manifest, 'version'));
   // These checks are what this module relies on in each namespace. The signatures of the Babel types and of each
   // mutator's mutate stay unchecked; the self-check in install() runs them.
   const [mutate, placers, index, babel] = await Promise.all([
@@ -221,12 +222,10 @@ export async function resolveFromCore(
     importFile(join(dir, 'dist', 'src', 'index.js')),
     importFile(createRequire(packageJson).resolve('@babel/core')),
   ]);
-  const allMutators = isRecord(mutate) ? mutate.allMutators : undefined;
-  const allMutantPlacers = isRecord(placers)
-    ? placers.allMutantPlacers
-    : undefined;
-  const Instrumenter = isRecord(index) ? index.Instrumenter : undefined;
-  const types = isRecord(babel) ? babel.types : undefined;
+  const allMutators = fieldOf(mutate, 'allMutators');
+  const allMutantPlacers = fieldOf(placers, 'allMutantPlacers');
+  const Instrumenter = fieldOf(index, 'Instrumenter');
+  const types = fieldOf(babel, 'types');
   const missing = (name: string): Error =>
     new Error(
       `lz-stryker-ui-mutators: the instrumenter ${version} in ${dir} has no ${name}.`,
@@ -240,14 +239,12 @@ export async function resolveFromCore(
     throw missing('allMutantPlacers');
   }
 
-  if (typeof Instrumenter !== 'function') {
-    throw missing('Instrumenter');
-  }
+  const instrument =
+    typeof Instrumenter === 'function'
+      ? fieldOf(Instrumenter.prototype, 'instrument')
+      : undefined;
 
-  const prototype: unknown = Instrumenter.prototype;
-  const instrument = isRecord(prototype) ? prototype.instrument : undefined;
-
-  if (typeof instrument !== 'function') {
+  if (typeof Instrumenter !== 'function' || typeof instrument !== 'function') {
     throw missing('Instrumenter');
   }
 
@@ -257,15 +254,15 @@ export async function resolveFromCore(
     .filter(isRecord)
     .find(({ name }) => name === 'expressionMutantPlacer');
 
-  if (placer === undefined) {
+  if (
+    placer === undefined ||
+    typeof placer.canPlace !== 'function' ||
+    typeof placer.place !== 'function'
+  ) {
     throw missing('expressionMutantPlacer');
   }
 
   const { canPlace, place } = placer;
-
-  if (typeof canPlace !== 'function' || typeof place !== 'function') {
-    throw missing('expressionMutantPlacer');
-  }
 
   const changed = (what: string): Error =>
     new Error(
@@ -330,12 +327,11 @@ function assertBabelTypes(
   value: unknown,
   missing: (name: string) => Error,
 ): asserts value is BabelTypes {
-  const react = isRecord(value) ? value.react : undefined;
   const absent = [
     ...babelTypeMembers.filter(
-      (member) => !isRecord(value) || typeof value[member] !== 'function',
+      (member) => typeof fieldOf(value, member) !== 'function',
     ),
-    ...(isRecord(react) && typeof react.buildChildren === 'function'
+    ...(typeof fieldOf(fieldOf(value, 'react'), 'buildChildren') === 'function'
       ? []
       : ['react.buildChildren']),
   ];
