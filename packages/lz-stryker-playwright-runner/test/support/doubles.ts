@@ -12,8 +12,12 @@ import type {
 
 import type { RunnerStrykerOptions } from '../../src/options.ts';
 import { setEnv } from '../../src/playwright-test-runner.ts';
-import type { ReportedTest } from '../../src/reporter.ts';
+import {
+  LzStrykerCollectingReporter,
+  type ReportedTest,
+} from '../../src/reporter.ts';
 import type { DryRunRequest, MutantRunRequest } from '../../src/run-request.ts';
+import type { RunOutput } from '../../src/run-result.ts';
 import { DRY_RUN_BUDGET } from '../../src/timeouts.ts';
 
 export type Outcome = ReturnType<TestCase['outcome']>;
@@ -163,6 +167,18 @@ export function mutantRequest(
     hitLimit: undefined,
     budget: DRY_RUN_BUDGET,
     ...request,
+  };
+}
+
+/** A passed run with the hook installed, an empty reporter and no snapshots, with the given fields. */
+export function runOutput(output: Partial<RunOutput> = {}): RunOutput {
+  return {
+    status: 'passed',
+    reporter: new LzStrykerCollectingReporter(),
+    snapshots: [],
+    hookInstalled: true,
+    installErrors: [],
+    ...output,
   };
 }
 

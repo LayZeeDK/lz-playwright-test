@@ -5,7 +5,9 @@ import { test } from 'node:test';
 
 import type { TestCase, TestResult } from '@playwright/test/reporter';
 import {
+  type DryRunResult,
   DryRunStatus,
+  type MutantRunResult,
   MutantRunStatus,
   type TestResult as StrykerTestResult,
   TestStatus,
@@ -17,6 +19,7 @@ import {
   type SnapshotLine,
 } from '../src/protocol.ts';
 import { LzStrykerCollectingReporter } from '../src/reporter.ts';
+import type { RunRequest } from '../src/run-request.ts';
 import {
   attemptSummary,
   coverageGaps,
@@ -36,6 +39,7 @@ import {
   mutantRequest,
   type Outcome,
   plain,
+  runOutput,
 } from './support/doubles.ts';
 
 // A snapshot as the runner reads it from a line the hook wrote.
@@ -67,20 +71,34 @@ function classify(
   reporter: LzStrykerCollectingReporter,
   {
     status = 'failed',
-    mutant = true,
     hookInstalled = true,
-    testFilter,
+    request = mutantRequest(),
   }: {
     status?: RunStatus;
-    mutant?: boolean;
     hookInstalled?: boolean;
-    testFilter?: string[];
+    request?: RunRequest;
   } = {},
 ) {
-  return toRunResult(
-    { status, reporter, snapshots: [], hookInstalled, installErrors: [] },
-    mutant ? mutantRequest({ testFilter }) : dryRequest(),
-  );
+  return toRunResult(runOutput({ status, reporter, hookInstalled }), request);
+}
+
+const passedTest = {
+  id: 'a',
+  name: 'a',
+  status: TestStatus.Success,
+  timeSpentMs: 10,
+} as const;
+
+function completed(result: DryRunResult) {
+  assert.equal(result.status, DryRunStatus.Complete);
+
+  return result;
+}
+
+function killed(result: MutantRunResult) {
+  assert.equal(result.status, MutantRunStatus.Killed);
+
+  return result;
 }
 
 // The output of a run whose tests all passed, with the given snapshot lines.
@@ -88,13 +106,7 @@ function passedRun(lines: Partial<SnapshotLine>[]): RunOutput {
   const reporter = new LzStrykerCollectingReporter();
   attempt(reporter, 'a', 'expected', 'passed');
 
-  return {
-    status: 'passed',
-    reporter,
-    snapshots: lines.map(parsed),
-    hookInstalled: true,
-    installErrors: [],
-  };
+  return runOutput({ reporter, snapshots: lines.map(parsed) });
 }
 
 test('a mutant run fails a test that passes only on a retry', () => {
@@ -105,12 +117,11 @@ test('a mutant run fails a test that passes only on a retry', () => {
   const result = classify(reporter, { status: 'passed' });
 
   assert.deepEqual(
-    result.status === DryRunStatus.Complete &&
-      result.tests.map((t) => [
-        t.id,
-        t.status,
-        t.status === TestStatus.Failed ? t.failureMessage : undefined,
-      ]),
+    completed(result).tests.map((t) => [
+      t.id,
+      t.status,
+      t.status === TestStatus.Failed ? t.failureMessage : undefined,
+    ]),
     [['a', TestStatus.Failed, 'a failed']],
   );
 });
@@ -120,11 +131,13 @@ test('the dry run counts a test that passes on a retry as passing', () => {
   attempt(reporter, 'a', 'unexpected', 'failed');
   attempt(reporter, 'a', 'flaky', 'passed');
 
-  const result = classify(reporter, { status: 'passed', mutant: false });
+  const result = classify(reporter, {
+    status: 'passed',
+    request: dryRequest(),
+  });
 
   assert.deepEqual(
-    result.status === DryRunStatus.Complete &&
-      result.tests.map((t) => t.status),
+    completed(result).tests.map((t) => t.status),
     [TestStatus.Success],
   );
 });
@@ -165,11 +178,10 @@ test('the dry run reports a timed-out test as a failed test', () => {
   const reporter = new LzStrykerCollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'timedOut');
 
-  const result = classify(reporter, { mutant: false });
+  const result = classify(reporter, { request: dryRequest() });
 
   assert.deepEqual(
-    result.status === DryRunStatus.Complete &&
-      result.tests.map((t) => t.status),
+    completed(result).tests.map((t) => t.status),
     [TestStatus.Failed],
   );
 });
@@ -178,7 +190,7 @@ test('a mutant run without test results is an error, filtered or not', () => {
   assert.deepEqual(
     classify(new LzStrykerCollectingReporter(), {
       status: 'passed',
-      testFilter: ['gone', 'also gone'],
+      request: mutantRequest({ testFilter: ['gone', 'also gone'] }),
     }),
     {
       status: DryRunStatus.Error,
@@ -205,7 +217,7 @@ test('a test result is named by its title path without the empty titles', () => 
   const result = classify(reporter, { status: 'passed' });
 
   assert.deepEqual(
-    result.status === DryRunStatus.Complete && result.tests.map((t) => t.name),
+    completed(result).tests.map((t) => t.name),
     ['[app.spec.ts] › a'],
   );
 });
@@ -267,7 +279,7 @@ test('a timed-out or interrupted attempt failed but killed nothing', () => {
 test('an unfiltered dry run without tests completes empty, so Stryker applies allowEmpty', () => {
   const result = classify(new LzStrykerCollectingReporter(), {
     status: 'passed',
-    mutant: false,
+    request: dryRequest(),
   });
 
   assert.deepEqual(result, {
@@ -280,7 +292,7 @@ test('an unfiltered dry run without tests completes empty, so Stryker applies al
 test('a run that Playwright failed without a test or an error is an error, not an empty run', () => {
   const result = classify(new LzStrykerCollectingReporter(), {
     status: 'failed',
-    mutant: false,
+    request: dryRequest(),
   });
 
   assert.deepEqual(result, {
@@ -306,11 +318,10 @@ test('a dry run with coverage off reports the tests and no coverage', () => {
     dryRequest({ coverageAnalysis: 'off' }),
   );
 
+  const { tests, mutantCoverage } = completed(result);
+
   assert.deepEqual(
-    result.status === DryRunStatus.Complete && {
-      tests: result.tests.map((t) => t.id),
-      mutantCoverage: result.mutantCoverage,
-    },
+    { tests: tests.map((t) => t.id), mutantCoverage },
     { tests: ['a'], mutantCoverage: undefined },
   );
   assert.equal(gaps, undefined);
@@ -337,10 +348,10 @@ test('a dry run merges the coverage of every snapshot exactly and reports the ga
     dryRequest(),
   );
 
-  assert.deepEqual(
-    result.status === DryRunStatus.Complete && plain(result.mutantCoverage),
-    { static: { '2': 1 }, perTest: { a: { '1': 3 } } },
-  );
+  assert.deepEqual(plain(completed(result).mutantCoverage), {
+    static: { '2': 1 },
+    perTest: { a: { '1': 3 } },
+  });
   assert.deepEqual(gaps, { lostFrames: 1, sharedFrames: 1 });
 });
 
@@ -384,20 +395,14 @@ test('the hit limit outranks a kill, summed over every snapshot', () => {
 
   assert.equal(hitCount, 1100);
   assert.equal(result.status, MutantRunStatus.Timeout);
-  assert.match(
-    result.status === MutantRunStatus.Timeout ? (result.reason ?? '') : '',
-    /Hit limit reached/,
-  );
+  assert.match(result.reason ?? '', /Hit limit reached/);
 });
 
 test('the hit limit counts on a run that is otherwise an error', () => {
-  const output: RunOutput = {
+  const output = runOutput({
     status: 'failed',
-    reporter: new LzStrykerCollectingReporter(),
     snapshots: [parsed({ hitCount: 1001 })],
-    hookInstalled: true,
-    installErrors: [],
-  };
+  });
 
   assert.equal(
     mutantRunResult(output, mutantRequest({ hitLimit: 1000 })).result.status,
@@ -415,10 +420,7 @@ test('a mutant run under its hit limit reports the kill', () => {
 
   const { result } = mutantRunResult(output, mutantRequest({ hitLimit: 1000 }));
 
-  assert.deepEqual(
-    result.status === MutantRunStatus.Killed && result.killedBy,
-    ['b'],
-  );
+  assert.deepEqual(killed(result).killedBy, ['b']);
 });
 
 test('a run with a failed attempt may have lost its server', () => {
@@ -438,13 +440,7 @@ test('a run the deadline stopped is never rerun, though its stopped test counts 
 });
 
 test('a deadline stop during config load, before any test, is a Timeout', () => {
-  const output: RunOutput = {
-    status: 'deadline',
-    reporter: new LzStrykerCollectingReporter(),
-    snapshots: [],
-    hookInstalled: false,
-    installErrors: [],
-  };
+  const output = runOutput({ status: 'deadline', hookInstalled: false });
 
   assert.equal(
     toRunResult(output, mutantRequest({ testFilter: ['a'] })).status,
@@ -474,10 +470,7 @@ test('a deadline stop after a test killed the mutant reports the kill', () => {
     mutantRequest({ testFilter: ['a', 'b', 'c'] }),
   );
 
-  assert.deepEqual(
-    result.status === MutantRunStatus.Killed && result.killedBy,
-    ['b'],
-  );
+  assert.deepEqual(killed(result).killedBy, ['b']);
 });
 
 test('a run someone else interrupted stays an error', () => {
@@ -491,16 +484,9 @@ test('a run someone else interrupted stays an error', () => {
 });
 
 test('the missing-coverage error names lost frames when every frame was lost', () => {
-  const passed = {
-    id: 'a',
-    name: 'a',
-    status: TestStatus.Success,
-    timeSpentMs: 10,
-  } as const;
-
   assert.match(
     missingCoverageError(
-      [passed],
+      [passedTest],
       [parsed({ lost: true }), parsed({ lost: true })],
     ) ?? '',
     /all 2 frame\(s\) did not answer/,
@@ -508,32 +494,19 @@ test('the missing-coverage error names lost frames when every frame was lost', (
 });
 
 test('the missing-coverage error says no instrumented code ran instead of blaming the webServer', () => {
-  const passed = {
-    id: 'a',
-    name: 'a',
-    status: TestStatus.Success,
-    timeSpentMs: 10,
-  } as const;
-
   assert.equal(
-    missingCoverageError([passed], []),
+    missingCoverageError([passedTest], []),
     'Tests ran, but no instrumented code ran, neither in a page nor in a Playwright worker. The dry run needs at least one test that runs the app code, in a page or by importing it.',
   );
 });
 
 test('the missing-coverage error blames the webServer when pages answered without instrumented code', () => {
-  const passed = {
-    id: 'a',
-    name: 'a',
-    status: TestStatus.Success,
-    timeSpentMs: 10,
-  } as const;
   const blame =
     'No page loaded instrumented code. Is the webServer serving the Stryker sandbox? A server that was already running (reuseExistingServer) serves the original sources.';
 
-  assert.equal(missingCoverageError([passed], [parsed({})]), blame);
+  assert.equal(missingCoverageError([passedTest], [parsed({})]), blame);
   assert.equal(
-    missingCoverageError([passed], [parsed({ lost: true }), parsed({})]),
+    missingCoverageError([passedTest], [parsed({ lost: true }), parsed({})]),
     blame,
   );
 });
@@ -561,16 +534,9 @@ test('a failed test outranks the errors of its run', () => {
 });
 
 test('coverage from a Playwright worker alone satisfies the dry run', () => {
-  const passed = {
-    id: 'a',
-    name: 'a',
-    status: TestStatus.Success,
-    timeSpentMs: 10,
-  } as const;
-
   assert.equal(
     missingCoverageError(
-      [passed],
+      [passedTest],
       [parsed({ mutantCoverage: { static: { '1': 1 }, perTest: {} } })],
     ),
     undefined,
