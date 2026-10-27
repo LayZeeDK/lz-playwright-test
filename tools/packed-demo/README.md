@@ -19,12 +19,17 @@ cp apps/demo-app-e2e/src/*.spec.ts <scratch>/e2e/
 (cd packages/lz-stryker-playwright-runner && npm pack --pack-destination <scratch>/tarballs)
 (cd packages/lz-stryker-ui-mutators && npm pack --pack-destination <scratch>/tarballs)
 cd <scratch>
-npm install
+npm install --ignore-scripts
 npx playwright install chromium
 node --no-experimental-strip-types --input-type=module -e "await import('@layzee/lz-stryker-playwright-runner'); await import('@layzee/lz-stryker-ui-mutators')"
 npx playwright test
 npx stryker run stryker.config.mjs
 ```
+
+No dependency needs an install script, so `--ignore-scripts` keeps registry code from running on the host
+during the install. The project has no lockfile, so transitive dependencies resolve fresh on each install:
+with one, npm would take each tarball's contents from its cache by the recorded integrity and install the
+old package after a repack.
 
 The `node` line imports both packages with type stripping turned off, so it fails if anything in them is
 TypeScript. The dev server listens on 127.0.0.1, on port 4500 outside Stryker and 4600 plus the worker number
