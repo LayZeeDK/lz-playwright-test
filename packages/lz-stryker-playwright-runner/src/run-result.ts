@@ -4,6 +4,7 @@ import {
   determineHitLimitReached,
   type DryRunResult,
   DryRunStatus,
+  type ErrorDryRunResult,
   type MutantRunResult,
   type TestResult,
   TestStatus,
@@ -107,10 +108,7 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
   });
 
   if (status === 'interrupted') {
-    return {
-      status: DryRunStatus.Error,
-      errorMessage: 'The Playwright run was interrupted',
-    };
+    return errorRun('The Playwright run was interrupted');
   }
 
   // Before the empty-run rules: a stop during the config load leaves no tests at all.
@@ -118,22 +116,15 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
     return { status: DryRunStatus.Timeout, reason };
   }
 
-  const failed = tests.some((test) => test.status === TestStatus.Failed);
-
-  if (reporter.errors.length && !failed) {
-    return {
-      status: DryRunStatus.Error,
-      errorMessage: reporter.errors.join('\n'),
-    };
+  if (reporter.errors.length && !anyFailed(tests)) {
+    return errorRun(reporter.errors.join('\n'));
   }
 
   // Playwright catches its own internal errors, prints them, and fails the run without reporting them.
   if (status === 'failed' && tests.length === 0) {
-    return {
-      status: DryRunStatus.Error,
-      errorMessage:
-        'Playwright failed without running a test; rerun Stryker with --logLevel trace to see its error.',
-    };
+    return errorRun(
+      'Playwright failed without running a test; rerun Stryker with --logLevel trace to see its error.',
+    );
   }
 
   if (tests.length === 0) {
@@ -142,21 +133,15 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
 
   // A worker that dies at the hook's install is to Playwright only a crash; the hook left the cause.
   if (installErrors.length > 0) {
-    return {
-      status: DryRunStatus.Error,
-      errorMessage: `The Stryker worker hook failed to install in a Playwright worker: ${[...new Set(installErrors)].join('\n')}`,
-    };
+    return errorRun(
+      `The Stryker worker hook failed to install in a Playwright worker: ${[...new Set(installErrors)].join('\n')}`,
+    );
   }
 
-  if (
-    !hookInstalled &&
-    tests.some((test) => test.status !== TestStatus.Skipped)
-  ) {
-    return {
-      status: DryRunStatus.Error,
-      errorMessage:
-        'Tests ran but the Stryker worker hook did not install in any Playwright worker; this Playwright version may have changed its worker entry point.',
-    };
+  if (!hookInstalled && anyRan(tests)) {
+    return errorRun(
+      'Tests ran but the Stryker worker hook did not install in any Playwright worker; this Playwright version may have changed its worker entry point.',
+    );
   }
 
   if (reason) {
@@ -170,10 +155,11 @@ export function missingCoverageError(
   tests: readonly TestResult[],
   snapshots: readonly Snapshot[],
 ): string | undefined {
-  const ran = tests.some((test) => test.status !== TestStatus.Skipped);
-  const failed = tests.some((test) => test.status === TestStatus.Failed);
-
-  if (!ran || failed || snapshots.some((snapshot) => snapshot.coverage)) {
+  if (
+    !anyRan(tests) ||
+    anyFailed(tests) ||
+    snapshots.some((snapshot) => snapshot.coverage)
+  ) {
     return undefined;
   }
 
@@ -181,10 +167,10 @@ export function missingCoverageError(
     return 'Tests ran, but no instrumented code ran, neither in a page nor in a Playwright worker. The dry run needs at least one test that runs the app code, in a page or by importing it.';
   }
 
-  const lost = snapshots.filter((snapshot) => snapshot.lost).length;
+  const { lostFrames } = coverageGaps(snapshots);
 
-  if (lost === snapshots.length) {
-    return `No page reported coverage: all ${lost} frame(s) did not answer before their context closed.`;
+  if (lostFrames === snapshots.length) {
+    return `No page reported coverage: all ${lostFrames} frame(s) did not answer before their context closed.`;
   }
 
   return 'No page loaded instrumented code. Is the webServer serving the Stryker sandbox? A server that was already running (reuseExistingServer) serves the original sources.';
@@ -200,27 +186,26 @@ export function mergeCoverage(snapshots: readonly Snapshot[]): MutantCoverage {
     target: Record<string, number>,
     hits: Record<string, number>,
   ) => {
-    for (const [mutantId, count] of Object.entries(hits)) {
+    Object.entries(hits).forEach(([mutantId, count]) => {
       target[mutantId] = (target[mutantId] ?? 0) + count;
-    }
+    });
   };
 
-  for (const { coverage, outlivedItsTest } of snapshots) {
+  snapshots.forEach(({ coverage, outlivedItsTest }) => {
     if (!coverage) {
-      continue;
+      return;
     }
 
     add(merged.static, coverage.static);
-
-    for (const [testId, hits] of Object.entries(coverage.perTest)) {
+    Object.entries(coverage.perTest).forEach(([testId, hits]) => {
       add(
         outlivedItsTest
           ? merged.static
           : (merged.perTest[testId] ??= emptyRecord()),
         hits,
       );
-    }
-  }
+    });
+  });
 
   return merged;
 }
@@ -234,7 +219,7 @@ export function coverageGaps(snapshots: readonly Snapshot[]): CoverageGaps {
   };
 }
 
-export function sumHitCounts(snapshots: readonly Snapshot[]): number {
+function sumHitCounts(snapshots: readonly Snapshot[]): number {
   return snapshots.reduce((sum, { hitCount }) => sum + hitCount, 0);
 }
 
@@ -252,10 +237,7 @@ export function dryRunResult(
   const errorMessage = missingCoverageError(tests, snapshots);
 
   if (errorMessage) {
-    return {
-      result: { status: DryRunStatus.Error, errorMessage },
-      gaps: undefined,
-    };
+    return { result: errorRun(errorMessage), gaps: undefined };
   }
 
   if (request.coverageAnalysis === 'off') {
@@ -290,16 +272,24 @@ function emptyRunResult(request: RunRequest): RunResult {
   }
 
   if (request.testFilter?.length) {
-    return {
-      status: DryRunStatus.Error,
-      errorMessage: `None of the ${request.testFilter.length} selected tests ran; their Playwright test ids no longer match.`,
-    };
+    return errorRun(
+      `None of the ${request.testFilter.length} selected tests ran; their Playwright test ids no longer match.`,
+    );
   }
 
-  return {
-    status: DryRunStatus.Error,
-    errorMessage: 'Playwright ran no tests.',
-  };
+  return errorRun('Playwright ran no tests.');
+}
+
+function errorRun(errorMessage: string): ErrorDryRunResult {
+  return { status: DryRunStatus.Error, errorMessage };
+}
+
+function anyRan(tests: readonly TestResult[]): boolean {
+  return tests.some((test) => test.status !== TestStatus.Skipped);
+}
+
+function anyFailed(tests: readonly TestResult[]): boolean {
+  return tests.some((test) => test.status === TestStatus.Failed);
 }
 
 function toTestResult(test: ReportedTest, isMutantRun: boolean): TestResult {

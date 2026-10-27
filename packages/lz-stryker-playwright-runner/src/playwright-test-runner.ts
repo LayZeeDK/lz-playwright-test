@@ -322,13 +322,13 @@ export async function withEnv<T>(
 }
 
 function setEnv(values: Readonly<Record<string, string | undefined>>) {
-  for (const [name, value] of Object.entries(values)) {
+  Object.entries(values).forEach(([name, value]) => {
     if (value === undefined) {
       delete process.env[name];
     } else {
       process.env[name] = value;
     }
-  }
+  });
 }
 
 // Playwright's own webServer port check tries both loopback addresses: localhost can resolve to only one of them.
@@ -347,7 +347,7 @@ export function acceptsConnections(
   return new Promise((resolve) => {
     let answered = 0;
 
-    for (const host of LOOPBACK_HOSTS) {
+    LOOPBACK_HOSTS.forEach((host) => {
       const socket = connect({ host, port, timeout: 5000 });
       const done = (ok: boolean) => {
         socket.destroy();
@@ -360,7 +360,7 @@ export function acceptsConnections(
       socket.once('connect', () => done(true));
       socket.once('error', () => done(false));
       socket.once('timeout', () => done(false));
-    }
+    });
   });
 }
 
