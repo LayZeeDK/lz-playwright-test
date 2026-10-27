@@ -53,7 +53,19 @@ exports as `strykerValidationSchema`.
 - `workers`: the Playwright workers per Stryker test runner process. The default is 1. The `workers`
   value in the Playwright config has no effect.
 
-## Faster killed mutants
+## Faster mutation runs
+
+Stryker's `concurrency` sets how many test runner processes run at once. Each one starts its own
+`webServer`, so the Playwright config must give each process its own port, for example from
+`STRYKER_MUTATOR_WORKER`. On this repository's demo, concurrency 2 ran 1.9 times as fast as concurrency 1
+and concurrency 4 ran 3.1 times as fast, with the same status for every mutant (2 rounds each, e2e and
+component tests). Each process used about 1.35 GB of memory there.
+
+Every mutant run loads the Playwright config in two new processes, Playwright's test loader and its worker.
+What the config imports adds to each run. On the demo, `@nx/playwright/preset` and `@nx/devkit` took about
+0.19 s to import in a fresh process, against 0.27 s for `@playwright/test` itself.
+
+### Faster killed mutants
 
 Most of a mutation run's time goes to killed mutants. A killed mutant's failing assertion waits out
 `expect.timeout` before it fails, and Playwright's default is 5 s. Stryker sets `STRYKER_MUTATOR_WORKER`

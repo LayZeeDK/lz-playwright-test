@@ -331,9 +331,13 @@ splits one run as follows:
 - 399 ms to fork the worker;
 - 299 ms for the worker to reach its first test.
 
+The demo config's own imports are part of that. In a fresh Node process, `@nx/playwright/preset` with
+`@nx/devkit` took 189 to 206 ms to import, and `@playwright/test` 264 to 282 ms. That was 5 interleaved
+rounds, each import in its own process, on 2026-10-27. The loader and the worker each load the config once
+per run.
+
 Earlier runs measured more: 1.8 s to the first test on 2026-10-26 and 2.7 s on 2026-10-24. What causes the
-spread was not measured. Sharing one browser
-across runs through `connectWsEndpoint` saved nothing measurable, so browser launch is not the cost. That
+spread was not measured. Sharing one browser across runs through `connectWsEndpoint` saved nothing measurable, so browser launch is not the cost. That
 shared-browser result is from the decision log and was not rerun. The runner's own code is not the cost
 either. In a CPU profile of a demo e2e run, its worker hook took 0.09% of the Playwright workers' busy time.
 
@@ -365,6 +369,17 @@ runs. That is 5 runs per side, interleaved A and B, at concurrency 3:
 - No mutant moved between Killed and Survived in any of the 20 runs.
 - One e2e run on each side had one mutant report Timeout instead of Killed. Both count as detected.
 - The demo configs keep the default, so the counts above still come from it.
+
+Stryker's concurrency scales close to linearly up to 4 on this machine (12 cores, 32 GB). Two rounds,
+interleaved, default configs, 2026-10-27:
+
+| Run      | Concurrency 1 | Concurrency 2 | Concurrency 4 |
+| -------- | ------------- | ------------- | ------------- |
+| demo e2e | 262 s, 233 s  | 134 s, 132 s  | 82 s, 73 s    |
+| demo CT  | 155 s, 158 s  | 80 s, 80 s    | 52 s, 47 s    |
+
+All 12 reports give every mutant the same status as the first concurrency 1 run. Each test runner process
+used about 1.35 GB of memory, which sets the ceiling sooner than the cores do.
 
 ## Limits
 
