@@ -147,6 +147,13 @@ field. Evidence: `.audit/types/step4-notes.md` (local, gitignored), "lz-tdd fric
 O3 and O4 held again in the same run: both skills said to coach and not to write or run the code, against the
 brief, and `lz-red`'s mechanics leaf is still Vitest-only in a `node:test` repo.
 
+**O18. A test list generated from a table breaks the one-red-at-a-time loop.** A worker replaced a check of one
+Babel member with a check of 38 (2026-10-27). Following O17, it generated one red per member from the member list,
+which gave about 60 failing tests at once, and turned them green in one step. The list had to exist in production
+code before its reds could be generated, which runs against the first of the Three Laws. Under Node's type
+stripping, tests that used the not-yet-written API failed as TypeErrors at the point of use, which `lz-red` counts
+as a valid but blunter red. Evidence: `.audit/types/step3b-notes.md` (local, gitignored), "lz-tdd friction".
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -205,6 +212,9 @@ guard mutant that compiles and to leave out the ones the checker rejects, and sa
 **S16 (from O17).** In `lz-red`'s test-selection leaf, say that a parser or guard that checks several fields gets
 one failing test per field, each with only that field wrong, and that this is the test list a mutation score
 asks for.
+
+**S17 (from O18).** Give `lz-red` a case for a table-driven test list: write the table as test data first, run its
+reds as one batch, and say whether the table belongs in the test or in the code under test.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
