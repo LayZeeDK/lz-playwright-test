@@ -110,6 +110,14 @@ const always = /\\n {2}"(\w+)": \(\) => "(\w+)",?(?=\\n)/g;
 const withAttribute =
   /\\n {2}"(\w+)": \(\w+\) => \{\\n {4}return \w+\.hasAttribute\("(\w+)"\) \? "(\w+)" : null;\\n {2}\}/g;
 
+function captured(value: string | undefined): string {
+  if (value === undefined) {
+    throw new Error();
+  }
+
+  return value;
+}
+
 /**
  * The entries of Playwright's `kImplicitRoleByTagName` whose role is constant or depends on one attribute, read from
  * the text of playwright-core/lib/coreBundle.js. Entries whose role depends on more are left out. Throws when the table
@@ -125,15 +133,16 @@ export function parseRoleTable(bundle: string): RoleTable {
 
   const table = bundle.slice(from, to + end.length);
   const roles: RoleTable = new Map([
-    ...[...table.matchAll(always)].flatMap(([, tag, role]) =>
-      tag === undefined || role === undefined
-        ? []
-        : [[tag.toLowerCase(), { role }] as const],
+    ...[...table.matchAll(always)].map(
+      ([, tag, role]) =>
+        [captured(tag).toLowerCase(), { role: captured(role) }] as const,
     ),
-    ...[...table.matchAll(withAttribute)].flatMap(([, tag, attribute, role]) =>
-      tag === undefined || attribute === undefined || role === undefined
-        ? []
-        : [[tag.toLowerCase(), { role, attribute }] as const],
+    ...[...table.matchAll(withAttribute)].map(
+      ([, tag, attribute, role]) =>
+        [
+          captured(tag).toLowerCase(),
+          { role: captured(role), attribute: captured(attribute) },
+        ] as const,
     ),
   ]);
 
