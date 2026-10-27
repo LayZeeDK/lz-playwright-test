@@ -653,6 +653,23 @@ describe('resolveFromCore against a fake instrumenter', () => {
     assert.equal(instrumenter.types, types);
   });
 
+  it('skips placer entries that are not objects', async (t) => {
+    const { corePackage } = fakeCore(t, [], {
+      [placersPath]: placersFile([
+        'null',
+        "'expressionMutantPlacer'",
+        "{ name: 'expressionMutantPlacer', canPlace() { return false; }, place() {} }",
+      ]),
+    });
+
+    const instrumenter = await resolveFromCore(corePackage);
+
+    assert.equal(
+      Reflect.get(instrumenter.expressionPlacer.target, 'name'),
+      'expressionMutantPlacer',
+    );
+  });
+
   it("calls the placer's own canPlace and place on the placer, with the arguments it was given", async (t) => {
     const { corePackage, modules } = fakeCore(t, [], {
       [placersPath]:
