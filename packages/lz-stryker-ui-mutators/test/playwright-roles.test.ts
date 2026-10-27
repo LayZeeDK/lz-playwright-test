@@ -1,24 +1,20 @@
 // parseRoleTable on excerpts of playwright-core's bundle from 1.63.0 to the newest alpha, and consumerRoles against
 // fake playwright-core installs on disk and against the installed one.
 import assert from 'node:assert/strict';
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { describe, it, type TestContext } from 'node:test';
+import { describe, it } from 'node:test';
 
 import { bundled } from '../src/bundled-roles.ts';
 import { consumerRoles, parseRoleTable } from '../src/playwright-roles.ts';
 import { exported } from './support/exports.ts';
+import { excerpt, fakePlaywrightCore } from './support/fake-playwright-core.ts';
 
-const fixtureVersions = ['1.63.0', '1.64.1', '1.65.0-alpha-2026-10-27'];
+// tools/playwright-roles-matrix.ts writes one fixture per minor version of playwright-core.
+const fixtureVersions = readdirSync(
+  join(import.meta.dirname, 'fixture', 'roles'),
+).map((file) => file.replace(/\.txt$/, ''));
 const installedBundle = join(
   dirname(
     createRequire(import.meta.url).resolve('playwright-core/package.json'),
@@ -28,15 +24,11 @@ const installedBundle = join(
 );
 const otherBundled = { version: '0.0.1', roles: new Map() };
 
-/** The kImplicitRoleByTagName excerpt of playwright-core/lib/coreBundle.js at `version`, escaped as in the bundle. */
-function excerpt(version: string): string {
-  return readFileSync(
-    join(import.meta.dirname, 'fixture', 'roles', `${version}.txt`),
-    'utf8',
-  );
-}
-
 describe('parseRoleTable', () => {
+  it('has a fixture for the oldest supported playwright-core, 1.63.0', () => {
+    assert.ok(fixtureVersions.includes('1.63.0'), String(fixtureVersions));
+  });
+
   fixtureVersions.forEach((version) => {
     it(`reads the 53 entries of playwright-core ${version} whose role is constant or set by one attribute`, () => {
       const roles = parseRoleTable(excerpt(version));
@@ -101,7 +93,7 @@ describe('parseRoleTable', () => {
 });
 
 describe('the bundled table', () => {
-  it("equals the table of the playwright-core this repository installs, so an upgrade fails here until it's copied", () => {
+  it('equals the table of the playwright-core this repository installs, so an upgrade fails here until generate-roles runs', () => {
     const manifest = readFileSync(
       join(installedBundle, '..', '..', 'package.json'),
       'utf8',
@@ -116,24 +108,6 @@ describe('the bundled table', () => {
 });
 
 describe('consumerRoles', () => {
-  /** A playwright-core `version` whose lib/coreBundle.js holds `bundle`, under a directory `t` removes; its resolve. */
-  function fakePlaywrightCore(t: TestContext, version: string, bundle: string) {
-    const root = realpathSync(mkdtempSync(join(tmpdir(), 'ui-mutators-pw-')));
-    t.after(() => rmSync(root, { recursive: true, force: true }));
-    const dir = join(root, 'node_modules', 'playwright-core');
-    mkdirSync(join(dir, 'lib'), { recursive: true });
-    writeFileSync(
-      join(dir, 'package.json'),
-      JSON.stringify({ name: 'playwright-core', version }),
-    );
-    writeFileSync(join(dir, 'lib', 'coreBundle.js'), bundle);
-
-    return {
-      resolve: createRequire(join(root, 'index.js')).resolve,
-      bundlePath: join(dir, 'lib', 'coreBundle.js'),
-    };
-  }
-
   function recorder() {
     const messages: string[] = [];
 

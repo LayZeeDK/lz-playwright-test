@@ -11,7 +11,8 @@ gets few mutants it can kill. This plugin adds ten operators:
 - `LzUrlAttribute`: empties `href`, `to`, and `action`.
 - `LzDisabledAttribute`: forces `disabled`, `readOnly`, and `aria-disabled` off.
 - `LzHiddenAttribute`: forces `hidden` and `aria-hidden` off.
-- `LzElementRole`: removes `role`, or swaps a `button`, or an `a` that has an `href`, for a `span`.
+- `LzElementRole`: removes `role`, or swaps a `button`, or an `a` or `area` that has an `href`, for a
+  `span`. It takes these roles from Playwright (see "The roles come from your Playwright").
 - `LzChildExpression`: replaces a `{value}` child with `null`.
 - `LzStateAttribute`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, and `aria-selected`.
 
@@ -23,9 +24,33 @@ shapes it skips. Reports show each operator's name as the mutator name.
 - `@stryker-mutator/core` 10.1, tested on 10.1.1. The plugin patches internals of that version's
   instrumenter, and warns when it finds another version.
 - Node.js 22 or later, tested on 22.23.1 and 24.22.0 on Windows 11 arm64, and on 24.22.1 on Linux arm64.
+- Optional: `playwright-core` 1.63 or later, below 2. Any `@playwright/test` or `playwright` install
+  brings it.
 
 The operators do not need a particular test runner. With `@layzee/lz-stryker-playwright-runner`, a
 Playwright test can kill each of them.
+
+## The roles come from your Playwright
+
+`LzElementRole` uses Playwright's table of implicit roles, the one `getByRole` uses, so the operator
+treats an element the way your tests find it. The table decides which tags the span swap changes and
+which `role` attributes restate a tag's own role and are left in place.
+
+When the plugin loads, it reads the table from the `playwright-core` it resolves from its own folder.
+`playwright-core` is an optional peer dependency, so your installed version is the one it finds.
+
+- Without `playwright-core`, the plugin uses the table it bundles, and prints nothing.
+- If `playwright-core` is installed but the plugin cannot read its table, the plugin prints one warning
+  and uses the bundled table. The warning names the version and path it found, the reason, and the
+  version of the bundled table:
+
+  ```text
+  lz-stryker-ui-mutators: cannot read the implicit role table of playwright-core 1.99.0 in <path> (Error: kImplicitRoleByTagName not found); LzElementRole uses the table bundled from playwright-core 1.64.1.
+  ```
+
+The bundled table is generated from `playwright-core` when the package is built, so each release carries
+the table of the Playwright version it was built with. If that table cannot be read, the build fails. The
+package's tests parse the table of each Playwright minor version from 1.63 on.
 
 ## Turn the operators on
 

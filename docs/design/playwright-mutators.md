@@ -47,7 +47,7 @@ are in the Opus draft, section 2. Where this list differs from the draft, this l
 5. `LzUrlAttribute`: `href`, `to`, and `action` become `""`, from a string or a bound expression; a template literal is left to `StringLiteral`, as for `LzLabelAttribute`. Killed by `toHaveURL`.
 6. `LzDisabledAttribute`: forces `disabled`, `readOnly`, and `aria-disabled` off, and skips boolean-literal values (`disabled={true}`), which `BooleanLiteral` already flips. Killed by `toBeDisabled`, `toBeEditable`.
 7. `LzHiddenAttribute`: forces `hidden` and `aria-hidden` off. It never forces an element hidden. It skips `aria-hidden` on `svg`, `img`, and `i`, as the Opus draft did (2.7): those are decorative icons, and exposing one changes nothing a role, label, or text query sees. Killed by `toBeVisible`, `getByRole` (hidden elements leave the tree).
-8. `LzElementRole`: removes `role`, or swaps a semantic tag for `span`: `button` always, and `a` only when it has an `href`. An `<a>` without `href` has no `link` role, so swapping it would be an equivalent mutant. The `span` drops `href`, `type`, and `disabled`, which a `span` cannot take (see "Rules the synthetic cases settled"). Killed by `getByRole`.
+8. `LzElementRole`: removes `role`, or swaps a tag for `span` when Playwright's role table gives it the role `button` or `link`: `button` always, and `a` and `area` only when they have an `href`. An `<a>` without `href` has no `link` role, so swapping it would be an equivalent mutant. The `span` drops `href`, `type`, and `disabled`, which a `span` cannot take (see "Rules the synthetic cases settled"). Killed by `getByRole`.
 9. `LzChildExpression`: a `{value}` child becomes `null`. Killed by `toHaveText`.
 10. `LzStateAttribute`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, `aria-selected`. A string value flips between `"true"` and `"false"`, and an expression is negated, except where negating would give a constant: a ternary flips each branch instead, and a `String()` or `.toString()` call gets no mutant (see "Rules the synthetic cases settled"). Killed by `toHaveAttribute` and role queries with state options.
 
@@ -169,14 +169,17 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
   `label` that also wraps its control, because nesting keeps the association. `LzTextLiteral` skips text
   inside `style` and `script`, which is CSS or code, not rendered text. `LzElementRole` skips a `role` equal
   to the element's implicit role, such as `<button role="button">`, because removing it changes nothing.
-  The implicit roles are the ones Playwright 1.64.1's `getByRole` computes for a tag from its name alone
-  (`getImplicitAriaRole` in `playwright-core/lib/coreBundle.js`), plus `a` with `href` (`link`). That is
-  every tag in Playwright's table with a fixed role: `article`, `aside`, `blockquote`, `button`, `caption`,
+  The implicit roles come from Playwright's own table, `kImplicitRoleByTagName` in
+  `playwright-core/lib/coreBundle.js`, which `getImplicitAriaRole` reads for `getByRole`. The operator
+  takes every tag whose role there is fixed, plus `a` and `area` with `href` (`link`). It reads the table
+  of the consumer's `playwright-core` when the plugin loads, and falls back to a table generated from
+  `playwright-core` when the package is built, as the package README describes. The span swap reads the
+  same table. In 1.64.1 the tags with a fixed role are `article`, `aside`, `blockquote`, `button`, `caption`,
   `code`, `datalist`, `dd`, `del`, `details`, `dfn`, `dialog`, `dt`, `em`, `fieldset`, `figure`, `h1` to
   `h6`, `hr`, `html`, `ins`, `li`, `main`, `mark`, `math`, `menu`, `meter`, `nav`, `ol`, `optgroup`,
   `option`, `output`, `p`, `progress`, `search`, `strong`, `sub`, `sup`, `svg`, `table`, `tbody`,
   `textarea`, `tfoot`, `thead`, `time`, `tr`, and `ul`. So `<output role="status">` and
-  `<svg role="img">` get no `RoleRemoval`. `area`, `footer`, `form`, `header`, `img`, `input`, `section`,
+  `<svg role="img">` get no `RoleRemoval`. `area` without `href`, `footer`, `form`, `header`, `img`, `input`, `section`,
   `select`, `td`, and `th` get their role from attributes or context, so removing an explicit one can
   change what `getByRole` finds, and the skip leaves them out. `dd`, `dt`, `li`, `tbody`, `tfoot`,
   `thead`, and `tr` lose their implicit role under a parent with `role="none"` or `role="presentation"`;
