@@ -7,6 +7,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { before, type TestContext, test } from 'node:test';
@@ -93,8 +94,9 @@ function runWorker(t: TestContext, imports: string[]) {
   const dir = mkdtempSync(path.join(tmpdir(), 'worker-hook-gate-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const files: Record<string, string> = {
+    // A function with info(), as Playwright exports its test.
     'node_modules/playwright/test.js':
-      'exports.test = { info() { throw new Error("no test"); } };',
+      'exports.test = Object.assign(() => {}, { info() { throw new Error("no test"); } });',
     'node_modules/playwright-core/package.json': '{"main":"index.js"}',
     // Every install adds one listener, so each line is one install.
     'node_modules/playwright-core/index.js': [
@@ -135,6 +137,46 @@ function runWorker(t: TestContext, imports: string[]) {
 }
 
 const HOOK_URL = new URL('../src/worker-hook.ts', import.meta.url).href;
+
+// A Playwright install with the given playwright/test, and a require from its worker entry.
+function playwrightWith(t: TestContext, playwrightTest: string) {
+  const dir = mkdtempSync(path.join(tmpdir(), 'worker-hook-api-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const files: Record<string, string> = {
+    'node_modules/playwright/test.js': playwrightTest,
+    'node_modules/playwright-core/index.js':
+      'exports._instrumentation = { addListener() {} };',
+  };
+
+  for (const [file, content] of Object.entries(files)) {
+    mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    writeFileSync(path.join(dir, file), content);
+  }
+
+  return createRequire(path.join(dir, 'entry.js'));
+}
+
+for (const playwrightTest of [
+  'exports.other = {};',
+  'exports.test = {};',
+  'exports.test = () => {};',
+  'exports.test = { info: 1 };',
+]) {
+  test(`the hook refuses a playwright/test without test.info() (${playwrightTest})`, (t) => {
+    assert.throws(
+      () =>
+        hook.install(
+          playwrightWith(t, playwrightTest),
+          { outDir: 'unused', perTest: false },
+          '__apiTest__',
+        ),
+      {
+        message:
+          'The worker hook needs test.info() from playwright/test, which tells it the test that runs.',
+      },
+    );
+  });
+}
 
 test('during a run the hook installs in the main thread of a Playwright worker, not in its threads', (t) => {
   const { child, outDir } = runWorker(t, [HOOK_URL]);
@@ -180,7 +222,7 @@ test('a worker writes the coverage its app code recorded at exit, as one line', 
   exit();
 
   assert.deepEqual(
-    lines.map((line) => JSON.parse(line)),
+    lines.map((line): unknown => JSON.parse(line)),
     [
       {
         mutantCoverage: { static: { '1': 2 }, perTest: {} },
@@ -224,7 +266,7 @@ test('with a hit limit the worker counts hits from zero and writes the count at 
   exit();
 
   assert.deepEqual(
-    lines.map((line) => JSON.parse(line)),
+    lines.map((line): unknown => JSON.parse(line)),
     [{ hitCount: 4, outlivedItsTest: false }],
   );
 });
@@ -239,7 +281,7 @@ test('a worker past its hit limit writes its count at once, and not again at exi
   ns.hitCount = 11;
 
   assert.deepEqual(
-    lines.map((line) => JSON.parse(line)),
+    lines.map((line): unknown => JSON.parse(line)),
     [{ hitCount: 11, outlivedItsTest: false }],
   );
 

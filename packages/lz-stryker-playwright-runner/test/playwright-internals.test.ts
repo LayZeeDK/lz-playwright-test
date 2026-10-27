@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import {
   type CommonModule,
   type CoreBundleModule,
+  instrumentationOf,
   isSerialSuite,
   probeInternals,
   type RunnerModule,
@@ -90,6 +91,78 @@ test('the probe names every internal when one is missing', () => {
     assert.throws(() => probeInternals('1.99.0', modules), {
       message:
         /^Playwright 1\.99\.0 changed the internals this runner calls \(playwright\/lib\/runner TestRunner with initialize, .*stopTests; playwright\/lib\/common configLoader; playwright-core coreBundle isURLAvailable\)\.$/,
+    });
+  }
+});
+
+test('the probe names every internal when a module or a step on the path to an internal is not an object', () => {
+  const arrowRunner = () => undefined;
+
+  for (const modules of [
+    { ...fakeModules(), runner: undefined },
+    { ...fakeModules(), common: undefined },
+    { ...fakeModules(), coreBundle: undefined },
+    { ...fakeModules(), coreBundle: {} },
+    { ...fakeModules(), runner: { testRunner: { TestRunner: arrowRunner } } },
+  ]) {
+    assert.throws(() => probeInternals('1.99.0', modules), {
+      message:
+        /^Playwright 1\.99\.0 changed the internals this runner calls \(playwright\/lib\/runner TestRunner with initialize, /,
+    });
+  }
+});
+
+test("the probe's URL check passes the URL and the HTTPS flag on, and counts only true as available", async () => {
+  const calls: unknown[][] = [];
+  const answering = (answer: unknown) => ({
+    ...fakeModules(),
+    coreBundle: {
+      utils: {
+        isURLAvailable: async (...args: unknown[]) => {
+          calls.push(args);
+
+          return answer;
+        },
+      },
+    },
+  });
+  const url = new URL('http://localhost:3000');
+
+  assert.equal(
+    await probeInternals('1.63.0', answering(true)).isURLAvailable(url, true),
+    true,
+  );
+  assert.equal(
+    await probeInternals('1.63.0', answering('yes')).isURLAvailable(url, false),
+    false,
+  );
+  assert.deepEqual(calls, [
+    [url, true],
+    [url, false],
+  ]);
+});
+
+test('the instrumentation is the one playwright-core exports, and its absence fails loudly', () => {
+  const listeners: unknown[] = [];
+  const core = {
+    _instrumentation: {
+      listeners,
+      addListener(listener: unknown) {
+        this.listeners.push(listener);
+      },
+    },
+  };
+  const listener = {};
+
+  instrumentationOf(core).addListener(listener);
+
+  assert.equal(listeners.length, 1);
+  assert.equal(listeners[0], listener);
+
+  for (const core of [undefined, {}, { _instrumentation: {} }]) {
+    assert.throws(() => instrumentationOf(core), {
+      message:
+        /^Playwright changed the internals this runner calls \(playwright-core _instrumentation\.addListener\)\.$/,
     });
   }
 });

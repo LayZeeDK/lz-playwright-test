@@ -8,9 +8,10 @@ import type { TestContext } from 'node:test';
 import type { Browser, BrowserContext, Frame, Page } from '@playwright/test';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
-import type {
-  Instrumentation,
-  SlotType,
+import {
+  type Instrumentation,
+  isRecord,
+  type SlotType,
 } from '../../src/playwright-internals.ts';
 import type { RunSettings } from '../../src/protocol.ts';
 import type {
@@ -219,5 +220,10 @@ export function parsedLines(content: string) {
   return content
     .split('\n')
     .filter(Boolean)
-    .map((line) => JSON.parse(line));
+    .map((line) => {
+      const parsed: unknown = JSON.parse(line);
+      assert.ok(isRecord(parsed));
+
+      return parsed;
+    });
 }

@@ -190,21 +190,28 @@ export async function resolveFromCore(
     '@stryker-mutator/instrumenter/package.json',
   );
   const dir = dirname(packageJson);
-  const version = String(fromCore(packageJson).version);
-  // `import()` types each namespace as `any`; these checks are what this module relies on in each one.
-  const [{ allMutators }, { allMutantPlacers }, { Instrumenter }, { types }] =
-    await Promise.all([
-      importFile(join(dir, 'dist', 'src', 'mutators', 'mutate.js')),
-      importFile(join(dir, 'dist', 'src', 'mutant-placers', 'index.js')),
-      importFile(join(dir, 'dist', 'src', 'index.js')),
-      importFile(createRequire(packageJson).resolve('@babel/core')),
-    ]);
+  const manifest: unknown = fromCore(packageJson);
+  const version = String(isRecord(manifest) ? manifest.version : undefined);
+  // These checks are what this module relies on in each namespace; the signatures of the functions they find
+  // stay unchecked, and the self-check in install() runs them.
+  const [mutate, placers, index, babel] = await Promise.all([
+    importFile(join(dir, 'dist', 'src', 'mutators', 'mutate.js')),
+    importFile(join(dir, 'dist', 'src', 'mutant-placers', 'index.js')),
+    importFile(join(dir, 'dist', 'src', 'index.js')),
+    importFile(createRequire(packageJson).resolve('@babel/core')),
+  ]);
+  const allMutators = isRecord(mutate) ? mutate.allMutators : undefined;
+  const allMutantPlacers = isRecord(placers)
+    ? placers.allMutantPlacers
+    : undefined;
+  const Instrumenter = isRecord(index) ? index.Instrumenter : undefined;
+  const types = isRecord(babel) ? babel.types : undefined;
   const missing = (name: string): Error =>
     new Error(
       `lz-stryker-ui-mutators: the instrumenter ${version} in ${dir} has no ${name}.`,
     );
 
-  if (!Array.isArray(allMutators)) {
+  if (!Array.isArray(allMutators) || !allMutators.every(isNodeMutator)) {
     throw missing('allMutators');
   }
 
@@ -212,17 +219,15 @@ export async function resolveFromCore(
     throw missing('allMutantPlacers');
   }
 
-  if (typeof Instrumenter !== 'function') {
+  if (!isInstrumenterClass(Instrumenter)) {
     throw missing('Instrumenter');
   }
 
-  if (typeof types?.isJSXText !== 'function') {
+  if (!isBabelTypes(types)) {
     throw missing('Babel types');
   }
 
-  const expressionPlacer = allMutantPlacers.find(
-    ({ name }) => name === 'expressionMutantPlacer',
-  );
+  const expressionPlacer = allMutantPlacers.find(isExpressionPlacer);
 
   if (expressionPlacer === undefined) {
     throw missing('expressionMutantPlacer');
@@ -246,6 +251,52 @@ export async function resolveFromCore(
   };
 }
 
-function importFile(path: string) {
+function importFile(path: string): Promise<unknown> {
   return import(pathToFileURL(path).href);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isNodeMutator(value: unknown): value is NodeMutatorLike {
+  return (
+    isRecord(value) &&
+    typeof value.name === 'string' &&
+    typeof value.mutate === 'function'
+  );
+}
+
+function isExpressionPlacer(value: unknown): value is MutantPlacerLike {
+  return (
+    isRecord(value) &&
+    value.name === 'expressionMutantPlacer' &&
+    typeof value.canPlace === 'function' &&
+    typeof value.place === 'function'
+  );
+}
+
+type InstrumenterClass = new (logger: typeof SILENT) => {
+  instrument(
+    files: readonly (SourceFile & { mutate: true })[],
+    options: {
+      plugins: null;
+      excludedMutations: readonly string[];
+      ignorers: [];
+    },
+  ): Promise<InstrumentResult>;
+};
+
+function isInstrumenterClass(value: unknown): value is InstrumenterClass {
+  if (typeof value !== 'function') {
+    return false;
+  }
+
+  const prototype: unknown = value.prototype;
+
+  return isRecord(prototype) && typeof prototype.instrument === 'function';
+}
+
+function isBabelTypes(value: unknown): value is BabelTypes {
+  return isRecord(value) && typeof value.isJSXText === 'function';
 }

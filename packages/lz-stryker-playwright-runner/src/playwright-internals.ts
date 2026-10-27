@@ -109,27 +109,31 @@ export function supportsPlaywright(version: string): boolean {
   return major === MIN_PLAYWRIGHT.major && minor >= MIN_PLAYWRIGHT.minor;
 }
 
+/**
+ * Checks each internal the runner calls; what is left unchecked is the signature of the TestRunner
+ * methods, which only a run can tell.
+ */
 export function probeInternals(
   version: string,
   modules: {
-    runner: Partial<RunnerModule>;
-    common: Partial<CommonModule>;
-    coreBundle: Partial<CoreBundleModule>;
+    runner: unknown;
+    common: unknown;
+    coreBundle: unknown;
   },
 ): Playwright {
-  const TestRunner = modules.runner.testRunner?.TestRunner;
-  const configLoader = modules.common.configLoader;
-  const isURLAvailable = modules.coreBundle.utils?.isURLAvailable;
-  const prototype = TestRunner?.prototype as
-    | Partial<Record<keyof TestRunner, unknown>>
-    | undefined;
+  const { runner, common, coreBundle } = modules;
+  const testRunner = isRecord(runner) ? runner.testRunner : undefined;
+  const TestRunner = isRecord(testRunner) ? testRunner.TestRunner : undefined;
+  const configLoader = isRecord(common) ? common.configLoader : undefined;
+  const resolveConfigLocation = isRecord(configLoader)
+    ? configLoader.resolveConfigLocation
+    : undefined;
+  const utils = isRecord(coreBundle) ? coreBundle.utils : undefined;
+  const isURLAvailable = isRecord(utils) ? utils.isURLAvailable : undefined;
 
   if (
-    typeof TestRunner !== 'function' ||
-    TEST_RUNNER_METHODS.some(
-      (method) => typeof prototype?.[method] !== 'function',
-    ) ||
-    typeof configLoader?.resolveConfigLocation !== 'function' ||
+    !isTestRunnerClass(TestRunner) ||
+    typeof resolveConfigLocation !== 'function' ||
     typeof isURLAvailable !== 'function'
   ) {
     throw new Error(
@@ -140,16 +144,40 @@ export function probeInternals(
   return {
     version,
     async createTestRunner(configFile, overrides) {
-      const runner = new TestRunner(
-        configLoader.resolveConfigLocation(configFile),
-        overrides,
+      const configLocation: unknown = Reflect.apply(
+        resolveConfigLocation,
+        configLoader,
+        [configFile],
       );
-      await runner.initialize({});
+      const created = new TestRunner(configLocation, overrides);
+      await created.initialize({});
 
-      return runner;
+      return created;
     },
-    isURLAvailable,
+    async isURLAvailable(url, ignoreHTTPSErrors) {
+      const available: unknown = await Reflect.apply(
+        isURLAvailable,
+        undefined,
+        [url, ignoreHTTPSErrors],
+      );
+
+      return available === true;
+    },
   };
+}
+
+function isTestRunnerClass(
+  value: unknown,
+): value is RunnerModule['testRunner']['TestRunner'] {
+  if (typeof value !== 'function') {
+    return false;
+  }
+
+  const prototype: unknown = value.prototype;
+
+  return TEST_RUNNER_METHODS.every(
+    (method) => isRecord(prototype) && typeof prototype[method] === 'function',
+  );
 }
 
 export function loadPlaywright(configFile: string | undefined): Playwright {
@@ -163,7 +191,8 @@ export function loadPlaywright(configFile: string | undefined): Playwright {
   const playwrightRequire = createRequire(
     testRequire.resolve('playwright/package.json'),
   );
-  const { version }: { version: string } = playwrightRequire('./package.json');
+  const manifest: unknown = playwrightRequire('./package.json');
+  const version = String(isRecord(manifest) ? manifest.version : undefined);
 
   if (!supportsPlaywright(version)) {
     throw new Error(
@@ -178,13 +207,24 @@ export function loadPlaywright(configFile: string | undefined): Playwright {
   });
 }
 
-export function instrumentationOf(
-  playwrightRequire: NodeJS.Require,
-): Instrumentation {
-  const core: { _instrumentation: Instrumentation } =
-    playwrightRequire('playwright-core');
+/** The instrumentation of the `playwright-core` module a worker loads. */
+export function instrumentationOf(core: unknown): Instrumentation {
+  const instrumentation = isRecord(core) ? core._instrumentation : undefined;
+  const addListener = isRecord(instrumentation)
+    ? instrumentation.addListener
+    : undefined;
 
-  return core._instrumentation;
+  if (typeof addListener !== 'function') {
+    throw new Error(
+      'Playwright changed the internals this runner calls (playwright-core _instrumentation.addListener).',
+    );
+  }
+
+  return {
+    addListener(listener) {
+      Reflect.apply(addListener, instrumentation, [listener]);
+    },
+  };
 }
 
 /** What the timeout manager of Playwright 1.63 and 1.64 runs: the test body, hooks, worker teardown, modifiers. */

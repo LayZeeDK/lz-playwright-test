@@ -45,7 +45,27 @@ export interface PageSettings {
   hitLimit?: number | undefined;
 }
 
-type Test = TestType<object, object>;
+type Test = Pick<TestType<object, object>, 'info'>;
+
+/** The `test` of playwright/test; the check covers that `test.info` is a function, not what it returns. */
+function testOf(playwrightTest: unknown): Test {
+  const test = isRecord(playwrightTest) ? playwrightTest.test : undefined;
+
+  if (!hasInfo(test)) {
+    throw new Error(
+      'The worker hook needs test.info() from playwright/test, which tells it the test that runs.',
+    );
+  }
+
+  return test;
+}
+
+function hasInfo(value: unknown): value is Test {
+  return (
+    (typeof value === 'function' || isRecord(value)) &&
+    typeof Reflect.get(value, 'info') === 'function'
+  );
+}
 
 // Undefined under `node -e`, which a worker's NODE_OPTIONS can reach; RegExp.test reads it as "undefined".
 const entry = process.argv[1];
@@ -71,8 +91,10 @@ export function install(
   { outDir, perTest, hitLimit }: RunSettings,
   ns: string = INSTRUMENTER_CONSTANTS.NAMESPACE,
 ): void {
-  const { test }: { test: Test } = playwrightRequire('playwright/test');
-  const instrumentation = instrumentationOf(playwrightRequire);
+  const test = testOf(playwrightRequire('playwright/test'));
+  const instrumentation = instrumentationOf(
+    playwrightRequire('playwright-core'),
+  );
   const activeMutant =
     process.env[INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE];
   const outFile = path.join(

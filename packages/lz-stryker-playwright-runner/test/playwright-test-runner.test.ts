@@ -130,6 +130,21 @@ for (const version of ['1.62.9', '2.0.0']) {
   });
 }
 
+test('init refuses a Playwright whose package.json names no version', async (t) => {
+  const fake = fakePlaywright(t);
+  writeFileSync(
+    path.join(fake.dir, 'node_modules', 'playwright', 'package.json'),
+    '{"name":"playwright"}',
+  );
+  const { runner: shell } = runner(fake.configFile);
+
+  await assert.rejects(shell.init(), {
+    message:
+      'The Playwright test runner needs Playwright 1.63 or a later 1.x release, found undefined.',
+  });
+  assert.deepEqual(fake.calls, []);
+});
+
 test('init warns when timeoutMS is below twice the expect timeout, and only then', async (t) => {
   const fake = fakePlaywright(t);
   const low = runner(fake.configFile, { timeoutMS: 9_999 });

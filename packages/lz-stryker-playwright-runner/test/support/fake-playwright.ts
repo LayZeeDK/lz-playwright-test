@@ -15,6 +15,7 @@ import type {
 } from '../../src/playwright-internals.ts';
 import { LzStrykerPlaywrightTestRunner } from '../../src/playwright-test-runner.ts';
 import {
+  readRunSettings,
   RUN_SETTINGS,
   type RunSettings,
   serializeSnapshot,
@@ -161,11 +162,13 @@ export function fakePlaywright(
           'PLAYWRIGHT_NO_COPY_PROMPT',
         ].map((name) => [name, process.env[name]]),
       );
+      const settings = readRunSettings(env);
+      assert.ok(settings);
       const run: Run = {
         reporter: collecting(reporter),
         params,
         env,
-        settings: JSON.parse(env[RUN_SETTINGS] ?? 'null'),
+        settings,
       };
       calls.push(['runTests']);
       runs.push(run);

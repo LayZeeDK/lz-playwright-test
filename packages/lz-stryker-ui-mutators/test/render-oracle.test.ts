@@ -10,16 +10,18 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { pathToFileURL } from 'node:url';
+
+import ts from 'typescript';
 
 import {
   resolveFromCore,
   type InstrumentedMutant,
   type InstrumentResult,
 } from '../src/install.ts';
+import { exportedFunction } from './support/exports.ts';
 import { installInto, ours } from './support/installed.ts';
 
 type Component = (props: unknown) => unknown;
@@ -36,9 +38,6 @@ const source = readFileSync(samplePath, 'utf8');
 // workspace; `tmp` is ignored by git. A directory per process, removed after it, as a Stryker run of this package
 // runs several processes of this file in one sandbox at once.
 const tmpDir = join(import.meta.dirname, '..', 'tmp');
-const ts: typeof import('typescript') = createRequire(
-  join(root, 'package.json'),
-)('typescript');
 let outDir: string;
 let result: InstrumentResult;
 let original: string;
@@ -75,9 +74,9 @@ async function load(tsx: string): Promise<Component> {
   }).outputText;
   const file = join(outDir, `m${counter++}.mjs`);
   writeFileSync(file, js);
-  const module: { App: Component } = await import(pathToFileURL(file).href);
+  const app = exportedFunction(await import(pathToFileURL(file).href), 'App');
 
-  return module.App;
+  return (props): unknown => Reflect.apply(app, undefined, [props]);
 }
 
 const FRAGMENT = Symbol.for('react.fragment');

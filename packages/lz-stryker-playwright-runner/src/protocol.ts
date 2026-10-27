@@ -55,9 +55,17 @@ export function serializeSnapshot(line: SnapshotLine): string {
   }
 }
 
+/** A record without a prototype, so a key such as __proto__ stays an own key. */
+export function emptyRecord<T>(): Record<string, T> {
+  const record: Record<string, T> = {};
+  Object.setPrototypeOf(record, null);
+
+  return record;
+}
+
 // A key such as __proto__ or a count that is not a hit count must not reach an ordinary object.
 function hitCounts(value: unknown): Record<string, number> {
-  const counts: Record<string, number> = Object.create(null);
+  const counts = emptyRecord<number>();
 
   for (const [mutantId, count] of Object.entries(
     isRecord(value) ? value : {},
@@ -75,7 +83,7 @@ function parseCoverage(value: unknown): MutantCoverage | undefined {
     return undefined;
   }
 
-  const perTest: MutantCoverage['perTest'] = Object.create(null);
+  const perTest: MutantCoverage['perTest'] = emptyRecord();
 
   for (const [testId, hits] of Object.entries(
     isRecord(value.perTest) ? value.perTest : {},

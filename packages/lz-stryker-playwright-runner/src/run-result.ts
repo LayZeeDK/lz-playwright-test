@@ -10,7 +10,7 @@ import {
   toMutantRunResult,
 } from '@stryker-mutator/api/test-runner';
 
-import type { Snapshot } from './protocol.ts';
+import { emptyRecord, type Snapshot } from './protocol.ts';
 import { type LzStrykerCollectingReporter, errorText } from './reporter.ts';
 import type {
   DryRunRequest,
@@ -178,8 +178,8 @@ export function missingCoverageError(
 // The output maps have no prototype, so a test id such as __proto__ from a page stays an own key.
 export function mergeCoverage(snapshots: readonly Snapshot[]): MutantCoverage {
   const merged: MutantCoverage = {
-    static: Object.create(null),
-    perTest: Object.create(null),
+    static: emptyRecord(),
+    perTest: emptyRecord(),
   };
   const add = (
     target: Record<string, number>,
@@ -201,7 +201,7 @@ export function mergeCoverage(snapshots: readonly Snapshot[]): MutantCoverage {
       add(
         outlivedItsTest
           ? merged.static
-          : (merged.perTest[testId] ??= Object.create(null)),
+          : (merged.perTest[testId] ??= emptyRecord()),
         hits,
       );
     }

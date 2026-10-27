@@ -19,6 +19,7 @@ import {
   type SourceFile,
 } from '../src/install.ts';
 import { operatorNames } from '../src/operators.ts';
+import { exportedFunction } from './support/exports.ts';
 import { installInto, ours } from './support/installed.ts';
 
 const root = join(import.meta.dirname, '..', '..', '..');
@@ -58,13 +59,18 @@ async function instrumentEach(excludedMutations: readonly string[]) {
 
 before(async () => {
   instrumenter = await resolveFromCore();
-  ({ parse } = await import(
-    pathToFileURL(
-      createRequire(join(instrumenter.dir, 'package.json')).resolve(
-        '@babel/parser',
-      ),
-    ).href
-  ));
+  const babelParse = exportedFunction(
+    await import(
+      pathToFileURL(
+        createRequire(join(instrumenter.dir, 'package.json')).resolve(
+          '@babel/parser',
+        ),
+      ).href
+    ),
+    'parse',
+  );
+  parse = (code, options) =>
+    Reflect.apply(babelParse, undefined, [code, options]);
   stock = await instrumentEach([]);
   await installInto(instrumenter);
   excluded = await instrumentEach(operatorNames);

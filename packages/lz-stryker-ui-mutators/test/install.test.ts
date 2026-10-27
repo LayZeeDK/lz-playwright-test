@@ -25,6 +25,7 @@ import {
 } from '../src/install.ts';
 import type { BabelTypes, NodeMutatorLike, Operator } from '../src/mutator.ts';
 import type { MutantPlacerLike } from '../src/placer.ts';
+import { exportedFunction } from './support/exports.ts';
 
 const OWN = Symbol.for('@layzee/lz-stryker-ui-mutators');
 const LOCATION = { start: { line: 0, column: 0 }, end: { line: 0, column: 1 } };
@@ -155,15 +156,15 @@ describe('install', () => {
     const { run, names, instrumenter, expressionPlacer, warnings } = setup();
     // A query makes Node evaluate the file again as a separate module, as a second installed copy would be.
     const specifier = '../src/install.ts?copy';
-    const copy: { install: typeof install } = await import(specifier);
+    const copyInstall = exportedFunction(await import(specifier), 'install');
 
     await run([operator('Alpha')]);
     const { canPlace } = expressionPlacer;
-    await copy.install(
+    await Reflect.apply(copyInstall, undefined, [
       [operator('Alpha')],
       async () => instrumenter,
-      (message) => warnings.push(message),
-    );
+      (message: string) => warnings.push(message),
+    ]);
 
     assert.deepEqual(names(), ['StringLiteral', 'BooleanLiteral', 'Alpha']);
     assert.equal(expressionPlacer.canPlace, canPlace);
@@ -427,6 +428,10 @@ describe('resolveFromCore', () => {
 
 describe('resolveFromCore against a fake instrumenter', () => {
   const roots: string[] = [];
+  const placersFile = (placers: readonly string[]) =>
+    `export const allMutantPlacers = [${placers.join(', ')}];`;
+  const mutatorsFile = (mutators: readonly string[]) =>
+    `export const allMutators = [${mutators.join(', ')}];`;
 
   after(() => {
     for (const root of roots) {
@@ -454,9 +459,13 @@ describe('resolveFromCore against a fake instrumenter', () => {
         '{ "name": "@stryker-mutator/instrumenter", "version": "9.9.8", "type": "module" }',
       '@stryker-mutator/instrumenter/dist/src/mutators/mutate.js':
         'export const allMutators = [];',
-      '@stryker-mutator/instrumenter/dist/src/mutant-placers/index.js': `export const allMutantPlacers = ${JSON.stringify(
-        placers.map((name) => ({ name })),
-      )};`,
+      '@stryker-mutator/instrumenter/dist/src/mutant-placers/index.js':
+        placersFile(
+          placers.map(
+            (name) =>
+              `{ name: ${JSON.stringify(name)}, canPlace() { return false; }, place() {} }`,
+          ),
+        ),
       '@stryker-mutator/instrumenter/dist/src/index.js':
         'export class Instrumenter {\n' +
         '  constructor(logger) { this.logger = logger; }\n' +
@@ -496,14 +505,44 @@ describe('resolveFromCore against a fake instrumenter', () => {
       'export const allMutators = {};',
     ],
     [
+      'allMutators',
+      '@stryker-mutator/instrumenter/dist/src/mutators/mutate.js',
+      mutatorsFile(['null']),
+    ],
+    [
+      'allMutators',
+      '@stryker-mutator/instrumenter/dist/src/mutators/mutate.js',
+      mutatorsFile(['{ mutate() {} }']),
+    ],
+    [
+      'allMutators',
+      '@stryker-mutator/instrumenter/dist/src/mutators/mutate.js',
+      mutatorsFile(["{ name: 'A', mutate() {} }", "{ name: 'B' }"]),
+    ],
+    [
       'allMutantPlacers',
       '@stryker-mutator/instrumenter/dist/src/mutant-placers/index.js',
       'export const placers = [];',
     ],
     [
+      'expressionMutantPlacer',
+      '@stryker-mutator/instrumenter/dist/src/mutant-placers/index.js',
+      placersFile(["{ name: 'expressionMutantPlacer', place() {} }"]),
+    ],
+    [
+      'expressionMutantPlacer',
+      '@stryker-mutator/instrumenter/dist/src/mutant-placers/index.js',
+      placersFile(["{ name: 'expressionMutantPlacer', canPlace() {} }"]),
+    ],
+    [
       'Instrumenter',
       '@stryker-mutator/instrumenter/dist/src/index.js',
       'export const Instrumenter = {};',
+    ],
+    [
+      'Instrumenter',
+      '@stryker-mutator/instrumenter/dist/src/index.js',
+      'export class Instrumenter {}',
     ],
     [
       'Babel types',
@@ -536,13 +575,13 @@ describe('resolveFromCore against a fake instrumenter', () => {
         dir: instrumenter.dir,
         version: instrumenter.version,
         types: Object.keys(instrumenter.types),
-        placer: instrumenter.expressionPlacer,
+        placer: instrumenter.expressionPlacer.name,
       },
       {
         dir,
         version: '9.9.8',
         types: ['fake', 'isJSXText'],
-        placer: { name: 'expressionMutantPlacer' },
+        placer: 'expressionMutantPlacer',
       },
     );
   });
