@@ -94,13 +94,7 @@ export function mayHaveLostItsServer(output: RunOutput): boolean {
 }
 
 export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
-  const {
-    status,
-    reporter,
-    snapshots,
-    hookInstalled,
-    installErrors: [installError],
-  } = output;
+  const { status, reporter, snapshots, hookInstalled, installErrors } = output;
   const isMutantRun = request.kind === 'mutant';
   const testCases = [...reporter.testCases.values()];
   const tests = testCases.map((test) => toTestResult(test, isMutantRun));
@@ -147,10 +141,10 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
   }
 
   // A worker that dies at the hook's install is to Playwright only a crash; the hook left the cause.
-  if (installError !== undefined) {
+  if (installErrors.length > 0) {
     return {
       status: DryRunStatus.Error,
-      errorMessage: `The Stryker worker hook failed to install in a Playwright worker: ${installError}`,
+      errorMessage: `The Stryker worker hook failed to install in a Playwright worker: ${[...new Set(installErrors)].join('\n')}`,
     };
   }
 

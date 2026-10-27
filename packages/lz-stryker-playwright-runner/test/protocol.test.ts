@@ -84,8 +84,9 @@ test('the run settings are read from the environment, with a hit limit only when
   );
 });
 
-test('run settings that are not an object or have a field of the wrong type are refused', () => {
+test('run settings that are not JSON, not an object or have a field of the wrong type are refused', () => {
   for (const raw of [
+    '{oops',
     'null',
     '[]',
     '{"perTest":true}',
@@ -97,4 +98,11 @@ test('run settings that are not an object or have a field of the wrong type are 
       message: `${RUN_SETTINGS} holds no valid run settings: ${raw}`,
     });
   }
+});
+
+test('run settings that are not JSON are refused with the parse error as the cause', () => {
+  assert.throws(
+    () => readRunSettings({ [RUN_SETTINGS]: '{oops' }),
+    (error) => error instanceof Error && error.cause instanceof SyntaxError,
+  );
 });

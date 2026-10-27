@@ -84,7 +84,7 @@ export function readRunnerOptions(
 
   const own = options.lzStrykerPlaywright ?? {};
 
-  if (isRecord(own)) {
+  if (isRecord(own) && !Array.isArray(own)) {
     const {
       configFile,
       projects,

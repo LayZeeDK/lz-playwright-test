@@ -116,13 +116,18 @@ if (
   try {
     install(createRequire(entry), settings);
   } catch (error) {
-    fs.writeFileSync(
-      path.join(
-        settings.outDir,
-        `worker-${process.pid}${INSTALL_ERROR_SUFFIX}`,
-      ),
-      String(error),
-    );
+    try {
+      fs.writeFileSync(
+        path.join(
+          settings.outDir,
+          `worker-${process.pid}${INSTALL_ERROR_SUFFIX}`,
+        ),
+        String(error),
+      );
+    } catch {
+      // The worker still exits with the install error; the run then reports only a crashed worker.
+    }
+
     throw error;
   }
 }

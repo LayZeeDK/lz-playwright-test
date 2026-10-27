@@ -60,6 +60,8 @@ test('the runner options refuse --testFiles', () => {
 test('the runner options refuse lzStrykerPlaywright options that are not an object or have a field of the wrong type', () => {
   for (const lzStrykerPlaywright of [
     'chromium',
+    [],
+    { workers: null },
     { configFile: 1 },
     { projects: 'chromium' },
     { projects: ['chromium', 1] },

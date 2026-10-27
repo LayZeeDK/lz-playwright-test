@@ -208,6 +208,21 @@ test('a worker whose hook fails to install leaves the error for the run and exit
   });
 });
 
+test('a worker whose hook fails to install and cannot leave the error still exits with that error', (t) => {
+  const removeOutDir = `import fs from 'node:fs'; fs.rmSync(JSON.parse(process.env.${RUN_SETTINGS}).outDir, { recursive: true });`;
+  const { child } = runWorker(
+    t,
+    [`data:text/javascript,${encodeURIComponent(removeOutDir)}`, HOOK_URL],
+    'exports.test = {};',
+  );
+
+  assert.equal(child.status, 1, child.stderr);
+  assert.match(
+    child.stderr,
+    /Error: The worker hook needs test\.info\(\) from playwright\/test/,
+  );
+});
+
 test('a second copy of the hook in the same worker installs nothing', (t) => {
   // Another URL loads the module again, as a second install of this package would.
   const { child, outDir } = runWorker(t, [HOOK_URL, `${HOOK_URL}?copy=2`]);

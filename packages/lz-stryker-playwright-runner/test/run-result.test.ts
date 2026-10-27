@@ -727,3 +727,16 @@ test('coverage from a context that outlived its test counts as static', () => {
   assert.deepEqual({ ...coverage.static }, { '1': 1 });
   assert.deepEqual({ ...coverage.perTest }, {});
 });
+
+test('a run whose workers failed to install the hook reports each distinct error once', () => {
+  const output: RunOutput = {
+    ...passedRun([]),
+    installErrors: ['Error: a', 'Error: b', 'Error: a'],
+  };
+
+  assert.deepEqual(toRunResult(output, dryRequest()), {
+    status: DryRunStatus.Error,
+    errorMessage:
+      'The Stryker worker hook failed to install in a Playwright worker: Error: a\nError: b',
+  });
+});

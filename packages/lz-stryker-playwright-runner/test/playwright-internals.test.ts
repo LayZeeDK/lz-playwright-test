@@ -16,7 +16,7 @@ const src = new URL('../src/', import.meta.url);
 
 /** `answers` holds what each TestRunner method resolves to, by method name. */
 function fakeModules(
-  methods = TEST_RUNNER_METHODS,
+  methods: readonly string[] = TEST_RUNNER_METHODS,
   answers: Readonly<Record<string, unknown>> = {},
 ) {
   class TestRunner {}

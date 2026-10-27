@@ -143,7 +143,14 @@ export function readRunSettings(
     return undefined;
   }
 
-  const settings: unknown = JSON.parse(raw);
+  const refused = `${RUN_SETTINGS} holds no valid run settings: ${raw}`;
+  let settings: unknown;
+
+  try {
+    settings = JSON.parse(raw);
+  } catch (cause) {
+    throw new Error(refused, { cause });
+  }
 
   if (isRecord(settings)) {
     const { outDir, perTest, hitLimit } = settings;
@@ -159,5 +166,5 @@ export function readRunSettings(
     }
   }
 
-  throw new Error(`${RUN_SETTINGS} holds no valid run settings: ${raw}`);
+  throw new Error(refused);
 }

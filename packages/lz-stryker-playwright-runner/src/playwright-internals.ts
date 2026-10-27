@@ -51,16 +51,15 @@ export interface TestRunner {
   stopTests(): Promise<void>;
 }
 
-const TEST_RUNNER_METHOD_SET: Record<keyof TestRunner, true> = {
-  initialize: true,
-  loadConfig: true,
-  listTests: true,
-  runGlobalSetup: true,
-  runGlobalTeardown: true,
-  runTests: true,
-  stopTests: true,
-};
-export const TEST_RUNNER_METHODS = Object.keys(TEST_RUNNER_METHOD_SET);
+export const TEST_RUNNER_METHODS = [
+  'initialize',
+  'loadConfig',
+  'listTests',
+  'runGlobalSetup',
+  'runGlobalTeardown',
+  'runTests',
+  'stopTests',
+] as const satisfies readonly (keyof TestRunner)[];
 
 export interface CoreBundleModule {
   utils: {
