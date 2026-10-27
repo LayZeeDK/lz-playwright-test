@@ -126,6 +126,18 @@ O8 gained one more case on a Linux-only bug (a port check that read a live serve
 which passes on Windows before the fix, in favour of a test through the injected `connect` seam that fails on every
 OS with an AssertionError on the value.
 
+**O15. `lz-tpp`'s list says nothing useful about a boundary guard.** A worker turned on typescript-eslint's
+`no-unsafe-*` rules and added runtime checks in six places, each test-first (2026-10-27). Every green step was
+"(unconditional -> if)" plus a parse of an `unknown` value, so naming the transformation added nothing. The list
+ranks ways to grow an algorithm, and a guard at a trust boundary is not one. Evidence:
+`.audit/types/step3-notes.md` (local, gitignored), "lz-tdd friction".
+
+**O16. Neither skill covers a guard whose mutants the type checker rejects.** With Stryker's TypeScript checker
+on, mutating a narrowing check on an `unknown` value often yields a compile error, which does not count against the
+score. Where it compiles, a test must kill it. This decided which tests the worker wrote in the same run, and
+neither `lz-red` nor `lz-tpp` mentions it. Evidence: the same notes file, which names the test meant to kill each
+compiling mutant.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -174,6 +186,12 @@ a default, a boolean literal used only as a mark).
 **S13 (from O14).** In `lz-refactor` step 5, say that an owner's recorded approval of the public change (a ruling,
 an issue, a brief that quotes it) answers the pause, and that the refactoring then proceeds with the consumers'
 breakage stated in the commit.
+
+**S14 (from O15).** Give `lz-tpp` a short case for a guard at a trust boundary: the green step is the check plus
+its error, and the choice that matters is where the parse happens, not which transformation it is.
+
+**S15 (from O16).** In `lz-red`, for a repo with a mutation score and a type checker, say to write a test for each
+guard mutant that compiles and to leave out the ones the checker rejects, and say how to tell the two apart.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
