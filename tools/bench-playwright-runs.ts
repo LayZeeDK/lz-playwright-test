@@ -12,6 +12,13 @@ import {
 } from '../packages/lz-stryker-playwright-runner/src/playwright-internals.ts';
 
 const [configArg, runsArg = '3', ...testIds] = process.argv.slice(2);
+
+if (configArg === undefined) {
+  throw new Error(
+    'Usage: node tools/bench-playwright-runs.ts <playwright config> [runs=3] [testId...]',
+  );
+}
+
 const configFile = path.resolve(configArg);
 
 const browserServer = process.env.BENCH_SHARED_BROWSER

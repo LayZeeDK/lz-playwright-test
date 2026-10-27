@@ -102,8 +102,8 @@ function createDb(): Db {
     nextCommentId: 1,
   };
 
-  const addUser = (username: string, bio: string) =>
-    db.users.push({
+  const addUser = (username: string, bio: string): User => {
+    const user: User = {
       id: db.nextUserId++,
       username,
       email: `${username}@example.com`,
@@ -111,7 +111,11 @@ function createDb(): Db {
       bio,
       image: '',
       following: new Set(),
-    });
+    };
+    db.users.push(user);
+
+    return user;
+  };
   const addArticle = (
     author: number,
     minutesAgo: number,
@@ -119,8 +123,8 @@ function createDb(): Db {
     description: string,
     body: string,
     tagList: string[],
-  ) =>
-    db.articles.push({
+  ): Article => {
+    const article: Article = {
       id: db.nextArticleId++,
       slug: slugify(title),
       title,
@@ -131,14 +135,18 @@ function createDb(): Db {
       updatedAt: at(minutesAgo),
       authorId: author,
       favoritedBy: new Set(),
-    });
+    };
+    db.articles.push(article);
 
-  addUser('jake', 'I work at statefarm');
-  addUser('anne', 'Writes about testing');
+    return article;
+  };
+
+  const jake = addUser('jake', 'I work at statefarm');
+  const anne = addUser('anne', 'Writes about testing');
   addUser('carl', '');
-  db.users[1].following.add(1);
+  anne.following.add(jake.id);
 
-  addArticle(
+  const dragon = addArticle(
     1,
     50,
     'How to train your dragon',
@@ -187,7 +195,7 @@ function createDb(): Db {
     updatedAt: at(5),
     authorId: 2,
   });
-  db.articles[0].favoritedBy.add(2);
+  dragon.favoritedBy.add(anne.id);
 
   return db;
 }
@@ -265,7 +273,7 @@ function verifyToken(
 ): { id: number; username: string } | null {
   const [h, p, s] = token.split('.');
 
-  if (!s || sign(secret, `${h}.${p}`) !== s) {
+  if (p === undefined || !s || sign(secret, `${h}.${p}`) !== s) {
     return null;
   }
 
@@ -553,20 +561,20 @@ export function createApiServer({
       'optional',
       ({ params, me }) => [
         200,
-        { profile: profileView(findUser(params.username), me) },
+        { profile: profileView(findUser(param(params, 'username')), me) },
       ],
     ],
     [
       'POST',
       '/profiles/:username/follow',
       'required',
-      ({ params, me }) => setFollow(params.username, me, true),
+      ({ params, me }) => setFollow(param(params, 'username'), me, true),
     ],
     [
       'DELETE',
       '/profiles/:username/follow',
       'required',
-      ({ params, me }) => setFollow(params.username, me, false),
+      ({ params, me }) => setFollow(param(params, 'username'), me, false),
     ],
 
     [
@@ -648,7 +656,7 @@ export function createApiServer({
       'optional',
       ({ params, me }) => [
         200,
-        { article: articleView(findArticle(params.slug), me) },
+        { article: articleView(findArticle(param(params, 'slug')), me) },
       ],
     ],
     [
@@ -656,7 +664,7 @@ export function createApiServer({
       '/articles/:slug',
       'required',
       ({ params, me, body }) => {
-        const article = findArticle(params.slug);
+        const article = findArticle(param(params, 'slug'));
         const input = body?.article ?? {};
 
         requireOwner(me, article.authorId);
@@ -704,7 +712,7 @@ export function createApiServer({
       '/articles/:slug',
       'required',
       ({ params, me }) => {
-        const article = findArticle(params.slug);
+        const article = findArticle(param(params, 'slug'));
 
         requireOwner(me, article.authorId);
         db.articles = db.articles.filter((a) => a !== article);
@@ -717,13 +725,13 @@ export function createApiServer({
       'POST',
       '/articles/:slug/favorite',
       'required',
-      ({ params, me }) => setFavorite(params.slug, me, true),
+      ({ params, me }) => setFavorite(param(params, 'slug'), me, true),
     ],
     [
       'DELETE',
       '/articles/:slug/favorite',
       'required',
-      ({ params, me }) => setFavorite(params.slug, me, false),
+      ({ params, me }) => setFavorite(param(params, 'slug'), me, false),
     ],
 
     [
@@ -731,7 +739,7 @@ export function createApiServer({
       '/articles/:slug/comments',
       'optional',
       ({ params, me }) => {
-        const article = findArticle(params.slug);
+        const article = findArticle(param(params, 'slug'));
         const comments = db.comments
           .filter((c) => c.articleId === article.id)
           .sort((a, b) => b.id - a.id);
@@ -744,7 +752,7 @@ export function createApiServer({
       '/articles/:slug/comments',
       'required',
       ({ params, me, body }) => {
-        const article = findArticle(params.slug);
+        const article = findArticle(param(params, 'slug'));
         const errors = required(body?.comment, ['body']);
 
         if (hasErrors(errors)) {
@@ -771,7 +779,7 @@ export function createApiServer({
       '/articles/:slug/comments/:id',
       'required',
       ({ params, me }) => {
-        const article = findArticle(params.slug);
+        const article = findArticle(param(params, 'slug'));
         const comment = db.comments.find(
           (c) => c.id === Number(params.id) && c.articleId === article.id,
         );
@@ -935,6 +943,16 @@ function countParam(value: string | null, fallback: number): number {
   return value === null || value === '' || !Number.isInteger(count) || count < 0
     ? fallback
     : count;
+}
+
+function param(params: Context['params'], name: string): string {
+  const value = params[name];
+
+  if (value === undefined) {
+    throw new Error(`The route has no :${name} parameter`);
+  }
+
+  return value;
 }
 
 function decodeParam(value: string): string {

@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 
 import { IMPLICIT_ROLE } from '../src/operators.ts';
+import { defined } from './support/defined.ts';
 
 const require = createRequire(import.meta.url);
 const BUNDLE = join(
@@ -34,8 +35,8 @@ function playwrightTable(): Map<string, string | undefined> {
     /^\s+"([A-Z0-9]+)": \((\w*)\) => (.*)$/gm,
   )) {
     const constant =
-      parameter === '' ? /^"([a-z]+)",?$/.exec(result.trim()) : null;
-    table.set(tag.toLowerCase(), constant?.[1]);
+      parameter === '' ? /^"([a-z]+)",?$/.exec(defined(result).trim()) : null;
+    table.set(defined(tag).toLowerCase(), constant?.[1]);
   }
 
   return table;

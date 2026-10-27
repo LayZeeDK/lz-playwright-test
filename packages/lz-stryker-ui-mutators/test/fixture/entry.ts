@@ -2,6 +2,7 @@
 // Prints one JSON line: the names this package registered, whether the placer is wrapped, and the ignorer outcome.
 import { resolveFromCore } from '../../src/install.ts';
 import { operators } from '../../src/operators.ts';
+import { defined } from '../support/defined.ts';
 
 if (process.argv[2] === 'broken') {
   Object.assign(operators[0], { sample: 'export const a = 1;\n' });
@@ -13,7 +14,7 @@ const own = Symbol.for('@layzee/lz-stryker-ui-mutators');
 let ignorer: string;
 
 try {
-  const [plugin] = strykerPlugins;
+  const plugin = defined(strykerPlugins[0]);
   ignorer = `${plugin.kind} ${plugin.name} ${String(plugin.factory().shouldIgnore({}))}`;
 } catch (error) {
   ignorer = `throws ${error instanceof Error ? error.message : String(error)}`;
