@@ -1,15 +1,23 @@
 // parseRoleTable on excerpts of playwright-core's bundle from 1.63.0 to the newest alpha, and consumerRoles against
 // fake playwright-core installs on disk and against the installed one.
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 
 import { bundled } from '../src/bundled-roles.ts';
-import { consumerRoles, parseRoleTable } from '../src/playwright-roles.ts';
+import {
+  consumerRoles,
+  parseRoleTable,
+  type BundledRoles,
+} from '../src/playwright-roles.ts';
 import { exported } from './support/exports.ts';
-import { excerpt, fakePlaywrightCore } from './support/fake-playwright-core.ts';
+import {
+  excerpt,
+  fakePlaywrightCore,
+  tempRoot,
+} from './support/fake-playwright-core.ts';
 
 // tools/playwright-roles-matrix.ts writes one fixture per minor version of playwright-core.
 const fixtureVersions = readdirSync(
@@ -22,7 +30,10 @@ const installedBundle = join(
   'lib',
   'coreBundle.js',
 );
-const otherBundled = { version: '0.0.1', roles: new Map() };
+const otherBundled: BundledRoles = { version: '0.0.1', roles: new Map() };
+// A table whose only entry is BUTTON, so it lacks the A and AREA entries that LzElementRole reads.
+const buttonOnly =
+  'kImplicitRoleByTagName = {\\n  "BUTTON": () => "button"\\n};';
 
 describe('parseRoleTable', () => {
   it('has a fixture for the oldest supported playwright-core, 1.63.0', () => {
@@ -50,12 +61,18 @@ describe('parseRoleTable', () => {
 
   it('reads an attribute entry whose function names its parameter with more than one letter', () => {
     const roles = parseRoleTable(
-      'kImplicitRoleByTagName = {\\n  "AREA": (element) => {\\n    return element.hasAttribute("href") ? "link" : null;\\n  }\\n};',
+      'kImplicitRoleByTagName = {\\n  "A": (e) => {\\n    return e.hasAttribute("href") ? "link" : null;\\n  },' +
+        '\\n  "AREA": (element) => {\\n    return element.hasAttribute("href") ? "link" : null;\\n  },' +
+        '\\n  "BUTTON": () => "button"\\n};',
     );
 
     assert.deepEqual(
       [...roles],
-      [['area', { role: 'link', attribute: 'href' }]],
+      [
+        ['button', { role: 'button' }],
+        ['a', { role: 'link', attribute: 'href' }],
+        ['area', { role: 'link', attribute: 'href' }],
+      ],
     );
   });
 
@@ -82,7 +99,20 @@ describe('parseRoleTable', () => {
       [
         'no entry is constant or set by one attribute',
         'kImplicitRoleByTagName = {\\n  "INPUT": (e) => e.type\\n};',
-        'kImplicitRoleByTagName has no entry whose role is constant or set by one attribute',
+        'kImplicitRoleByTagName lacks the entries for a, area, button that LzElementRole reads',
+      ],
+      [
+        'the table lacks some of the entries that LzElementRole reads',
+        buttonOnly,
+        'kImplicitRoleByTagName lacks the entries for a, area that LzElementRole reads',
+      ],
+      [
+        'the table lacks only the BUTTON entry',
+        excerpt('1.64.1').replace(
+          '"BUTTON": () => "button"',
+          '"BUTTON": (e) => e.type',
+        ),
+        'kImplicitRoleByTagName lacks the entries for button that LzElementRole reads',
       ],
     ] as const
   ).forEach(([title, bundle, message]) => {
@@ -113,7 +143,6 @@ describe('consumerRoles', () => {
 
     return { messages, warn: (message: string) => messages.push(message) };
   }
-
   it("reads the consumer's table, and warns about nothing", (t) => {
     const { resolve } = fakePlaywrightCore(t, '1.63.0', excerpt('1.63.0'));
     const { messages, warn } = recorder();
@@ -181,6 +210,48 @@ describe('consumerRoles', () => {
     assert.deepEqual(messages, [
       `lz-stryker-ui-mutators: cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} ` +
         '(Error: kImplicitRoleByTagName not found); LzElementRole uses the table bundled from playwright-core 0.0.1.',
+    ]);
+  });
+
+  it('gives the bundled table, and warns once naming the missing tags, when the table lacks entries LzElementRole reads', (t) => {
+    const { resolve, bundlePath } = fakePlaywrightCore(t, '1.99.0', buttonOnly);
+    const { messages, warn } = recorder();
+
+    assert.equal(
+      consumerRoles(otherBundled, resolve, warn),
+      otherBundled.roles,
+    );
+    assert.deepEqual(messages, [
+      `lz-stryker-ui-mutators: cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} ` +
+        '(Error: kImplicitRoleByTagName lacks the entries for a, area that LzElementRole reads); ' +
+        'LzElementRole uses the table bundled from playwright-core 0.0.1.',
+    ]);
+  });
+
+  // Node.js's own resolver rejects a package.json that is not JSON, so a custom resolve stands in for one that does not.
+  it('gives the bundled table, and warns once with the manifest path and reason, when the manifest is not JSON', (t) => {
+    const manifest = join(tempRoot(t), 'package.json');
+    writeFileSync(manifest, '{');
+    const resolve = () => manifest;
+    const { messages, warn } = recorder();
+    // Node.js words the JSON error differently across versions.
+    let jsonError: unknown;
+    assert.throws(
+      () => JSON.parse('{'),
+      (error) => {
+        jsonError = error;
+
+        return true;
+      },
+    );
+
+    assert.equal(
+      consumerRoles(otherBundled, resolve, warn),
+      otherBundled.roles,
+    );
+    assert.deepEqual(messages, [
+      `lz-stryker-ui-mutators: cannot read the implicit role table of playwright-core in ${manifest} ` +
+        `(${String(jsonError)}); LzElementRole uses the table bundled from playwright-core 0.0.1.`,
     ]);
   });
 });

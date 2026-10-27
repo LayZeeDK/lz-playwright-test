@@ -41,15 +41,18 @@ When the plugin loads, it reads the table from the `playwright-core` it resolves
 
 - Without `playwright-core`, the plugin uses the table it bundles, and prints nothing.
 - If `playwright-core` is installed but the plugin cannot read its table, the plugin prints one warning
-  and uses the bundled table. The warning names the version and path it found, the reason, and the
-  version of the bundled table:
+  and uses the bundled table. A table that lacks the entry for `a`, `area` or `button` counts as
+  unreadable, because the span swap and the role skip read them. The warning names the version and path
+  it found (only the path of `package.json` when that file cannot be read), the reason, and the version
+  of the bundled table:
 
   ```text
   lz-stryker-ui-mutators: cannot read the implicit role table of playwright-core 1.99.0 in <path> (Error: kImplicitRoleByTagName not found); LzElementRole uses the table bundled from playwright-core 1.64.1.
   ```
 
 The bundled table is generated from `playwright-core` when the package is built, so each release carries
-the table of the Playwright version it was built with. If that table cannot be read, the build fails. The
+the table of the Playwright version it was built with. If that table cannot be read, or lacks one of those
+entries, the build fails and names what is missing. The
 package's tests parse the table of each Playwright minor version from 1.63 on.
 
 ## Turn the operators on

@@ -9,8 +9,9 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 
 import {
-  findPlaywrightCore,
+  findManifest,
   parseRoleTable,
+  readPlaywrightCore,
   type PlaywrightCore,
 } from '../src/playwright-roles.ts';
 
@@ -33,7 +34,8 @@ function reason(error: unknown): string {
 let core: PlaywrightCore | undefined;
 
 try {
-  core = findPlaywrightCore(createRequire(from).resolve);
+  const manifest = findManifest(createRequire(from).resolve);
+  core = manifest === undefined ? undefined : readPlaywrightCore(manifest);
 } catch (error) {
   fail(`cannot resolve playwright-core from ${from}: ${reason(error)}.`);
 }

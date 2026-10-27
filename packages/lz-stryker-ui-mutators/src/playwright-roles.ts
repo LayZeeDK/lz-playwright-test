@@ -25,16 +25,14 @@ export interface PlaywrightCore {
 }
 
 /**
- * The playwright-core that `resolve` finds, or undefined when it finds none. Throws when resolving fails for another
- * reason, such as a subpath its `exports` leave out.
+ * The path of the playwright-core package.json that `resolve` finds, or undefined when it finds none. Throws when
+ * resolving fails for another reason, such as a subpath its `exports` leave out.
  */
-export function findPlaywrightCore(
+export function findManifest(
   resolve: (specifier: string) => string,
-): PlaywrightCore | undefined {
-  let manifest: string;
-
+): string | undefined {
   try {
-    manifest = resolve('playwright-core/package.json');
+    return resolve('playwright-core/package.json');
   } catch (error) {
     if (
       error instanceof Error &&
@@ -46,7 +44,10 @@ export function findPlaywrightCore(
 
     throw error;
   }
+}
 
+/** The playwright-core whose package.json is at `manifest`. Throws when that file is unreadable or not JSON. */
+export function readPlaywrightCore(manifest: string): PlaywrightCore {
   return {
     version: String(
       fieldOf(JSON.parse(readFileSync(manifest, 'utf8')), 'version'),
@@ -66,18 +67,22 @@ export function consumerRoles(
     .resolve,
   warn: (message: string) => void = console.warn,
 ): RoleTable {
-  let core: PlaywrightCore | undefined;
+  let found = '';
 
   try {
-    core = findPlaywrightCore(resolve);
+    const manifest = findManifest(resolve);
 
-    return core === undefined
-      ? bundled.roles
-      : parseRoleTable(readFileSync(core.bundlePath, 'utf8'));
+    if (manifest === undefined) {
+      return bundled.roles;
+    }
+
+    found = ` in ${manifest}`;
+    const core = readPlaywrightCore(manifest);
+    found = ` ${core.version} in ${core.bundlePath}`;
+
+    return parseRoleTable(readFileSync(core.bundlePath, 'utf8'));
   } catch (error) {
     const code = fieldOf(error, 'code');
-    const found =
-      core === undefined ? '' : ` ${core.version} in ${core.bundlePath}`;
     const reason =
       code === undefined
         ? String(error)
@@ -92,6 +97,8 @@ export function consumerRoles(
   }
 }
 
+/** The tags whose implicit role is button or link, which LzElementRole's span swap and redundant-role skip read. */
+const readTags: readonly string[] = ['a', 'area', 'button'];
 const start = 'kImplicitRoleByTagName = {';
 // The table sits in playwright-core/lib/coreBundle.js inside one string literal, so its line breaks are the two
 // characters `\n`. An entry is a line indented by two spaces; deeper lines belong to an entry's function body.
@@ -103,7 +110,7 @@ const withAttribute =
 /**
  * The entries of Playwright's `kImplicitRoleByTagName` whose role is constant or depends on one attribute, read from
  * the text of playwright-core/lib/coreBundle.js. Entries whose role depends on more are left out. Throws when the table
- * is missing or none of its entries has either shape.
+ * is missing or lacks an entry of that shape for `a`, `area` or `button`, naming the missing tags.
  */
 export function parseRoleTable(bundle: string): RoleTable {
   const from = bundle.indexOf(start);
@@ -127,9 +134,11 @@ export function parseRoleTable(bundle: string): RoleTable {
     ),
   ]);
 
-  if (roles.size === 0) {
+  const missing = readTags.filter((tag) => !roles.has(tag));
+
+  if (missing.length > 0) {
     throw new Error(
-      'kImplicitRoleByTagName has no entry whose role is constant or set by one attribute',
+      `kImplicitRoleByTagName lacks the entries for ${missing.join(', ')} that LzElementRole reads`,
     );
   }
 

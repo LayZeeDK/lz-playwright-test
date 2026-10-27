@@ -59,6 +59,23 @@ describe('generate-roles', () => {
     assert.equal(existsSync(out), false);
   });
 
+  it('exits 1 with one line naming the missing tags, and writes nothing, when the table lacks entries LzElementRole reads', (t) => {
+    const { root, bundlePath } = fakePlaywrightCore(
+      t,
+      '1.99.0',
+      'kImplicitRoleByTagName = {\\n  "BUTTON": () => "button"\\n};',
+    );
+
+    const { status, stderr, out } = generate(root);
+
+    assert.equal(status, 1);
+    assert.equal(
+      stderr,
+      `lz-stryker-ui-mutators build: cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath}: kImplicitRoleByTagName lacks the entries for a, area that LzElementRole reads.\n`,
+    );
+    assert.equal(existsSync(out), false);
+  });
+
   it('exits 1 with one line, and writes nothing, when resolving playwright-core fails for another reason', (t) => {
     const { root } = fakePlaywrightCore(t, '1.99.0', excerpt('1.64.1'));
     writeFileSync(
