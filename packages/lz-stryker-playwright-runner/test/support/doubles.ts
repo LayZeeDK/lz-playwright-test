@@ -11,7 +11,6 @@ import type {
 } from '@stryker-mutator/api/test-runner';
 
 import type { RunnerStrykerOptions } from '../../src/options.ts';
-import { setEnv } from '../../src/playwright-test-runner.ts';
 import {
   LzStrykerCollectingReporter,
   type ReportedTest,
@@ -36,18 +35,6 @@ export function tempTree(
   });
 
   return dir;
-}
-
-/** Sets `values` in process.env, an undefined value unsetting its variable, and restores them after the test. */
-export function stubEnv(
-  t: TestContext,
-  values: Readonly<Record<string, string | undefined>>,
-): void {
-  const previous = Object.fromEntries(
-    Object.keys(values).map((name) => [name, process.env[name]]),
-  );
-  t.after(() => setEnv(previous));
-  setEnv(values);
 }
 
 /** An Error with a Node.js system error `code`, such as `ENOENT`. */

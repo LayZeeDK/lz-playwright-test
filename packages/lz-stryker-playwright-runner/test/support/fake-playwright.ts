@@ -12,7 +12,10 @@ import type {
   RunTestsParams,
   TestRunner,
 } from '../../src/playwright-internals.ts';
-import { LzStrykerPlaywrightTestRunner } from '../../src/playwright-test-runner.ts';
+import {
+  LzStrykerPlaywrightTestRunner,
+  setEnv,
+} from '../../src/playwright-test-runner.ts';
 import {
   readRunSettings,
   RUN_SETTINGS,
@@ -24,13 +27,7 @@ import {
   LzStrykerCollectingReporter,
   type ReportedTest,
 } from '../../src/reporter.ts';
-import {
-  finishedTest,
-  logger,
-  strykerOptions,
-  stubEnv,
-  tempTree,
-} from './doubles.ts';
+import { finishedTest, logger, strykerOptions, tempTree } from './doubles.ts';
 
 export type Status = FullResult['status'];
 
@@ -70,6 +67,18 @@ export interface Behaviour {
 
 /** The fake's record of every call, in order. */
 type Call = [string, ...unknown[]];
+
+/** Sets `values` in process.env, an undefined value unsetting its variable, and restores them after the test. */
+export function stubEnv(
+  t: TestContext,
+  values: Readonly<Record<string, string | undefined>>,
+): void {
+  const previous = Object.fromEntries(
+    Object.keys(values).map((name) => [name, process.env[name]]),
+  );
+  t.after(() => setEnv(previous));
+  setEnv(values);
+}
 
 export function writeSnapshots(run: Run, lines: SnapshotLine[]) {
   writeFileSync(
@@ -223,14 +232,14 @@ export function fakePlaywright(
     calls,
     runs,
     names: () => calls.map(([name]) => name),
-    /** A runner on `configFile` that the fake's cleanup disposes, and the lines it logs. */
-    runner: (
-      configFile: string | undefined,
-      {
-        timeoutMS = 10_000,
-        lzStrykerPlaywright = {},
-      }: { timeoutMS?: number; lzStrykerPlaywright?: object } = {},
-    ) => {
+    /**
+     * A runner on `configFile`, unless `lzStrykerPlaywright` overrides it, that the fake's cleanup disposes, and the
+     * lines it logs.
+     */
+    runner: ({
+      timeoutMS = 10_000,
+      lzStrykerPlaywright = {},
+    }: { timeoutMS?: number; lzStrykerPlaywright?: object } = {}) => {
       const { log, lines } = logger();
       const shell = new LzStrykerPlaywrightTestRunner(
         strykerOptions({

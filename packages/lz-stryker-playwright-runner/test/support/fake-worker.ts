@@ -1,7 +1,6 @@
 // The worker hook's install against a fake Playwright in this process.
 import assert from 'node:assert/strict';
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { TestContext } from 'node:test';
 
@@ -23,6 +22,7 @@ import type {
   PageSettings,
   StrykerNamespace,
 } from '../../src/worker-hook.ts';
+import { tempTree } from './doubles.ts';
 
 const ACTIVE_MUTANT = INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
 
@@ -99,11 +99,10 @@ export function fakeInstall(
   } = {},
 ) {
   const ns = `__hookTest${Math.random().toString(36).slice(2)}__`;
-  const outDir = mkdtempSync(path.join(tmpdir(), 'worker-hook-install-'));
+  const outDir = tempTree(t, 'worker-hook-install-', {});
   const scope: Record<string, unknown> = globalThis;
   prepare?.(outDir, ns);
   const exitListeners = process.listeners('exit');
-  const previousMutant = process.env[ACTIVE_MUTANT];
   let running: string | undefined;
   let runnable: Runnable = { type: 'test' };
   let listener: Listener | undefined;
@@ -135,6 +134,7 @@ export function fakeInstall(
     },
   };
 
+  const previousMutant = process.env[ACTIVE_MUTANT];
   setEnv({ [ACTIVE_MUTANT]: activeMutant });
 
   try {
@@ -149,7 +149,6 @@ export function fakeInstall(
   t.after(() => {
     added.forEach((exit) => process.off('exit', exit));
     delete scope[ns];
-    rmSync(outDir, { recursive: true, force: true });
   });
 
   assert.ok(listener);
