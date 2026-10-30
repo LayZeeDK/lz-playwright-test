@@ -28,9 +28,9 @@ describe('withJsxPlacement', () => {
     const placed: { node: t.Node; mutants: t.Node[] }[] = [];
     const { path, place } = placeOn('<input disabled />;', 'JSXAttribute', {
       canPlace: () => false,
-      place: (path, appliedMutants) => {
+      place: (placedPath, appliedMutants) => {
         placed.push({
-          node: path.node,
+          node: placedPath.node,
           mutants: [...appliedMutants.values()],
         });
       },

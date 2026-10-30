@@ -9,10 +9,11 @@ import { describe, it } from 'node:test';
 import { parseRoleTable } from '../src/playwright-roles.ts';
 import { exported } from './support/exports.ts';
 import {
+  buttonOnly,
   excerpt,
   fakePlaywrightCore,
-  tempRoot,
 } from './support/fake-playwright-core.ts';
+import { tempRoot } from './support/temp-tree.ts';
 
 const script = join(import.meta.dirname, '..', 'scripts', 'generate-roles.ts');
 
@@ -60,11 +61,7 @@ describe('generate-roles', () => {
   });
 
   it('exits 1 with one line naming the missing tags, and writes nothing, when the table lacks entries LzElementRole reads', (t) => {
-    const { root, bundlePath } = fakePlaywrightCore(
-      t,
-      '1.99.0',
-      'kImplicitRoleByTagName = {\\n  "BUTTON": () => "button"\\n};',
-    );
+    const { root, bundlePath } = fakePlaywrightCore(t, '1.99.0', buttonOnly);
 
     const { status, stderr, out } = generate(root);
 
@@ -77,9 +74,13 @@ describe('generate-roles', () => {
   });
 
   it('exits 1 with one line, and writes nothing, when resolving playwright-core fails for another reason', (t) => {
-    const { root } = fakePlaywrightCore(t, '1.99.0', excerpt('1.64.1'));
+    const { root, manifestPath } = fakePlaywrightCore(
+      t,
+      '1.99.0',
+      excerpt('1.64.1'),
+    );
     writeFileSync(
-      join(root, 'node_modules', 'playwright-core', 'package.json'),
+      manifestPath,
       JSON.stringify({ name: 'playwright-core', exports: { '.': './x.js' } }),
     );
 
@@ -94,7 +95,7 @@ describe('generate-roles', () => {
   });
 
   it('exits 1 with one line, and writes nothing, when playwright-core is not installed', (t) => {
-    const root = tempRoot(t);
+    const root = tempRoot(t, 'ui-mutators-pw-');
 
     const { status, stderr, out } = generate(root);
 

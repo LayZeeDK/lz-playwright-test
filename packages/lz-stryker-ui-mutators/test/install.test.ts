@@ -2,15 +2,7 @@
 // realpath and resolve, and resolveFromCore against the installed instrumenter and against a fake one on disk.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import {
-  mkdirSync,
-  mkdtempSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { describe, it, type TestContext } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
@@ -33,6 +25,7 @@ import {
 import type { MutantPlacerLike } from '../src/placer.ts';
 import { firstPath, parse } from './support/babel.ts';
 import { exported, exportedFunction } from './support/exports.ts';
+import { tempRoot, writeTree } from './support/temp-tree.ts';
 
 const OWN = Symbol.for('@layzee/lz-stryker-ui-mutators');
 const LOCATION = { start: { line: 0, column: 0 }, end: { line: 0, column: 1 } };
@@ -211,7 +204,7 @@ describe('install', () => {
 
   it("treats a Stryker mutator whose name lowercases to an operator's name as a collision", async () => {
     const { run, instrumenter } = setup();
-    const kelvinSign = 'K';
+    const kelvinSign = '\u212A';
     instrumenter.allMutators.push({ name: kelvinSign, mutate: () => [] });
 
     await assert.rejects(run([operator('k')]), {
@@ -262,50 +255,37 @@ describe('install', () => {
     );
   });
 
-  it('counts a mutant of an operator only from its own sample file', async () => {
-    const { run, instrumenter } = setup();
-    const misplaced: Instrumenter = {
-      ...instrumenter,
-      async instrument(files) {
-        const { mutants } = await instrumenter.instrument(files);
+  (
+    [
+      [
+        'a mutant of an operator only from its own sample file',
+        { fileName: 'Other.self-check.tsx' },
+      ],
+      [
+        'a mutant in the sample file of an operator only when that operator made it',
+        { mutatorName: 'StringLiteral' },
+      ],
+    ] satisfies [string, Partial<InstrumentedMutant>][]
+  ).forEach(([title, fields]) => {
+    it(`counts ${title}`, async () => {
+      const { run, instrumenter } = setup();
+      const changed: Instrumenter = {
+        ...instrumenter,
+        async instrument(files) {
+          const { mutants } = await instrumenter.instrument(files);
 
-        return {
-          files,
-          mutants: mutants.map((mutant) => ({
-            ...mutant,
-            fileName: 'Other.self-check.tsx',
-          })),
-        };
-      },
-    };
+          return {
+            files,
+            mutants: mutants.map((mutant) => ({ ...mutant, ...fields })),
+          };
+        },
+      };
 
-    await assert.rejects(
-      run([operator('Alpha')], misplaced),
-      /made no mutants of Alpha from their samples/,
-    );
-  });
-
-  it('counts a mutant in the sample file of an operator only when that operator made it', async () => {
-    const { run, instrumenter } = setup();
-    const foreign: Instrumenter = {
-      ...instrumenter,
-      async instrument(files) {
-        const { mutants } = await instrumenter.instrument(files);
-
-        return {
-          files,
-          mutants: mutants.map((mutant) => ({
-            ...mutant,
-            mutatorName: 'StringLiteral',
-          })),
-        };
-      },
-    };
-
-    await assert.rejects(
-      run([operator('Alpha')], foreign),
-      /made no mutants of Alpha from their samples/,
-    );
+      await assert.rejects(
+        run([operator('Alpha')], changed),
+        /made no mutants of Alpha from their samples/,
+      );
+    });
   });
 
   ['10.1.2', '10.2.0', '110.1.1'].forEach((version) => {
@@ -503,9 +483,7 @@ describe('resolveFromCore against a fake instrumenter', () => {
     placers: readonly string[],
     replace: Readonly<Record<string, string>> = {},
   ) {
-    const root = realpathSync(mkdtempSync(join(tmpdir(), 'ui-mutators-core-')));
-    t.after(() => rmSync(root, { recursive: true, force: true }));
-    const modules = join(root, 'node_modules');
+    const modules = join(tempRoot(t, 'ui-mutators-core-'), 'node_modules');
     const dir = join(modules, '@stryker-mutator', 'instrumenter');
     const files: Record<string, string> = {
       '@stryker-mutator/core/package.json':
@@ -534,11 +512,7 @@ describe('resolveFromCore against a fake instrumenter', () => {
       ...replace,
     };
 
-    Object.entries(files).forEach(([name, content]) => {
-      const path = join(modules, name);
-      mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, content);
-    });
+    writeTree(modules, files);
 
     return {
       corePackage: join(modules, '@stryker-mutator', 'core', 'package.json'),

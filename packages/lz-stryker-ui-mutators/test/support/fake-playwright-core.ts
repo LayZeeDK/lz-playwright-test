@@ -1,23 +1,9 @@
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { TestContext } from 'node:test';
 
-/** A directory that `t` removes after the test. */
-export function tempRoot(t: TestContext): string {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), 'ui-mutators-pw-')));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-
-  return root;
-}
+import { tempRoot, writeTree } from './temp-tree.ts';
 
 /** A playwright-core `version` whose lib/coreBundle.js holds `bundle`, under a directory `t` removes; its resolve. */
 export function fakePlaywrightCore(
@@ -25,21 +11,24 @@ export function fakePlaywrightCore(
   version: string,
   bundle: string,
 ) {
-  const root = tempRoot(t);
+  const root = tempRoot(t, 'ui-mutators-pw-');
   const dir = join(root, 'node_modules', 'playwright-core');
-  mkdirSync(join(dir, 'lib'), { recursive: true });
-  writeFileSync(
-    join(dir, 'package.json'),
-    JSON.stringify({ name: 'playwright-core', version }),
-  );
-  writeFileSync(join(dir, 'lib', 'coreBundle.js'), bundle);
+  writeTree(dir, {
+    'package.json': JSON.stringify({ name: 'playwright-core', version }),
+    'lib/coreBundle.js': bundle,
+  });
 
   return {
     root,
     resolve: createRequire(join(root, 'index.js')).resolve,
+    manifestPath: join(dir, 'package.json'),
     bundlePath: join(dir, 'lib', 'coreBundle.js'),
   };
 }
+
+// A table whose only entry is BUTTON, so it lacks the A and AREA entries that LzElementRole reads.
+export const buttonOnly =
+  'kImplicitRoleByTagName = {\\n  "BUTTON": () => "button"\\n};';
 
 /** The kImplicitRoleByTagName excerpt of playwright-core/lib/coreBundle.js at `version`, escaped as in the bundle. */
 export function excerpt(version: string): string {
