@@ -91,7 +91,7 @@ before(async () => {
 });
 
 after(async () => {
-  await session?.runner.dispose();
+  await session?.dispose();
 });
 
 test('dry run completes with every test passing', () => {
@@ -105,9 +105,7 @@ test('dry run completes with every test passing', () => {
 });
 
 test('per-test coverage credits a text mutant only to the tests that render its element', () => {
-  const { mutantCoverage } = session.dryRun;
-  assert.ok(mutantCoverage, 'the dry run reports coverage');
-  const { perTest, static: staticCoverage } = mutantCoverage;
+  const { perTest, static: staticCoverage } = session.mutantCoverage;
   const heading = mutant('LzTextLiteral', 'Orders', '').id;
   const status = mutant('LzTextLiteral', 'Revealed', '').id;
 

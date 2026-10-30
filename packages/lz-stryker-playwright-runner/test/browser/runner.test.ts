@@ -15,11 +15,7 @@ import path from 'node:path';
 import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import type {
-  CoverageData,
-  Mutant,
-  MutantCoverage,
-} from '@stryker-mutator/api/core';
+import type { CoverageData, Mutant } from '@stryker-mutator/api/core';
 import {
   type MutantRunResult,
   MutantRunStatus,
@@ -82,19 +78,12 @@ function mutant(
   return found;
 }
 
-function dryRunCoverage(): MutantCoverage {
-  const { mutantCoverage } = session.dryRun;
-  assert.ok(mutantCoverage, 'the dry run reports coverage');
-
-  return mutantCoverage;
-}
-
 function testId(title: string): string {
   return session.testId(title);
 }
 
 function perTestCoverage(title: string): CoverageData {
-  const found = dryRunCoverage().perTest[testId(title)];
+  const found = session.mutantCoverage.perTest[testId(title)];
   assert.ok(found, `test "${title}" has per-test coverage`);
 
   return found;
@@ -132,6 +121,33 @@ function runKnownKill(): Promise<MutantRunResult> {
   return session.mutantRun(mutant('ArithmeticOperator', 'a - b'), {
     testFilter: [testId('shows the greeting')],
   });
+}
+
+// The budget of the two deadline tests' loop runs, so their deadline comparisons mean the same.
+const timeout = 8000;
+
+/**
+ * Runs the endless-loop mutant against the test `title` under `timeout`, timing the run, then the known kill.
+ * `stopTook` is how long a deadline stop logged during the run took, if one fired.
+ */
+async function timedLoopRun(title: string) {
+  const loggedBefore = logged.length;
+  const started = performance.now();
+  const timedOut = await session.mutantRun(mutant('UpdateOperator', 'i--'), {
+    testFilter: [testId(title)],
+    timeout,
+  });
+  // Past its budget, Stryker would kill and restart the worker, webServer and all.
+  const elapsed = performance.now() - started;
+  const killed = await runKnownKill();
+
+  return {
+    timedOut,
+    elapsed,
+    stopTook: deadlineStopTook(loggedBefore),
+    deadlineMs: timeout - STOP_HEADROOM_MS,
+    killed,
+  };
 }
 
 function assertTimedOut(result: MutantRunResult, reason: RegExp): void {
@@ -177,7 +193,7 @@ after(async () => {
   rmSync(oldSchemeRoot, { recursive: true, force: true });
 
   if (!disposed) {
-    await session?.runner.dispose();
+    await session?.dispose();
   }
 });
 
@@ -264,11 +280,11 @@ test('a page shared from beforeAll reports its coverage as static', () => {
   const loopMutant = mutant('UpdateOperator', 'i--').id;
 
   assert.ok(
-    dryRunCoverage().static[loopMutant],
+    session.mutantCoverage.static[loopMutant],
     'shared-page coverage lands in static',
   );
   assert.equal(
-    dryRunCoverage().perTest[testId('first user of the shared page')],
+    session.mutantCoverage.perTest[testId('first user of the shared page')],
     undefined,
   );
 });
@@ -276,7 +292,7 @@ test('a page shared from beforeAll reports its coverage as static', () => {
 test('coverage survives a navigation to a page without instrumented code', () => {
   const greetingMutant = mutant('StringLiteral', '""').id;
   const coverage =
-    dryRunCoverage().perTest[
+    session.mutantCoverage.perTest[
       testId('keeps coverage across a navigation to a page without the app')
     ];
 
@@ -286,13 +302,13 @@ test('coverage survives a navigation to a page without instrumented code', () =>
 test('a page never closed before the worker closes the browser still reports coverage, as static', () => {
   const doubleMutant = mutant('ArithmeticOperator', 'n / 2').id;
 
-  assert.ok(dryRunCoverage().static[doubleMutant]);
+  assert.ok(session.mutantCoverage.static[doubleMutant]);
 });
 
 test('a page the test closes still reports its coverage, for that test', () => {
   const halfMutant = mutant('ArithmeticOperator', 'n * 2').id;
   const coverage =
-    dryRunCoverage().perTest[
+    session.mutantCoverage.perTest[
       testId('halves on a second page it closes before the test ends')
     ];
 
@@ -300,7 +316,7 @@ test('a page the test closes still reports its coverage, for that test', () => {
 });
 
 test('reused contexts still get per-test coverage', () => {
-  const { perTest } = dryRunCoverage();
+  const { perTest } = session.mutantCoverage;
   const loopMutant = mutant('UpdateOperator', 'i--').id;
 
   assert.equal(
@@ -311,7 +327,7 @@ test('reused contexts still get per-test coverage', () => {
 });
 
 test('app code a test runs in the Playwright worker gets per-test coverage', () => {
-  const { perTest } = dryRunCoverage();
+  const { perTest } = session.mutantCoverage;
 
   assert.deepEqual(
     Object.keys(perTest[testId('adds in the worker')] ?? {}).sort(),
@@ -320,7 +336,7 @@ test('app code a test runs in the Playwright worker gets per-test coverage', () 
 });
 
 test('app code imported into the Playwright worker, outside any test, is static coverage', () => {
-  const { perTest, static: atImport } = dryRunCoverage();
+  const { perTest, static: atImport } = session.mutantCoverage;
   const importMutant = mutant('StringLiteral', '""', 'src/node-only.ts').id;
 
   assert.ok(atImport[importMutant], 'the import counts as static');
@@ -331,7 +347,7 @@ test('app code imported into the Playwright worker, outside any test, is static 
 });
 
 test('app code a beforeAll hook or a worker fixture runs in the Playwright worker is static coverage', () => {
-  const { perTest, static: shared } = dryRunCoverage();
+  const { perTest, static: shared } = session.mutantCoverage;
   const groupMutants = [
     mutant('ArithmeticOperator', 'n - 1', 'src/node-only.ts').id,
     mutant('ArithmeticOperator', 'n + 1', 'src/node-only.ts').id,
@@ -348,7 +364,9 @@ test('app code a beforeAll hook or a worker fixture runs in the Playwright worke
 
 test('a page a beforeAll hook opens and closes in its own context is static coverage', () => {
   assert.equal(
-    dryRunCoverage().perTest[testId('reads what the beforeAll page computed')],
+    session.mutantCoverage.perTest[
+      testId('reads what the beforeAll page computed')
+    ],
     undefined,
   );
 });
@@ -357,7 +375,7 @@ test('a mutant in app code that only the worker runs is killed by the test the d
   const workerMutant = mutant('ArithmeticOperator', 'a - b');
   const worker = testId('adds in the worker');
 
-  assert.ok(dryRunCoverage().perTest[worker]?.[workerMutant.id]);
+  assert.ok(session.mutantCoverage.perTest[worker]?.[workerMutant.id]);
 
   const result = await session.mutantRun(workerMutant, {
     testFilter: [worker],
@@ -412,16 +430,8 @@ test('a run whose selected tests no longer exist is an error, not a survivor', a
 });
 
 test('an infinite loop without a hit limit times out within its budget, and the next run is clean', async (t) => {
-  const timeout = 8000;
-  const loggedBefore = logged.length;
-  const started = performance.now();
-  const timedOut = await session.mutantRun(mutant('UpdateOperator', 'i--'), {
-    testFilter: [testId('counts to three')],
-    timeout,
-  });
-  // Past its budget, Stryker would kill and restart the worker, webServer and all.
-  const elapsed = performance.now() - started;
-  const killed = await runKnownKill();
+  const { timedOut, elapsed, stopTook, deadlineMs, killed } =
+    await timedLoopRun('counts to three');
 
   assert.equal(
     timedOut.status,
@@ -431,9 +441,7 @@ test('an infinite loop without a hit limit times out within its budget, and the 
   // The per-test timeout and the deadline fall at about the same moment, so either may end the run.
   // A deadline stop is timed from when it started, as in the deadline test; without one the whole
   // run ended before the deadline. Playwright's teardown after either is reported, not asserted.
-  const stopTook = deadlineStopTook(loggedBefore);
   const endedAt = stopTook === undefined ? elapsed : elapsed - stopTook;
-  const deadlineMs = timeout - STOP_HEADROOM_MS;
   t.diagnostic(
     `run took ${Math.round(elapsed)} ms, deadline stop ${stopTook === undefined ? 'none' : `took ${stopTook} ms`}`,
   );
@@ -456,23 +464,14 @@ test('an infinite loop trips the hit limit and reports a timeout', async () => {
 test('a loop in a test that raised its own timeout stops at the deadline, without a new init', async (t) => {
   const serverPid = () =>
     fetch('http://127.0.0.1:4321/__pid').then((response) => response.text());
-  const timeout = 8000;
   const before = await serverPid();
-  const loggedBefore = logged.length;
-  const started = performance.now();
-  const timedOut = await session.mutantRun(mutant('UpdateOperator', 'i--'), {
-    testFilter: [testId('counts to three under a raised timeout')],
-    timeout,
-  });
-  const elapsed = performance.now() - started;
-  const killed = await runKnownKill();
+  const { timedOut, elapsed, stopTook, deadlineMs, killed } =
+    await timedLoopRun('counts to three under a raised timeout');
 
   assertTimedOut(timedOut, /deadline/);
   // The runner decides when the stop starts; how long Playwright's teardown then takes is not its
   // to decide (2.1 s in 8 of 9 measured runs, 6.5 s once), so that part is reported, not asserted.
-  const stopTook = deadlineStopTook(loggedBefore);
   const stoppedAfter = elapsed - Number(stopTook);
-  const deadlineMs = timeout - STOP_HEADROOM_MS;
   t.diagnostic(
     `stop started after ${Math.round(stoppedAfter)} ms, took ${stopTook} ms`,
   );
@@ -518,7 +517,7 @@ test('dispose removes the temp directory the runner kept its output and runs in'
     'the temp directory exists while the runner is up',
   );
 
-  await session.runner.dispose();
+  await session.dispose();
   disposed = true;
 
   assert.deepEqual(ownRoots(), []);
