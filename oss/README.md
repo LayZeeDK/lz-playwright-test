@@ -7,7 +7,11 @@ Every copy also needs this runner and StrykerJS installed. Link the runner as a 
 an absolute link. Node resolves the link and strips the runner's TypeScript outside `node_modules`.
 Every Stryker config here loads the runner by its package name, `@layzee/lz-stryker-playwright-runner`.
 
+Build both packages in this repo first. A copy loads each package from its `dist` folder, which a fresh
+clone does not have; without it the import fails with `ERR_MODULE_NOT_FOUND`.
+
 ```sh
+npx nx run-many -t build
 npm install -D @stryker-mutator/core@^10.1.1 file:<this repo>/packages/lz-stryker-playwright-runner
 ```
 
