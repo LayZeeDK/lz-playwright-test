@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
-import { fieldOf } from './install.ts';
+import { fieldOf } from './is-record.ts';
 
 export interface ImplicitRole {
   readonly role: string;
@@ -118,12 +118,8 @@ function captured(value: string | undefined): string {
   return value;
 }
 
-/**
- * The entries of Playwright's `kImplicitRoleByTagName` whose role is constant or depends on one attribute, read from
- * the text of playwright-core/lib/coreBundle.js. Entries whose role depends on more are left out. Throws when the table
- * is missing or lacks an entry of that shape for `a`, `area` or `button`, naming the missing tags.
- */
-export function parseRoleTable(bundle: string): RoleTable {
+/** The `kImplicitRoleByTagName` table in the text of playwright-core/lib/coreBundle.js. Throws when it is missing. */
+export function roleTableExcerpt(bundle: string): string {
   const from = bundle.indexOf(start);
   const to = bundle.indexOf(end, from);
 
@@ -131,7 +127,16 @@ export function parseRoleTable(bundle: string): RoleTable {
     throw new Error('kImplicitRoleByTagName not found');
   }
 
-  const table = bundle.slice(from, to + end.length);
+  return bundle.slice(from, to + end.length);
+}
+
+/**
+ * The entries of Playwright's `kImplicitRoleByTagName` whose role is constant or depends on one attribute, read from
+ * the text of playwright-core/lib/coreBundle.js. Entries whose role depends on more are left out. Throws when the table
+ * is missing or lacks an entry of that shape for `a`, `area` or `button`, naming the missing tags.
+ */
+export function parseRoleTable(bundle: string): RoleTable {
+  const table = roleTableExcerpt(bundle);
   const roles: RoleTable = new Map([
     ...[...table.matchAll(always)].map(
       ([, tag, role]) =>

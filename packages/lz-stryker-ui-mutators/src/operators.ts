@@ -9,7 +9,6 @@ import {
   type BabelTypes,
   type ElementSite,
 } from './mutator.ts';
-import { bundled } from './bundled-roles.ts';
 import type { RoleTable } from './playwright-roles.ts';
 
 const HAS_WORD = /[\p{L}\p{N}]/u;
@@ -237,10 +236,6 @@ export function operatorsFor(roles: RoleTable) {
 }
 
 export type OperatorName = ReturnType<typeof operatorsFor>[number]['name'];
-
-export const operatorNames: readonly OperatorName[] = operatorsFor(
-  bundled.roles,
-).map(({ name }) => name);
 
 function isJsxBranch(node: types.Node, t: BabelTypes): boolean {
   return t.isJSXElement(node) || t.isJSXFragment(node) || t.isNullLiteral(node);

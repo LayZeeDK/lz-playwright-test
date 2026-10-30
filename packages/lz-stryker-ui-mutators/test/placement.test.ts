@@ -18,10 +18,9 @@ import {
   type Instrumenter,
   type SourceFile,
 } from '../src/install.ts';
-import { operatorNames } from '../src/operators.ts';
 import { defined } from './support/defined.ts';
 import { exportedFunction } from './support/exports.ts';
-import { installInto, ours } from './support/installed.ts';
+import { installInto, operatorNames, ours } from './support/installed.ts';
 
 const root = join(import.meta.dirname, '..', '..', '..');
 const corpus: readonly SourceFile[] = [

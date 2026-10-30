@@ -10,9 +10,13 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
+import {
+  fieldOf,
+  isRecord,
+} from '../packages/lz-stryker-ui-mutators/src/is-record.ts';
+import { roleTableExcerpt } from '../packages/lz-stryker-ui-mutators/src/playwright-roles.ts';
+
 const oldestMinor = 63;
-const start = 'kImplicitRoleByTagName = {';
-const end = '\\n};';
 const fixtures = path.join(
   import.meta.dirname,
   '..',
@@ -23,20 +27,27 @@ const fixtures = path.join(
   'roles',
 );
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function tarballOf(versions: Record<string, unknown>, version: string): string {
-  const entry = versions[version];
-  const dist = isRecord(entry) ? entry['dist'] : undefined;
-  const tarball = isRecord(dist) ? dist['tarball'] : undefined;
+  const tarball = fieldOf(fieldOf(versions[version], 'dist'), 'tarball');
 
   if (typeof tarball !== 'string') {
     throw new Error(`playwright-core ${version} has no dist.tarball`);
   }
 
   return tarball;
+}
+
+function excerptOf(bundle: string, version: string): string {
+  try {
+    return roleTableExcerpt(bundle);
+  } catch (error) {
+    throw new Error(
+      `playwright-core ${version} has no kImplicitRoleByTagName`,
+      {
+        cause: error,
+      },
+    );
+  }
 }
 
 const response = await fetch('https://registry.npmjs.org/playwright-core', {
@@ -48,9 +59,8 @@ if (!response.ok) {
 }
 
 const metadata: unknown = await response.json();
-const versions = isRecord(metadata) ? metadata['versions'] : undefined;
-const tags = isRecord(metadata) ? metadata['dist-tags'] : undefined;
-const latest = isRecord(tags) ? tags['latest'] : undefined;
+const versions = fieldOf(metadata, 'versions');
+const latest = fieldOf(fieldOf(metadata, 'dist-tags'), 'latest');
 
 if (!isRecord(versions) || typeof latest !== 'string') {
   throw new Error('the playwright-core metadata has no versions or no latest');
@@ -107,20 +117,10 @@ try {
       path.join(work, 'package', 'lib', 'coreBundle.js'),
       'utf8',
     );
-    const from = bundle.indexOf(start);
-    const to = bundle.indexOf(end, from);
+    const excerpt = excerptOf(bundle, version);
 
-    if (from === -1 || to === -1) {
-      throw new Error(
-        `playwright-core ${version} has no kImplicitRoleByTagName`,
-      );
-    }
-
-    writeFileSync(
-      path.join(fixtures, `${version}.txt`),
-      `${bundle.slice(from, to + end.length)}\n`,
-    );
-    console.log(`${version}: ${String(to + end.length - from)} characters`);
+    writeFileSync(path.join(fixtures, `${version}.txt`), `${excerpt}\n`);
+    console.log(`${version}: ${String(excerpt.length)} characters`);
   }
 } finally {
   rmSync(work, { recursive: true, force: true });

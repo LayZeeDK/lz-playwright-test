@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 
 import type { MutantStatus, Position } from '@stryker-mutator/api/core';
 
+import { fieldOf, isRecord } from './is-record.ts';
 import {
   babelTypeMembers,
   toNodeMutator,
@@ -311,10 +312,6 @@ function importFile(path: string): Promise<unknown> {
   return import(pathToFileURL(path).href);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
 function isListedMutator(value: unknown): value is ListedMutator {
   return (
     isRecord(value) &&
@@ -440,8 +437,4 @@ function stringOf(
   }
 
   return value;
-}
-
-export function fieldOf(value: unknown, key: string): unknown {
-  return isRecord(value) ? value[key] : undefined;
 }

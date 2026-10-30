@@ -14,26 +14,25 @@ import {
 } from '../src/playwright-roles.ts';
 import { exported } from './support/exports.ts';
 import {
+  buttonOnly,
   excerpt,
   fakePlaywrightCore,
-  tempRoot,
 } from './support/fake-playwright-core.ts';
+import { tempRoot } from './support/temp-tree.ts';
 
 // tools/playwright-roles-matrix.ts writes one fixture per minor version of playwright-core.
 const fixtureVersions = readdirSync(
   join(import.meta.dirname, 'fixture', 'roles'),
 ).map((file) => file.replace(/\.txt$/, ''));
+const installedManifest = createRequire(import.meta.url).resolve(
+  'playwright-core/package.json',
+);
 const installedBundle = join(
-  dirname(
-    createRequire(import.meta.url).resolve('playwright-core/package.json'),
-  ),
+  dirname(installedManifest),
   'lib',
   'coreBundle.js',
 );
 const otherBundled: BundledRoles = { version: '0.0.1', roles: new Map() };
-// A table whose only entry is BUTTON, so it lacks the A and AREA entries that LzElementRole reads.
-const buttonOnly =
-  'kImplicitRoleByTagName = {\\n  "BUTTON": () => "button"\\n};';
 
 describe('parseRoleTable', () => {
   it('has a fixture for the oldest supported playwright-core, 1.63.0', () => {
@@ -124,10 +123,7 @@ describe('parseRoleTable', () => {
 
 describe('the bundled table', () => {
   it('equals the table of the playwright-core this repository installs, so an upgrade fails here until generate-roles runs', () => {
-    const manifest = readFileSync(
-      join(installedBundle, '..', '..', 'package.json'),
-      'utf8',
-    );
+    const manifest = readFileSync(installedManifest, 'utf8');
 
     assert.deepEqual(
       bundled.roles,
@@ -231,20 +227,20 @@ describe('consumerRoles', () => {
 
   // Node.js's own resolver rejects a package.json that is not JSON, so a custom resolve stands in for one that does not.
   it('gives the bundled table, and warns once with the manifest path and reason, when the manifest is not JSON', (t) => {
-    const manifest = join(tempRoot(t), 'package.json');
+    const manifest = join(tempRoot(t, 'ui-mutators-pw-'), 'package.json');
     writeFileSync(manifest, '{');
     const resolve = () => manifest;
     const { messages, warn } = recorder();
     // Node.js words the JSON error differently across versions.
-    let jsonError: unknown;
-    assert.throws(
-      () => JSON.parse('{'),
-      (error) => {
-        jsonError = error;
+    const jsonError = (() => {
+      try {
+        JSON.parse('{');
+      } catch (error) {
+        return error;
+      }
 
-        return true;
-      },
-    );
+      return undefined;
+    })();
 
     assert.equal(
       consumerRoles(otherBundled, resolve, warn),

@@ -17,7 +17,10 @@ export function parse(code: string): types.File {
 }
 
 /** The first path of `type` in `file`, in traversal order. */
-export function firstPath(file: types.File, type: string): NodePath {
+export function firstPath(
+  file: types.File,
+  type: types.Node['type'],
+): NodePath {
   const paths: NodePath[] = [];
 
   traverse(file, {

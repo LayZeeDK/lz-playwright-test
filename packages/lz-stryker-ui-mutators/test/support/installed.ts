@@ -2,7 +2,11 @@
 // where STRYKER_MUTATOR_WORKER makes index.ts skip the install (a mutation run of this package).
 import { bundled } from '../../src/bundled-roles.ts';
 import { install, type Instrumenter } from '../../src/install.ts';
-import { operatorNames, operatorsFor } from '../../src/operators.ts';
+import { operatorsFor, type OperatorName } from '../../src/operators.ts';
+
+export const operatorNames: readonly OperatorName[] = operatorsFor(
+  bundled.roles,
+).map(({ name }) => name);
 
 export const ours: ReadonlySet<string> = new Set(operatorNames);
 

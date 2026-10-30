@@ -1,8 +1,6 @@
 // Writes src/bundled-roles.ts from the implicit role table of the playwright-core this repository installs, with the
 // same extractor that reads the consumer's table at run time. Exits 1 with one line on stderr, and writes nothing,
-// when that table cannot be read. The Nx target generate-roles runs it before build, typecheck, lint and test.
-// The test points it at a fake playwright-core and a temp file with LZ_UI_MUTATORS_ROLES_FROM and
-// LZ_UI_MUTATORS_ROLES_OUT.
+// when that table cannot be read.
 // Run: node scripts/generate-roles.ts
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';

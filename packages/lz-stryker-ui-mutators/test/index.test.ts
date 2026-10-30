@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
-import { operatorNames } from '../src/operators.ts';
+import { operatorNames } from './support/installed.ts';
 
 const ENTRY = join(import.meta.dirname, 'fixture', 'entry.ts');
 
