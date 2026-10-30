@@ -17,7 +17,7 @@ import {
   isOwnDir,
   isRunning,
   namespaceToken,
-  OWNER_FILE,
+  ownerFile,
   removeLeftRoots,
   rootPid,
 } from '../src/temp-root.ts';
@@ -184,16 +184,16 @@ test('a folder that vanished is not ours', () => {
   );
 });
 
-const TOKEN = 'ns-of-this-runner';
+const ownerToken = 'ns-of-this-runner';
 
-// A temp directory holding the given entries, each a folder with an owner marker that holds `TOKEN`, and a
+// A temp directory holding the given entries, each a folder with an owner marker that holds `ownerToken`, and a
 // `remove` double that records the base names it is given.
 function tmpWith(t: TestContext, names: string[]) {
   const tmp = tempTree(
     t,
     'temp-root-test-',
     Object.fromEntries(
-      names.map((name) => [path.join(name, OWNER_FILE), TOKEN]),
+      names.map((name) => [path.join(name, ownerFile), ownerToken]),
     ),
   );
   const removed: string[] = [];
@@ -213,19 +213,19 @@ test('a dead root is removed only when its owner marker holds the token of this 
     'lz-stryker-playwright-103-notxt0',
   ]);
   writeFileSync(
-    path.join(tmp, 'lz-stryker-playwright-101-theirs', OWNER_FILE),
+    path.join(tmp, 'lz-stryker-playwright-101-theirs', ownerFile),
     'ns-of-another-runner',
   );
-  rmSync(path.join(tmp, 'lz-stryker-playwright-102-nomark', OWNER_FILE));
-  rmSync(path.join(tmp, 'lz-stryker-playwright-103-notxt0', OWNER_FILE));
-  mkdirSync(path.join(tmp, 'lz-stryker-playwright-103-notxt0', OWNER_FILE));
+  rmSync(path.join(tmp, 'lz-stryker-playwright-102-nomark', ownerFile));
+  rmSync(path.join(tmp, 'lz-stryker-playwright-103-notxt0', ownerFile));
+  mkdirSync(path.join(tmp, 'lz-stryker-playwright-103-notxt0', ownerFile));
 
   const result = removeLeftRoots(tmp, {
     running: () => false,
     owned: () => true,
     remove,
     ownPid: 1,
-    token: TOKEN,
+    token: ownerToken,
   });
 
   assert.deepEqual(result, ['lz-stryker-playwright-100-ours00']);
@@ -247,7 +247,7 @@ test('only the roots of dead runners of this user are removed, and named', (t) =
     owned: (dir) => !dir.includes('-400-'),
     remove,
     ownPid: 300,
-    token: TOKEN,
+    token: ownerToken,
   });
 
   assert.deepEqual(result, ['lz-stryker-playwright-100-dead00']);
@@ -269,7 +269,7 @@ test('a root that cannot be removed now is skipped without an error', (t) => {
       }
     },
     ownPid: 1,
-    token: TOKEN,
+    token: ownerToken,
   });
 
   assert.deepEqual(result, ['lz-stryker-playwright-101-bbbbbb']);
@@ -278,11 +278,14 @@ test('a root that cannot be removed now is skipped without an error', (t) => {
 test('a new root is named after the pid of the runner that owns it', (t) => {
   const tmp = tempTree(t, 'temp-root-test-', {});
 
-  const root = createTempRoot(tmp, 4242, TOKEN);
+  const root = createTempRoot(tmp, 4242, ownerToken);
 
   assert.equal(rootPid(path.basename(root.dir)), 4242);
-  assert.deepEqual(readdirSync(root.dir).sort(), [OWNER_FILE, 'runs']);
-  assert.equal(readFileSync(path.join(root.dir, OWNER_FILE), 'utf8'), TOKEN);
+  assert.deepEqual(readdirSync(root.dir).sort(), [ownerFile, 'runs']);
+  assert.equal(
+    readFileSync(path.join(root.dir, ownerFile), 'utf8'),
+    ownerToken,
+  );
   assert.deepEqual(
     [root.nextRunDir(), root.nextRunDir()],
     [path.join(root.dir, 'runs', '0'), path.join(root.dir, 'runs', '1')],
@@ -299,7 +302,7 @@ test('a root whose owner file cannot be written is removed, and the write error 
 
   assert.throws(
     () =>
-      createTempRoot(tmp, 4242, TOKEN, () => {
+      createTempRoot(tmp, 4242, ownerToken, () => {
         throw full;
       }),
     (error) => error === full,

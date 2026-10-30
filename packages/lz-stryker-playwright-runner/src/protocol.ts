@@ -5,14 +5,14 @@ import type { MutantCoverage } from '@stryker-mutator/api/core';
 
 import { isRecord } from './is-record.ts';
 
-export const RUN_SETTINGS = 'LZ_STRYKER_PLAYWRIGHT_RUN';
+export const runSettingsEnv = 'LZ_STRYKER_PLAYWRIGHT_RUN';
 
-export const SNAPSHOT_SUFFIX = '.ndjson';
+export const snapshotSuffix = '.ndjson';
 
 /** A worker whose hook failed to install leaves the error in a file of this suffix, as text. */
-export const INSTALL_ERROR_SUFFIX = '.install-error';
+export const installErrorSuffix = '.install-error';
 
-export const FRAME_READ_TIMEOUT_MS = 2000;
+export const frameReadTimeoutMs = 2000;
 
 export interface RunSettings {
   outDir: string;
@@ -130,13 +130,13 @@ export function parseSnapshotLine(line: string): Snapshot | undefined {
 export function readSnapshotDir(dir: string): SnapshotDir {
   const names = fs.readdirSync(dir);
   const read = (file: string) => fs.readFileSync(path.join(dir, file), 'utf8');
-  const files = names.filter((file) => file.endsWith(SNAPSHOT_SUFFIX));
+  const files = names.filter((file) => file.endsWith(snapshotSuffix));
   const snapshots = files
     .flatMap((file) => read(file).split('\n'))
     .map(parseSnapshotLine)
     .filter((snapshot) => snapshot !== undefined);
   const installErrors = names
-    .filter((file) => file.endsWith(INSTALL_ERROR_SUFFIX))
+    .filter((file) => file.endsWith(installErrorSuffix))
     .map(read);
 
   return { snapshots, hookInstalled: files.length > 0, installErrors };
@@ -145,13 +145,13 @@ export function readSnapshotDir(dir: string): SnapshotDir {
 export function readRunSettings(
   env: NodeJS.ProcessEnv,
 ): RunSettings | undefined {
-  const raw = env[RUN_SETTINGS];
+  const raw = env[runSettingsEnv];
 
   if (raw === undefined) {
     return undefined;
   }
 
-  const refused = `${RUN_SETTINGS} holds no valid run settings: ${raw}`;
+  const refused = `${runSettingsEnv} holds no valid run settings: ${raw}`;
   let settings: unknown;
 
   try {

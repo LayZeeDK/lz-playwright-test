@@ -5,12 +5,12 @@ import {
   armDeadline,
   assertionTimeoutWarning,
   configTimeouts,
-  DEFAULT_EXPECT_TIMEOUT_MS,
-  MIN_TEST_TIMEOUT_MS,
+  defaultExpectTimeoutMs,
+  minTestTimeoutMs,
   mutantRunBudget,
-  RUN_START_MS,
-  STOP_HEADROOM_MS,
-  STOP_RETRY_MS,
+  runStartMs,
+  stopHeadroomMs,
+  stopRetryMs,
   timeoutReason,
 } from '../src/timeouts.ts';
 
@@ -33,7 +33,7 @@ test('the config cap is the largest project timeout, and Infinity when a project
   );
   assert.deepEqual(configTimeouts([]), {
     testTimeoutCap: Infinity,
-    expectTimeout: DEFAULT_EXPECT_TIMEOUT_MS,
+    expectTimeout: defaultExpectTimeoutMs,
   });
 });
 
@@ -50,7 +50,7 @@ test('the expect timeout is the largest over the projects, with Playwright defau
       { expect: { timeout: 1000 }, project: { timeout: 1 } },
       { project: { timeout: 1 } },
     ]).expectTimeout,
-    DEFAULT_EXPECT_TIMEOUT_MS,
+    defaultExpectTimeoutMs,
   );
 });
 
@@ -72,10 +72,7 @@ test('a mutant run gets the timeout less the headroom as its test timeout, and a
 });
 
 test('the test timeout keeps its floor and the config cap', () => {
-  assert.equal(
-    mutantRunBudget(6000, uncapped).testTimeout,
-    MIN_TEST_TIMEOUT_MS,
-  );
+  assert.equal(mutantRunBudget(6000, uncapped).testTimeout, minTestTimeoutMs);
   assert.equal(
     mutantRunBudget(60_000, { ...uncapped, testTimeoutCap: 10_000 })
       .testTimeout,
@@ -84,15 +81,15 @@ test('the test timeout keeps its floor and the config cap', () => {
 });
 
 test('no deadline when it would leave too little time for a test to finish', () => {
-  const shortest = RUN_START_MS + MIN_TEST_TIMEOUT_MS;
+  const shortest = runStartMs + minTestTimeoutMs;
 
   assert.equal(mutantRunBudget(4500, uncapped).deadlineMs, undefined);
   assert.equal(
-    mutantRunBudget(shortest + STOP_HEADROOM_MS - 1, uncapped).deadlineMs,
+    mutantRunBudget(shortest + stopHeadroomMs - 1, uncapped).deadlineMs,
     undefined,
   );
   assert.equal(
-    mutantRunBudget(shortest + STOP_HEADROOM_MS, uncapped).deadlineMs,
+    mutantRunBudget(shortest + stopHeadroomMs, uncapped).deadlineMs,
     shortest,
   );
 });
@@ -103,7 +100,7 @@ test('the deadline never comes before a test that starts on time hits its own ti
 
     if (deadlineMs !== undefined) {
       assert.ok(
-        deadlineMs >= RUN_START_MS + (testTimeout ?? 0),
+        deadlineMs >= runStartMs + (testTimeout ?? 0),
         `timeout ${timeout}: deadline ${deadlineMs}, test timeout ${testTimeout}`,
       );
     }
@@ -198,14 +195,14 @@ test('a deadline repeats stop until it is disarmed, since Playwright ignores it 
   const { deadline, calls, tick } = armed(t, 1000);
 
   tick(1000);
-  tick(STOP_RETRY_MS - 1);
+  tick(stopRetryMs - 1);
 
   assert.deepEqual(calls, [1000]);
 
   tick(1);
-  tick(STOP_RETRY_MS);
+  tick(stopRetryMs);
   deadline.disarm();
-  tick(STOP_RETRY_MS * 10);
+  tick(stopRetryMs * 10);
 
   assert.deepEqual(calls, [1000, 1100, 1200]);
 });

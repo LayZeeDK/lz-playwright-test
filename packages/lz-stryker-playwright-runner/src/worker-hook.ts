@@ -16,15 +16,15 @@ import {
   type RunningSlot,
   runningSlotOf,
   type SlotType,
-  WORKER_ENTRY,
+  workerEntry,
 } from './playwright-internals.ts';
 import {
-  FRAME_READ_TIMEOUT_MS,
-  INSTALL_ERROR_SUFFIX,
+  frameReadTimeoutMs,
+  installErrorSuffix,
   readRunSettings,
   type RunSettings,
   serializeSnapshot,
-  SNAPSHOT_SUFFIX,
+  snapshotSuffix,
   type SnapshotLine,
 } from './protocol.ts';
 
@@ -99,7 +99,7 @@ const entry = process.argv[1];
 const settings = readRunSettings(process.env);
 // `Symbol.for`, so a second copy of this package in the worker, from another install, sees the mark
 // of the first and leaves the worker's coverage to it.
-const INSTALLED: unique symbol = Symbol.for(
+const installed: unique symbol = Symbol.for(
   '@layzee/lz-stryker-playwright-runner/worker-hook',
 );
 
@@ -107,10 +107,10 @@ if (
   settings &&
   isMainThread &&
   entry !== undefined &&
-  WORKER_ENTRY.test(entry) &&
-  !(INSTALLED in globalThis)
+  workerEntry.test(entry) &&
+  !(installed in globalThis)
 ) {
-  Reflect.set(globalThis, INSTALLED, INSTALLED);
+  Reflect.set(globalThis, installed, installed);
 
   try {
     install(createRequire(entry), settings);
@@ -119,7 +119,7 @@ if (
       fs.writeFileSync(
         path.join(
           settings.outDir,
-          `worker-${process.pid}${INSTALL_ERROR_SUFFIX}`,
+          `worker-${process.pid}${installErrorSuffix}`,
         ),
         String(error),
       );
@@ -144,7 +144,7 @@ export function install(
     process.env[INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE];
   const outFile = path.join(
     outDir,
-    `worker-${process.pid}-${randomUUID()}${SNAPSHOT_SUFFIX}`,
+    `worker-${process.pid}-${randomUUID()}${snapshotSuffix}`,
   );
   const contexts = new WeakMap<HookedContext, ContextState>();
   const alreadyRead = new WeakSet<HookedPage>();
@@ -327,12 +327,12 @@ export function recordNodeCoverage(
 // needs, so test.info() alone names the first test of a group for code that serves the whole group.
 // Fixtures differ between the two rules: Node code cannot tell a worker fixture from a test's own, so
 // it counts for no test, while a context a fixture opens is checked again at close (outlivedItsTest).
-const PER_TEST_SLOTS: ReadonlySet<SlotType> = new Set([
+const perTestSlots: ReadonlySet<SlotType> = new Set([
   'test',
   'beforeEach',
   'afterEach',
 ]);
-const GROUP_HOOKS: ReadonlySet<SlotType> = new Set(['beforeAll', 'afterAll']);
+const groupHooks: ReadonlySet<SlotType> = new Set(['beforeAll', 'afterAll']);
 
 /** The test that Node code running now belongs to: none in a beforeAll or afterAll hook or a fixture. */
 function nodeTestId(test: CurrentTest): string | undefined {
@@ -344,7 +344,7 @@ function nodeTestId(test: CurrentTest): string | undefined {
 
   const { slot } = running;
 
-  return slot && !slot.inFixture && PER_TEST_SLOTS.has(slot.type)
+  return slot && !slot.inFixture && perTestSlots.has(slot.type)
     ? running.testId
     : undefined;
 }
@@ -357,7 +357,7 @@ function contextTestId(test: CurrentTest): string | undefined {
   const running = test();
   const type = running?.slot?.type;
 
-  return type !== undefined && GROUP_HOOKS.has(type)
+  return type !== undefined && groupHooks.has(type)
     ? undefined
     : running?.testId;
 }
@@ -380,10 +380,7 @@ async function readNamespace(
   ns: string,
 ): Promise<FrameRead | undefined> {
   const { promise: lost, resolve } = Promise.withResolvers<FrameRead>();
-  const timer = setTimeout(
-    () => resolve({ lost: true }),
-    FRAME_READ_TIMEOUT_MS,
-  );
+  const timer = setTimeout(() => resolve({ lost: true }), frameReadTimeoutMs);
   const read = frame
     .evaluate((name) => {
       const scope: Record<string, unknown> = globalThis;

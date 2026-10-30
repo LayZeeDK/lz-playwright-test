@@ -19,7 +19,7 @@ import {
 import {
   type ConfigWebServer,
   loadPlaywright,
-  NO_COPY_PROMPT_ENV,
+  noCopyPromptEnv,
   type Playwright,
   type TestRunner,
 } from './playwright-internals.ts';
@@ -65,12 +65,12 @@ interface Session {
   readonly timeouts: ConfigTimeouts;
 }
 
-const HOOK = new URL(
+const workerHookUrl = new URL(
   `./worker-hook${path.extname(import.meta.filename)}`,
   import.meta.url,
 ).href;
 
-const RUN_OVERRIDES = {
+const runOverrides = {
   use: { screenshot: 'off', trace: 'off', video: 'off' },
 };
 
@@ -106,7 +106,7 @@ export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
     try {
       playwright = await pw.createTestRunner(options.configFile, {
         outputDir: root.outputDir,
-        ...RUN_OVERRIDES,
+        ...runOverrides,
       });
       const config = await playwright.loadConfig();
       const timeouts = configTimeouts(config.projects);
@@ -240,9 +240,9 @@ export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
       const { status } = await withEnv(
         {
           NODE_OPTIONS:
-            `--import "${HOOK}" ${this.baseNodeOptions ?? ''}`.trim(),
+            `--import "${workerHookUrl}" ${this.baseNodeOptions ?? ''}`.trim(),
           ...env,
-          [NO_COPY_PROMPT_ENV]: '1',
+          [noCopyPromptEnv]: '1',
         },
         () =>
           session.playwright.runTests(reporter, {
@@ -324,7 +324,7 @@ export function setEnv(values: Readonly<Record<string, string | undefined>>) {
 }
 
 // Playwright's own webServer port check tries both loopback addresses: localhost can resolve to only one of them.
-const LOOPBACK_HOSTS = ['127.0.0.1', '::1'];
+const loopbackHosts = ['127.0.0.1', '::1'];
 
 /** The members of a net.Socket that a port check uses. */
 export interface ConnectingSocket {
@@ -339,13 +339,13 @@ export function acceptsConnections(
   return new Promise((resolve) => {
     let answered = 0;
 
-    LOOPBACK_HOSTS.forEach((host) => {
+    loopbackHosts.forEach((host) => {
       const socket = connect({ host, port, timeout: 5000 });
       const done = (ok: boolean) => {
         socket.destroy();
         answered += 1;
 
-        if (ok || answered === LOOPBACK_HOSTS.length) {
+        if (ok || answered === loopbackHosts.length) {
           resolve(ok);
         }
       };

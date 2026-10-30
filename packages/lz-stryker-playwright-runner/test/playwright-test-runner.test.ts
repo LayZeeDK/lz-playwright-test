@@ -16,15 +16,15 @@ import {
 } from '@stryker-mutator/api/test-runner';
 
 import { strykerPlugins, strykerValidationSchema } from '../src/index.ts';
-import { OPTION_PROPERTIES } from '../src/options.ts';
+import { optionProperties } from '../src/options.ts';
 import { fieldOf } from '../src/is-record.ts';
-import { INSTALL_ERROR_SUFFIX } from '../src/protocol.ts';
+import { installErrorSuffix } from '../src/protocol.ts';
 import {
   acceptsConnections,
   LzStrykerPlaywrightTestRunner,
   withEnv,
 } from '../src/playwright-test-runner.ts';
-import { namespaceToken, OWNER_FILE, ROOT_PREFIX } from '../src/temp-root.ts';
+import { namespaceToken, ownerFile, rootPrefix } from '../src/temp-root.ts';
 import {
   dryRunOptions,
   finishedTest,
@@ -34,14 +34,14 @@ import {
   strykerOptions,
 } from './support/doubles.ts';
 import {
-  ACTIVE_MUTANT,
+  activeMutantEnv,
   fakePlaywright,
   passAll,
   stubEnv,
   writeSnapshots,
 } from './support/fake-playwright.ts';
 
-const HOOK = new URL('../src/worker-hook.ts', import.meta.url).href;
+const workerHookUrl = new URL('../src/worker-hook.ts', import.meta.url).href;
 
 /** A server listening on a free localhost port, and that port. */
 async function listening(): Promise<{ server: net.Server; port: number }> {
@@ -63,7 +63,7 @@ test('the package declares the runner as the lz-stryker-playwright test runner, 
   ]);
   assert.equal(
     strykerValidationSchema.properties.lzStrykerPlaywright.properties,
-    OPTION_PROPERTIES,
+    optionProperties,
   );
 });
 
@@ -194,9 +194,9 @@ function leaveDeadRoots(tmp: string, suffixes: string[]): string[] {
   const dead = spawnSync(process.execPath, ['-e', '']).pid;
 
   return suffixes.map((suffix) => {
-    const name = `${ROOT_PREFIX}${dead}-${suffix}`;
+    const name = `${rootPrefix}${dead}-${suffix}`;
     mkdirSync(path.join(tmp, name));
-    writeFileSync(path.join(tmp, name, OWNER_FILE), namespaceToken());
+    writeFileSync(path.join(tmp, name, ownerFile), namespaceToken());
 
     return name;
   });
@@ -252,7 +252,7 @@ test('the temp root init creates holds the namespace token its sweep matches', a
   const [rootName] = readdirSync(fake.tmp);
   assert.ok(rootName);
   assert.equal(
-    fs.readFileSync(path.join(fake.tmp, rootName, OWNER_FILE), 'utf8'),
+    fs.readFileSync(path.join(fake.tmp, rootName, ownerFile), 'utf8'),
     namespaceToken(),
   );
 });
@@ -357,11 +357,11 @@ test('dispose removes the run folders and output before it waits for the workers
   root = path.join(fake.tmp, rootName);
   // Playwright creates the output folder; the runner creates the runs folder.
   mkdirSync(path.join(root, 'output'));
-  assert.deepEqual(readdirSync(root).sort(), ['output', OWNER_FILE, 'runs']);
+  assert.deepEqual(readdirSync(root).sort(), ['output', ownerFile, 'runs']);
 
   await shell.dispose();
 
-  assert.deepEqual(seen, [OWNER_FILE]);
+  assert.deepEqual(seen, [ownerFile]);
 });
 
 test('a dry run runs every test with the hook and the run settings in the workers environment', async (t) => {
@@ -389,7 +389,7 @@ test('a dry run runs every test with the hook and the run settings in the worker
     outDir: run.settings.outDir,
     perTest: true,
   });
-  assert.equal(run.env[ACTIVE_MUTANT], undefined);
+  assert.equal(run.env[activeMutantEnv], undefined);
   assert.equal(run.env.PLAYWRIGHT_NO_COPY_PROMPT, '1');
   assert.equal(existsSync(run.settings.outDir), false);
   assert.deepEqual({ ...process.env }, before);
@@ -424,9 +424,12 @@ test('the hook is preloaded before the NODE_OPTIONS the runner started with, so 
 
   assert.deepEqual(
     fake.runs.map((run) => run.env.NODE_OPTIONS),
-    [`--import "${HOOK}"`, `--import "${HOOK}" --max-old-space-size=100`],
+    [
+      `--import "${workerHookUrl}"`,
+      `--import "${workerHookUrl}" --max-old-space-size=100`,
+    ],
   );
-  assert.equal(existsSync(fileURLToPath(HOOK)), true);
+  assert.equal(existsSync(fileURLToPath(workerHookUrl)), true);
 });
 
 test('a dry run stops at the first failure unless bail is disabled, and asks for coverage only per test', async (t) => {
@@ -509,7 +512,7 @@ test('a mutant run activates the mutant and runs its tests with their serial gro
   const [run] = fake.runs;
   assert.ok(run);
 
-  assert.equal(run.env[ACTIVE_MUTANT], '7');
+  assert.equal(run.env[activeMutantEnv], '7');
   assert.deepEqual(run.settings, {
     outDir: run.settings.outDir,
     perTest: false,
@@ -624,7 +627,7 @@ test('a run whose worker failed to install the hook reports the error the worker
     runTests: async (run) => {
       run.reporter.onTestEnd(finishedTest('a', 'failed'));
       writeFileSync(
-        path.join(run.settings.outDir, `worker-1${INSTALL_ERROR_SUFFIX}`),
+        path.join(run.settings.outDir, `worker-1${installErrorSuffix}`),
         'Error: no test.info()',
       );
 

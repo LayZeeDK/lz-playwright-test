@@ -7,9 +7,9 @@ import { before, type TestContext, test } from 'node:test';
 
 import type { HookedContext } from '../src/playwright-internals.ts';
 import {
-  FRAME_READ_TIMEOUT_MS,
+  frameReadTimeoutMs,
   readSnapshotDir,
-  RUN_SETTINGS,
+  runSettingsEnv,
   type RunSettings,
 } from '../src/protocol.ts';
 import type * as Hook from '../src/worker-hook.ts';
@@ -53,7 +53,7 @@ function worker(
   };
 }
 
-const HOOK_URL = new URL('../src/worker-hook.ts', import.meta.url).href;
+const workerHookUrl = new URL('../src/worker-hook.ts', import.meta.url).href;
 
 test('a Playwright worker outside a Stryker run loads the hook and installs nothing', (t) => {
   // A path that ends like Playwright's worker entry, so only the run-settings check keeps the hook out.
@@ -65,12 +65,12 @@ test('a Playwright worker outside a Stryker run loads the hook and installs noth
   // An install without run settings throws at import, before the entry runs.
   const child = spawnSync(
     process.execPath,
-    ['--import', HOOK_URL, path.join(dir, entry)],
+    ['--import', workerHookUrl, path.join(dir, entry)],
     {
       encoding: 'utf8',
       // The child keeps NODE_OPTIONS: under Stryker, the test runner's preload there reports the
       // coverage the gate makes in the child.
-      env: { ...process.env, [RUN_SETTINGS]: undefined },
+      env: { ...process.env, [runSettingsEnv]: undefined },
     },
   );
 
@@ -117,7 +117,7 @@ function runWorker(
       encoding: 'utf8',
       env: {
         ...process.env,
-        [RUN_SETTINGS]: JSON.stringify({ outDir, perTest: false }),
+        [runSettingsEnv]: JSON.stringify({ outDir, perTest: false }),
       },
     },
   );
@@ -160,7 +160,7 @@ function playwrightWith(t: TestContext, playwrightTest: string) {
 });
 
 test('during a run the hook installs in the main thread of a Playwright worker, not in its threads', (t) => {
-  const { child, outDir } = runWorker(t, [HOOK_URL]);
+  const { child, outDir } = runWorker(t, [workerHookUrl]);
 
   assert.equal(child.status, 0, child.stderr);
   assert.equal(child.stdout.trim(), 'main');
@@ -168,7 +168,7 @@ test('during a run the hook installs in the main thread of a Playwright worker, 
 });
 
 test('a worker whose hook fails to install leaves the error for the run and exits with it', (t) => {
-  const { child, outDir } = runWorker(t, [HOOK_URL], 'exports.test = {};');
+  const { child, outDir } = runWorker(t, [workerHookUrl], 'exports.test = {};');
 
   assert.equal(child.status, 1, child.stderr);
   assert.deepEqual(readSnapshotDir(outDir), {
@@ -181,10 +181,10 @@ test('a worker whose hook fails to install leaves the error for the run and exit
 });
 
 test('a worker whose hook fails to install and cannot leave the error still exits with that error', (t) => {
-  const removeOutDir = `import fs from 'node:fs'; fs.rmSync(JSON.parse(process.env.${RUN_SETTINGS}).outDir, { recursive: true });`;
+  const removeOutDir = `import fs from 'node:fs'; fs.rmSync(JSON.parse(process.env.${runSettingsEnv}).outDir, { recursive: true });`;
   const { child } = runWorker(
     t,
-    [`data:text/javascript,${encodeURIComponent(removeOutDir)}`, HOOK_URL],
+    [`data:text/javascript,${encodeURIComponent(removeOutDir)}`, workerHookUrl],
     'exports.test = {};',
   );
 
@@ -197,7 +197,10 @@ test('a worker whose hook fails to install and cannot leave the error still exit
 
 test('a second copy of the hook in the same worker installs nothing', (t) => {
   // Another URL loads the module again, as a second install of this package would.
-  const { child, outDir } = runWorker(t, [HOOK_URL, `${HOOK_URL}?copy=2`]);
+  const { child, outDir } = runWorker(t, [
+    workerHookUrl,
+    `${workerHookUrl}?copy=2`,
+  ]);
 
   assert.equal(child.status, 0, child.stderr);
   assert.equal(child.stdout.trim(), 'main');
@@ -208,7 +211,7 @@ test('the hook installs nothing in a worker where another version of it installe
   const mark = `globalThis[Symbol.for('@layzee/lz-stryker-playwright-runner/worker-hook')]=1`;
   const { child, outDir } = runWorker(t, [
     `data:text/javascript,${mark}`,
-    HOOK_URL,
+    workerHookUrl,
   ]);
 
   assert.equal(child.status, 0, child.stderr);
@@ -773,7 +776,7 @@ test('a frame that does not answer in time is lost', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
 
   const closing = created.close();
-  t.mock.timers.tick(FRAME_READ_TIMEOUT_MS - 1);
+  t.mock.timers.tick(frameReadTimeoutMs - 1);
   await new Promise((resolve) => setImmediate(resolve));
 
   assert.equal(hooked.read(), '');

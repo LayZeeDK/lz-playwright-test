@@ -1,8 +1,8 @@
 import { add, countTo, double, half } from './lib.js';
 
-const GREETING = 'Hello';
+const greeting = 'Hello';
 
-document.querySelector('#out')?.replaceChildren(`${GREETING} ${add(1, 2)}`);
+document.querySelector('#out')?.replaceChildren(`${greeting} ${add(1, 2)}`);
 window.countTo = countTo;
 window.double = double;
 window.half = half;

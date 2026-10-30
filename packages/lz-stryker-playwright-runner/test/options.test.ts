@@ -6,14 +6,14 @@ import { test } from 'node:test';
 import { Ajv } from 'ajv';
 
 import {
-  OPTION_PROPERTIES,
+  optionProperties,
   readRunnerOptions,
   strykerValidationSchema,
 } from '../src/options.ts';
 import {
-  MIN_TEST_TIMEOUT_MS,
-  RUN_START_MS,
-  STOP_HEADROOM_MS,
+  minTestTimeoutMs,
+  runStartMs,
+  stopHeadroomMs,
 } from '../src/timeouts.ts';
 import { strykerOptions } from './support/doubles.ts';
 
@@ -140,7 +140,7 @@ test("Stryker's check of the options refuses wrong types, workers below 1 and un
 });
 
 test('every option says what it is for', () => {
-  Object.entries(OPTION_PROPERTIES).forEach(([name, { description }]) => {
+  Object.entries(optionProperties).forEach(([name, { description }]) => {
     assert.match(description, /^[A-Z].{20,}\.$/, name);
   });
 
@@ -156,15 +156,15 @@ test('the README lists exactly the options the schema has', () => {
     ([, name]) => name,
   );
 
-  assert.deepEqual(listed, Object.keys(OPTION_PROPERTIES));
+  assert.deepEqual(listed, Object.keys(optionProperties));
 });
 
 test('the README states the per-test timeout the runner sets', () => {
   const [, headroom, floor] =
     /less ([\d.]+) s but\s+at\s+least\s+([\d.]+) s/.exec(readme) ?? [];
 
-  assert.equal(Number(headroom) * 1000, RUN_START_MS + STOP_HEADROOM_MS);
-  assert.equal(Number(floor) * 1000, MIN_TEST_TIMEOUT_MS);
+  assert.equal(Number(headroom) * 1000, runStartMs + stopHeadroomMs);
+  assert.equal(Number(floor) * 1000, minTestTimeoutMs);
 });
 
 test('the README states when the runner stops a mutant run, and below which timeout it does not', () => {
@@ -172,9 +172,9 @@ test('the README states when the runner stops a mutant run, and below which time
   const [, noStopBelow] =
     /timeout\s+is\s+under\s+([\d.]+) s/.exec(readme) ?? [];
 
-  assert.equal(Number(headroom) * 1000, STOP_HEADROOM_MS);
+  assert.equal(Number(headroom) * 1000, stopHeadroomMs);
   assert.equal(
     Number(noStopBelow) * 1000,
-    RUN_START_MS + MIN_TEST_TIMEOUT_MS + STOP_HEADROOM_MS,
+    runStartMs + minTestTimeoutMs + stopHeadroomMs,
   );
 });

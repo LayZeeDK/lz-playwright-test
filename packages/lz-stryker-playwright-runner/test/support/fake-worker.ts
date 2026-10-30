@@ -24,7 +24,7 @@ import type {
 } from '../../src/worker-hook.ts';
 import { tempTree } from './doubles.ts';
 
-const ACTIVE_MUTANT = INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
+const activeMutantEnv = INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
 
 type Listener = Parameters<Instrumentation['addListener']>[0];
 
@@ -134,13 +134,13 @@ export function fakeInstall(
     },
   };
 
-  const previousMutant = process.env[ACTIVE_MUTANT];
-  setEnv({ [ACTIVE_MUTANT]: activeMutant });
+  const previousMutant = process.env[activeMutantEnv];
+  setEnv({ [activeMutantEnv]: activeMutant });
 
   try {
     installHook((id) => modules[id], { outDir, ...settings }, ns);
   } finally {
-    setEnv({ [ACTIVE_MUTANT]: previousMutant });
+    setEnv({ [activeMutantEnv]: previousMutant });
   }
 
   const added = process

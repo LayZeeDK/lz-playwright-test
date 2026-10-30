@@ -47,7 +47,7 @@ export interface CoverageGaps {
   readonly sharedFrames: number;
 }
 
-const OUTCOME: Record<ReturnType<TestCase['outcome']>, TestStatus> = {
+const statusByOutcome: Record<ReturnType<TestCase['outcome']>, TestStatus> = {
   expected: TestStatus.Success,
   flaky: TestStatus.Success,
   unexpected: TestStatus.Failed,
@@ -301,7 +301,9 @@ function toTestResult(test: ReportedTest, isMutantRun: boolean): TestResult {
   // through describe.configure({ retries }), which outranks the retries: 0 that Playwright's
   // runTests sets.
   const status =
-    outcome === 'flaky' && isMutantRun ? TestStatus.Failed : OUTCOME[outcome];
+    outcome === 'flaky' && isMutantRun
+      ? TestStatus.Failed
+      : statusByOutcome[outcome];
   const base = {
     id: test.id,
     name: `[${titles[0]}] › ${titles.slice(1).join(' › ')}`,

@@ -24,8 +24,8 @@ import {
 import { Instrumenter } from '@stryker-mutator/instrumenter';
 
 import { acceptsConnections } from '../../src/playwright-test-runner.ts';
-import { namespaceToken, OWNER_FILE } from '../../src/temp-root.ts';
-import { STOP_HEADROOM_MS } from '../../src/timeouts.ts';
+import { namespaceToken, ownerFile } from '../../src/temp-root.ts';
+import { stopHeadroomMs } from '../../src/timeouts.ts';
 import { logger } from '../support/doubles.ts';
 import { type Session, startSession, transpile } from './support/session.ts';
 
@@ -145,7 +145,7 @@ async function timedLoopRun(title: string) {
     timedOut,
     elapsed,
     stopTook: deadlineStopTook(loggedBefore),
-    deadlineMs: timeout - STOP_HEADROOM_MS,
+    deadlineMs: timeout - stopHeadroomMs,
     killed,
   };
 }
@@ -176,7 +176,7 @@ before(async () => {
 
   rmSync(fixture('test-results'), { recursive: true, force: true });
   mkdirSync(deadRoot, { recursive: true });
-  writeFileSync(path.join(deadRoot, OWNER_FILE), namespaceToken());
+  writeFileSync(path.join(deadRoot, ownerFile), namespaceToken());
   mkdirSync(oldSchemeRoot, { recursive: true });
 
   session = await startSession(

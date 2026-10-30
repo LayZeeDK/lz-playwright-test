@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
-import { RUN_SETTINGS } from '../src/protocol.ts';
+import { runSettingsEnv } from '../src/protocol.ts';
 import {
   dryRunRequest,
   mutantRunRequest,
@@ -16,7 +16,7 @@ import {
   mutantRunOptions,
 } from './support/doubles.ts';
 
-const ACTIVE_MUTANT = INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
+const activeMutantEnv = INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
 
 test('a mutant run request widens its filter to serial groups and gets its budget', () => {
   const request = mutantRunRequest(
@@ -54,13 +54,13 @@ test('a dry run request keeps the config timeouts', () => {
 test('a dry run plan runs every test with no active mutant, and collects per-test coverage only for perTest', () => {
   assert.deepEqual(runPlan(dryRequest(), 'out'), {
     env: {
-      [RUN_SETTINGS]: '{"outDir":"out","perTest":true}',
-      [ACTIVE_MUTANT]: undefined,
+      [runSettingsEnv]: '{"outDir":"out","perTest":true}',
+      [activeMutantEnv]: undefined,
     },
     params: { testIds: undefined, maxFailures: undefined, timeout: undefined },
   });
   assert.equal(
-    runPlan(dryRequest({ coverageAnalysis: 'all' }), 'out').env[RUN_SETTINGS],
+    runPlan(dryRequest({ coverageAnalysis: 'all' }), 'out').env[runSettingsEnv],
     '{"outDir":"out","perTest":false}',
   );
 });
@@ -78,8 +78,8 @@ test('a mutant run plan activates the mutant and runs its filter in its budget, 
     ),
     {
       env: {
-        [RUN_SETTINGS]: '{"outDir":"out","perTest":false,"hitLimit":5}',
-        [ACTIVE_MUTANT]: '7',
+        [runSettingsEnv]: '{"outDir":"out","perTest":false,"hitLimit":5}',
+        [activeMutantEnv]: '7',
       },
       params: { testIds: ['a', 'b'], maxFailures: undefined, timeout: 900 },
     },

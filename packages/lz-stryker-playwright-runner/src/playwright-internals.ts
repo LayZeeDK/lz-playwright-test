@@ -52,7 +52,7 @@ export interface TestRunner {
   stopTests(): Promise<void>;
 }
 
-export const TEST_RUNNER_METHODS = [
+export const testRunnerMethods = [
   'initialize',
   'loadConfig',
   'listTests',
@@ -74,19 +74,19 @@ export interface CommonModule {
   };
 }
 
-export const MIN_PLAYWRIGHT: {
+export const minPlaywright: {
   readonly major: number;
   readonly minor: number;
 } = { major: 1, minor: 63 };
 
-export const WORKER_ENTRY =
+export const workerEntry =
   /[\\/]playwright[\\/]lib[\\/]worker[\\/]workerProcessEntry\.js$/;
 
 /**
  * Turns off the aria snapshot Playwright takes of a failed test's page for its error prompt. On a page
  * stuck in a loop it waits out its 5 s timeout and pushes the run past Stryker's.
  */
-export const NO_COPY_PROMPT_ENV = 'PLAYWRIGHT_NO_COPY_PROMPT';
+export const noCopyPromptEnv = 'PLAYWRIGHT_NO_COPY_PROMPT';
 
 /** The members of a Playwright Frame the worker hook calls; the page function reads one global. */
 export interface HookedFrame {
@@ -136,7 +136,7 @@ export interface Playwright {
 export function supportsPlaywright(version: string): boolean {
   const [major, minor = NaN] = version.split('.').map(Number);
 
-  return major === MIN_PLAYWRIGHT.major && minor >= MIN_PLAYWRIGHT.minor;
+  return major === minPlaywright.major && minor >= minPlaywright.minor;
 }
 
 /**
@@ -163,7 +163,7 @@ export function probeInternals(
   const changed = () =>
     internalsChanged(
       version,
-      `playwright/lib/runner TestRunner with ${TEST_RUNNER_METHODS.join(', ')}; playwright/lib/common configLoader; playwright-core coreBundle isURLAvailable`,
+      `playwright/lib/runner TestRunner with ${testRunnerMethods.join(', ')}; playwright/lib/common configLoader; playwright-core coreBundle isURLAvailable`,
     );
 
   if (
@@ -185,7 +185,7 @@ export function probeInternals(
   };
   const prototype: unknown = TestRunner.prototype;
   const methods = Object.fromEntries(
-    TEST_RUNNER_METHODS.map((name) => [name, methodOf(prototype, name)]),
+    testRunnerMethods.map((name) => [name, methodOf(prototype, name)]),
   );
 
   return {
@@ -347,7 +347,7 @@ export function loadPlaywright(configFile: string | undefined): Playwright {
 
   if (!supportsPlaywright(version)) {
     throw new Error(
-      `The Playwright test runner needs Playwright ${MIN_PLAYWRIGHT.major}.${MIN_PLAYWRIGHT.minor} or a later ${MIN_PLAYWRIGHT.major}.x release, found ${version}.`,
+      `The Playwright test runner needs Playwright ${minPlaywright.major}.${minPlaywright.minor} or a later ${minPlaywright.major}.x release, found ${version}.`,
     );
   }
 
@@ -377,7 +377,7 @@ export function instrumentationOf(core: unknown): Instrumentation {
 }
 
 /** What the timeout manager of Playwright 1.63 and 1.64 runs: the test body, hooks, worker teardown, modifiers. */
-const SLOT_TYPES = [
+const slotTypes = [
   'test',
   'beforeEach',
   'afterEach',
@@ -390,7 +390,7 @@ const SLOT_TYPES = [
   'fixme',
 ] as const;
 
-export type SlotType = (typeof SLOT_TYPES)[number];
+export type SlotType = (typeof slotTypes)[number];
 
 export interface RunningSlot {
   readonly type: SlotType;
@@ -444,7 +444,7 @@ function internalsChanged(version: string, what: string): Error {
 }
 
 function isSlotType(value: unknown): value is SlotType {
-  return SLOT_TYPES.some((type) => type === value);
+  return slotTypes.some((type) => type === value);
 }
 
 export function isSerialSuite(suite: unknown): boolean {

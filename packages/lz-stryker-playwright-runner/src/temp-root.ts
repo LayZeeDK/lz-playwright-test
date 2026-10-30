@@ -17,13 +17,13 @@ export interface TempRoot {
   remove(): void;
 }
 
-export const ROOT_PREFIX = 'lz-stryker-playwright-';
-export const OWNER_FILE = 'owner';
+export const rootPrefix = 'lz-stryker-playwright-';
+export const ownerFile = 'owner';
 
 // mkdtemp appends six letters or digits.
 export function rootPid(name: string): number | undefined {
-  const pid = name.startsWith(ROOT_PREFIX)
-    ? Number(/^(\d+)-[A-Za-z0-9]{6}$/.exec(name.slice(ROOT_PREFIX.length))?.[1])
+  const pid = name.startsWith(rootPrefix)
+    ? Number(/^(\d+)-[A-Za-z0-9]{6}$/.exec(name.slice(rootPrefix.length))?.[1])
     : undefined;
 
   return Number.isSafeInteger(pid) ? pid : undefined;
@@ -118,7 +118,7 @@ export function removeLeftRoots(
     }
 
     try {
-      if (fs.readFileSync(path.join(dir, OWNER_FILE), 'utf8') === token) {
+      if (fs.readFileSync(path.join(dir, ownerFile), 'utf8') === token) {
         remove(dir);
 
         return [name];
@@ -156,13 +156,13 @@ export function createTempRoot(
   token: string,
   writeFile: (file: string, data: string) => void = fs.writeFileSync,
 ): TempRoot {
-  const dir = fs.mkdtempSync(path.join(tmp, `${ROOT_PREFIX}${pid}-`));
+  const dir = fs.mkdtempSync(path.join(tmp, `${rootPrefix}${pid}-`));
   const outputDir = path.join(dir, 'output');
   const runsDir = path.join(dir, 'runs');
   let runs = 0;
 
   try {
-    writeFile(path.join(dir, OWNER_FILE), token);
+    writeFile(path.join(dir, ownerFile), token);
     fs.mkdirSync(runsDir);
   } catch (error) {
     removeDir(dir);

@@ -26,7 +26,7 @@ type OptionSchemas = {
   };
 };
 
-export const OPTION_PROPERTIES = {
+export const optionProperties = {
   configFile: {
     type: 'string',
     description:
@@ -54,7 +54,7 @@ export const strykerValidationSchema = {
       type: 'object',
       default: {},
       additionalProperties: false,
-      properties: OPTION_PROPERTIES,
+      properties: optionProperties,
     },
   },
 };
@@ -88,7 +88,7 @@ export function readRunnerOptions(
     const {
       configFile,
       projects,
-      workers = OPTION_PROPERTIES.workers.default,
+      workers = optionProperties.workers.default,
     } = own;
 
     if (

@@ -17,7 +17,7 @@ import {
 } from '../../src/reporter.ts';
 import type { DryRunRequest, MutantRunRequest } from '../../src/run-request.ts';
 import type { RunOutput } from '../../src/run-result.ts';
-import { DRY_RUN_BUDGET } from '../../src/timeouts.ts';
+import { dryRunBudget } from '../../src/timeouts.ts';
 
 export type Outcome = ReturnType<TestCase['outcome']>;
 
@@ -143,7 +143,7 @@ export function dryRequest(
     kind: 'dry',
     disableBail: true,
     coverageAnalysis: 'perTest',
-    budget: DRY_RUN_BUDGET,
+    budget: dryRunBudget,
     ...request,
   };
 }
@@ -157,7 +157,7 @@ export function mutantRequest(
     activeMutant: '1',
     testFilter: undefined,
     hitLimit: undefined,
-    budget: DRY_RUN_BUDGET,
+    budget: dryRunBudget,
     ...request,
   };
 }

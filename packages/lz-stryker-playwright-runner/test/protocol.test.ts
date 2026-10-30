@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import {
   parseSnapshotLine,
   readRunSettings,
-  RUN_SETTINGS,
+  runSettingsEnv,
   serializeSnapshot,
 } from '../src/protocol.ts';
 import { plain } from './support/doubles.ts';
@@ -69,12 +69,12 @@ test('a parsed line keeps no coverage that is not a map', () => {
 test('the run settings are read from the environment, with a hit limit only when one is set', () => {
   assert.equal(readRunSettings({}), undefined);
   assert.deepEqual(
-    readRunSettings({ [RUN_SETTINGS]: '{"outDir":"out","perTest":true}' }),
+    readRunSettings({ [runSettingsEnv]: '{"outDir":"out","perTest":true}' }),
     { outDir: 'out', perTest: true },
   );
   assert.deepEqual(
     readRunSettings({
-      [RUN_SETTINGS]: '{"outDir":"out","perTest":false,"hitLimit":5}',
+      [runSettingsEnv]: '{"outDir":"out","perTest":false,"hitLimit":5}',
     }),
     { outDir: 'out', perTest: false, hitLimit: 5 },
   );
@@ -90,15 +90,15 @@ test('run settings that are not JSON, not an object or have a field of the wrong
     '{"outDir":"out","perTest":"true"}',
     '{"outDir":"out","perTest":true,"hitLimit":"5"}',
   ].forEach((raw) => {
-    assert.throws(() => readRunSettings({ [RUN_SETTINGS]: raw }), {
-      message: `${RUN_SETTINGS} holds no valid run settings: ${raw}`,
+    assert.throws(() => readRunSettings({ [runSettingsEnv]: raw }), {
+      message: `${runSettingsEnv} holds no valid run settings: ${raw}`,
     });
   });
 });
 
 test('run settings that are not JSON are refused with the parse error as the cause', () => {
   assert.throws(
-    () => readRunSettings({ [RUN_SETTINGS]: '{oops' }),
+    () => readRunSettings({ [runSettingsEnv]: '{oops' }),
     (error) => error instanceof Error && error.cause instanceof SyntaxError,
   );
 });

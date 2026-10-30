@@ -18,7 +18,7 @@ import {
 } from '../../src/playwright-test-runner.ts';
 import {
   readRunSettings,
-  RUN_SETTINGS,
+  runSettingsEnv,
   type RunSettings,
   serializeSnapshot,
   type SnapshotLine,
@@ -31,8 +31,9 @@ import { finishedTest, logger, strykerOptions, tempTree } from './doubles.ts';
 
 export type Status = FullResult['status'];
 
-export const ACTIVE_MUTANT = INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
-const FAKE = '__fakePlaywright__';
+export const activeMutantEnv =
+  INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
+const fakeGlobal = '__fakePlaywright__';
 
 interface Project {
   default: boolean;
@@ -103,7 +104,7 @@ export function fakePlaywright(
   // Registered first, so the runners are disposed before the folder goes and the temp variables are restored.
   t.after(async () => {
     await Promise.all(live.map((shell) => shell.dispose()));
-    delete globals[FAKE];
+    delete globals[fakeGlobal];
   });
 
   const dir = tempTree(t, 'runner-shell-test-', {
@@ -114,10 +115,10 @@ export function fakePlaywright(
       name: 'playwright',
       version,
     }),
-    'node_modules/playwright/lib/runner.js': `module.exports = globalThis.${FAKE}.runner;`,
-    'node_modules/playwright/lib/common.js': `module.exports = globalThis.${FAKE}.common;`,
+    'node_modules/playwright/lib/runner.js': `module.exports = globalThis.${fakeGlobal}.runner;`,
+    'node_modules/playwright/lib/common.js': `module.exports = globalThis.${fakeGlobal}.common;`,
     'node_modules/playwright-core/package.json': '{"name":"playwright-core"}',
-    'node_modules/playwright-core/lib/coreBundle.js': `module.exports = globalThis.${FAKE}.coreBundle;`,
+    'node_modules/playwright-core/lib/coreBundle.js': `module.exports = globalThis.${fakeGlobal}.coreBundle;`,
   });
   const tmp = path.join(dir, 'tmp');
   mkdirSync(tmp);
@@ -176,8 +177,8 @@ export function fakePlaywright(
       const env = Object.fromEntries(
         [
           'NODE_OPTIONS',
-          RUN_SETTINGS,
-          ACTIVE_MUTANT,
+          runSettingsEnv,
+          activeMutantEnv,
           'PLAYWRIGHT_NO_COPY_PROMPT',
         ].map((name) => [name, process.env[name]]),
       );
@@ -221,7 +222,7 @@ export function fakePlaywright(
       },
     },
   };
-  globals[FAKE] = fake;
+  globals[fakeGlobal] = fake;
   // init() and the temp root read os.tmpdir(), so the fake's own folder stands in for it.
   stubEnv(t, { TMPDIR: tmp, TEMP: tmp, TMP: tmp });
 

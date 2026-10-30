@@ -8,15 +8,15 @@ import {
   probeInternals,
   runningSlotOf,
   supportsPlaywright,
-  TEST_RUNNER_METHODS,
-  WORKER_ENTRY,
+  testRunnerMethods,
+  workerEntry,
 } from '../src/playwright-internals.ts';
 
 const src = new URL('../src/', import.meta.url);
 
 /** `answers` holds what each TestRunner method resolves to, by method name. */
 function fakeModules(
-  methods: readonly string[] = TEST_RUNNER_METHODS,
+  methods: readonly string[] = testRunnerMethods,
   answers: Readonly<Record<string, unknown>> = {},
 ) {
   class TestRunner {}
@@ -49,19 +49,19 @@ test('the runner supports Playwright 1.63 and later 1.x releases', () => {
 
 test("the worker entry is Playwright's workerProcessEntry.js, by either path separator", () => {
   assert.equal(
-    WORKER_ENTRY.test(
+    workerEntry.test(
       '/app/node_modules/playwright/lib/worker/workerProcessEntry.js',
     ),
     true,
   );
   assert.equal(
-    WORKER_ENTRY.test(
+    workerEntry.test(
       'C:\\app\\node_modules\\playwright\\lib\\worker\\workerProcessEntry.js',
     ),
     true,
   );
   assert.equal(
-    WORKER_ENTRY.test(
+    workerEntry.test(
       '/app/node_modules/playwright/lib/worker/workerProcessEntry.js.map',
     ),
     false,
@@ -77,7 +77,7 @@ test('the probe accepts the internals the runner calls', () => {
 
 test('the probe names every internal when one is missing', () => {
   const missingMethod = fakeModules(
-    TEST_RUNNER_METHODS.filter((method) => method !== 'stopTests'),
+    testRunnerMethods.filter((method) => method !== 'stopTests'),
   );
   const missingLoader = { ...fakeModules(), common: {} };
   const missingUtil = {
@@ -146,7 +146,7 @@ test("the probe's URL check passes the URL and the HTTPS flag on, and counts onl
 function testRunnerAnswering(answers: Readonly<Record<string, unknown>>) {
   return probeInternals(
     '1.99.0',
-    fakeModules(TEST_RUNNER_METHODS, answers),
+    fakeModules(testRunnerMethods, answers),
   ).createTestRunner(undefined, {});
 }
 
@@ -340,7 +340,7 @@ test('the test runner calls each method on the instance Playwright constructed, 
     }
   }
 
-  TEST_RUNNER_METHODS.forEach((method) => {
+  testRunnerMethods.forEach((method) => {
     Object.assign(TestRunner.prototype, {
       async [method](this: unknown, ...args: unknown[]) {
         seen.push([method, this, ...args]);
@@ -386,7 +386,7 @@ test('the test runner calls the methods the probe read, not ones put on the prot
   const playwright = probeInternals('1.99.0', modules);
   const { TestRunner } = modules.runner.testRunner;
   const later: string[] = [];
-  TEST_RUNNER_METHODS.forEach((method) => {
+  testRunnerMethods.forEach((method) => {
     Object.assign(TestRunner.prototype, {
       [method]: async () => {
         later.push(method);

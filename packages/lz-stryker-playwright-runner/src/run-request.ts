@@ -5,11 +5,11 @@ import type {
 } from '@stryker-mutator/api/test-runner';
 
 import type { RunTestsParams } from './playwright-internals.ts';
-import { RUN_SETTINGS, type RunSettings } from './protocol.ts';
+import { runSettingsEnv, type RunSettings } from './protocol.ts';
 import { type SerialGroups, withSerialGroups } from './serial-groups.ts';
 import {
   type ConfigTimeouts,
-  DRY_RUN_BUDGET,
+  dryRunBudget,
   mutantRunBudget,
   type RunBudget,
 } from './timeouts.ts';
@@ -37,7 +37,7 @@ export function dryRunRequest({
   disableBail,
   coverageAnalysis,
 }: DryRunOptions): DryRunRequest {
-  return { kind: 'dry', disableBail, coverageAnalysis, budget: DRY_RUN_BUDGET };
+  return { kind: 'dry', disableBail, coverageAnalysis, budget: dryRunBudget };
 }
 
 export function mutantRunRequest(
@@ -78,7 +78,7 @@ export function runPlan(request: RunRequest, outDir: string): RunPlan {
 
   return {
     env: {
-      [RUN_SETTINGS]: JSON.stringify(settings),
+      [runSettingsEnv]: JSON.stringify(settings),
       [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: mutant?.activeMutant,
     },
     params: {
