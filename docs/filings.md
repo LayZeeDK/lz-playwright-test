@@ -239,6 +239,37 @@ a constant file would pass its success case only by copying the fixture's table.
 a missing output file inside the test body. `lz-red` accepts that red, and a sharper one needs a stub that writes a
 wrong file, which is code written only to fail. Evidence: `fixF7a-notes.md`, `fixF7b-notes.md` (local, gitignored).
 
+**O29. `lz-refactor` has no step for checking an earlier refactoring.** Every procedure starts from recognizing a
+smell and treats each smell as found fresh. In round 2 of the code smell review (2026-10-30), several findings were
+smells that round-1 fixes had created, after step 4 had counted those fixes as APPLY. The skill had no way to call
+such a cost a regression of an earlier fix. Reviewers of already-triaged items built their "considered and not
+raised" lists outside the skill, because it has no notion of a decline that still stands. In round 3 (2026-10-31),
+most of the audit confirmed that 29 earlier refactorings held, and the result table sat outside the skill. One
+implementer rightly chose another shape than a triage ruling asked for. Step 4 can say DECLINE but not "amend the
+ruling". Two round-3 findings were smells the change had moved elsewhere, such as duplication swapped for diverging
+semantics, and no smell leaf matched. Evidence: `round2-synthesis.md`, "lz-tdd friction", item 3; the same sections
+of `r2-runner-src-closed.md`, `r2-runner-test-b-closed.md`, `r2-ui-test-closed.md`, `r3-closed.md` and
+`r3-neutral.md` (local, gitignored).
+
+**O30. Step 4 compares unlike units.** A dependency edge, a drift risk and a test-only export are not duplication
+sites or obscurity. In round 2, one reviewer had to invent a count of "modules loaded for nothing" to set a module
+that imports from the wrong neighbour against "adds 1 file". Another needed prose to justify APPLY for the same
+items. A shared test double that drags modules in at import had the same problem. In a round-2 fix, step 5's
+public-API guard covered consumers but not the Nx module boundary rule, which a behaviour-preserving move can break.
+Evidence: `round2-synthesis.md`, "lz-tdd friction", item 6; the same sections of `r2-ui-src-closed.md`,
+`r2-ui-src-neutral.md`, `r2-runner-test-b-closed.md` and `fixU2-B-notes.md` (local, gitignored).
+
+**O31. No guidance for an arrange step that shares code with the subject under test.** In round 2, a test built its
+environment with `stubEnv`, a helper that calls `setEnv`, which is the code under test. Replace Inline Code with
+Function Call scored APPLY. Test independence argued the other way, and step 4 had no place for that argument.
+Evidence: `round2-synthesis.md`, "lz-tdd friction", item 10; `r2-runner-test-b-closed.md`, item 3 (local,
+gitignored).
+
+**O32. Step 4 cannot say that a duplicate is weaker than its original.** In round 2, a copied lookup in a test
+dropped the existence assert of the original. The duplication was one rule against one added member, so the count
+forced a DECLINE. The count had no way to record that the copy is less safe, which was the reason to fix it.
+Evidence: `round2-synthesis.md`, "lz-tdd friction", item 11; `r2-runner-test-a1-neutral.md` (local, gitignored).
+
 O1 held again in the same two fixes. Most mutant-killing tests were pins that passed on their first run, because a
 larger green step had already brought their behaviour. `lz-red` calls a first-run pass on new behaviour a false
 green. The workers showed each red by applying the mutant by hand. Evidence: `fixF7a-notes.md`, `fixF7b-notes.md`.
@@ -262,6 +293,47 @@ coverage and not unreachable code. Evidence: `chunk-f5.md`.
 O17 held again for a Substitute Algorithm. The new condition joins two operands with `&&`, and one operand had no
 test that fails when only that operand is wrong. `lz-refactor`'s advice to write characterization tests does not ask
 for one test per operand. Evidence: `fixF2-notes.md`, D6.
+
+O5 held again in round 2. Duplicated arrange blocks, hand-rolled teardown beside a shared fixture helper, a helper
+called for a result it discards, table-driven test lists and fixture literals shared across files were mapped by
+hand to Duplicated Code and Fowler moves. Evidence: `round2-synthesis.md`, "lz-tdd friction", item 8.
+
+O19 held again in all twelve round-2 reviews and in round 3. Each stated mutant effects outside the verdict line.
+Round 2 added that for test code under an assertion-only Stryker config, the cost is assertions added, merged or
+removed. A round-2 fix found that a guard that never runs leaves an uncovered mutant, which only the reviews had
+said. Evidence: `round2-synthesis.md`, "lz-tdd friction", item 1; `r3-closed.md`; `fixU2-C-notes.md`.
+
+O20 held again in round 2. The skill has no notion of a review scope since a base, of a smell present at the base,
+or of a smell the change already removed, which was most of every diff. Scope came from the briefs alone. Evidence:
+`round2-synthesis.md`, "lz-tdd friction", item 2.
+
+O21 held again. A round-2 fix could not run the browser tests, so it checked four items together by type-check and
+lint. Evidence: `fixR2-C-notes.md`.
+
+O22 held again in rounds 2 and 3. A one-for-one Extract Function had no verdict for "only if a house rule wants one
+home". The skill does not name folding test copies into an existing table (Parameterize Function over rows) as the
+way out of the tie, nor count reuse of a file's own idiom as adding nothing. Rename, Remove Middle Man, Slide
+Statements and Replace Inline Code with Function Call always score "removes N > adds 0", which misses churn of 21
+call-site edits. The skill does not say whether a moved function counts as added. Fix workers again found that the
+count adds nothing to pre-triaged items. Evidence: `round2-synthesis.md`, "lz-tdd friction", items 4 and 5;
+`r3-neutral.md`; `fixU2-A-notes.md`, `fixU2-B-notes.md`, `fixU2-C-notes.md`.
+
+O23 held again in rounds 2 and 3. The house rule asked for `forEach` where the audit marks a side-effect loop "no".
+The audit's scope, "the code you refactored", is undefined in a diff audit, and in round 3 it ran over loops a
+previous round had already converted. It has no answer for iteration that a library owns, such as a Babel visitor
+callback. A short form for "every loop has a side effect" would save the per-loop listing. Evidence:
+`round2-synthesis.md`, "lz-tdd friction", item 9; `r3-closed.md`; `r3-neutral.md`.
+
+O24 held again in rounds 2 and 3, with new gaps. The index has no entry for two clear-looking names that mean
+different things in one module, for a comment made false by a behaviour-preserving refactoring or one that restates
+configuration, for a shadowed name, for production code that exists only for tests, or for a lookalike Unicode
+literal. It has no Replace Magic Literal leaf and no name for turning a callback into a return value. Insider
+Trading fits a misplaced shared helper only loosely. The skill does not ask whether a repo tool may import package
+source, which depends on the build graph. Round 3 added a constant returned from a parameterized helper. Evidence:
+`round2-synthesis.md`, "lz-tdd friction", item 7; `r3-closed.md`, item 3; `fixU2-C-notes.md`.
+
+O26 held again. A round-2 fix judged its public-API pause by `src/index.ts` and not by module exports. The skill
+does not say to do that. Evidence: `fixU2-A-notes.md`.
 
 ### Suggestions
 
@@ -366,6 +438,21 @@ code, so it runs as a red-green fix with `lz-red` and `lz-tpp`, not as a refacto
 **S27 (from O28).** Give `lz-tpp` a case for a first test that only the whole implementation passes, such as
 fixtures that parse to one table. Take that step whole, then pin the details with synthetic inputs. In `lz-red`,
 say whether a stub written only to sharpen a red is worth its code.
+
+**S28 (from O29).** Add a verify mode to `lz-refactor`. For each earlier refactoring it reports whether the fix held,
+diverged from its ruling, or created a new smell. Let a decline stand with its reason, let step 4 propose amending a
+ruling, and add a case for a smell the change moved elsewhere.
+
+**S29 (from O30).** Let step 4 name costs that are not counts, such as dependency direction, drift risk and a
+test-only export, and weigh them in words. In step 5, check the project's module boundary rules beside the public
+API.
+
+**S30 (from O31).** In `lz-refactor`'s test-code guidance, say that an arrange helper built on the code under test
+couples the test to its subject. Prefer arrange code that does not call the subject, even when a shared helper
+exists.
+
+**S31 (from O32).** Let step 4 record that a duplicate is weaker than its original, for example a dropped assert, and
+treat restoring the lost check as reason enough to apply.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
