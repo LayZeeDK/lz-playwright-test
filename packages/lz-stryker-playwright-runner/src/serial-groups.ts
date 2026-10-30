@@ -50,7 +50,7 @@ export function serialGroups(testCases: Iterable<ReportedTest>): SerialGroups {
   const bySuite = new Map<object, string[]>();
   const byTest = new Map<string, string[]>();
 
-  for (const test of testCases) {
+  [...testCases].forEach((test) => {
     const group = outermostSerialSuite(test);
 
     if (group) {
@@ -59,7 +59,7 @@ export function serialGroups(testCases: Iterable<ReportedTest>): SerialGroups {
       bySuite.set(group, ids);
       byTest.set(test.id, ids);
     }
-  }
+  });
 
   return byTest;
 }

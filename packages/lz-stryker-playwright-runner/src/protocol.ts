@@ -67,14 +67,22 @@ export function emptyRecord<T>(): Record<string, T> {
   return record;
 }
 
-// A key such as __proto__ or a count that is not a hit count must not reach an ordinary object.
+/** Untrusted entries go straight into a record without a prototype, never through an ordinary object. */
+function recordOf<T>(
+  entries: readonly (readonly [string, T])[],
+): Record<string, T> {
+  const record = emptyRecord<T>();
+  entries.forEach(([key, value]) => {
+    record[key] = value;
+  });
+
+  return record;
+}
+
 function hitCounts(value: unknown): Record<string, number> {
-  return Object.assign(
-    emptyRecord<number>(),
-    Object.fromEntries(
-      entriesOf(value).flatMap(([mutantId, count]) =>
-        isHitCount(count) ? [[mutantId, count] as const] : [],
-      ),
+  return recordOf(
+    entriesOf(value).flatMap(([mutantId, count]) =>
+      isHitCount(count) ? [[mutantId, count] as const] : [],
     ),
   );
 }
@@ -88,17 +96,14 @@ function parseCoverage(value: unknown): MutantCoverage | undefined {
     return undefined;
   }
 
-  const perTest: MutantCoverage['perTest'] = Object.assign(
-    emptyRecord<Record<string, number>>(),
-    Object.fromEntries(
-      entriesOf(value.perTest).map(([testId, hits]) => [
-        testId,
-        hitCounts(hits),
-      ]),
+  return {
+    static: hitCounts(value.static),
+    perTest: recordOf(
+      entriesOf(value.perTest).map(
+        ([testId, hits]) => [testId, hitCounts(hits)] as const,
+      ),
     ),
-  );
-
-  return { static: hitCounts(value.static), perTest };
+  };
 }
 
 export function parseSnapshotLine(line: string): Snapshot | undefined {

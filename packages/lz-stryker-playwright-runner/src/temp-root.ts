@@ -109,28 +109,27 @@ export function removeLeftRoots(
     token: string;
   },
 ): string[] {
-  const removed: string[] = [];
-
-  for (const name of fs.readdirSync(tmp)) {
+  return fs.readdirSync(tmp).flatMap((name) => {
     const pid = rootPid(name);
     const dir = path.join(tmp, name);
 
     if (pid === undefined || pid === ownPid || running(pid) || !owned(dir)) {
-      continue;
+      return [];
     }
 
     try {
       if (fs.readFileSync(path.join(dir, OWNER_FILE), 'utf8') === token) {
         remove(dir);
-        removed.push(name);
+
+        return [name];
       }
     } catch {
       // A root whose owner file cannot be read is kept; one that cannot be removed now, the next
       // runner that starts tries again.
     }
-  }
 
-  return removed;
+    return [];
+  });
 }
 
 export function removeDir(dir: string): void {

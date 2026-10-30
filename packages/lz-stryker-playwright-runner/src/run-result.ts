@@ -116,7 +116,7 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
     return { status: DryRunStatus.Timeout, reason };
   }
 
-  if (reporter.errors.length && !anyFailed(tests)) {
+  if (reporter.errors.length && !anyTestFailed(tests)) {
     return errorRun(reporter.errors.join('\n'));
   }
 
@@ -157,7 +157,7 @@ export function missingCoverageError(
 ): string | undefined {
   if (
     !anyRan(tests) ||
-    anyFailed(tests) ||
+    anyTestFailed(tests) ||
     snapshots.some((snapshot) => snapshot.coverage)
   ) {
     return undefined;
@@ -288,7 +288,7 @@ function anyRan(tests: readonly TestResult[]): boolean {
   return tests.some((test) => test.status !== TestStatus.Skipped);
 }
 
-function anyFailed(tests: readonly TestResult[]): boolean {
+function anyTestFailed(tests: readonly TestResult[]): boolean {
   return tests.some((test) => test.status === TestStatus.Failed);
 }
 
