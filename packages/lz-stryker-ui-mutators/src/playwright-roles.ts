@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
-import { fieldOf } from './install.ts';
+import { fieldOf } from './is-record.ts';
 
 export interface ImplicitRole {
   readonly role: string;
