@@ -15,13 +15,13 @@ import {
 } from './mutator.ts';
 import { withJsxPlacement, type PlacerMethods } from './placer.ts';
 
-export const TESTED_VERSION = '10.1.1';
-const CORE_BIN = /[\\/]@stryker-mutator[\\/]core[\\/]bin[\\/]stryker\.js$/;
-const NAME = /^[A-Za-z]+$/;
+export const testedVersion = '10.1.1';
+const coreBin = /[\\/]@stryker-mutator[\\/]core[\\/]bin[\\/]stryker\.js$/;
+const namePattern = /^[A-Za-z]+$/;
 // `Symbol.for`, so a second copy of this package in the process sees the marks of the first.
-const OWN: unique symbol = Symbol.for('@layzee/lz-stryker-ui-mutators');
+const ownMark: unique symbol = Symbol.for('@layzee/lz-stryker-ui-mutators');
 const nothing = (): undefined => undefined;
-const SILENT = {
+const silentLogger = {
   debug: nothing,
   info: nothing,
   warn: nothing,
@@ -91,9 +91,9 @@ export async function install(
   register(instrumenter, operators);
   await selfCheck(instrumenter, operators);
 
-  if (instrumenter.version !== TESTED_VERSION) {
+  if (instrumenter.version !== testedVersion) {
     warn(
-      `lz-stryker-ui-mutators was tested with @stryker-mutator/instrumenter ${TESTED_VERSION}, not ` +
+      `lz-stryker-ui-mutators was tested with @stryker-mutator/instrumenter ${testedVersion}, not ` +
         `${instrumenter.version} in ${instrumenter.dir}; its self-check passed.`,
     );
   }
@@ -104,7 +104,7 @@ function checkNames(
   present: readonly ListedMutator[],
 ): void {
   const names = operators.map(({ name }) => name);
-  const invalid = names.filter((name) => !NAME.test(name));
+  const invalid = names.filter((name) => !namePattern.test(name));
 
   if (invalid.length > 0) {
     throw new Error(
@@ -118,7 +118,7 @@ function checkNames(
   const keys = names.map(keyOf);
   const others = new Set(
     present
-      .filter((mutator) => !(OWN in mutator))
+      .filter((mutator) => !(ownMark in mutator))
       .map(({ name }) => keyOf(name)),
   );
   const taken = names.filter((name, index) => {
@@ -144,14 +144,17 @@ function register(
   allMutators.push(
     ...operators
       .filter(({ name }) => !registered.has(name))
-      .map((operator) => ({ ...toNodeMutator(operator, types), [OWN]: OWN })),
+      .map((operator) => ({
+        ...toNodeMutator(operator, types),
+        [ownMark]: ownMark,
+      })),
   );
 
-  if (!(OWN in expressionPlacer.target)) {
+  if (!(ownMark in expressionPlacer.target)) {
     Object.assign(
       expressionPlacer.target,
       withJsxPlacement(expressionPlacer.original, types),
-      { [OWN]: OWN },
+      { [ownMark]: ownMark },
     );
   }
 }
@@ -200,7 +203,7 @@ export function corePackageJson(
     // argv1 names no file on disk; fall back to the core this module resolves.
   }
 
-  return bin !== undefined && CORE_BIN.test(bin)
+  return bin !== undefined && coreBin.test(bin)
     ? join(bin, '..', '..', 'package.json')
     : resolveHere('@stryker-mutator/core/package.json');
 }
@@ -297,7 +300,7 @@ export async function resolveFromCore(
       },
     },
     async instrument(files, excludedMutations = []) {
-      const created: unknown = Reflect.construct(Instrumenter, [SILENT]);
+      const created: unknown = Reflect.construct(Instrumenter, [silentLogger]);
       const result: unknown = await Reflect.apply(instrument, created, [
         files.map((file) => ({ ...file, mutate: true })),
         { plugins: null, excludedMutations, ignorers: [] },

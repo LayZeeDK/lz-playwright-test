@@ -12,7 +12,7 @@ import {
   corePackageJson,
   install,
   resolveFromCore,
-  TESTED_VERSION,
+  testedVersion,
   type InstrumentedMutant,
   type Instrumenter,
   type SourceFile,
@@ -27,8 +27,11 @@ import { firstPath, parse } from './support/babel.ts';
 import { exported, exportedFunction } from './support/exports.ts';
 import { tempRoot, writeTree } from './support/temp-tree.ts';
 
-const OWN = Symbol.for('@layzee/lz-stryker-ui-mutators');
-const LOCATION = { start: { line: 0, column: 0 }, end: { line: 0, column: 1 } };
+const ownMark = Symbol.for('@layzee/lz-stryker-ui-mutators');
+const anyLocation = {
+  start: { line: 0, column: 0 },
+  end: { line: 0, column: 1 },
+};
 const strykerMutators = ['StringLiteral', 'BooleanLiteral'] as const;
 
 function operator(name: string): Operator {
@@ -42,7 +45,7 @@ function operator(name: string): Operator {
 /** A fake instrumenter: each marked mutator not in `silent` makes one mutant in its own self-check file. */
 function setup({
   silent = [],
-  version = TESTED_VERSION,
+  version = testedVersion,
 }: {
   readonly silent?: readonly string[];
   readonly version?: string;
@@ -67,14 +70,16 @@ function setup({
     async instrument(files) {
       instrumented.push([...files]);
       const mutants = allMutators
-        .filter((mutator) => OWN in mutator && !silent.includes(mutator.name))
+        .filter(
+          (mutator) => ownMark in mutator && !silent.includes(mutator.name),
+        )
         .map(
           (mutator): InstrumentedMutant => ({
             id: mutator.name,
             fileName: `${mutator.name}.self-check.tsx`,
             mutatorName: mutator.name,
             replacement: '',
-            location: LOCATION,
+            location: anyLocation,
           }),
         );
 
@@ -116,7 +121,7 @@ describe('install', () => {
 
     assert.notEqual(expressionPlacer.canPlace, canPlace);
     assert.notEqual(expressionPlacer.place, place);
-    assert.equal(OWN in expressionPlacer, true);
+    assert.equal(ownMark in expressionPlacer, true);
   });
 
   it('adds nothing and wraps the placer once when it installs the same operators again', async () => {
@@ -198,7 +203,7 @@ describe('install', () => {
       assert.deepEqual(names(), strykerMutators);
       assert.deepEqual(instrumented, []);
       assert.equal(expressionPlacer.canPlace, canPlace);
-      assert.equal(OWN in expressionPlacer, false);
+      assert.equal(ownMark in expressionPlacer, false);
     });
   });
 
@@ -248,7 +253,7 @@ describe('install', () => {
       run([operator('Alpha'), operator('Beta'), operator('Gamma')]),
       {
         message:
-          `lz-stryker-ui-mutators: the instrumenter ${TESTED_VERSION} in /stryker/instrumenter made no mutants of Alpha, Gamma from ` +
+          `lz-stryker-ui-mutators: the instrumenter ${testedVersion} in /stryker/instrumenter made no mutants of Alpha, Gamma from ` +
           'their samples, so it does not run the mutators this module added. A bundled or second copy of the ' +
           'instrumenter does that.',
       },
@@ -296,7 +301,7 @@ describe('install', () => {
 
       assert.deepEqual(names(), [...strykerMutators, 'Alpha']);
       assert.deepEqual(warnings, [
-        `lz-stryker-ui-mutators was tested with @stryker-mutator/instrumenter ${TESTED_VERSION}, not ${version} in ` +
+        `lz-stryker-ui-mutators was tested with @stryker-mutator/instrumenter ${testedVersion}, not ${version} in ` +
           '/stryker/instrumenter; its self-check passed.',
       ]);
     });
@@ -314,8 +319,8 @@ describe('install', () => {
 });
 
 describe('corePackageJson', () => {
-  const CORE = join('/global', 'node_modules', '@stryker-mutator', 'core');
-  const HERE = join(
+  const coreDir = join('/global', 'node_modules', '@stryker-mutator', 'core');
+  const hereDir = join(
     '/repo',
     'node_modules',
     '@stryker-mutator',
@@ -341,7 +346,7 @@ describe('corePackageJson', () => {
       (specifier) => {
         assert.equal(specifier, '@stryker-mutator/core/package.json');
 
-        return HERE;
+        return hereDir;
       },
     );
 
@@ -352,8 +357,8 @@ describe('corePackageJson', () => {
 
   it("takes the core whose bin started the process, through the bin's links", () => {
     assert.equal(
-      coreFor('/usr/local/bin/stryker', join(CORE, 'bin', 'stryker.js')),
-      join(CORE, 'package.json'),
+      coreFor('/usr/local/bin/stryker', join(coreDir, 'bin', 'stryker.js')),
+      join(coreDir, 'package.json'),
     );
   });
 
@@ -367,7 +372,7 @@ describe('corePackageJson', () => {
       [
         'a file next to the bin',
         '/usr/local/bin/stryker',
-        join(CORE, 'bin', 'stryker.js.map'),
+        join(coreDir, 'bin', 'stryker.js.map'),
       ],
       [
         "another package's bin",
@@ -385,7 +390,7 @@ describe('corePackageJson', () => {
     ] as const
   ).forEach(([title, argv1, real]) => {
     it(`takes the core this module resolves when the process runs ${title}`, () => {
-      assert.equal(coreFor(argv1, real), HERE);
+      assert.equal(coreFor(argv1, real), hereDir);
     });
   });
 
@@ -412,7 +417,7 @@ describe('resolveFromCore', () => {
   it("returns the installed instrumenter, with Stryker's mutators, the expression placer and Babel 8 types", async () => {
     const instrumenter = await resolveFromCore();
 
-    assert.equal(instrumenter.version, TESTED_VERSION);
+    assert.equal(instrumenter.version, testedVersion);
     assert.ok(
       instrumenter.allMutators.some(({ name }) => name === 'StringLiteral'),
     );

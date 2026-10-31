@@ -80,7 +80,7 @@ async function load(tsx: string): Promise<Component> {
   return (props): unknown => Reflect.apply(app, undefined, [props]);
 }
 
-const FRAGMENT = Symbol.for('react.fragment');
+const fragmentType = Symbol.for('react.fragment');
 
 function isElement(node: object): node is ElementLike {
   return 'type' in node && 'props' in node;
@@ -109,7 +109,7 @@ function serialize(node: unknown): string {
     return `<${type.name}>${serialize(type(props))}</${type.name}>`;
   }
 
-  if (type === FRAGMENT) {
+  if (type === fragmentType) {
     return serialize(props.children);
   }
 
@@ -175,13 +175,9 @@ function offsetOf(line: number, column: number): number {
   );
 }
 
-declare global {
-  var __renderOracle__: unknown;
-}
-
 // The instrumented header caches the namespace object, so the test changes it in place rather than replacing it.
 const namespace: { activeMutant?: string | undefined } = {};
-globalThis.__renderOracle__ = namespace;
+Reflect.set(globalThis, '__renderOracle__', namespace);
 
 /** Each mutant's render through the build and through the hand-applied source. */
 async function renders(mutant: InstrumentedMutant) {

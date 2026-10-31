@@ -7,14 +7,15 @@ import { describe, it } from 'node:test';
 
 import { operatorNames } from './support/installed.ts';
 
-const ENTRY = join(import.meta.dirname, 'fixture', 'entry.ts');
+const entryPath = join(import.meta.dirname, 'fixture', 'entry.ts');
 
 function runEntry(
   extraEnv: Readonly<Record<string, string>>,
   ...args: string[]
 ) {
-  const { STRYKER_MUTATOR_WORKER: _ignored, ...env } = process.env;
-  const child = spawnSync(process.execPath, [ENTRY, ...args], {
+  const env = { ...process.env };
+  delete env.STRYKER_MUTATOR_WORKER;
+  const child = spawnSync(process.execPath, [entryPath, ...args], {
     encoding: 'utf8',
     env: { ...env, ...extraEnv },
   });
