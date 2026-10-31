@@ -42,9 +42,10 @@ When the plugin loads, it reads the table from the `playwright-core` it resolves
 - Without `playwright-core`, the plugin uses the table it bundles, and prints nothing.
 - If `playwright-core` is installed but the plugin cannot read its table, the plugin prints one warning
   and uses the bundled table. A table that lacks the entry for `a`, `area` or `button` counts as
-  unreadable, because the span swap needs them. The role skip uses whatever entries the table holds. The warning names the version and path
-  it found (only the path of `package.json` when that file cannot be read), the reason, and the version
-  of the bundled table:
+  unreadable, because the span swap needs them. To decide which `role` attributes to leave in place, the
+  operator uses whatever entries the table holds. The warning names the version and path it found (only
+  the path of `package.json` when that file cannot be read), the reason, and the version of the bundled
+  table:
 
   ```text
   lz-stryker-ui-mutators: cannot read the implicit role table of playwright-core 1.99.0 in <path> (Error: kImplicitRoleByTagName not found); LzElementRole uses the table bundled from playwright-core 1.64.1.
@@ -54,11 +55,6 @@ The bundled table is generated from `playwright-core` when the package is built,
 the table of the Playwright version it was built with. If that table cannot be read, or lacks one of those
 entries, the build fails and names what is missing. The
 package's tests parse the table of each Playwright minor version from 1.63 on.
-
-In this repository, `node scripts/generate-roles.ts` writes `src/bundled-roles.ts`; the build runs it.
-When a Playwright minor version ships, run `node scripts/playwright-roles-matrix.ts`.
-It downloads that version's table into `test/fixture/roles/`, and the tests then fail if the parser cannot
-read it.
 
 ## Turn the operators on
 
@@ -86,6 +82,12 @@ patches is missing.
 
 Exclude an operator by name with `mutator.excludedMutations`, or with a `// Stryker disable <name>`
 comment on the code.
+
+## Develop this package
+
+The build runs `node scripts/generate-roles.ts`, which writes `src/bundled-roles.ts`. When a Playwright
+minor version ships, run `node scripts/playwright-roles-matrix.ts` from the package folder. It saves that
+version's table in `test/fixture/roles/`, and the tests fail if the parser cannot read it.
 
 ## License
 

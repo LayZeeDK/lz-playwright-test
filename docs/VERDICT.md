@@ -331,15 +331,18 @@ splits one run as follows:
 - 399 ms to fork the worker;
 - 299 ms for the worker to reach its first test.
 
-The demo config's own imports are part of that. In a fresh Node process, `@nx/playwright/preset` with
-`@nx/devkit` took 189 to 206 ms to import, and `@playwright/test` 264 to 282 ms. That was 5 interleaved
-rounds, each import in its own process, on 2026-10-27. Playwright 1.64.1's source shows that the loader and
-the worker each load the config once per run. That count is read from the source, not measured.
+In a fresh Node process, `@nx/playwright/preset` with `@nx/devkit` took 189 to 206 ms to import, and
+`@playwright/test` 264 to 282 ms. That was 5 interleaved rounds, each import in its own cold process, on
+2026-10-27. These figures do not add up to the 292 ms above. The likely reason, inferred and not measured, is
+that the test loader already holds `@playwright/test` when it imports the config, so the cold figures overlap
+what it has loaded. Playwright
+1.64.1's source shows that the loader and the worker each load the config once per run. That count is read
+from the source, not measured.
 
 Earlier runs measured more: 1.8 s to the first test on 2026-10-26 and 2.7 s on 2026-10-24. What causes the
 spread was not measured. Sharing one browser across runs through `connectWsEndpoint` saved nothing
-measurable, so browser launch is not the cost. That shared-browser result is from the decision log and was not rerun. The runner's own code is not the cost
-either. In a CPU profile of a demo e2e run, its worker hook took 0.09% of the Playwright workers' busy time.
+measurable, so browser launch is not the cost. That shared-browser result is from the decision log and was
+not rerun. The runner's own code is not the cost either. In a CPU profile of a demo e2e run, its worker hook took 0.09% of the Playwright workers' busy time.
 
 A killed mutant usually costs more than a surviving one: the failing test waits out its auto-waiting
 assertion (`expect.timeout`, 5 s by default) before it fails. Stryker sizes its timeout from passing

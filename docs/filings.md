@@ -603,8 +603,8 @@ Phase C's "prefer a different model family" then rests on the measured model.
 
 **Observation 2: Phase D lets the parent overrule the cross-judge on an unmeasured claim.** Phase D says
 "Disagreement means one of you is biased or the rubric was ambiguous. Read both rationales before deciding." The
-parent overruled the judge with "my role table already settles that case". A later study showed the table covered
-17 of Playwright's 52 tags.
+parent overruled the judge with "my role table already settles that case". That table held 17 tags. Playwright
+1.64.1's `kImplicitRoleByTagName` gives a fixed role to 51 tags, all 17 among them, out of 62 tags in all.
 
 **Suggestion 2.** Add to Phase D: an override of the cross-judge names the measured fact it rests on, and a claim
 that something is complete is checked against the primary source first. Record that fact in the synthesis note

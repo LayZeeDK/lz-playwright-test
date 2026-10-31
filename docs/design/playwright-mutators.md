@@ -183,10 +183,10 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
   `code`, `datalist`, `dd`, `del`, `details`, `dfn`, `dialog`, `dt`, `em`, `fieldset`, `figure`, `h1` to
   `h6`, `hr`, `html`, `ins`, `li`, `main`, `mark`, `math`, `menu`, `meter`, `nav`, `ol`, `optgroup`,
   `option`, `output`, `p`, `progress`, `search`, `strong`, `sub`, `sup`, `svg`, `table`, `tbody`,
-  `textarea`, `tfoot`, `thead`, `time`, `tr`, and `ul`. So `<output role="status">` and
-  `<svg role="img">` get no `RoleRemoval`. `area` without `href`, `footer`, `form`, `header`, `img`, `input`, `section`,
-  `select`, `td`, and `th` get their role from attributes or context, so removing an explicit one can
-  change what `getByRole` finds, and the skip leaves them out. `dd`, `dt`, `li`, `tbody`, `tfoot`,
+  `textarea`, `tfoot`, `thead`, `time`, `tr`, and `ul`. So `LzElementRole` makes no removal mutant for
+  `<output role="status">` or `<svg role="img">`, and both keep their `role`. `area` without `href`,
+  `footer`, `form`, `header`, `img`, `input`, `section`, `select`, `td`, and `th` get their role from
+  attributes or context, so removing an explicit one can change what `getByRole` finds, and the skip leaves them out. `dd`, `dt`, `li`, `tbody`, `tfoot`,
   `thead`, and `tr` lose their implicit role under a parent with `role="none"` or `role="presentation"`;
   that shape is rare, and the skip keeps them. Cases design-7 and design-14 cover the role skip.
 
