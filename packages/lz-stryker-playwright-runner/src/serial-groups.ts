@@ -20,6 +20,7 @@ export function projectsThatRun(
 export async function listSerialGroups(
   playwright: Pick<TestRunner, 'listTests'>,
   projects: readonly string[],
+  version: string,
 ): Promise<SerialGroups> {
   const reporter = new LzStrykerCollectingReporter();
   const result = await playwright.listTests(reporter, { projects });
@@ -43,15 +44,18 @@ export async function listSerialGroups(
     );
   }
 
-  return serialGroups(reporter.listedTests);
+  return serialGroups(reporter.listedTests, version);
 }
 
-export function serialGroups(testCases: Iterable<ReportedTest>): SerialGroups {
+export function serialGroups(
+  testCases: Iterable<ReportedTest>,
+  version: string,
+): SerialGroups {
   const bySuite = new Map<object, string[]>();
   const byTest = new Map<string, string[]>();
 
   [...testCases].forEach((test) => {
-    const group = outermostSerialSuite(test);
+    const group = outermostSerialSuite(test, version);
 
     if (group) {
       const ids = bySuite.get(group) ?? [];
@@ -64,7 +68,10 @@ export function serialGroups(testCases: Iterable<ReportedTest>): SerialGroups {
   return byTest;
 }
 
-function outermostSerialSuite(test: ReportedTest): object | undefined {
+function outermostSerialSuite(
+  test: ReportedTest,
+  version: string,
+): object | undefined {
   let outermost: object | undefined;
 
   for (
@@ -72,7 +79,7 @@ function outermostSerialSuite(test: ReportedTest): object | undefined {
     isRecord(suite);
     suite = suite['parent']
   ) {
-    if (isSerialSuite(suite)) {
+    if (isSerialSuite(suite, version)) {
       outermost = suite;
     }
   }

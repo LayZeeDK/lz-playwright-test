@@ -19,6 +19,12 @@ export interface RunSettings {
   readonly hitLimit?: number | undefined;
 }
 
+export interface PageSettings extends Pick<RunSettings, 'hitLimit'> {
+  readonly ns: string;
+  readonly activeMutant?: string | undefined;
+  readonly testId?: string | undefined;
+}
+
 export interface SnapshotLine {
   readonly mutantCoverage?: unknown;
   readonly hitCount?: unknown;

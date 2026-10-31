@@ -2,8 +2,9 @@
 import assert from 'node:assert/strict';
 import { before, type TestContext, test } from 'node:test';
 
+import type { PageSettings } from '../src/protocol.ts';
 import type * as Hook from '../src/worker-hook.ts';
-import type { PageSettings, StrykerNamespace } from '../src/worker-hook.ts';
+import type { StrykerNamespace } from '../src/worker-hook.ts';
 
 let hook: typeof Hook;
 

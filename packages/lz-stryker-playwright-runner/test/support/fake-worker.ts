@@ -16,12 +16,8 @@ import {
   type SlotType,
 } from '../../src/playwright-internals.ts';
 import { setEnv } from '../../src/playwright-test-runner.ts';
-import type { RunSettings } from '../../src/protocol.ts';
-import type {
-  install,
-  PageSettings,
-  StrykerNamespace,
-} from '../../src/worker-hook.ts';
+import type { PageSettings, RunSettings } from '../../src/protocol.ts';
+import type { install, StrykerNamespace } from '../../src/worker-hook.ts';
 import { tempTree } from './doubles.ts';
 
 const activeMutantEnv = INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;

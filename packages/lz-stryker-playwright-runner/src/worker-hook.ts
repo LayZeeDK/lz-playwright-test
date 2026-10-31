@@ -13,6 +13,7 @@ import {
   type HookedFrame,
   type HookedPage,
   instrumentationOf,
+  internalsChanged,
   type RunningSlot,
   runningSlotOf,
   type SlotType,
@@ -21,6 +22,7 @@ import {
 import {
   frameReadTimeoutMs,
   installErrorSuffix,
+  type PageSettings,
   readRunSettings,
   type RunSettings,
   serializeSnapshot,
@@ -30,22 +32,31 @@ import {
 
 type FrameRead = Omit<SnapshotLine, 'outlivedItsTest'>;
 
-interface FrameReads extends ReadonlyArray<FrameRead> {
-  push(...items: FrameRead[]): number;
-}
+class ContextState {
+  readonly testId: string | undefined;
+  readonly #closedPageSnapshots: FrameRead[] = [];
+  #collected = false;
 
-interface ContextState {
-  readonly testId?: string | undefined;
-  readonly closedPageSnapshots: FrameReads;
+  constructor(testId: string | undefined) {
+    this.testId = testId;
+  }
+
+  keepClosedPage(snapshots: readonly FrameRead[]): void {
+    this.#closedPageSnapshots.push(...snapshots);
+  }
+
+  collectOnce(): readonly FrameRead[] | undefined {
+    if (this.#collected) {
+      return undefined;
+    }
+
+    this.#collected = true;
+
+    return this.#closedPageSnapshots;
+  }
 }
 
 type Writable<T> = { -readonly [K in keyof T]: T[K] };
-
-export interface PageSettings extends Pick<RunSettings, 'hitLimit'> {
-  readonly ns: string;
-  readonly activeMutant?: string | undefined;
-  readonly testId?: string | undefined;
-}
 
 interface RunningTest {
   readonly testId: string;
@@ -67,8 +78,9 @@ function currentTestOf(playwrightTest: unknown): CurrentTest {
   const info = memberOf(test, 'info');
 
   if (typeof info !== 'function') {
-    throw new Error(
-      'The worker hook needs test.info() from playwright/test, which tells it the test that runs.',
+    throw internalsChanged(
+      undefined,
+      'playwright/test test.info(), which tells the worker hook the test that runs',
     );
   }
 
@@ -89,8 +101,9 @@ function currentTestOf(playwrightTest: unknown): CurrentTest {
       typeof found['testId'] !== 'string' ||
       typeof version !== 'string'
     ) {
-      throw new Error(
-        "The worker hook needs test.info() from playwright/test to return the running test's testId and config.version.",
+      throw internalsChanged(
+        undefined,
+        "playwright/test test.info() returning the running test's testId and config.version",
       );
     }
 
@@ -151,7 +164,6 @@ export function install(
     `worker-${process.pid}-${randomUUID()}${snapshotSuffix}`,
   );
   const contexts = new WeakMap<HookedContext, ContextState>();
-  const collected = new WeakSet<HookedContext>();
   const alreadyRead = new WeakSet<HookedPage>();
   const patchedBrowsers = new WeakSet<HookedBrowser>();
 
@@ -173,14 +185,14 @@ export function install(
 
   async function collect(context: HookedContext) {
     const state = contexts.get(context);
+    const closedPageSnapshots = state?.collectOnce();
 
-    if (!state || collected.has(context)) {
+    if (!state || !closedPageSnapshots) {
       return;
     }
 
-    collected.add(context);
     const snapshots = [
-      ...state.closedPageSnapshots,
+      ...closedPageSnapshots,
       ...(await readOnce(context.pages())),
     ];
     const outlivedItsTest =
@@ -200,7 +212,7 @@ export function install(
   function collectBeforePageCloses(state: ContextState, page: HookedPage) {
     const close = page.close.bind(page);
     page.close = async (options) => {
-      state.closedPageSnapshots.push(...(await readOnce([page])));
+      state.keepClosedPage(await readOnce([page]));
 
       return close(options);
     };
@@ -222,10 +234,7 @@ export function install(
 
   instrumentation.addListener({
     async runAfterCreateBrowserContext(context) {
-      const state: ContextState = {
-        testId: perTest ? contextTestId(test) : undefined,
-        closedPageSnapshots: [],
-      };
+      const state = new ContextState(perTest ? contextTestId(test) : undefined);
       contexts.set(context, state);
       collectBeforeBrowserCloses(context.browser());
       context.on('page', (page) => collectBeforePageCloses(state, page));

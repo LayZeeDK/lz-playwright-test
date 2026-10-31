@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import type { FullResult, Reporter } from '@playwright/test/reporter';
 
 import { fieldOf, isRecord } from './is-record.ts';
-import type { PageSettings } from './worker-hook.ts';
+import type { PageSettings } from './protocol.ts';
 
 type Status = FullResult['status'];
 
@@ -196,7 +196,7 @@ export function probeInternals(
         args: readonly unknown[],
       ): unknown => Reflect.apply(methodOf(methods, name), created, args);
       const status = async (
-        method: 'listTests' | 'runGlobalSetup' | 'runTests',
+        method: 'runGlobalSetup' | 'runTests',
         args: readonly unknown[],
       ) => parseStatus(await call(method, args), method, version);
       const runner: TestRunner = {
@@ -254,8 +254,9 @@ function parseStatus(
   const known = statuses.find((candidate) => candidate === status);
 
   if (known === undefined) {
-    throw new Error(
-      `Playwright ${version} changed what TestRunner.${method}() resolves to; this runner reads its status: passed, failed, timedout or interrupted.`,
+    throw internalsChanged(
+      version,
+      `TestRunner.${method}() resolving to a status of passed, failed, timedout or interrupted`,
     );
   }
 
@@ -267,9 +268,10 @@ function parseConfig(
   version: string,
 ): Awaited<ReturnType<TestRunner['loadConfig']>> {
   const changed = () =>
-    new Error(
-      `Playwright ${version} changed what TestRunner.loadConfig() resolves to; this runner reads projects[].default, ` +
-        'project.name, project.timeout and expect.timeout, and webServers[].url, port and ignoreHTTPSErrors.',
+    internalsChanged(
+      version,
+      'TestRunner.loadConfig() resolving to projects[].default, project.name, project.timeout and expect.timeout, ' +
+        'and webServers[].url, port and ignoreHTTPSErrors',
     );
   const projects = fieldOf(value, 'projects');
   const webServers = fieldOf(value, 'webServers');
@@ -286,7 +288,6 @@ function parseConfig(
 
       if (
         !isRecord(project) ||
-        typeof project['default'] !== 'boolean' ||
         !isRecord(settings) ||
         typeof settings['name'] !== 'string' ||
         typeof settings['timeout'] !== 'number' ||
@@ -297,26 +298,28 @@ function parseConfig(
       }
 
       return {
-        default: project['default'],
+        default: !!project['default'],
         expect: expect === undefined ? undefined : { timeout: expectTimeout },
         project: { name: settings['name'], timeout: settings['timeout'] },
       };
     }),
     webServers: webServers.map((server: unknown): ConfigWebServer => {
+      const port = fieldOf(server, 'port');
+
       if (
         !isRecord(server) ||
         (server['url'] !== undefined && typeof server['url'] !== 'string') ||
-        (server['port'] !== undefined && typeof server['port'] !== 'number') ||
-        (server['ignoreHTTPSErrors'] !== undefined &&
-          typeof server['ignoreHTTPSErrors'] !== 'boolean')
+        (port !== undefined &&
+          typeof port !== 'number' &&
+          !(typeof port === 'string' && /^\d+$/.test(port)))
       ) {
         throw changed();
       }
 
       return {
         url: server['url'],
-        port: server['port'],
-        ignoreHTTPSErrors: server['ignoreHTTPSErrors'],
+        port: port === undefined ? undefined : Number(port),
+        ignoreHTTPSErrors: !!server['ignoreHTTPSErrors'],
       };
     }),
   };
@@ -354,8 +357,9 @@ export function instrumentationOf(core: unknown): Instrumentation {
   const addListener = fieldOf(instrumentation, 'addListener');
 
   if (typeof addListener !== 'function') {
-    throw new Error(
-      'Playwright changed the internals this runner calls (playwright-core _instrumentation.addListener).',
+    throw internalsChanged(
+      undefined,
+      'playwright-core _instrumentation.addListener',
     );
   }
 
@@ -430,9 +434,15 @@ function timeoutManagerChanged(version: string): Error {
   );
 }
 
-function internalsChanged(version: string, what: string): Error {
+export function internalsChanged(
+  version: string | undefined,
+  what: string,
+): Error {
+  const playwright =
+    version === undefined ? 'Playwright' : `Playwright ${version}`;
+
   return new Error(
-    `Playwright ${version} changed the internals this runner calls (${what}).`,
+    `${playwright} changed the internals this runner calls (${what}).`,
   );
 }
 
@@ -440,12 +450,13 @@ function isSlotType(value: unknown): value is SlotType {
   return slotTypes.some((type) => type === value);
 }
 
-export function isSerialSuite(suite: unknown): boolean {
+export function isSerialSuite(suite: unknown, version: string): boolean {
   const mode = fieldOf(suite, '_parallelMode');
 
   if (typeof mode !== 'string') {
-    throw new Error(
-      'Playwright suites no longer carry Suite._parallelMode, which this runner reads to keep describe.serial groups together.',
+    throw internalsChanged(
+      version,
+      'Suite._parallelMode, which keeps describe.serial groups together',
     );
   }
 

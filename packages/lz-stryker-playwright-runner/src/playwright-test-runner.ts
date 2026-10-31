@@ -129,6 +129,7 @@ export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
       const serialGroups = await listSerialGroups(
         playwright,
         projectsThatRun(options.projects, config.projects),
+        pw.version,
       );
       this.#session = {
         options,

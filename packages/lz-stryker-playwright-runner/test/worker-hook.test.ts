@@ -147,7 +147,7 @@ function playwrightWith(t: TestContext, playwrightTest: string) {
         ),
       {
         message:
-          'The worker hook needs test.info() from playwright/test, which tells it the test that runs.',
+          'Playwright changed the internals this runner calls (playwright/test test.info(), which tells the worker hook the test that runs).',
       },
     );
   });
@@ -169,7 +169,7 @@ test('a worker whose hook fails to install leaves the error for the run and exit
     snapshots: [],
     hookInstalled: false,
     installErrors: [
-      'Error: The worker hook needs test.info() from playwright/test, which tells it the test that runs.',
+      'Error: Playwright changed the internals this runner calls (playwright/test test.info(), which tells the worker hook the test that runs).',
     ],
   });
 });
@@ -185,7 +185,7 @@ test('a worker whose hook fails to install and cannot leave the error still exit
   assert.equal(child.status, 1, child.stderr);
   assert.match(
     child.stderr,
-    /Error: The worker hook needs test\.info\(\) from playwright\/test/,
+    /Error: Playwright changed the internals this runner calls \(playwright\/test test\.info\(\), /,
   );
 });
 
@@ -479,7 +479,7 @@ refusedInfos.forEach(([title, info]) => {
 
     assert.throws(() => hooked.namespace().currentTestId, {
       message:
-        "The worker hook needs test.info() from playwright/test to return the running test's testId and config.version.",
+        "Playwright changed the internals this runner calls (playwright/test test.info() returning the running test's testId and config.version).",
     });
   });
 });

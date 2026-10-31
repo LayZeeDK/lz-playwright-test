@@ -72,6 +72,16 @@ export interface RunnerStrykerOptions {
   readonly lzStrykerPlaywright?: unknown;
 }
 
+const optionGuards = {
+  configFile: (value) => value === undefined || typeof value === 'string',
+  projects: (value) => value === undefined || isStringArray(value),
+  workers: (value) => value === undefined || typeof value === 'number',
+} satisfies {
+  readonly [K in keyof LzStrykerPlaywrightOptions]-?: (
+    value: unknown,
+  ) => value is LzStrykerPlaywrightOptions[K];
+};
+
 export function readRunnerOptions(
   options: RunnerStrykerOptions,
 ): RunnerOptions {
@@ -84,21 +94,17 @@ export function readRunnerOptions(
   const own = options.lzStrykerPlaywright ?? {};
 
   if (isRecord(own) && !Array.isArray(own)) {
-    const {
-      configFile,
-      projects,
-      workers = optionProperties.workers.default,
-    } = own;
+    const { configFile, projects, workers } = own;
 
     if (
-      (configFile === undefined || typeof configFile === 'string') &&
-      (projects === undefined || isStringArray(projects)) &&
-      typeof workers === 'number'
+      optionGuards.configFile(configFile) &&
+      optionGuards.projects(projects) &&
+      optionGuards.workers(workers)
     ) {
       return {
         configFile: configFile ? path.resolve(configFile) : undefined,
         projects,
-        workers,
+        workers: workers ?? optionProperties.workers.default,
         strykerTimeoutMS: options.timeoutMS,
       };
     }

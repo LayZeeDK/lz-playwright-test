@@ -203,7 +203,33 @@ test('the test runner resolves loadConfig to the project and web server fields t
     ],
     webServers: [
       { url: 'http://localhost:3000', port: 3000, ignoreHTTPSErrors: true },
-      { url: undefined, port: undefined, ignoreHTTPSErrors: undefined },
+      { url: undefined, port: undefined, ignoreHTTPSErrors: false },
+    ],
+  });
+});
+
+test('the test runner reads loaded config values the way Playwright does: a numeric string port, and default and ignoreHTTPSErrors by truthiness', async () => {
+  const runner = await testRunnerAnswering({
+    loadConfig: {
+      projects: [
+        { default: 'yes', project: { name: 'a', timeout: 1 } },
+        { default: 0, project: { name: 'b', timeout: 1 } },
+      ],
+      webServers: [
+        { port: '3000', ignoreHTTPSErrors: 1 },
+        { port: 4000, ignoreHTTPSErrors: '' },
+      ],
+    },
+  });
+
+  assert.deepEqual(await runner.loadConfig(), {
+    projects: [
+      { default: true, expect: undefined, project: { name: 'a', timeout: 1 } },
+      { default: false, expect: undefined, project: { name: 'b', timeout: 1 } },
+    ],
+    webServers: [
+      { url: undefined, port: 3000, ignoreHTTPSErrors: true },
+      { url: undefined, port: 4000, ignoreHTTPSErrors: false },
     ],
   });
 });
@@ -224,10 +250,6 @@ const refusedConfigs = [
   ['has no projects array', { projects: {}, webServers: [] }],
   ['has no webServers array', { projects: [], webServers: {} }],
   ['has a project that is no object', { projects: [null], webServers: [] }],
-  [
-    'has a project with no boolean default',
-    { projects: [{ ...validProject, default: 'yes' }], webServers: [] },
-  ],
   [
     'has a project with no project object',
     { projects: [{ ...validProject, project: null }], webServers: [] },
@@ -263,12 +285,16 @@ const refusedConfigs = [
     { projects: [], webServers: [{ ...validServer, url: 1 }] },
   ],
   [
-    'has a web server with no number port',
-    { projects: [], webServers: [{ ...validServer, port: '1' }] },
+    'has a web server whose port is a string of no digits',
+    { projects: [], webServers: [{ ...validServer, port: 'auto' }] },
   ],
   [
-    'has a web server with no boolean ignoreHTTPSErrors',
-    { projects: [], webServers: [{ ...validServer, ignoreHTTPSErrors: 1 }] },
+    'has a web server whose port is an empty string',
+    { projects: [], webServers: [{ ...validServer, port: '' }] },
+  ],
+  [
+    'has a web server whose port is no number or string',
+    { projects: [], webServers: [{ ...validServer, port: [3000] }] },
   ],
 ] as const;
 
@@ -278,8 +304,8 @@ refusedConfigs.forEach(([title, config]) => {
 
     await assert.rejects(runner.loadConfig(), {
       message:
-        'Playwright 1.99.0 changed what TestRunner.loadConfig() resolves to; this runner reads projects[].default, ' +
-        'project.name, project.timeout and expect.timeout, and webServers[].url, port and ignoreHTTPSErrors.',
+        'Playwright 1.99.0 changed the internals this runner calls (TestRunner.loadConfig() resolving to projects[].default, ' +
+        'project.name, project.timeout and expect.timeout, and webServers[].url, port and ignoreHTTPSErrors).',
     });
   });
 });
@@ -321,7 +347,7 @@ test('the test runner resolves listTests, runGlobalSetup and runTests to their s
       const runner = await testRunnerAnswering({ [method]: answer });
 
       await assert.rejects(statusCalls(runner)[method](), {
-        message: `Playwright 1.99.0 changed what TestRunner.${method}() resolves to; this runner reads its status: passed, failed, timedout or interrupted.`,
+        message: `Playwright 1.99.0 changed the internals this runner calls (TestRunner.${method}() resolving to a status of passed, failed, timedout or interrupted).`,
       });
     });
   });
@@ -424,13 +450,13 @@ test('the instrumentation is the one playwright-core exports, and its absence fa
 });
 
 test('the describe mode is read from the suite, and its absence fails loudly', () => {
-  assert.equal(isSerialSuite({ _parallelMode: 'serial' }), true);
-  assert.equal(isSerialSuite({ _parallelMode: 'none' }), false);
-  assert.throws(() => isSerialSuite({}), {
-    message: /Suite\._parallelMode/,
-  });
-  assert.throws(() => isSerialSuite(undefined), {
-    message: /Suite\._parallelMode/,
+  assert.equal(isSerialSuite({ _parallelMode: 'serial' }, '1.99.0'), true);
+  assert.equal(isSerialSuite({ _parallelMode: 'none' }, '1.99.0'), false);
+  [{}, undefined].forEach((suite) => {
+    assert.throws(() => isSerialSuite(suite, '1.99.0'), {
+      message:
+        'Playwright 1.99.0 changed the internals this runner calls (Suite._parallelMode, which keeps describe.serial groups together).',
+    });
   });
 });
 
