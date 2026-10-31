@@ -61,8 +61,8 @@ Stryker's `concurrency` sets how many test runner processes run at once. Each on
 and concurrency 4 ran 3.2 times as fast, with the same status for every mutant (2 rounds each, e2e and
 component tests).
 
-Playwright 1.64's source loads the Playwright config twice per mutant run, in two new processes: the test
-loader and the worker. So what the config imports adds to each run. Keep the config's imports light: on the
+Playwright 1.64's source shows that each mutant run loads the Playwright config twice, in two new processes:
+the test loader and the worker. So what the config imports adds to each run. Keep the config's imports light: on the
 demo, `@nx/playwright/preset` and `@nx/devkit` took about 0.19 s to import in a fresh process, against
 0.27 s for `@playwright/test` itself.
 
@@ -84,8 +84,8 @@ export default defineConfig({
 On this repository's demo, 1000 ms cut a component-test run from a median of 58 s to 29 s, and an e2e
 run from 111 s to 56 s. Those are 5 runs per side, interleaved, at concurrency 3. The e2e runs varied
 more: the default side ranged from 89 s to 150 s, a spread larger than the 55 s gain. No mutant changed
-between Killed and Survived. If the page needs longer than the shorter wait to show the right result, the assertion fails without any mutant
-at fault, and the mutant counts as killed. So run once with each setting and compare the statuses in the
+between Killed and Survived. If the page needs longer than the shorter wait to show the right result, the
+assertion fails without any mutant at fault, and the mutant counts as killed. So run once with each setting and compare the statuses in the
 two JSON reports before you keep the shorter wait. Keep `timeoutMS` at least twice the expect timeout;
 the runner warns at startup when it is lower.
 
