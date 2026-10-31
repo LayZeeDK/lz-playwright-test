@@ -1,6 +1,7 @@
 # Verdict: a StrykerJS test runner for Playwright Test
 
-Status: prototype, 2026-10-25. Throwaway code. The decisions transfer, and the code does not have to.
+Status: written for the prototype on 2026-10-25 and kept current since. The runner and the UI operators now
+ship from `packages/` as built JavaScript.
 
 ## The question
 
@@ -18,7 +19,7 @@ Yes, with one plugin (`testRunner: 'lz-stryker-playwright'`) for both kinds of t
 `@playwright/experimental-ct-*` packages. Component tests are now plain `@playwright/test` tests that
 call the built-in `mount()` fixture against your own dev server. The same runner code runs both, with no
 component-specific branch. The price is a dependency on undocumented Playwright internals, which any
-Playwright release can change. Limits lists the six internals and the one undocumented environment
+Playwright release can change. Limits lists the seven internals and the one undocumented environment
 variable that the runner uses.
 
 It also ran, with no runner change, on copies of four open-source repos: the hello-world repo (7
@@ -454,8 +455,7 @@ All 12 reports give every mutant the same status as the first concurrency 1 run.
   set for the tests that cover the mutant. A long group can run past it, and the mutant counts as a
   Timeout, which Stryker counts as detected (inferred from the code, not run).
 - Node refuses to strip types under `node_modules`, so a published package needs a JavaScript build of
-  the hook and the runner. The prototype is used through a symlink, which Node resolves outside
-  `node_modules`.
+  the hook and the runner. Both packages therefore ship built JavaScript in `dist`.
 - `disableBail` cannot lift a `maxFailures` set in the user's Playwright config.
 - The runner runs Playwright with `lzStrykerPlaywright.workers` from the Stryker config (default 1), not the
   `workers` value in the Playwright config. A suite that passes only when its tests spread over several
