@@ -291,9 +291,8 @@ function* replaced(
   }
 }
 
-// WAI-ARIA makes "false" the default of both, so removing a "false" value leaves the accessibility tree as it was.
-const falseByDefault = new Set(['aria-disabled', 'aria-hidden']);
-
+// Playwright reads only aria-hidden="true", so removing "false" changes nothing. aria-disabled="false" is
+// not like it: it stops a disabled ancestor from disabling the element (hasAriaDisabledInChain).
 function removalChangesNothing(
   { name, value }: AttributeSite,
   t: BabelTypes,
@@ -301,7 +300,7 @@ function removalChangesNothing(
   return (
     (value.kind === 'string' &&
       value.text === 'false' &&
-      falseByDefault.has(name)) ||
+      name === 'aria-hidden') ||
     (value.kind === 'expression' &&
       t.isIdentifier(value.expression, { name: 'undefined' }))
   );

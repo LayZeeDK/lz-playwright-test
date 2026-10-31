@@ -1375,11 +1375,12 @@ export const cases: readonly Case[] = [
   {
     id: 'design-48',
     title:
-      'aria-disabled="false" and aria-hidden="false" are not removed, since removal gives the same tree; "true" is',
+      'aria-hidden="false" is not removed, since Playwright reads only "true"; aria-disabled="false" is, since it overrides a disabled ancestor',
     origin:
       'docs/design/playwright-mutators.md:133, LzDisabledAttribute and LzHiddenAttribute',
     jsx: '<form><button aria-disabled="false">One</button><p aria-hidden="false">Two</p><p aria-hidden="true">Three</p></form>',
     expect: [
+      ['LzDisabledAttribute', 'aria-disabled={undefined}'],
       ['LzElementRole', '<span aria-disabled="false">One</span>'],
       ['LzTextLiteral', ''],
       ['LzTextLiteral', ''],
