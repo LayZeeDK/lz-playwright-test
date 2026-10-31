@@ -149,8 +149,9 @@ otherwise:
 
 - Only code that runs in the page or in a Playwright test worker gets the active mutant. Server-side code
   (SSR, API routes) runs in the `webServer`, which starts once without one, so its mutants are
-  NoCoverage, or Survived with `coverageAnalysis: 'off'`. On a server-rendered app, a mutant that changes text or an element breaks hydration and
-  counts as Killed even when no test checks it, and one that changes an attribute never reaches the DOM.
+  NoCoverage, or Survived with `coverageAnalysis: 'off'`. On a server-rendered app, a mutant that
+  changes text or an element breaks hydration and counts as Killed even when no test checks it, and one
+  that changes an attribute never reaches the DOM.
 - One server serves every mutant run, so what one run writes to the server or its backend is still
   there in the next. A suite that needs a fresh backend can report a mutant wrongly.
 - Dependency projects, such as a `setup` project that logs in, run on every mutant run with the mutant
