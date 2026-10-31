@@ -19,7 +19,14 @@ export interface Session {
   mutantRun(
     m: Mutant,
     options?: Partial<
-      Pick<MutantRunOptions, 'testFilter' | 'hitLimit' | 'timeout'>
+      Pick<
+        MutantRunOptions,
+        | 'testFilter'
+        | 'hitLimit'
+        | 'timeout'
+        | 'mutantActivation'
+        | 'reloadEnvironment'
+      >
     >,
   ): Promise<MutantRunResult>;
   dispose(): Promise<void>;

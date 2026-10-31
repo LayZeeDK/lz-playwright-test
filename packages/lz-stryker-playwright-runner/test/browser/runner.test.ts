@@ -393,12 +393,24 @@ test('a runtime mutant is killed by the test that covers it', async () => {
   assert.deepEqual(result.killedBy, [testId('shows the greeting')]);
 });
 
-test('a module-level (static) mutant is killed', async () => {
+test('a module-level mutant in page code is killed by the test whose page loads it', async () => {
   const result = await session.mutantRun(mutant('StringLiteral', '""'), {
     testFilter: [testId('shows the greeting')],
   });
 
   assert.equal(result.status, MutantRunStatus.Killed);
+});
+
+test('a static mutant run as Stryker plans one, with no test filter and static activation, is killed', async () => {
+  const result = await session.mutantRun(
+    mutant('ArithmeticOperator', 'n - 1', 'src/node-only.ts'),
+    { mutantActivation: 'static', reloadEnvironment: true },
+  );
+
+  assert.equal(result.status, MutantRunStatus.Killed, JSON.stringify(result));
+  assert.deepEqual(result.killedBy, [
+    testId('reads what the beforeAll hook computed'),
+  ]);
 });
 
 test('a mutant the selected tests do not reach survives, and the next run starts clean', async () => {
