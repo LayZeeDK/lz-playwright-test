@@ -49,6 +49,15 @@ export const typeSafetyRules = {
     { assertionStyle: 'never' },
   ],
   '@typescript-eslint/no-non-null-assertion': 'error',
+  '@typescript-eslint/ban-ts-comment': [
+    'error',
+    {
+      'ts-expect-error': true,
+      'ts-ignore': true,
+      'ts-nocheck': true,
+      'ts-check': false,
+    },
+  ],
   'dot-notation': 'off',
   '@typescript-eslint/dot-notation': 'error',
   '@typescript-eslint/naming-convention': [
