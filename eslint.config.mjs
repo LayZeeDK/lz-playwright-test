@@ -66,6 +66,31 @@ export const typeSafetyRules = {
   ],
 };
 
+const declaredType = ':matches(TSInterfaceDeclaration, TSTypeAliasDeclaration)';
+
+export const readonlyRules = {
+  'no-restricted-syntax': [
+    'error',
+    {
+      selector: `${declaredType} TSPropertySignature:not([readonly=true])`,
+      message: 'readonly member',
+    },
+    {
+      selector: `${declaredType} TSPropertySignature :not(TSTypeOperator[operator='readonly']) > TSArrayType`,
+      message: 'readonly array',
+    },
+    {
+      selector: `${declaredType} TSPropertySignature TSTypeReference[typeName.name='Array']`,
+      message: 'readonly array',
+    },
+    {
+      selector:
+        ':matches(PropertyDefinition, MethodDefinition, TSParameterProperty, AccessorProperty, TSAbstractPropertyDefinition, TSAbstractMethodDefinition)[accessibility="private"]',
+      message: 'Use a # member instead of the private modifier.',
+    },
+  ],
+};
+
 export default [
   ...nx.configs['flat/base'],
   ...nx.configs['flat/typescript'],
@@ -134,6 +159,14 @@ export default [
       },
     },
     rules: typeSafetyRules,
+  },
+  {
+    files: [
+      'packages/lz-stryker-ui-mutators/**/*.ts',
+      'packages/lz-stryker-playwright-runner/test/**/*.ts',
+    ],
+    ignores: ['packages/lz-stryker-ui-mutators/test/corpus/**'],
+    rules: readonlyRules,
   },
   {
     files: ['**/*.spec.ts', '**/playwright*.config.{ts,mts}'],

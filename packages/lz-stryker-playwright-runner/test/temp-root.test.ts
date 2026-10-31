@@ -276,7 +276,7 @@ test('a root that cannot be removed now is skipped without an error', (t) => {
 });
 
 test('a new root is named after the pid of the runner that owns it', (t) => {
-  const tmp = tempTree(t, 'temp-root-test-', {});
+  const tmp = tempTree(t, 'temp-root-test-');
 
   const root = createTempRoot(tmp, 4242, ownerToken);
 
@@ -297,7 +297,7 @@ test('a new root is named after the pid of the runner that owns it', (t) => {
 });
 
 test('a root whose owner file cannot be written is removed, and the write error is thrown', (t) => {
-  const tmp = tempTree(t, 'temp-root-test-', {});
+  const tmp = tempTree(t, 'temp-root-test-');
   const full = codedError('ENOSPC');
 
   assert.throws(

@@ -106,7 +106,7 @@ export interface NodeMutatorLike {
   readonly name: string;
   mutate(
     path: NodePath,
-    context: { isExpressionContext: boolean },
+    context: { readonly isExpressionContext: boolean },
   ): Iterable<types.Node>;
 }
 

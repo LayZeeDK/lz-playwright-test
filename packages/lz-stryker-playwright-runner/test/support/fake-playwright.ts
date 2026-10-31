@@ -36,34 +36,34 @@ export const activeMutantEnv =
 const fakeGlobal = '__fakePlaywright__';
 
 interface Project {
-  default: boolean;
-  expect?: { timeout?: number };
-  project: { name: string; timeout: number };
+  readonly default: boolean;
+  readonly expect?: { readonly timeout?: number };
+  readonly project: { readonly name: string; readonly timeout: number };
 }
 
 interface WebServer {
-  url?: string;
-  port?: number;
-  ignoreHTTPSErrors?: boolean;
+  readonly url?: string;
+  readonly port?: number;
+  readonly ignoreHTTPSErrors?: boolean;
 }
 
 /** What one runTests call saw: its params, the run settings and the environment the workers get. */
 export interface Run {
-  reporter: LzStrykerCollectingReporter;
-  params: RunTestsParams;
-  settings: RunSettings;
-  env: Record<string, string | undefined>;
+  readonly reporter: LzStrykerCollectingReporter;
+  readonly params: RunTestsParams;
+  readonly settings: RunSettings;
+  readonly env: Record<string, string | undefined>;
 }
 
 export interface Behaviour {
-  projects?: Project[];
-  webServers?: WebServer[];
-  listed?: ReportedTest[];
-  initialize?: () => Promise<void>;
-  globalSetup?: (reporter: Reporter) => Status;
-  globalTeardown?: () => Promise<void>;
-  runTests?: (run: Run) => Promise<Status>;
-  urlUp?: (url: URL, ignoreHTTPSErrors: boolean) => Promise<boolean>;
+  readonly projects?: readonly Project[];
+  readonly webServers?: readonly WebServer[];
+  readonly listed?: readonly ReportedTest[];
+  readonly initialize?: () => Promise<void>;
+  readonly globalSetup?: (reporter: Reporter) => Status;
+  readonly globalTeardown?: () => Promise<void>;
+  readonly runTests?: (run: Run) => Promise<Status>;
+  readonly urlUp?: (url: URL, ignoreHTTPSErrors: boolean) => Promise<boolean>;
 }
 
 /** The fake's record of every call, in order. */

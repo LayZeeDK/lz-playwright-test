@@ -30,15 +30,18 @@ type Listener = Parameters<Instrumentation['addListener']>[0];
 
 /** The shape of Playwright's TestInfo._timeoutManager._running.runnable. */
 export interface Runnable {
-  type: SlotType;
-  fixture?: { title: string };
+  readonly type: SlotType;
+  readonly fixture?: { readonly title: string };
 }
 
 interface FakeFrame {
   /** The global name the frame's namespace has; undefined reads the name the hook asks for. */
-  name?: string;
-  evaluate?: (fn: (name: string) => unknown, name: string) => Promise<unknown>;
-  detached?: boolean;
+  readonly name?: string;
+  readonly evaluate?: (
+    fn: (name: string) => unknown,
+    name: string,
+  ) => Promise<unknown>;
+  readonly detached?: boolean;
 }
 
 function frame({
@@ -99,7 +102,7 @@ export function fakeInstall(
   } = {},
 ) {
   const ns = `__hookTest${Math.random().toString(36).slice(2)}__`;
-  const outDir = tempTree(t, 'worker-hook-install-', {});
+  const outDir = tempTree(t, 'worker-hook-install-');
   const scope: Record<string, unknown> = globalThis;
   prepare?.(outDir, ns);
   const exitListeners = process.listeners('exit');

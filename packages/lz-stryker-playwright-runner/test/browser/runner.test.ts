@@ -125,6 +125,7 @@ function runKnownKill(): Promise<MutantRunResult> {
 
 // The budget of the two deadline tests' loop runs, so their deadline comparisons mean the same.
 const timeout = 8000;
+const deadlineMs = timeout - stopHeadroomMs;
 
 /**
  * Runs the endless-loop mutant against the test `title` under `timeout`, timing the run, then the known kill.
@@ -145,7 +146,6 @@ async function timedLoopRun(title: string) {
     timedOut,
     elapsed,
     stopTook: deadlineStopTook(loggedBefore),
-    deadlineMs: timeout - stopHeadroomMs,
     killed,
   };
 }
@@ -430,7 +430,7 @@ test('a run whose selected tests no longer exist is an error, not a survivor', a
 });
 
 test('an infinite loop without a hit limit times out within its budget, and the next run is clean', async (t) => {
-  const { timedOut, elapsed, stopTook, deadlineMs, killed } =
+  const { timedOut, elapsed, stopTook, killed } =
     await timedLoopRun('counts to three');
 
   assert.equal(
@@ -465,8 +465,9 @@ test('a loop in a test that raised its own timeout stops at the deadline, withou
   const serverPid = () =>
     fetch('http://127.0.0.1:4321/__pid').then((response) => response.text());
   const before = await serverPid();
-  const { timedOut, elapsed, stopTook, deadlineMs, killed } =
-    await timedLoopRun('counts to three under a raised timeout');
+  const { timedOut, elapsed, stopTook, killed } = await timedLoopRun(
+    'counts to three under a raised timeout',
+  );
 
   assertTimedOut(timedOut, /deadline/);
   // The runner decides when the stop starts; how long Playwright's teardown then takes is not its

@@ -13,11 +13,11 @@ before(async () => {
 });
 
 interface FakePage {
-  top?: boolean;
-  carried?: string | null;
-  storageThrows?: boolean;
+  readonly top?: boolean;
+  readonly carried?: string | null;
+  readonly storageThrows?: boolean;
   /** Runs before the init script, as the page's earlier code would. */
-  prepare?: (ns: string) => void;
+  readonly prepare?: (ns: string) => void;
 }
 
 /** Runs the init script with the page globals it uses, and returns the namespace and storage it left. */

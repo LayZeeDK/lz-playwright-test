@@ -57,7 +57,12 @@ export interface InstrumentResult {
 /** What this package reads of a mutator in Stryker's list; only Stryker calls `mutate`. */
 export interface ListedMutator {
   readonly name: string;
-  readonly mutate: (...args: never[]) => unknown;
+  readonly mutate: (...args: readonly never[]) => unknown;
+}
+
+/** Stryker's own list: this package reads it and appends its operators, nothing more. */
+export interface MutatorList extends ReadonlyArray<ListedMutator> {
+  push(...mutators: ListedMutator[]): number;
 }
 
 export interface Instrumenter {
@@ -65,7 +70,7 @@ export interface Instrumenter {
   readonly version: string;
   readonly types: BabelTypes;
   /** The array `transformBabel` reads by default on every file (`babel-transformer.js:8`). */
-  readonly allMutators: ListedMutator[];
+  readonly allMutators: MutatorList;
   /**
    * `target` is the first entry of the frozen `allMutantPlacers`; the array is frozen, this object is not
    * (`mutant-placers/index.js:6`). `original` calls the methods `target` had when it was resolved.

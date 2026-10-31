@@ -8,7 +8,7 @@ export type SerialGroups = ReadonlyMap<string, readonly string[]>;
 // Given no names, listTests would also load the default: false projects.
 export function projectsThatRun(
   option: string[] | undefined,
-  projects: { default: boolean; project: { name: string } }[],
+  projects: readonly { default: boolean; project: { name: string } }[],
 ): string[] {
   return option?.length
     ? option

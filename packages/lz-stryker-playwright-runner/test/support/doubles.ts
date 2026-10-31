@@ -25,7 +25,7 @@ export type Outcome = ReturnType<TestCase['outcome']>;
 export function tempTree(
   t: TestContext,
   prefix: string,
-  files: Readonly<Record<string, string>>,
+  files: Readonly<Record<string, string>> = {},
 ): string {
   const dir = mkdtempSync(path.join(tmpdir(), prefix));
   t.after(() => rmSync(dir, { recursive: true, force: true }));

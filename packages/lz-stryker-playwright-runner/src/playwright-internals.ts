@@ -35,8 +35,8 @@ export interface ConfigWebServer {
 export interface TestRunner {
   initialize(params: Record<string, never>): Promise<void>;
   loadConfig(): Promise<{
-    projects: ConfigProject[];
-    webServers: ConfigWebServer[];
+    projects: readonly ConfigProject[];
+    webServers: readonly ConfigWebServer[];
   }>;
   // Resolves to undefined when Playwright throws, after printing the error to stderr.
   listTests(
