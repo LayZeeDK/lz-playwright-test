@@ -30,7 +30,7 @@ import {
   finishedTest,
   logger,
   mutantRunOptions,
-  plain,
+  withoutPrototypes,
   strykerOptions,
 } from './support/doubles.ts';
 import {
@@ -43,7 +43,6 @@ import {
 
 const workerHookUrl = new URL('../src/worker-hook.ts', import.meta.url).href;
 
-/** A server listening on a free localhost port, and that port. */
 async function listening(): Promise<{ server: net.Server; port: number }> {
   const server = net.createServer();
   await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
@@ -189,7 +188,6 @@ test('init warns when timeoutMS is below twice the expect timeout, and only then
   assert.deepEqual(enough.lines, []);
 });
 
-/** Leaves in `tmp` one temp root per suffix, as a runner that no longer runs leaves them, and returns their names. */
 function leaveDeadRoots(tmp: string, suffixes: string[]): string[] {
   const dead = spawnSync(process.execPath, ['-e', '']).pid;
 
@@ -393,7 +391,7 @@ test('a dry run runs every test with the hook and the run settings in the worker
   assert.equal(run.env['PLAYWRIGHT_NO_COPY_PROMPT'], '1');
   assert.equal(existsSync(run.settings.outDir), false);
   assert.deepEqual({ ...process.env }, before);
-  assert.deepEqual(plain(result), {
+  assert.deepEqual(withoutPrototypes(result), {
     status: DryRunStatus.Complete,
     tests: [
       {

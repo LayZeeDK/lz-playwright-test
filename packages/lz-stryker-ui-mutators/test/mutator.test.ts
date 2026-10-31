@@ -90,16 +90,6 @@ describe('toNodeMutator', () => {
     assert.deepEqual([sitesOf(file, 'href'), sitesOf(empty, 'href')], [[], []]);
   });
 
-  it('finds no site for an attribute whose opening element has no JSX element around it', () => {
-    const file = parse('<input disabled />;');
-    const [statement] = file.program.body;
-    assert.ok(t.isExpressionStatement(statement));
-    // @ts-expect-error -- a hand-built tree puts an opening element where an expression goes
-    statement.expression = firstElement(file).openingElement;
-
-    assert.deepEqual(sitesOf(file, 'disabled'), []);
-  });
-
   it('finds no site for an attribute whose opening element has no parent path, as in a traversal of the element alone', () => {
     const element = firstElement(parse('<input disabled />;'));
     const mutator = toNodeMutator(

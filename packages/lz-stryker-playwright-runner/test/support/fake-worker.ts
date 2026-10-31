@@ -97,7 +97,6 @@ export function fakeInstall(
     activeMutant?: string;
     /** Runs before install, as the worker's earlier code would. */
     prepare?: (outDir: string, ns: string) => void;
-    /** Replaces test.info(), as a Playwright whose TestInfo changed would. */
     info?: () => unknown;
   } = {},
 ) {

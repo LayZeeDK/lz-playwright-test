@@ -66,7 +66,6 @@ export interface RunnerOptions {
   readonly strykerTimeoutMS: number;
 }
 
-/** The Stryker options the runner reads. */
 export interface RunnerStrykerOptions {
   readonly testFiles?: readonly string[];
   readonly timeoutMS: number;

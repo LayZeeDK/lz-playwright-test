@@ -55,6 +55,11 @@ the table of the Playwright version it was built with. If that table cannot be r
 entries, the build fails and names what is missing. The
 package's tests parse the table of each Playwright minor version from 1.63 on.
 
+In this repository, `node scripts/generate-roles.ts` writes `src/bundled-roles.ts`; the build runs it.
+When a Playwright minor version ships, run `node tools/playwright-roles-matrix.ts` from the repository root.
+It downloads that version's table into `test/fixture/roles/`, and the tests then fail if the parser cannot
+read it.
+
 ## Turn the operators on
 
 Use one of two ways:

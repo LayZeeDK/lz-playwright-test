@@ -1,5 +1,3 @@
-// parseRoleTable on excerpts of playwright-core's bundle from 1.63.0 to the newest alpha, and consumerRoles against
-// fake playwright-core installs on disk and against the installed one.
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -20,7 +18,6 @@ import {
 } from './support/fake-playwright-core.ts';
 import { tempRoot } from './support/temp-tree.ts';
 
-// tools/playwright-roles-matrix.ts writes one fixture per minor version of playwright-core.
 const fixtureVersions = readdirSync(
   join(import.meta.dirname, 'fixture', 'roles'),
 ).map((file) => file.replace(/\.txt$/, ''));
@@ -45,10 +42,13 @@ describe('parseRoleTable', () => {
 
       assert.equal(roles.size, 53);
       assert.deepEqual(roles.get('button'), { role: 'button' });
-      assert.deepEqual(roles.get('a'), { role: 'link', attribute: 'href' });
+      assert.deepEqual(roles.get('a'), {
+        role: 'link',
+        requiredAttribute: 'href',
+      });
       assert.deepEqual(roles.get('area'), {
         role: 'link',
-        attribute: 'href',
+        requiredAttribute: 'href',
       });
       assert.deepEqual(roles.get('sup'), { role: 'superscript' });
       assert.deepEqual(roles.get('svg'), { role: 'img' });
@@ -69,8 +69,8 @@ describe('parseRoleTable', () => {
       [...roles],
       [
         ['button', { role: 'button' }],
-        ['a', { role: 'link', attribute: 'href' }],
-        ['area', { role: 'link', attribute: 'href' }],
+        ['a', { role: 'link', requiredAttribute: 'href' }],
+        ['area', { role: 'link', requiredAttribute: 'href' }],
       ],
     );
   });
@@ -231,7 +231,6 @@ describe('consumerRoles', () => {
     writeFileSync(manifest, '{');
     const resolve = () => manifest;
     const { messages, warn } = recorder();
-    // Node.js words the JSON error differently across versions.
     const jsonError = (() => {
       try {
         JSON.parse('{');

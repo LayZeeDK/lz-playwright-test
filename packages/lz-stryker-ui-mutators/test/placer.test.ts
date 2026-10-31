@@ -9,7 +9,6 @@ import { withJsxPlacement, type PlacerMethods } from '../src/placer.ts';
 import { firstPath, parse } from './support/babel.ts';
 
 describe('withJsxPlacement', () => {
-  /** The first path of `type` in `code`, and a function that places one mutant there through the wrapped `original`. */
   function placeOn(
     code: string,
     type: 'JSXAttribute' | 'JSXText',

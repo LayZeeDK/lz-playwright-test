@@ -64,7 +64,6 @@ export function serialGroups(testCases: Iterable<ReportedTest>): SerialGroups {
   return byTest;
 }
 
-// The walk goes from the test outwards, so the last serial suite it meets is the outermost.
 function outermostSerialSuite(test: ReportedTest): object | undefined {
   let outermost: object | undefined;
 

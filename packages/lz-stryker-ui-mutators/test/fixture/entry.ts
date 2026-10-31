@@ -1,4 +1,3 @@
-// Child-process driver for index.test.ts. Argument `taken`: register another mutator named LzTextLiteral first.
 // Prints one JSON line: the names this package registered, whether the placer is wrapped, and the ignorer outcome.
 import { resolveFromCore } from '../../src/install.ts';
 import { defined } from '../support/defined.ts';

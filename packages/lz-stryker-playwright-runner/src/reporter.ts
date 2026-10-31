@@ -4,14 +4,12 @@ import type {
   TestResult,
 } from '@playwright/test/reporter';
 
-/** The members of a Playwright TestResult the runner reads. */
 export interface ReportedAttempt {
   readonly status: TestResult['status'];
   readonly duration: number;
   readonly error?: TestError | undefined;
 }
 
-/** The members of a Playwright TestCase the runner reads; `parent` is its Suite. */
 export interface ReportedTest {
   readonly id: string;
   readonly expectedStatus: TestCase['expectedStatus'];

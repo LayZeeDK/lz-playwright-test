@@ -1,4 +1,3 @@
-// scripts/generate-roles.ts in a child `node` process, against fake playwright-core installs, writing to a temp file.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, writeFileSync } from 'node:fs';
@@ -17,9 +16,7 @@ import { tempRoot } from './support/temp-tree.ts';
 
 const script = join(import.meta.dirname, '..', 'scripts', 'generate-roles.ts');
 
-/** Runs the generator with playwright-core resolved from `root`, writing to `root`/bundled-roles.mts. */
 function generate(root: string) {
-  // .mts, so Node.js loads it as a module without a package.json that says so.
   const out = join(root, 'bundled-roles.mts');
   const child = spawnSync(process.execPath, [script], {
     encoding: 'utf8',

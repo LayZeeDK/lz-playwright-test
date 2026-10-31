@@ -38,7 +38,7 @@ import {
   fakeTestCase,
   mutantRequest,
   type Outcome,
-  plain,
+  withoutPrototypes,
   runOutput,
 } from './support/doubles.ts';
 
@@ -348,7 +348,7 @@ test('a dry run merges the coverage of every snapshot exactly and reports the ga
     dryRequest(),
   );
 
-  assert.deepEqual(plain(completed(result).mutantCoverage), {
+  assert.deepEqual(withoutPrototypes(completed(result).mutantCoverage), {
     static: { '2': 1 },
     perTest: { a: { '1': 3 } },
   });
@@ -626,7 +626,7 @@ test('a page frame puts its per-test coverage under its test and its static cove
     },
   ]);
 
-  assert.deepEqual(plain(coverage), {
+  assert.deepEqual(withoutPrototypes(coverage), {
     static: { '3': 1 },
     perTest: { a: { '1': 2 } },
   });
@@ -640,7 +640,7 @@ test('a frame of a shared context puts all its coverage in static', () => {
     },
   ]);
 
-  assert.deepEqual(plain(coverage), {
+  assert.deepEqual(withoutPrototypes(coverage), {
     static: { '2': 1, '3': 1 },
     perTest: {},
   });
@@ -656,7 +656,7 @@ test('two frames of one test sum their counts', () => {
     mutantCoverage: { static: {}, perTest: { a: { '1': 2 } } },
   };
 
-  assert.deepEqual(plain(merge([frame, other])), {
+  assert.deepEqual(withoutPrototypes(merge([frame, other])), {
     static: {},
     perTest: { a: { '1': 3, '2': 1 } },
   });
@@ -671,7 +671,7 @@ test('a worker line with coverage and no flags merges like a page frame', () => 
     mutantCoverage: { static: { '4': 5 }, perTest: { a: { '1': 2 } } },
   };
 
-  assert.deepEqual(plain(merge([page, worker])), {
+  assert.deepEqual(withoutPrototypes(merge([page, worker])), {
     static: { '4': 5 },
     perTest: { a: { '1': 3 } },
   });

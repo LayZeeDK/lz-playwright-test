@@ -186,8 +186,6 @@ test('a folder that vanished is not ours', () => {
 
 const ownerToken = 'ns-of-this-runner';
 
-// A temp directory holding the given entries, each a folder with an owner marker that holds `ownerToken`, and a
-// `remove` double that records the base names it is given.
 function tmpWith(t: TestContext, names: string[]) {
   const tmp = tempTree(
     t,

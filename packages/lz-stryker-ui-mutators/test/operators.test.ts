@@ -1,4 +1,3 @@
-// LzElementRole with a role table other than the bundled one, run through toNodeMutator over every path of a file.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
@@ -10,7 +9,6 @@ import type { RoleTable } from '../src/playwright-roles.ts';
 import { parse } from './support/babel.ts';
 import { defined } from './support/defined.ts';
 
-/** Each element that LzElementRole changes in `code` under `roles`, as `<name attributes> -> what it yields`. */
 function elementRoleMutants(code: string, roles: RoleTable): string[] {
   const file = parse(code);
   const mutator = toNodeMutator(
@@ -44,7 +42,7 @@ describe('LzElementRole', () => {
   it('swaps for a span exactly the elements whose role in the table is button or link', () => {
     const roles: RoleTable = new Map([
       ['div', { role: 'button' }],
-      ['nav', { role: 'link', attribute: 'data-to' }],
+      ['nav', { role: 'link', requiredAttribute: 'data-to' }],
       ['p', { role: 'paragraph' }],
     ]);
 

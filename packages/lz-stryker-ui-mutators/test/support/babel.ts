@@ -4,7 +4,6 @@ import { parseSync, traverse, type NodePath, type types } from '@babel/core';
 
 import { defined } from './defined.ts';
 
-/** `code` parsed as TSX by `@babel/core`, with no Babel config file read. */
 export function parse(code: string): types.File {
   const file = parseSync(code, {
     configFile: false,
@@ -16,7 +15,6 @@ export function parse(code: string): types.File {
   return file;
 }
 
-/** The first path of `type` in `file`, in traversal order. */
 export function firstPath(
   file: types.File,
   type: types.Node['type'],

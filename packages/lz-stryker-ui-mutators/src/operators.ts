@@ -43,7 +43,6 @@ const notOnSpan: ReadonlySet<string | undefined> = new Set([
   'type',
   'disabled',
 ]);
-/** The operators, with LzElementRole reading each element's implicit role from `roles`. */
 export function operatorsFor(roles: RoleTable) {
   return operatorTable([
     {
@@ -277,7 +276,8 @@ function implicitRole(
   const entry = roles.get(element.name);
 
   return entry !== undefined &&
-    (entry.attribute === undefined || element.attributes.has(entry.attribute))
+    (entry.requiredAttribute === undefined ||
+      element.attributes.has(entry.requiredAttribute))
     ? entry.role
     : undefined;
 }

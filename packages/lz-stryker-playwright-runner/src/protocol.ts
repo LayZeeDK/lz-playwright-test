@@ -9,7 +9,6 @@ export const runSettingsEnv = 'LZ_STRYKER_PLAYWRIGHT_RUN';
 
 export const snapshotSuffix = '.ndjson';
 
-/** A worker whose hook failed to install leaves the error in a file of this suffix, as text. */
 export const installErrorSuffix = '.install-error';
 
 export const frameReadTimeoutMs = 2000;
@@ -59,19 +58,17 @@ export function serializeSnapshot(line: SnapshotLine): string {
   }
 }
 
-/** A record without a prototype, so a key such as __proto__ stays an own key. */
-export function emptyRecord<T>(): Record<string, T> {
+export function nullPrototypeRecord<T>(): Record<string, T> {
   const record: Record<string, T> = {};
   Object.setPrototypeOf(record, null);
 
   return record;
 }
 
-/** Untrusted entries go straight into a record without a prototype, never through an ordinary object. */
-function recordOf<T>(
+function nullPrototypeRecordOf<T>(
   entries: readonly (readonly [string, T])[],
 ): Record<string, T> {
-  const record = emptyRecord<T>();
+  const record = nullPrototypeRecord<T>();
   entries.forEach(([key, value]) => {
     record[key] = value;
   });
@@ -80,7 +77,7 @@ function recordOf<T>(
 }
 
 function hitCounts(value: unknown): Record<string, number> {
-  return recordOf(
+  return nullPrototypeRecordOf(
     entriesOf(value).flatMap(([mutantId, count]) =>
       isHitCount(count) ? [[mutantId, count] as const] : [],
     ),
@@ -98,7 +95,7 @@ function parseCoverage(value: unknown): MutantCoverage | undefined {
 
   return {
     static: hitCounts(value['static']),
-    perTest: recordOf(
+    perTest: nullPrototypeRecordOf(
       entriesOf(value['perTest']).map(
         ([testId, hits]) => [testId, hitCounts(hits)] as const,
       ),

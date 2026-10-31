@@ -326,7 +326,6 @@ export function setEnv(values: Readonly<Record<string, string | undefined>>) {
 // Playwright's own webServer port check tries both loopback addresses: localhost can resolve to only one of them.
 const loopbackHosts = ['127.0.0.1', '::1'];
 
-/** The members of a net.Socket that a port check uses. */
 export interface ConnectingSocket {
   once(event: 'connect' | 'error' | 'timeout', listener: () => void): unknown;
   destroy(): unknown;
