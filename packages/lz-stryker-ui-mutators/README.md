@@ -56,7 +56,7 @@ entries, the build fails and names what is missing. The
 package's tests parse the table of each Playwright minor version from 1.63 on.
 
 In this repository, `node scripts/generate-roles.ts` writes `src/bundled-roles.ts`; the build runs it.
-When a Playwright minor version ships, run `node tools/playwright-roles-matrix.ts` from the repository root.
+When a Playwright minor version ships, run `node scripts/playwright-roles-matrix.ts`.
 It downloads that version's table into `test/fixture/roles/`, and the tests then fail if the parser cannot
 read it.
 

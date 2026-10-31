@@ -17,9 +17,9 @@ export default [
     rules: { ...typeSafetyRules, ...readonlyRules },
   },
   {
-    files: ['bench-playwright-runs.ts', 'playwright-roles-matrix.ts'],
+    files: ['bench-playwright-runs.ts'],
     rules: {
-      // The benchmark and the matrix tool read internals of the runner and of ui-mutators that neither package exports.
+      // The benchmark reads internals of the runner that the package does not export.
       '@nx/enforce-module-boundaries': 'off',
     },
   },

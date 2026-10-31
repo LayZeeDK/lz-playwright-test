@@ -3,18 +3,13 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import {
-  fieldOf,
-  isRecord,
-} from '../packages/lz-stryker-ui-mutators/src/is-record.ts';
-import { roleTableExcerpt } from '../packages/lz-stryker-ui-mutators/src/playwright-roles.ts';
+import { fieldOf, isRecord } from '../src/is-record.ts';
+import { roleTableExcerpt } from '../src/playwright-roles.ts';
 
 const oldestMinor = 63;
 const fixtures = path.join(
   import.meta.dirname,
   '..',
-  'packages',
-  'lz-stryker-ui-mutators',
   'test',
   'fixture',
   'roles',
