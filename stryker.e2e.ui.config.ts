@@ -19,4 +19,5 @@ export default {
   coverageAnalysis: 'perTest',
   timeoutMS: 10_000,
   jsonReporter: { fileName: 'reports/e2e-ui/mutation.json' },
+  htmlReporter: { fileName: 'reports/e2e-ui/mutation.html' },
 } satisfies PartialStrykerOptions;

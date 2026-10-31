@@ -12,5 +12,6 @@ export default {
   coverageAnalysis: 'perTest',
   timeoutMS: 10_000,
   jsonReporter: { fileName: 'reports/ct/mutation.json' },
+  htmlReporter: { fileName: 'reports/ct/mutation.html' },
   tempDirName: '.stryker-tmp-ct',
 } satisfies PartialStrykerOptions;
