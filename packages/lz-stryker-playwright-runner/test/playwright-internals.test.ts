@@ -234,6 +234,50 @@ test('the test runner reads loaded config values the way Playwright does: a nume
   });
 });
 
+test('the test runner reads what Playwright runs though its types refuse it: a falsy port or url as none, a URL object as its string, a null expect.timeout as none', async () => {
+  const runner = await testRunnerAnswering({
+    loadConfig: {
+      projects: [
+        {
+          default: true,
+          expect: { timeout: null },
+          project: { name: 'a', timeout: 1 },
+        },
+      ],
+      webServers: [
+        { port: '' },
+        { port: null },
+        { port: false },
+        { port: 0 },
+        { url: null },
+        { url: new URL('http://127.0.0.1:41234/') },
+      ],
+    },
+  });
+
+  assert.deepEqual(await runner.loadConfig(), {
+    projects: [
+      {
+        default: true,
+        expect: { timeout: undefined },
+        project: { name: 'a', timeout: 1 },
+      },
+    ],
+    webServers: [
+      { url: undefined, port: undefined, ignoreHTTPSErrors: false },
+      { url: undefined, port: undefined, ignoreHTTPSErrors: false },
+      { url: undefined, port: undefined, ignoreHTTPSErrors: false },
+      { url: undefined, port: undefined, ignoreHTTPSErrors: false },
+      { url: undefined, port: undefined, ignoreHTTPSErrors: false },
+      {
+        url: 'http://127.0.0.1:41234/',
+        port: undefined,
+        ignoreHTTPSErrors: false,
+      },
+    ],
+  });
+});
+
 const validProject = {
   default: true,
   expect: { timeout: 5 },
@@ -287,10 +331,6 @@ const refusedConfigs = [
   [
     'has a web server whose port is a string of no digits',
     { projects: [], webServers: [{ ...validServer, port: 'auto' }] },
-  ],
-  [
-    'has a web server whose port is an empty string',
-    { projects: [], webServers: [{ ...validServer, port: '' }] },
   ],
   [
     'has a web server whose port is no number or string',
@@ -436,15 +476,15 @@ test('the instrumentation is the one playwright-core exports, and its absence fa
   };
   const listener = {};
 
-  instrumentationOf(core).addListener(listener);
+  instrumentationOf(core, '1.99.0').addListener(listener);
 
   assert.equal(listeners.length, 1);
   assert.equal(listeners[0], listener);
 
   [undefined, {}, { _instrumentation: {} }].forEach((core) => {
-    assert.throws(() => instrumentationOf(core), {
+    assert.throws(() => instrumentationOf(core, '1.99.0'), {
       message:
-        /^Playwright changed the internals this runner calls \(playwright-core _instrumentation\.addListener\)\.$/,
+        /^Playwright 1\.99\.0 changed the internals this runner calls \(playwright-core _instrumentation\.addListener\)\.$/,
     });
   });
 });

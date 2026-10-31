@@ -73,13 +73,13 @@ function memberOf(value: unknown, key: string): unknown {
 }
 
 /** Reads test.info() of playwright/test's `test`, and parses what it returns. */
-function currentTestOf(playwrightTest: unknown): CurrentTest {
+function currentTestOf(playwrightTest: unknown, version: string): CurrentTest {
   const test = memberOf(playwrightTest, 'test');
   const info = memberOf(test, 'info');
 
   if (typeof info !== 'function') {
     throw internalsChanged(
-      undefined,
+      version,
       'playwright/test test.info(), which tells the worker hook the test that runs',
     );
   }
@@ -94,16 +94,10 @@ function currentTestOf(playwrightTest: unknown): CurrentTest {
       return undefined;
     }
 
-    const version = fieldOf(fieldOf(found, 'config'), 'version');
-
-    if (
-      !isRecord(found) ||
-      typeof found['testId'] !== 'string' ||
-      typeof version !== 'string'
-    ) {
+    if (!isRecord(found) || typeof found['testId'] !== 'string') {
       throw internalsChanged(
-        undefined,
-        "playwright/test test.info() returning the running test's testId and config.version",
+        version,
+        "playwright/test test.info() returning the running test's testId",
       );
     }
 
@@ -153,9 +147,13 @@ export function install(
   { outDir, perTest, hitLimit }: RunSettings,
   ns: string = INSTRUMENTER_CONSTANTS.NAMESPACE,
 ): void {
-  const test = currentTestOf(playwrightRequire('playwright/test'));
+  const version = String(
+    fieldOf(playwrightRequire('playwright/package.json'), 'version'),
+  );
+  const test = currentTestOf(playwrightRequire('playwright/test'), version);
   const instrumentation = instrumentationOf(
     playwrightRequire('playwright-core'),
+    version,
   );
   const activeMutant =
     process.env[INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE];

@@ -86,6 +86,7 @@ function runWorker(
   playwrightTest = playwrightTestModule,
 ) {
   const dir = tempTree(t, 'worker-hook-gate-', {
+    'node_modules/playwright/package.json': '{"version":"1.64.1"}',
     'node_modules/playwright/test.js': playwrightTest,
     'node_modules/playwright-core/package.json': '{"main":"index.js"}',
     // Every install adds one listener, so each line is one install.
@@ -122,6 +123,7 @@ function runWorker(
 
 function playwrightWith(t: TestContext, playwrightTest: string) {
   const dir = tempTree(t, 'worker-hook-api-', {
+    'node_modules/playwright/package.json': '{"version":"1.64.1"}',
     'node_modules/playwright/test.js': playwrightTest,
     'node_modules/playwright-core/index.js':
       'exports._instrumentation = { addListener() {} };',
@@ -147,7 +149,7 @@ function playwrightWith(t: TestContext, playwrightTest: string) {
         ),
       {
         message:
-          'Playwright changed the internals this runner calls (playwright/test test.info(), which tells the worker hook the test that runs).',
+          'Playwright 1.64.1 changed the internals this runner calls (playwright/test test.info(), which tells the worker hook the test that runs).',
       },
     );
   });
@@ -169,7 +171,7 @@ test('a worker whose hook fails to install leaves the error for the run and exit
     snapshots: [],
     hookInstalled: false,
     installErrors: [
-      'Error: Playwright changed the internals this runner calls (playwright/test test.info(), which tells the worker hook the test that runs).',
+      'Error: Playwright 1.64.1 changed the internals this runner calls (playwright/test test.info(), which tells the worker hook the test that runs).',
     ],
   });
 });
@@ -185,7 +187,7 @@ test('a worker whose hook fails to install and cannot leave the error still exit
   assert.equal(child.status, 1, child.stderr);
   assert.match(
     child.stderr,
-    /Error: Playwright changed the internals this runner calls \(playwright\/test test\.info\(\), /,
+    /Error: Playwright 1\.64\.1 changed the internals this runner calls \(playwright\/test test\.info\(\), /,
   );
 });
 
@@ -465,12 +467,7 @@ const running = {
 
 const refusedInfos = [
   ['is no object', null],
-  ['has no string testId', { ...running, testId: 1, config: { version: '1' } }],
-  ['has no config', { ...running, testId: 't1' }],
-  [
-    'has no string config.version',
-    { ...running, testId: 't1', config: { version: 1 } },
-  ],
+  ['has no string testId', { ...running, testId: 1 }],
 ] as const;
 
 refusedInfos.forEach(([title, info]) => {
@@ -479,7 +476,7 @@ refusedInfos.forEach(([title, info]) => {
 
     assert.throws(() => hooked.namespace().currentTestId, {
       message:
-        "Playwright changed the internals this runner calls (playwright/test test.info() returning the running test's testId and config.version).",
+        "Playwright 1.64.1 changed the internals this runner calls (playwright/test test.info() returning the running test's testId).",
     });
   });
 });

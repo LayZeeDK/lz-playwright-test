@@ -18,6 +18,7 @@ import {
 } from './options.ts';
 import {
   type ConfigWebServer,
+  isSerialSuite,
   loadPlaywright,
   noCopyPromptEnv,
   type Playwright,
@@ -129,7 +130,7 @@ export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
       const serialGroups = await listSerialGroups(
         playwright,
         projectsThatRun(options.projects, config.projects),
-        pw.version,
+        (suite) => isSerialSuite(suite, pw.version),
       );
       this.#session = {
         options,
@@ -377,7 +378,7 @@ function serverCheck(
     return [
       {
         name: server.url,
-        isUp: () => isURLAvailable(url, !!server.ignoreHTTPSErrors),
+        isUp: () => isURLAvailable(url, server.ignoreHTTPSErrors),
       },
     ];
   }

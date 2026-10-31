@@ -1,9 +1,11 @@
 import { isRecord } from './is-record.ts';
-import { isSerialSuite, type TestRunner } from './playwright-internals.ts';
+import type { TestRunner } from './playwright-internals.ts';
 import { LzStrykerCollectingReporter, type ReportedTest } from './reporter.ts';
 
 /** The ids of a describe.serial group's tests, by the id of each test in it. */
 export type SerialGroups = ReadonlyMap<string, readonly string[]>;
+
+type IsSerialSuite = (suite: unknown) => boolean;
 
 // Given no names, listTests would also load the default: false projects.
 export function projectsThatRun(
@@ -20,7 +22,7 @@ export function projectsThatRun(
 export async function listSerialGroups(
   playwright: Pick<TestRunner, 'listTests'>,
   projects: readonly string[],
-  version: string,
+  isSerial: IsSerialSuite,
 ): Promise<SerialGroups> {
   const reporter = new LzStrykerCollectingReporter();
   const result = await playwright.listTests(reporter, { projects });
@@ -44,18 +46,18 @@ export async function listSerialGroups(
     );
   }
 
-  return serialGroups(reporter.listedTests, version);
+  return serialGroups(reporter.listedTests, isSerial);
 }
 
 export function serialGroups(
   testCases: Iterable<ReportedTest>,
-  version: string,
+  isSerial: IsSerialSuite,
 ): SerialGroups {
   const bySuite = new Map<object, string[]>();
   const byTest = new Map<string, string[]>();
 
   [...testCases].forEach((test) => {
-    const group = outermostSerialSuite(test, version);
+    const group = outermostSerialSuite(test, isSerial);
 
     if (group) {
       const ids = bySuite.get(group) ?? [];
@@ -70,7 +72,7 @@ export function serialGroups(
 
 function outermostSerialSuite(
   test: ReportedTest,
-  version: string,
+  isSerial: IsSerialSuite,
 ): object | undefined {
   let outermost: object | undefined;
 
@@ -79,7 +81,7 @@ function outermostSerialSuite(
     isRecord(suite);
     suite = suite['parent']
   ) {
-    if (isSerialSuite(suite, version)) {
+    if (isSerial(suite)) {
       outermost = suite;
     }
   }

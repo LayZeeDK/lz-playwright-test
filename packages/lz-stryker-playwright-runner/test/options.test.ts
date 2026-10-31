@@ -59,7 +59,7 @@ test('the runner options refuse --testFiles', () => {
   );
 });
 
-test('the runner options refuse lzStrykerPlaywright options that are not an object or have a field of the wrong type', () => {
+test('the runner options refuse lzStrykerPlaywright options that are not an object or have a field of the wrong type, or a workers count that is no integer of at least 1', () => {
   [
     'chromium',
     [],
@@ -68,6 +68,8 @@ test('the runner options refuse lzStrykerPlaywright options that are not an obje
     { projects: 'chromium' },
     { projects: ['chromium', 1] },
     { workers: '2' },
+    { workers: 1.5 },
+    { workers: 0 },
   ].forEach((lzStrykerPlaywright) => {
     assert.throws(
       () => readRunnerOptions(strykerOptions({ lzStrykerPlaywright })),

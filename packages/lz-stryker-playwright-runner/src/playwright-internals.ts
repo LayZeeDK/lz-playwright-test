@@ -26,7 +26,7 @@ export interface ConfigProject {
 export interface ConfigWebServer {
   readonly url?: string | undefined;
   readonly port?: number | undefined;
-  readonly ignoreHTTPSErrors?: boolean | undefined;
+  readonly ignoreHTTPSErrors: boolean;
 }
 
 export interface TestRunner {
@@ -284,7 +284,7 @@ function parseConfig(
     projects: projects.map((project: unknown): ConfigProject => {
       const settings = fieldOf(project, 'project');
       const expect = fieldOf(project, 'expect');
-      const expectTimeout = fieldOf(expect, 'timeout');
+      const expectTimeout = fieldOf(expect, 'timeout') ?? undefined;
 
       if (
         !isRecord(project) ||
@@ -304,11 +304,13 @@ function parseConfig(
       };
     }),
     webServers: webServers.map((server: unknown): ConfigWebServer => {
-      const port = fieldOf(server, 'port');
+      const configUrl = fieldOf(server, 'url') || undefined;
+      const url = configUrl instanceof URL ? configUrl.href : configUrl;
+      const port = fieldOf(server, 'port') || undefined;
 
       if (
         !isRecord(server) ||
-        (server['url'] !== undefined && typeof server['url'] !== 'string') ||
+        (url !== undefined && typeof url !== 'string') ||
         (port !== undefined &&
           typeof port !== 'number' &&
           !(typeof port === 'string' && /^\d+$/.test(port)))
@@ -317,7 +319,7 @@ function parseConfig(
       }
 
       return {
-        url: server['url'],
+        url,
         port: port === undefined ? undefined : Number(port),
         ignoreHTTPSErrors: !!server['ignoreHTTPSErrors'],
       };
@@ -352,13 +354,16 @@ export function loadPlaywright(configFile: string | undefined): Playwright {
   });
 }
 
-export function instrumentationOf(core: unknown): Instrumentation {
+export function instrumentationOf(
+  core: unknown,
+  version: string,
+): Instrumentation {
   const instrumentation = fieldOf(core, '_instrumentation');
   const addListener = fieldOf(instrumentation, 'addListener');
 
   if (typeof addListener !== 'function') {
     throw internalsChanged(
-      undefined,
+      version,
       'playwright-core _instrumentation.addListener',
     );
   }
@@ -434,15 +439,9 @@ function timeoutManagerChanged(version: string): Error {
   );
 }
 
-export function internalsChanged(
-  version: string | undefined,
-  what: string,
-): Error {
-  const playwright =
-    version === undefined ? 'Playwright' : `Playwright ${version}`;
-
+export function internalsChanged(version: string, what: string): Error {
   return new Error(
-    `${playwright} changed the internals this runner calls (${what}).`,
+    `Playwright ${version} changed the internals this runner calls (${what}).`,
   );
 }
 

@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import type { FullResult } from '@playwright/test/reporter';
 
+import { isSerialSuite } from '../src/playwright-internals.ts';
 import type {
   LzStrykerCollectingReporter,
   ReportedTest,
@@ -15,6 +16,8 @@ import {
 } from '../src/serial-groups.ts';
 import { fakeTestCase } from './support/doubles.ts';
 
+const isSerial = (suite: unknown) => isSerialSuite(suite, '1.99.0');
+
 test('a mutant run selects every test of a describe.serial group, not one test alone', () => {
   const file = { _parallelMode: 'none', parent: undefined };
   const serial = { _parallelMode: 'serial', parent: file };
@@ -26,7 +29,7 @@ test('a mutant run selects every test of a describe.serial group, not one test a
       fakeTestCase('edit', { parent: nestedSerial }),
       fakeTestCase('alone', { parent: plain }),
     ],
-    '1.99.0',
+    isSerial,
   );
 
   assert.deepEqual(withSerialGroups(['edit'], groups), ['create', 'edit']);
@@ -43,7 +46,7 @@ test('serial grouping fails loudly when Playwright suites lose _parallelMode', (
     () =>
       serialGroups(
         [fakeTestCase('a', { parent: { parent: undefined } })],
-        '1.99.0',
+        isSerial,
       ),
     { message: /^Playwright 1\.99\.0 .*Suite\._parallelMode/ },
   );
@@ -95,7 +98,7 @@ test('listing passes the projects to Playwright and groups the describe.serial t
   );
   const { playwright, calls } = listing({ status: 'passed', tests });
 
-  const groups = await listSerialGroups(playwright, ['chromium'], '1.99.0');
+  const groups = await listSerialGroups(playwright, ['chromium'], isSerial);
 
   assert.deepEqual(groups.get('edit'), ['create', 'edit']);
   assert.deepEqual(calls, [['chromium']]);
@@ -107,7 +110,7 @@ test('listing fails when a test file does not load, though the status says passe
     errors: ['SyntaxError in a.spec.ts', 'SyntaxError in b.spec.ts'],
   });
 
-  await assert.rejects(listSerialGroups(playwright, [], '1.99.0'), {
+  await assert.rejects(listSerialGroups(playwright, [], isSerial), {
     message:
       'Playwright could not load every test file:\nSyntaxError in a.spec.ts\nSyntaxError in b.spec.ts',
   });
@@ -119,7 +122,7 @@ test('listing fails with the status Playwright reports', async () => {
     errors: ['config error', 'second error'],
   });
 
-  await assert.rejects(listSerialGroups(playwright, [], '1.99.0'), {
+  await assert.rejects(listSerialGroups(playwright, [], isSerial), {
     message:
       'Playwright could not list the tests (failed):\nconfig error\nsecond error',
   });
@@ -128,7 +131,7 @@ test('listing fails with the status Playwright reports', async () => {
 test('listing fails and points at the trace log when Playwright throws', async () => {
   const { playwright } = listing({});
 
-  await assert.rejects(listSerialGroups(playwright, [], '1.99.0'), {
+  await assert.rejects(listSerialGroups(playwright, [], isSerial), {
     message: /--logLevel trace/,
   });
 });

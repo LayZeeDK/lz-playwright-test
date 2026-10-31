@@ -116,12 +116,12 @@ export function fakeInstall(
 
         return {
           testId: running,
-          config: { version: '1.64.1' },
           _timeoutManager: { _running: { runnable } },
         };
       }),
   };
   const modules: Record<string, unknown> = {
+    'playwright/package.json': { version: '1.64.1' },
     'playwright/test': { test },
     'playwright-core': {
       _instrumentation: {

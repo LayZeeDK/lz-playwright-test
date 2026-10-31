@@ -101,12 +101,19 @@ export function readRunnerOptions(
       optionGuards.projects(projects) &&
       optionGuards.workers(workers)
     ) {
-      return {
-        configFile: configFile ? path.resolve(configFile) : undefined,
-        projects,
-        workers: workers ?? optionProperties.workers.default,
-        strykerTimeoutMS: options.timeoutMS,
-      };
+      const workerCount = workers ?? optionProperties.workers.default;
+
+      if (
+        Number.isInteger(workerCount) &&
+        workerCount >= optionProperties.workers.minimum
+      ) {
+        return {
+          configFile: configFile ? path.resolve(configFile) : undefined,
+          projects,
+          workers: workerCount,
+          strykerTimeoutMS: options.timeoutMS,
+        };
+      }
     }
   }
 

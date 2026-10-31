@@ -143,7 +143,10 @@ export function fakePlaywright(
         projects: behaviour.projects ?? [
           { default: true, project: { name: 'chromium', timeout: 30_000 } },
         ],
-        webServers: behaviour.webServers ?? [],
+        webServers: (behaviour.webServers ?? []).map((server) => ({
+          ignoreHTTPSErrors: false,
+          ...server,
+        })),
       };
     }
 
