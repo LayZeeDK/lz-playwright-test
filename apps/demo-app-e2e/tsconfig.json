@@ -4,7 +4,6 @@
     "allowJs": true,
     "outDir": "out-tsc/playwright",
     "sourceMap": false,
-    "noUncheckedIndexedAccess": true,
     "types": ["node"]
   },
   "include": [
