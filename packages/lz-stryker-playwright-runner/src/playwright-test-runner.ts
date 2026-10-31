@@ -1,8 +1,6 @@
 import net from 'node:net';
-import os from 'node:os';
 import path from 'node:path';
 
-import type { StrykerOptions } from '@stryker-mutator/api/core';
 import type { Logger } from '@stryker-mutator/api/logging';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 import type {
@@ -13,10 +11,15 @@ import type {
   TestRunner as StrykerTestRunner,
 } from '@stryker-mutator/api/test-runner';
 
-import { readRunnerOptions, type RunnerOptions } from './options.ts';
 import {
+  readRunnerOptions,
+  type RunnerOptions,
+  type RunnerStrykerOptions,
+} from './options.ts';
+import {
+  type ConfigWebServer,
   loadPlaywright,
-  NO_COPY_PROMPT_ENV,
+  noCopyPromptEnv,
   type Playwright,
   type TestRunner,
 } from './playwright-internals.ts';
@@ -40,12 +43,7 @@ import {
   projectsThatRun,
   type SerialGroups,
 } from './serial-groups.ts';
-import {
-  createTempRoot,
-  removeDir,
-  removeLeftRoots,
-  type TempRoot,
-} from './temp-root.ts';
+import { claimTempRoot, removeDir, type TempRoot } from './temp-root.ts';
 import {
   armDeadline,
   assertionTimeoutWarning,
@@ -67,26 +65,26 @@ interface Session {
   readonly timeouts: ConfigTimeouts;
 }
 
-const HOOK = new URL(
+const workerHookUrl = new URL(
   `./worker-hook${path.extname(import.meta.filename)}`,
   import.meta.url,
 ).href;
 
-const RUN_OVERRIDES = {
+const runOverrides = {
   use: { screenshot: 'off', trace: 'off', video: 'off' },
 };
 
 export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
   static inject = tokens(commonTokens.options, commonTokens.logger);
 
-  private readonly strykerOptions: StrykerOptions;
-  private readonly log: Logger;
-  private readonly baseNodeOptions = process.env.NODE_OPTIONS;
-  private session?: Session;
+  readonly #strykerOptions: RunnerStrykerOptions;
+  readonly #log: Logger;
+  readonly #baseNodeOptions = process.env['NODE_OPTIONS'];
+  #session: Session | undefined;
 
-  constructor(options: StrykerOptions, log: Logger) {
-    this.strykerOptions = options;
-    this.log = log;
+  constructor(options: RunnerStrykerOptions, log: Logger) {
+    this.#strykerOptions = options;
+    this.#log = log;
   }
 
   capabilities() {
@@ -94,23 +92,21 @@ export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
   }
 
   async init(): Promise<void> {
-    const options = readRunnerOptions(this.strykerOptions);
+    const options = readRunnerOptions(this.#strykerOptions);
     const pw = loadPlaywright(options.configFile);
-    const removed = removeLeftRoots(os.tmpdir());
-
-    if (removed.length) {
-      this.log.debug(
-        `Removed the temp directories of runners that no longer run: ${removed.join(', ')}`,
-      );
-    }
-
-    const root = createTempRoot();
+    const root = claimTempRoot((removed) => {
+      if (removed.length) {
+        this.#log.debug(
+          `Removed the temp directories of runners that no longer run: ${removed.join(', ')}`,
+        );
+      }
+    });
     let playwright: TestRunner | undefined;
 
     try {
       playwright = await pw.createTestRunner(options.configFile, {
         outputDir: root.outputDir,
-        ...RUN_OVERRIDES,
+        ...runOverrides,
       });
       const config = await playwright.loadConfig();
       const timeouts = configTimeouts(config.projects);
@@ -120,7 +116,7 @@ export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
       );
 
       if (warning) {
-        this.log.warn(warning);
+        this.#log.warn(warning);
       }
 
       const servers = config.webServers.flatMap((server) =>
@@ -134,7 +130,7 @@ export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
         playwright,
         projectsThatRun(options.projects, config.projects),
       );
-      this.session = {
+      this.#session = {
         options,
         playwright,
         root,
@@ -156,8 +152,8 @@ export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
   }
 
   async dispose(): Promise<void> {
-    const session = this.session;
-    this.session = undefined;
+    const session = this.#session;
+    this.#session = undefined;
 
     if (!session) {
       return;
@@ -174,60 +170,60 @@ export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
   async dryRun(options: DryRunOptions): Promise<DryRunResult> {
     const request = dryRunRequest(options);
     const { result, gaps } = dryRunResult(
-      await this.run(this.ready(), request),
+      await this.#run(this.#ready(), request),
       request,
     );
 
     if (gaps) {
-      logCoverageGaps(this.log, gaps);
+      logCoverageGaps(this.#log, gaps);
     }
 
     return result;
   }
 
   async mutantRun(options: MutantRunOptions): Promise<MutantRunResult> {
-    const session = this.ready();
+    const session = this.#ready();
     const request = mutantRunRequest(options, session);
     const { result, hitCount } = mutantRunResult(
-      await this.run(session, request),
+      await this.#run(session, request),
       request,
     );
-    this.log.debug(
+    this.#log.debug(
       `Mutant ${request.activeMutant}: ${result.status}, hitCount ${hitCount}/${request.hitLimit}`,
     );
 
     return result;
   }
 
-  private ready(): Session {
-    if (!this.session) {
+  #ready(): Session {
+    if (!this.#session) {
       throw new Error(
         'The Playwright test runner was used before init() finished.',
       );
     }
 
-    return this.session;
+    return this.#session;
   }
 
-  private async run(session: Session, request: RunRequest): Promise<RunOutput> {
+  async #run(session: Session, request: RunRequest): Promise<RunOutput> {
     const deadlineAt =
       request.budget.deadlineMs === undefined
         ? undefined
         : performance.now() + request.budget.deadlineMs;
-    await this.restartDeadServers(session);
-    let output = await this.runOnce(session, request, deadlineAt);
+    await this.#restartDeadServers(session);
+    let output = await this.#runOnce(session, request, deadlineAt);
 
     if (
       mayHaveLostItsServer(output) &&
-      (await this.restartDeadServers(session))
+      (await this.#restartDeadServers(session))
     ) {
-      output = await this.runOnce(session, request, deadlineAt);
+      output = await this.#runOnce(session, request, deadlineAt);
     }
 
     return output;
   }
 
-  private async runOnce(
+  async #runOnce(
     session: Session,
     request: RunRequest,
     deadlineAt: number | undefined,
@@ -244,9 +240,9 @@ export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
       const { status } = await withEnv(
         {
           NODE_OPTIONS:
-            `--import "${HOOK}" ${this.baseNodeOptions ?? ''}`.trim(),
+            `--import "${workerHookUrl}" ${this.#baseNodeOptions ?? ''}`.trim(),
           ...env,
-          [NO_COPY_PROMPT_ENV]: '1',
+          [noCopyPromptEnv]: '1',
         },
         () =>
           session.playwright.runTests(reporter, {
@@ -260,7 +256,7 @@ export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
       const { firedAt } = deadline;
 
       if (firedAt !== undefined) {
-        this.log.debug(
+        this.#log.debug(
           `deadline stop took ${Math.round(performance.now() - firedAt)} ms`,
         );
       }
@@ -281,7 +277,7 @@ export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
 
   // Playwright watches a webServer only while it starts. One that dies later would fail every
   // remaining test, and Stryker would count each mutant as killed.
-  private async restartDeadServers(session: Session): Promise<boolean> {
+  async #restartDeadServers(session: Session): Promise<boolean> {
     const up = await Promise.all(
       session.servers.map((server) => server.isUp()),
     );
@@ -292,7 +288,7 @@ export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
     }
 
     const names = dead.map((server) => server.name).join(', ');
-    this.log.warn(
+    this.#log.warn(
       `webServer at ${names} stopped answering; rerunning Playwright global setup (global teardown runs first).`,
     );
     await runGlobalSetup(session.playwright);
@@ -317,40 +313,46 @@ export async function withEnv<T>(
   }
 }
 
-function setEnv(values: Readonly<Record<string, string | undefined>>) {
-  for (const [name, value] of Object.entries(values)) {
+export function setEnv(values: Readonly<Record<string, string | undefined>>) {
+  Object.entries(values).forEach(([name, value]) => {
     if (value === undefined) {
       delete process.env[name];
     } else {
       process.env[name] = value;
     }
-  }
+  });
 }
 
 // Playwright's own webServer port check tries both loopback addresses: localhost can resolve to only one of them.
-const LOOPBACK_HOSTS = ['127.0.0.1', '::1'];
+const loopbackHosts = ['127.0.0.1', '::1'];
+
+/** The members of a net.Socket that a port check uses. */
+export interface ConnectingSocket {
+  once(event: 'connect' | 'error' | 'timeout', listener: () => void): unknown;
+  destroy(): unknown;
+}
 
 export function acceptsConnections(
   port: number,
-  connect: (options: net.TcpNetConnectOpts) => net.Socket = net.connect,
+  connect: (options: net.TcpNetConnectOpts) => ConnectingSocket = net.connect,
 ): Promise<boolean> {
   return new Promise((resolve) => {
     let answered = 0;
 
-    for (const host of LOOPBACK_HOSTS) {
+    loopbackHosts.forEach((host) => {
       const socket = connect({ host, port, timeout: 5000 });
       const done = (ok: boolean) => {
         socket.destroy();
         answered += 1;
 
-        if (ok || answered === LOOPBACK_HOSTS.length) {
+        if (ok || answered === loopbackHosts.length) {
           resolve(ok);
         }
       };
       socket.once('connect', () => done(true));
       socket.once('error', () => done(false));
       socket.once('timeout', () => done(false));
-    }
+    });
   });
 }
 
@@ -366,7 +368,7 @@ async function runGlobalSetup(playwright: TestRunner) {
 }
 
 function serverCheck(
-  server: { url?: string; port?: number; ignoreHTTPSErrors?: boolean },
+  server: ConfigWebServer,
   isURLAvailable: Playwright['isURLAvailable'],
 ): ServerCheck[] {
   if (server.url) {

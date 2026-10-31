@@ -3,7 +3,7 @@ import base from './stryker.base.ts';
 
 // Baseline: Stryker's command runner. STRYKER_BASELINE=define activates mutants through a Vite define
 // (the stryker-playwright-hello-world pattern); without it nothing reaches the browser.
-const define = process.env.STRYKER_BASELINE === 'define';
+const define = process.env['STRYKER_BASELINE'] === 'define';
 
 export default {
   ...base,

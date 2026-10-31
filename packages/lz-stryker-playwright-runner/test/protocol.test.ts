@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { parseSnapshotLine, serializeSnapshot } from '../src/protocol.ts';
-
-// parseSnapshotLine builds null-prototype maps, which deepEqual tells apart from object literals.
-function plain(value: unknown): unknown {
-  return JSON.parse(JSON.stringify(value));
-}
+import {
+  parseSnapshotLine,
+  readRunSettings,
+  runSettingsEnv,
+  serializeSnapshot,
+} from '../src/protocol.ts';
+import { plain } from './support/doubles.ts';
 
 test('a snapshot with a BigInt hit count is written as a lost frame', () => {
   const line = serializeSnapshot({ hitCount: 1n, outlivedItsTest: true });
@@ -17,7 +18,7 @@ test('a snapshot with a BigInt hit count is written as a lost frame', () => {
 
 test('a snapshot with cyclic coverage is written as a lost frame', () => {
   const cyclic: Record<string, unknown> = {};
-  cyclic.self = cyclic;
+  cyclic['self'] = cyclic;
 
   assert.deepEqual(
     JSON.parse(
@@ -62,5 +63,42 @@ test('a parsed line keeps no coverage that is not a map', () => {
         ?.coverage,
     ),
     { static: {}, perTest: { a: {} } },
+  );
+});
+
+test('the run settings are read from the environment, with a hit limit only when one is set', () => {
+  assert.equal(readRunSettings({}), undefined);
+  assert.deepEqual(
+    readRunSettings({ [runSettingsEnv]: '{"outDir":"out","perTest":true}' }),
+    { outDir: 'out', perTest: true },
+  );
+  assert.deepEqual(
+    readRunSettings({
+      [runSettingsEnv]: '{"outDir":"out","perTest":false,"hitLimit":5}',
+    }),
+    { outDir: 'out', perTest: false, hitLimit: 5 },
+  );
+});
+
+test('run settings that are not JSON, not an object or have a field of the wrong type are refused', () => {
+  [
+    '{oops',
+    'null',
+    '[]',
+    '{"perTest":true}',
+    '{"outDir":"out"}',
+    '{"outDir":"out","perTest":"true"}',
+    '{"outDir":"out","perTest":true,"hitLimit":"5"}',
+  ].forEach((raw) => {
+    assert.throws(() => readRunSettings({ [runSettingsEnv]: raw }), {
+      message: `${runSettingsEnv} holds no valid run settings: ${raw}`,
+    });
+  });
+});
+
+test('run settings that are not JSON are refused with the parse error as the cause', () => {
+  assert.throws(
+    () => readRunSettings({ [runSettingsEnv]: '{oops' }),
+    (error) => error instanceof Error && error.cause instanceof SyntaxError,
   );
 });

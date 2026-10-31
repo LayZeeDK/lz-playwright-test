@@ -1,30 +1,21 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import {
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, readdirSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { before, type TestContext, test } from 'node:test';
 
-import type { BrowserContext } from '@playwright/test';
-
+import type { HookedContext } from '../src/playwright-internals.ts';
 import {
-  FRAME_READ_TIMEOUT_MS,
-  RUN_SETTINGS,
+  frameReadTimeoutMs,
+  readSnapshotDir,
+  runSettingsEnv,
   type RunSettings,
 } from '../src/protocol.ts';
 import type * as Hook from '../src/worker-hook.ts';
 import type { StrykerNamespace } from '../src/worker-hook.ts';
-import {
-  fakeInstall,
-  parsedLines,
-  type Runnable,
-} from './support/fake-worker.ts';
+import { codedError, tempTree } from './support/doubles.ts';
+import { fakeInstall, type Runnable } from './support/fake-worker.ts';
 
 let hook: typeof Hook;
 
@@ -36,7 +27,13 @@ before(async () => {
 // Records a worker's namespace with fake I/O; `exit()` runs what the worker does at process exit.
 function worker(
   settings: { perTest: boolean; hitLimit?: number },
-  testId?: () => string | undefined,
+  {
+    testId = () => undefined,
+    write,
+  }: {
+    testId?: () => string | undefined;
+    write?: (line: string) => void;
+  } = {},
 ) {
   const ns: StrykerNamespace = {};
   const lines: string[] = [];
@@ -44,8 +41,8 @@ function worker(
   hook.recordNodeCoverage(
     ns,
     settings,
-    testId ?? (() => undefined),
-    (line) => lines.push(line),
+    testId,
+    write ?? ((line) => lines.push(line)),
     (listener) => listeners.push(listener),
   );
 
@@ -56,45 +53,45 @@ function worker(
   };
 }
 
-test('a Playwright worker outside a Stryker run loads the hook and installs nothing', () => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'worker-hook-test-'));
+const workerHookUrl = new URL('../src/worker-hook.ts', import.meta.url).href;
 
-  try {
-    // A path that ends like Playwright's worker entry, so only the run-settings check keeps the hook out.
-    const entry = path.join(dir, 'playwright/lib/worker/workerProcessEntry.js');
-    mkdirSync(path.dirname(entry), { recursive: true });
-    writeFileSync(entry, `console.log('entry ran');`);
+test('a Playwright worker outside a Stryker run loads the hook and installs nothing', (t) => {
+  // A path that ends like Playwright's worker entry, so only the run-settings check keeps the hook out.
+  const entry = 'playwright/lib/worker/workerProcessEntry.js';
+  const dir = tempTree(t, 'worker-hook-test-', {
+    [entry]: `console.log('entry ran');`,
+  });
 
-    // An install without run settings throws at import, before the entry runs.
-    const child = spawnSync(
-      process.execPath,
-      [
-        '--import',
-        new URL('../src/worker-hook.ts', import.meta.url).href,
-        entry,
-      ],
-      {
-        encoding: 'utf8',
-        // The child keeps NODE_OPTIONS: under Stryker, the test runner's preload there reports the
-        // coverage the gate makes in the child.
-        env: { ...process.env, [RUN_SETTINGS]: undefined },
-      },
-    );
+  // An install without run settings throws at import, before the entry runs.
+  const child = spawnSync(
+    process.execPath,
+    ['--import', workerHookUrl, path.join(dir, entry)],
+    {
+      encoding: 'utf8',
+      // The child keeps NODE_OPTIONS: under Stryker, the test runner's preload there reports the
+      // coverage the gate makes in the child.
+      env: { ...process.env, [runSettingsEnv]: undefined },
+    },
+  );
 
-    assert.equal(child.status, 0, child.stderr);
-    assert.equal(child.stdout.trim(), 'entry ran');
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
+  assert.equal(child.status, 0, child.stderr);
+  assert.equal(child.stdout.trim(), 'entry ran');
 });
 
+// As Playwright's own playwright/test: the module is its test, a function with info() and `test`.
+const playwrightTestModule = [
+  'const test = Object.assign(() => {}, { info() { throw new Error("no test"); } });',
+  'module.exports = Object.assign(test, { test });',
+].join('\n');
+
 // Starts a fake Playwright worker during a run with the given `--import`s; it prints one line per install.
-function runWorker(t: TestContext, imports: string[]) {
-  const dir = mkdtempSync(path.join(tmpdir(), 'worker-hook-gate-'));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const files: Record<string, string> = {
-    'node_modules/playwright/test.js':
-      'exports.test = { info() { throw new Error("no test"); } };',
+function runWorker(
+  t: TestContext,
+  imports: string[],
+  playwrightTest = playwrightTestModule,
+) {
+  const dir = tempTree(t, 'worker-hook-gate-', {
+    'node_modules/playwright/test.js': playwrightTest,
     'node_modules/playwright-core/package.json': '{"main":"index.js"}',
     // Every install adds one listener, so each line is one install.
     'node_modules/playwright-core/index.js': [
@@ -106,13 +103,7 @@ function runWorker(t: TestContext, imports: string[]) {
       `const { isMainThread, Worker } = require('node:worker_threads');`,
       `if (isMainThread) new Worker(__filename);`,
     ].join('\n'),
-  };
-
-  for (const [file, content] of Object.entries(files)) {
-    mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
-    writeFileSync(path.join(dir, file), content);
-  }
-
+  });
   const outDir = path.join(dir, 'out');
   mkdirSync(outDir);
 
@@ -126,7 +117,7 @@ function runWorker(t: TestContext, imports: string[]) {
       encoding: 'utf8',
       env: {
         ...process.env,
-        [RUN_SETTINGS]: JSON.stringify({ outDir, perTest: false }),
+        [runSettingsEnv]: JSON.stringify({ outDir, perTest: false }),
       },
     },
   );
@@ -134,19 +125,82 @@ function runWorker(t: TestContext, imports: string[]) {
   return { child, outDir };
 }
 
-const HOOK_URL = new URL('../src/worker-hook.ts', import.meta.url).href;
+// A Playwright install with the given playwright/test, and a require from its worker entry.
+function playwrightWith(t: TestContext, playwrightTest: string) {
+  const dir = tempTree(t, 'worker-hook-api-', {
+    'node_modules/playwright/test.js': playwrightTest,
+    'node_modules/playwright-core/index.js':
+      'exports._instrumentation = { addListener() {} };',
+  });
+
+  return createRequire(path.join(dir, 'entry.js'));
+}
+
+[
+  'module.exports = null;',
+  'exports.other = {};',
+  'exports.test = {};',
+  'exports.test = () => {};',
+  'exports.test = { info: 1 };',
+].forEach((playwrightTest) => {
+  test(`the hook refuses a playwright/test without test.info() (${playwrightTest})`, (t) => {
+    assert.throws(
+      () =>
+        hook.install(
+          playwrightWith(t, playwrightTest),
+          { outDir: 'unused', perTest: false },
+          '__apiTest__',
+        ),
+      {
+        message:
+          'The worker hook needs test.info() from playwright/test, which tells it the test that runs.',
+      },
+    );
+  });
+});
 
 test('during a run the hook installs in the main thread of a Playwright worker, not in its threads', (t) => {
-  const { child, outDir } = runWorker(t, [HOOK_URL]);
+  const { child, outDir } = runWorker(t, [workerHookUrl]);
 
   assert.equal(child.status, 0, child.stderr);
   assert.equal(child.stdout.trim(), 'main');
   assert.equal(readdirSync(outDir).length, 1);
 });
 
+test('a worker whose hook fails to install leaves the error for the run and exits with it', (t) => {
+  const { child, outDir } = runWorker(t, [workerHookUrl], 'exports.test = {};');
+
+  assert.equal(child.status, 1, child.stderr);
+  assert.deepEqual(readSnapshotDir(outDir), {
+    snapshots: [],
+    hookInstalled: false,
+    installErrors: [
+      'Error: The worker hook needs test.info() from playwright/test, which tells it the test that runs.',
+    ],
+  });
+});
+
+test('a worker whose hook fails to install and cannot leave the error still exits with that error', (t) => {
+  const removeOutDir = `import fs from 'node:fs'; fs.rmSync(JSON.parse(process.env.${runSettingsEnv}).outDir, { recursive: true });`;
+  const { child } = runWorker(
+    t,
+    [`data:text/javascript,${encodeURIComponent(removeOutDir)}`, workerHookUrl],
+    'exports.test = {};',
+  );
+
+  assert.equal(child.status, 1, child.stderr);
+  assert.match(
+    child.stderr,
+    /Error: The worker hook needs test\.info\(\) from playwright\/test/,
+  );
+});
+
 test('a second copy of the hook in the same worker installs nothing', (t) => {
   // Another URL loads the module again, as a second install of this package would.
-  const { child, outDir } = runWorker(t, [HOOK_URL, `${HOOK_URL}?copy=2`]);
+  const { child, outDir } = runWorker(t, [
+    workerHookUrl,
+    `${workerHookUrl}?copy=2`,
+  ]);
 
   assert.equal(child.status, 0, child.stderr);
   assert.equal(child.stdout.trim(), 'main');
@@ -157,7 +211,7 @@ test('the hook installs nothing in a worker where another version of it installe
   const mark = `globalThis[Symbol.for('@layzee/lz-stryker-playwright-runner/worker-hook')]=1`;
   const { child, outDir } = runWorker(t, [
     `data:text/javascript,${mark}`,
-    HOOK_URL,
+    workerHookUrl,
   ]);
 
   assert.equal(child.status, 0, child.stderr);
@@ -180,7 +234,7 @@ test('a worker writes the coverage its app code recorded at exit, as one line', 
   exit();
 
   assert.deepEqual(
-    lines.map((line) => JSON.parse(line)),
+    lines.map((line): unknown => JSON.parse(line)),
     [
       {
         mutantCoverage: { static: { '1': 2 }, perTest: {} },
@@ -199,7 +253,7 @@ test('the active mutant is left for the instrumented code to read from the envir
 
 test('per-test coverage names the test running at the time, and none between tests', () => {
   let running: string | undefined = 'test-a';
-  const { ns } = worker({ perTest: true }, () => running);
+  const { ns } = worker({ perTest: true }, { testId: () => running });
 
   assert.equal(ns.currentTestId, 'test-a');
 
@@ -209,7 +263,7 @@ test('per-test coverage names the test running at the time, and none between tes
 });
 
 test('without per-test coverage no test id is set', () => {
-  const { ns } = worker({ perTest: false }, () => 'test-a');
+  const { ns } = worker({ perTest: false }, { testId: () => 'test-a' });
 
   assert.equal(ns.currentTestId, undefined);
 });
@@ -224,7 +278,7 @@ test('with a hit limit the worker counts hits from zero and writes the count at 
   exit();
 
   assert.deepEqual(
-    lines.map((line) => JSON.parse(line)),
+    lines.map((line): unknown => JSON.parse(line)),
     [{ hitCount: 4, outlivedItsTest: false }],
   );
 });
@@ -239,7 +293,7 @@ test('a worker past its hit limit writes its count at once, and not again at exi
   ns.hitCount = 11;
 
   assert.deepEqual(
-    lines.map((line) => JSON.parse(line)),
+    lines.map((line): unknown => JSON.parse(line)),
     [{ hitCount: 11, outlivedItsTest: false }],
   );
 
@@ -250,20 +304,17 @@ test('a worker past its hit limit writes its count at once, and not again at exi
 });
 
 test('a write that fails at exit does not throw out of the exit listener', () => {
-  const ns: StrykerNamespace = {};
-  const listeners: (() => void)[] = [];
-  hook.recordNodeCoverage(
-    ns,
+  const { ns, exit } = worker(
     { perTest: false },
-    () => undefined,
-    () => {
-      throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+    {
+      write: () => {
+        throw codedError('ENOENT');
+      },
     },
-    (listener) => listeners.push(listener),
   );
   ns.mutantCoverage = { static: { '1': 1 }, perTest: {} };
 
-  assert.doesNotThrow(() => listeners.forEach((listener) => listener()));
+  assert.doesNotThrow(exit);
 });
 
 test('without a hit limit the worker counts no hits', () => {
@@ -289,19 +340,23 @@ test('install creates the worker snapshot file at once', (t) => {
 
 test('each install names its snapshot file by the worker pid and a random part', (t) => {
   const name = /^worker-(\d+)-([0-9a-f-]{36})\.ndjson$/;
-  const [first, second] = [
+  const parts = [
     installed(t, { perTest: false }),
     installed(t, { perTest: false }),
   ].map((hooked) => {
     const [file] = hooked.files();
     const match = name.exec(file ?? '');
     assert.ok(match, file);
+    const [, pid, random] = match;
 
-    return match;
+    return { pid, random };
   });
 
-  assert.equal(first[1], String(process.pid));
-  assert.notEqual(first[2], second[2]);
+  assert.deepEqual(
+    parts.map(({ pid }) => pid),
+    [String(process.pid), String(process.pid)],
+  );
+  assert.equal(new Set(parts.map(({ random }) => random)).size, 2);
 });
 
 test("install counts the worker's own hits in its namespace and writes them past the limit", (t) => {
@@ -355,9 +410,9 @@ test('a frame whose namespace is null holds nothing to read', async (t) => {
     hooked.page([hooked.frame({ name: '__nullNamespaceHere__' })]).page,
   );
   const scope: Record<string, unknown> = globalThis;
-  scope.__nullNamespaceHere__ = null;
+  scope['__nullNamespaceHere__'] = null;
   t.after(() => {
-    delete scope.__nullNamespaceHere__;
+    delete scope['__nullNamespaceHere__'];
   });
 
   await created.close();
@@ -399,7 +454,7 @@ test("the worker's namespace names no test in a beforeAll or afterAll hook, a fi
     { type: 'teardown' },
   ];
 
-  for (const runs of shared) {
+  shared.forEach((runs) => {
     hooked.setTest('t1', runs);
 
     assert.equal(
@@ -407,7 +462,32 @@ test("the worker's namespace names no test in a beforeAll or afterAll hook, a fi
       undefined,
       JSON.stringify(runs),
     );
-  }
+  });
+});
+
+const running = {
+  _timeoutManager: { _running: { runnable: { type: 'test' } } },
+};
+
+const refusedInfos = [
+  ['is no object', null],
+  ['has no string testId', { ...running, testId: 1, config: { version: '1' } }],
+  ['has no config', { ...running, testId: 't1' }],
+  [
+    'has no string config.version',
+    { ...running, testId: 't1', config: { version: 1 } },
+  ],
+] as const;
+
+refusedInfos.forEach(([title, info]) => {
+  test(`the worker hook refuses a test.info() that ${title}`, (t) => {
+    const hooked = installed(t, { perTest: true }, { info: () => info });
+
+    assert.throws(() => hooked.namespace().currentTestId, {
+      message:
+        "The worker hook needs test.info() from playwright/test to return the running test's testId and config.version.",
+    });
+  });
 });
 
 test('at exit the worker writes its Node coverage to its snapshot file', (t) => {
@@ -416,7 +496,7 @@ test('at exit the worker writes its Node coverage to its snapshot file', (t) => 
 
   hooked.exitListeners.forEach((exit) => exit(0));
 
-  assert.deepEqual(parsedLines(hooked.read()), [
+  assert.deepEqual(hooked.lines(), [
     {
       mutantCoverage: { static: { '1': 1 }, perTest: {} },
       outlivedItsTest: false,
@@ -448,12 +528,17 @@ test('without per-test coverage the init script names no test, and no mutant out
 
   const { scripts } = await hooked.context();
 
-  assert.deepEqual(scripts[0][1], {
-    ns: hooked.ns,
-    activeMutant: undefined,
-    testId: undefined,
-    hitLimit: undefined,
-  });
+  assert.deepEqual(scripts, [
+    [
+      hook.initPage,
+      {
+        ns: hooked.ns,
+        activeMutant: undefined,
+        testId: undefined,
+        hitLimit: undefined,
+      },
+    ],
+  ]);
 });
 
 test('a closing context writes what each frame of each page holds, as one line per frame', async (t) => {
@@ -496,15 +581,18 @@ test('a context closes into the snapshot file once', async (t) => {
   await created.close();
   await created.close();
 
-  assert.equal(parsedLines(hooked.read()).length, 1);
+  assert.equal(hooked.lines().length, 1);
 });
 
 test('a context the hook never saw created writes nothing', async (t) => {
   const hooked = installed(t, { perTest: false });
   hooked.namespace().hitCount = 1;
-  const unseen = {
+  const unseen: HookedContext = {
     pages: () => [hooked.page().page],
-  } as unknown as BrowserContext;
+    browser: () => null,
+    on: () => undefined,
+    addInitScript: async () => undefined,
+  };
 
   await hooked.hooks.runBeforeCloseBrowserContext?.(unseen);
 
@@ -532,9 +620,9 @@ test('per-test coverage of a context that outlived its test, or began outside on
   hooked.setTest(undefined);
   const noTest = await hooked.context();
 
-  for (const created of [sameTest, laterTest, noTest]) {
-    created.open(hooked.page().page);
-  }
+  [sameTest, laterTest, noTest].forEach((created) =>
+    created.open(hooked.page().page),
+  );
 
   hooked.setTest('t1');
   await sameTest.close();
@@ -544,7 +632,7 @@ test('per-test coverage of a context that outlived its test, or began outside on
   await noTest.close();
 
   assert.deepEqual(
-    parsedLines(hooked.read()).map((line) => line.outlivedItsTest),
+    hooked.lines().map((line) => line['outlivedItsTest']),
     [false, true, true],
   );
 });
@@ -563,11 +651,13 @@ test('a context a beforeAll or afterAll hook opens and closes counts as shared, 
   }
 
   assert.deepEqual(
-    created.map(({ scripts }) => scripts[0][1].testId),
-    [undefined, undefined],
+    created.map(({ scripts }) =>
+      scripts.map(([, settings]) => settings.testId),
+    ),
+    [[undefined], [undefined]],
   );
   assert.deepEqual(
-    parsedLines(hooked.read()).map((line) => line.outlivedItsTest),
+    hooked.lines().map((line) => line['outlivedItsTest']),
     [true, true],
   );
 });
@@ -580,9 +670,12 @@ test("a context a test's own fixture opens belongs to that test", async (t) => {
   opened.open(hooked.page().page);
   await opened.close();
 
-  assert.equal(opened.scripts[0][1].testId, 't1');
   assert.deepEqual(
-    parsedLines(hooked.read()).map((line) => line.outlivedItsTest),
+    opened.scripts.map(([, settings]) => settings.testId),
+    ['t1'],
+  );
+  assert.deepEqual(
+    hooked.lines().map((line) => line['outlivedItsTest']),
     [false],
   );
 });
@@ -596,7 +689,10 @@ test('a context that began outside a test and closes inside one counts as shared
 
   await created.close();
 
-  assert.deepEqual(parsedLines(hooked.read())[0].outlivedItsTest, true);
+  assert.deepEqual(
+    hooked.lines().map((line) => line['outlivedItsTest']),
+    [true],
+  );
 });
 
 test('without per-test coverage no context counts as shared', async (t) => {
@@ -609,7 +705,10 @@ test('without per-test coverage no context counts as shared', async (t) => {
 
   await created.close();
 
-  assert.equal(parsedLines(hooked.read())[0].outlivedItsTest, false);
+  assert.deepEqual(
+    hooked.lines().map((line) => line['outlivedItsTest']),
+    [false],
+  );
 });
 
 test('a page closed before its context is read first, once, and closes with its options', async (t) => {
@@ -625,7 +724,7 @@ test('a page closed before its context is read first, once, and closes with its 
 
   assert.deepEqual(closed, [{ reason: 'done' }]);
   assert.deepEqual(
-    parsedLines(hooked.read()).map((line) => line.hitCount),
+    hooked.lines().map((line) => line['hitCount']),
     [1],
   );
 });
@@ -647,7 +746,7 @@ test('a closing browser first collects every context it holds, and is patched on
   await first.close();
 
   assert.deepEqual(owner.closed, [{ reason: 'end' }]);
-  assert.equal(parsedLines(hooked.read()).length, 2);
+  assert.equal(hooked.lines().length, 2);
 });
 
 test('a frame that fails to answer is lost unless it was detached', async (t) => {
@@ -663,9 +762,7 @@ test('a frame that fails to answer is lost unless it was detached', async (t) =>
 
   await created.close();
 
-  assert.deepEqual(parsedLines(hooked.read()), [
-    { lost: true, outlivedItsTest: false },
-  ]);
+  assert.deepEqual(hooked.lines(), [{ lost: true, outlivedItsTest: false }]);
 });
 
 test('a frame that does not answer in time is lost', async (t) => {
@@ -679,7 +776,7 @@ test('a frame that does not answer in time is lost', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
 
   const closing = created.close();
-  t.mock.timers.tick(FRAME_READ_TIMEOUT_MS - 1);
+  t.mock.timers.tick(frameReadTimeoutMs - 1);
   await new Promise((resolve) => setImmediate(resolve));
 
   assert.equal(hooked.read(), '');
@@ -687,9 +784,7 @@ test('a frame that does not answer in time is lost', async (t) => {
   t.mock.timers.tick(1);
   await closing;
 
-  assert.deepEqual(parsedLines(hooked.read()), [
-    { lost: true, outlivedItsTest: false },
-  ]);
+  assert.deepEqual(hooked.lines(), [{ lost: true, outlivedItsTest: false }]);
 });
 
 test('a frame that answers leaves no read timer to hold the worker open', async (t) => {

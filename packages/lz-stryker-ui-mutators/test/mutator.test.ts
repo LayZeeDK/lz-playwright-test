@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { parseSync, traverse, types as t, type NodePath } from '@babel/core';
+import { traverse, types as t, type NodePath } from '@babel/core';
 
 import {
   isJsxChild,
@@ -11,17 +11,7 @@ import {
   type AttributeSite,
   type Operator,
 } from '../src/mutator.ts';
-
-function parse(code: string): t.File {
-  const file = parseSync(code, {
-    configFile: false,
-    babelrc: false,
-    parserOpts: { plugins: ['jsx', 'typescript'] },
-  });
-  assert.ok(file);
-
-  return file;
-}
+import { parse } from './support/babel.ts';
 
 function firstElement(file: t.File): t.JSXElement {
   const [statement] = file.program.body;
@@ -80,7 +70,7 @@ describe('toNodeMutator', () => {
     const file = parse('<input disabled />;');
     const [attribute] = firstElement(file).openingElement.attributes;
     assert.ok(t.isJSXAttribute(attribute));
-    delete (attribute as { value?: unknown }).value;
+    delete attribute.value;
 
     const sites = sitesOf(file, 'disabled');
 
@@ -102,9 +92,10 @@ describe('toNodeMutator', () => {
 
   it('finds no site for an attribute whose opening element has no JSX element around it', () => {
     const file = parse('<input disabled />;');
-    const [statement] = file.program.body as [t.ExpressionStatement];
-    statement.expression = firstElement(file)
-      .openingElement as unknown as t.Expression;
+    const [statement] = file.program.body;
+    assert.ok(t.isExpressionStatement(statement));
+    // @ts-expect-error -- a hand-built tree puts an opening element where an expression goes
+    statement.expression = firstElement(file).openingElement;
 
     assert.deepEqual(sitesOf(file, 'disabled'), []);
   });

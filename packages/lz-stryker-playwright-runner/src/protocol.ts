@@ -3,25 +3,28 @@ import path from 'node:path';
 
 import type { MutantCoverage } from '@stryker-mutator/api/core';
 
-import { isRecord } from './playwright-internals.ts';
+import { isRecord } from './is-record.ts';
 
-export const RUN_SETTINGS = 'LZ_STRYKER_PLAYWRIGHT_RUN';
+export const runSettingsEnv = 'LZ_STRYKER_PLAYWRIGHT_RUN';
 
-export const SNAPSHOT_SUFFIX = '.ndjson';
+export const snapshotSuffix = '.ndjson';
 
-export const FRAME_READ_TIMEOUT_MS = 2000;
+/** A worker whose hook failed to install leaves the error in a file of this suffix, as text. */
+export const installErrorSuffix = '.install-error';
+
+export const frameReadTimeoutMs = 2000;
 
 export interface RunSettings {
-  outDir: string;
-  perTest: boolean;
-  hitLimit?: number;
+  readonly outDir: string;
+  readonly perTest: boolean;
+  readonly hitLimit?: number | undefined;
 }
 
 export interface SnapshotLine {
-  mutantCoverage?: unknown;
-  hitCount?: unknown;
-  outlivedItsTest: boolean;
-  lost?: boolean;
+  readonly mutantCoverage?: unknown;
+  readonly hitCount?: unknown;
+  readonly outlivedItsTest: boolean;
+  readonly lost?: boolean;
 }
 
 export interface Snapshot {
@@ -32,8 +35,9 @@ export interface Snapshot {
 }
 
 export interface SnapshotDir {
-  snapshots: Snapshot[];
-  hookInstalled: boolean;
+  readonly snapshots: readonly Snapshot[];
+  readonly hookInstalled: boolean;
+  readonly installErrors: readonly string[];
 }
 
 export function isHitCount(value: unknown): value is number {
@@ -55,19 +59,36 @@ export function serializeSnapshot(line: SnapshotLine): string {
   }
 }
 
-// A key such as __proto__ or a count that is not a hit count must not reach an ordinary object.
+/** A record without a prototype, so a key such as __proto__ stays an own key. */
+export function emptyRecord<T>(): Record<string, T> {
+  const record: Record<string, T> = {};
+  Object.setPrototypeOf(record, null);
+
+  return record;
+}
+
+/** Untrusted entries go straight into a record without a prototype, never through an ordinary object. */
+function recordOf<T>(
+  entries: readonly (readonly [string, T])[],
+): Record<string, T> {
+  const record = emptyRecord<T>();
+  entries.forEach(([key, value]) => {
+    record[key] = value;
+  });
+
+  return record;
+}
+
 function hitCounts(value: unknown): Record<string, number> {
-  const counts: Record<string, number> = Object.create(null);
+  return recordOf(
+    entriesOf(value).flatMap(([mutantId, count]) =>
+      isHitCount(count) ? [[mutantId, count] as const] : [],
+    ),
+  );
+}
 
-  for (const [mutantId, count] of Object.entries(
-    isRecord(value) ? value : {},
-  )) {
-    if (isHitCount(count)) {
-      counts[mutantId] = count;
-    }
-  }
-
-  return counts;
+function entriesOf(value: unknown): [string, unknown][] {
+  return Object.entries(isRecord(value) ? value : {});
 }
 
 function parseCoverage(value: unknown): MutantCoverage | undefined {
@@ -75,15 +96,14 @@ function parseCoverage(value: unknown): MutantCoverage | undefined {
     return undefined;
   }
 
-  const perTest: MutantCoverage['perTest'] = Object.create(null);
-
-  for (const [testId, hits] of Object.entries(
-    isRecord(value.perTest) ? value.perTest : {},
-  )) {
-    perTest[testId] = hitCounts(hits);
-  }
-
-  return { static: hitCounts(value.static), perTest };
+  return {
+    static: hitCounts(value['static']),
+    perTest: recordOf(
+      entriesOf(value['perTest']).map(
+        ([testId, hits]) => [testId, hitCounts(hits)] as const,
+      ),
+    ),
+  };
 }
 
 export function parseSnapshotLine(line: string): Snapshot | undefined {
@@ -100,31 +120,59 @@ export function parseSnapshotLine(line: string): Snapshot | undefined {
   }
 
   return {
-    coverage: parseCoverage(raw.mutantCoverage),
-    hitCount: isHitCount(raw.hitCount) ? raw.hitCount : 0,
-    outlivedItsTest: raw.outlivedItsTest === true,
-    lost: raw.lost === true,
+    coverage: parseCoverage(raw['mutantCoverage']),
+    hitCount: isHitCount(raw['hitCount']) ? raw['hitCount'] : 0,
+    outlivedItsTest: raw['outlivedItsTest'] === true,
+    lost: raw['lost'] === true,
   };
 }
 
 export function readSnapshotDir(dir: string): SnapshotDir {
-  const files = fs
-    .readdirSync(dir)
-    .filter((file) => file.endsWith(SNAPSHOT_SUFFIX));
+  const names = fs.readdirSync(dir);
+  const read = (file: string) => fs.readFileSync(path.join(dir, file), 'utf8');
+  const files = names.filter((file) => file.endsWith(snapshotSuffix));
   const snapshots = files
-    .flatMap((file) =>
-      fs.readFileSync(path.join(dir, file), 'utf8').split('\n'),
-    )
+    .flatMap((file) => read(file).split('\n'))
     .map(parseSnapshotLine)
     .filter((snapshot) => snapshot !== undefined);
+  const installErrors = names
+    .filter((file) => file.endsWith(installErrorSuffix))
+    .map(read);
 
-  return { snapshots, hookInstalled: files.length > 0 };
+  return { snapshots, hookInstalled: files.length > 0, installErrors };
 }
 
 export function readRunSettings(
   env: NodeJS.ProcessEnv,
 ): RunSettings | undefined {
-  const raw = env[RUN_SETTINGS];
+  const raw = env[runSettingsEnv];
 
-  return raw === undefined ? undefined : (JSON.parse(raw) as RunSettings);
+  if (raw === undefined) {
+    return undefined;
+  }
+
+  const refused = `${runSettingsEnv} holds no valid run settings: ${raw}`;
+  let settings: unknown;
+
+  try {
+    settings = JSON.parse(raw);
+  } catch (cause) {
+    throw new Error(refused, { cause });
+  }
+
+  if (isRecord(settings)) {
+    const { outDir, perTest, hitLimit } = settings;
+
+    if (
+      typeof outDir === 'string' &&
+      typeof perTest === 'boolean' &&
+      (hitLimit === undefined || typeof hitLimit === 'number')
+    ) {
+      return hitLimit === undefined
+        ? { outDir, perTest }
+        : { outDir, perTest, hitLimit };
+    }
+  }
+
+  throw new Error(refused);
 }

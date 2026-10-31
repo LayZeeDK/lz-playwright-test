@@ -36,6 +36,63 @@ function dependencyChecks(ignoredDependencies) {
   ];
 }
 
+// Type-aware rules for the packages and the tools; tools/eslint.config.mjs applies them with its own tsconfig.
+export const typeSafetyRules = {
+  '@typescript-eslint/switch-exhaustiveness-check': 'error',
+  '@typescript-eslint/use-unknown-in-catch-callback-variable': 'error',
+  '@typescript-eslint/no-unsafe-assignment': 'error',
+  '@typescript-eslint/no-unsafe-member-access': 'error',
+  '@typescript-eslint/no-unsafe-call': 'error',
+  '@typescript-eslint/no-unsafe-return': 'error',
+  '@typescript-eslint/no-unsafe-argument': 'error',
+  '@typescript-eslint/consistent-type-assertions': [
+    'error',
+    { assertionStyle: 'never' },
+  ],
+  '@typescript-eslint/no-non-null-assertion': 'error',
+  'dot-notation': 'off',
+  '@typescript-eslint/dot-notation': 'error',
+  '@typescript-eslint/naming-convention': [
+    'error',
+    {
+      selector: 'variable',
+      format: ['camelCase', 'PascalCase'],
+      custom: { regex: '^[A-Z][A-Z0-9]+$', match: false },
+    },
+    { selector: 'variable', modifiers: ['destructured'], format: null },
+    {
+      selector: 'typeParameter',
+      format: ['PascalCase'],
+      custom: { regex: '^T([A-Z][A-Za-z0-9]*)?$', match: true },
+    },
+  ],
+};
+
+const declaredType = ':matches(TSInterfaceDeclaration, TSTypeAliasDeclaration)';
+
+export const readonlyRules = {
+  'no-restricted-syntax': [
+    'error',
+    {
+      selector: `${declaredType} TSPropertySignature:not([readonly=true])`,
+      message: 'readonly member',
+    },
+    {
+      selector: `${declaredType} TSPropertySignature :not(TSTypeOperator[operator='readonly']) > TSArrayType`,
+      message: 'readonly array',
+    },
+    {
+      selector: `${declaredType} TSPropertySignature TSTypeReference[typeName.name='Array']`,
+      message: 'readonly array',
+    },
+    {
+      selector:
+        ':matches(PropertyDefinition, MethodDefinition, TSParameterProperty, AccessorProperty, TSAbstractPropertyDefinition, TSAbstractMethodDefinition)[accessibility="private"]',
+      message: 'Use a # member instead of the private modifier.',
+    },
+  ],
+};
+
 export default [
   ...nx.configs['flat/base'],
   ...nx.configs['flat/typescript'],
@@ -87,8 +144,23 @@ export default [
       '**/*.cjs',
       '**/*.mjs',
     ],
-    // Override or add rules here
-    rules: {},
+    rules: {
+      // Deprecated; their replacements, no-empty-object-type and no-global-assign, are on.
+      '@typescript-eslint/no-empty-interface': 'off',
+      'no-native-reassign': 'off',
+    },
+  },
+  {
+    files: ['packages/**/*.ts', 'packages/**/*.tsx'],
+    // Fixture input for the operators, in no tsconfig.
+    ignores: ['packages/lz-stryker-ui-mutators/test/corpus/**'],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: { ...typeSafetyRules, ...readonlyRules },
   },
   {
     files: ['**/*.spec.ts', '**/playwright*.config.{ts,mts}'],
@@ -130,10 +202,11 @@ export default [
   {
     files: ['packages/lz-stryker-ui-mutators/package.json'],
     rules: {
-      // The operators import Babel for types only.
+      // The operators import Babel for types only; playwright-core's role table is resolved at run time.
       '@nx/dependency-checks': dependencyChecks([
         '@stryker-mutator/core',
         '@babel/core',
+        'playwright-core',
       ]),
     },
   },

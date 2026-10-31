@@ -13,16 +13,18 @@ before(async () => {
 });
 
 interface FakePage {
-  top?: boolean;
-  carried?: string | null;
-  storageThrows?: boolean;
+  readonly top?: boolean;
+  readonly carried?: string | null;
+  readonly storageThrows?: boolean;
+  /** Runs before the init script, as the page's earlier code would. */
+  readonly prepare?: (ns: string) => void;
 }
 
 /** Runs the init script with the page globals it uses, and returns the namespace and storage it left. */
 function pageRun(
   t: TestContext,
   settings: Omit<PageSettings, 'ns'>,
-  { top = true, carried = null, storageThrows = false }: FakePage = {},
+  { top = true, carried = null, storageThrows = false, prepare }: FakePage = {},
 ) {
   const ns = `__pageTest${Math.random().toString(36).slice(2)}__`;
   const stored = new Map<string, string>();
@@ -57,27 +59,28 @@ function pageRun(
   t.after(() => {
     delete scope[ns];
   });
+  prepare?.(ns);
 
   // The page globals exist only while page code runs, so nothing else in this process sees them.
   function inPage(run: () => void) {
-    for (const [name, value] of Object.entries(globals)) {
+    Object.entries(globals).forEach(([name, value]) => {
       Object.defineProperty(globalThis, name, {
         value,
         configurable: true,
         writable: true,
       });
-    }
+    });
 
     try {
       run();
     } finally {
-      for (const [name, descriptor] of saved) {
+      saved.forEach(([name, descriptor]) => {
         if (descriptor) {
           Object.defineProperty(globalThis, name, descriptor);
         } else {
           delete scope[name];
         }
-      }
+      });
     }
   }
 
@@ -121,57 +124,41 @@ test('the init script sets nothing it was not given', (t) => {
 });
 
 test('the init script keeps a namespace the page already has', (t) => {
-  const ns = '__pageTestExisting__';
   const existing = { kept: true };
-  const scope: Record<string, unknown> = globalThis;
-  scope[ns] = existing;
-  t.after(() => {
-    delete scope[ns];
-  });
-  const win: { top?: unknown } = {};
-  win.top = {};
-  Object.defineProperty(globalThis, 'window', {
-    value: win,
-    configurable: true,
-    writable: true,
-  });
+  const { s } = pageRun(
+    t,
+    { testId: 't1' },
+    {
+      top: false,
+      prepare: (ns) => {
+        const scope: Record<string, unknown> = globalThis;
+        scope[ns] = existing;
+      },
+    },
+  );
 
-  try {
-    hook.initPage({ ns, testId: 't1' });
-  } finally {
-    delete scope.window;
-  }
-
-  assert.equal(scope[ns], existing);
+  assert.equal(s, existing);
   assert.deepEqual(existing, { kept: true, currentTestId: 't1' });
 });
 
 test('the init script replaces a namespace that is null with its own', (t) => {
-  const ns = '__pageTestNull__';
-  const scope: Record<string, unknown> = globalThis;
-  scope[ns] = null;
-  t.after(() => {
-    delete scope[ns];
-  });
-  const win: { top?: unknown } = {};
-  win.top = {};
-  Object.defineProperty(globalThis, 'window', {
-    value: win,
-    configurable: true,
-    writable: true,
-  });
+  const { s } = pageRun(
+    t,
+    { testId: 't1' },
+    {
+      top: false,
+      prepare: (ns) => {
+        const scope: Record<string, unknown> = globalThis;
+        scope[ns] = null;
+      },
+    },
+  );
 
-  try {
-    hook.initPage({ ns, testId: 't1' });
-  } finally {
-    delete scope.window;
-  }
-
-  assert.deepEqual(scope[ns], { currentTestId: 't1' });
+  assert.deepEqual(s, { currentTestId: 't1' });
 });
 
 test('a carried value that is not an object carries nothing in, and the page still stores its own', (t) => {
-  for (const carried of ['5', '"text"', 'null']) {
+  ['5', '"text"', 'null'].forEach((carried) => {
     const { s, listeners } = pageRun(t, { hitLimit: 7 }, { carried });
 
     assert.deepEqual({ ...s }, { hitLimit: 7, hitCount: 0 }, carried);
@@ -179,7 +166,7 @@ test('a carried value that is not an object carries nothing in, and the page sti
       listeners.map(([event]) => event),
       ['pagehide'],
     );
-  }
+  });
 });
 
 test('a child frame carries nothing across navigations', (t) => {

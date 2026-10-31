@@ -6,14 +6,14 @@ import { test } from 'node:test';
 import { Ajv } from 'ajv';
 
 import {
-  OPTION_PROPERTIES,
+  optionProperties,
   readRunnerOptions,
   strykerValidationSchema,
 } from '../src/options.ts';
 import {
-  MIN_TEST_TIMEOUT_MS,
-  RUN_START_MS,
-  STOP_HEADROOM_MS,
+  minTestTimeoutMs,
+  runStartMs,
+  stopHeadroomMs,
 } from '../src/timeouts.ts';
 import { strykerOptions } from './support/doubles.ts';
 
@@ -22,6 +22,13 @@ const readmeOptions = readme
   .split(/^## /m)
   .find((section) => section.startsWith('Options\n'));
 
+const defaults = {
+  configFile: undefined,
+  projects: undefined,
+  workers: 1,
+  strykerTimeoutMS: 10_000,
+};
+
 test('the runner options resolve the config file and take the schema default for workers', () => {
   assert.deepEqual(
     readRunnerOptions(
@@ -29,12 +36,7 @@ test('the runner options resolve the config file and take the schema default for
         lzStrykerPlaywright: { configFile: 'e2e/playwright.config.ts' },
       }),
     ),
-    {
-      configFile: path.resolve('e2e/playwright.config.ts'),
-      projects: undefined,
-      workers: 1,
-      strykerTimeoutMS: 10_000,
-    },
+    { ...defaults, configFile: path.resolve('e2e/playwright.config.ts') },
   );
 });
 
@@ -57,14 +59,26 @@ test('the runner options refuse --testFiles', () => {
   );
 });
 
-test('without lzStrykerPlaywright options or with an empty --testFiles the runner takes its defaults', () => {
-  const defaults = {
-    configFile: undefined,
-    projects: undefined,
-    workers: 1,
-    strykerTimeoutMS: 10_000,
-  };
+test('the runner options refuse lzStrykerPlaywright options that are not an object or have a field of the wrong type', () => {
+  [
+    'chromium',
+    [],
+    { workers: null },
+    { configFile: 1 },
+    { projects: 'chromium' },
+    { projects: ['chromium', 1] },
+    { workers: '2' },
+  ].forEach((lzStrykerPlaywright) => {
+    assert.throws(
+      () => readRunnerOptions(strykerOptions({ lzStrykerPlaywright })),
+      {
+        message: `The lzStrykerPlaywright options do not match their schema: ${JSON.stringify(lzStrykerPlaywright)}`,
+      },
+    );
+  });
+});
 
+test('without lzStrykerPlaywright options or with an empty --testFiles the runner takes its defaults', () => {
   assert.deepEqual(readRunnerOptions(strykerOptions({})), defaults);
   assert.deepEqual(
     readRunnerOptions(strykerOptions({ testFiles: [] })),
@@ -107,28 +121,28 @@ test("Stryker's check of the options fills in the defaults", () => {
 });
 
 test("Stryker's check of the options refuses wrong types, workers below 1 and unknown options", () => {
-  for (const lzStrykerPlaywright of [
+  [
     { configFile: 1 },
     { projects: 'chromium' },
     { projects: [1] },
     { workers: 1.5 },
     { workers: 0 },
     { browser: 'chromium' },
-  ]) {
+  ].forEach((lzStrykerPlaywright) => {
     assert.equal(
       validate({ lzStrykerPlaywright }).valid,
       false,
       JSON.stringify(lzStrykerPlaywright),
     );
-  }
+  });
 
   assert.equal(validate({ lzStrykerPlaywright: [] }).valid, false);
 });
 
 test('every option says what it is for', () => {
-  for (const [name, { description }] of Object.entries(OPTION_PROPERTIES)) {
+  Object.entries(optionProperties).forEach(([name, { description }]) => {
     assert.match(description, /^[A-Z].{20,}\.$/, name);
-  }
+  });
 
   assert.equal(
     strykerValidationSchema.$schema,
@@ -142,15 +156,15 @@ test('the README lists exactly the options the schema has', () => {
     ([, name]) => name,
   );
 
-  assert.deepEqual(listed, Object.keys(OPTION_PROPERTIES));
+  assert.deepEqual(listed, Object.keys(optionProperties));
 });
 
 test('the README states the per-test timeout the runner sets', () => {
   const [, headroom, floor] =
     /less ([\d.]+) s but\s+at\s+least\s+([\d.]+) s/.exec(readme) ?? [];
 
-  assert.equal(Number(headroom) * 1000, RUN_START_MS + STOP_HEADROOM_MS);
-  assert.equal(Number(floor) * 1000, MIN_TEST_TIMEOUT_MS);
+  assert.equal(Number(headroom) * 1000, runStartMs + stopHeadroomMs);
+  assert.equal(Number(floor) * 1000, minTestTimeoutMs);
 });
 
 test('the README states when the runner stops a mutant run, and below which timeout it does not', () => {
@@ -158,9 +172,9 @@ test('the README states when the runner stops a mutant run, and below which time
   const [, noStopBelow] =
     /timeout\s+is\s+under\s+([\d.]+) s/.exec(readme) ?? [];
 
-  assert.equal(Number(headroom) * 1000, STOP_HEADROOM_MS);
+  assert.equal(Number(headroom) * 1000, stopHeadroomMs);
   assert.equal(
     Number(noStopBelow) * 1000,
-    RUN_START_MS + MIN_TEST_TIMEOUT_MS + STOP_HEADROOM_MS,
+    runStartMs + minTestTimeoutMs + stopHeadroomMs,
   );
 });

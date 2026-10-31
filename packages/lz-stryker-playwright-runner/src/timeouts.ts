@@ -1,13 +1,13 @@
-import { FRAME_READ_TIMEOUT_MS } from './protocol.ts';
+import { frameReadTimeoutMs } from './protocol.ts';
 
 // Config load and worker start before the first test, measured at about 2.7 s.
-export const RUN_START_MS = 3000;
+export const runStartMs = 3000;
 // A deadline stop measured 2078-2096 ms in 8 of 9 runs: the hung frame's read plus context close and worker exit.
-export const STOP_HEADROOM_MS = FRAME_READ_TIMEOUT_MS + 600;
-export const MIN_TEST_TIMEOUT_MS = 2000;
-export const STOP_RETRY_MS = 100;
+export const stopHeadroomMs = frameReadTimeoutMs + 600;
+export const minTestTimeoutMs = 2000;
+export const stopRetryMs = 100;
 // Playwright's default expect.timeout.
-export const DEFAULT_EXPECT_TIMEOUT_MS = 5000;
+export const defaultExpectTimeoutMs = 5000;
 
 export interface ConfigTimeouts {
   readonly testTimeoutCap: number;
@@ -16,23 +16,25 @@ export interface ConfigTimeouts {
 
 export function configTimeouts(
   projects: readonly {
-    expect?: { timeout?: number };
+    expect?: { timeout?: number | undefined } | undefined;
     project: { timeout: number };
   }[],
 ): ConfigTimeouts {
+  if (projects.length === 0) {
+    return {
+      testTimeoutCap: Infinity,
+      expectTimeout: defaultExpectTimeoutMs,
+    };
+  }
+
   const timeouts = projects.map(({ project }) => project.timeout);
   const expectTimeouts = projects.map(
-    ({ expect }) => expect?.timeout ?? DEFAULT_EXPECT_TIMEOUT_MS,
+    ({ expect }) => expect?.timeout ?? defaultExpectTimeoutMs,
   );
 
   return {
-    testTimeoutCap:
-      timeouts.length === 0 || timeouts.includes(0)
-        ? Infinity
-        : Math.max(...timeouts),
-    expectTimeout: expectTimeouts.length
-      ? Math.max(...expectTimeouts)
-      : DEFAULT_EXPECT_TIMEOUT_MS,
+    testTimeoutCap: timeouts.includes(0) ? Infinity : Math.max(...timeouts),
+    expectTimeout: Math.max(...expectTimeouts),
   };
 }
 
@@ -52,7 +54,7 @@ export interface RunBudget {
   readonly deadlineMs: number | undefined;
 }
 
-export const DRY_RUN_BUDGET: RunBudget = {
+export const dryRunBudget: RunBudget = {
   testTimeout: undefined,
   deadlineMs: undefined,
 };
@@ -61,15 +63,15 @@ export function mutantRunBudget(
   strykerTimeout: number,
   config: ConfigTimeouts,
 ): RunBudget {
-  const deadlineMs = strykerTimeout - STOP_HEADROOM_MS;
-  const testRoomMs = deadlineMs - RUN_START_MS;
+  const deadlineMs = strykerTimeout - stopHeadroomMs;
+  const testRoomMs = deadlineMs - runStartMs;
 
   return {
     testTimeout: Math.min(
-      Math.max(testRoomMs, MIN_TEST_TIMEOUT_MS),
+      Math.max(testRoomMs, minTestTimeoutMs),
       config.testTimeoutCap,
     ),
-    deadlineMs: testRoomMs < MIN_TEST_TIMEOUT_MS ? undefined : deadlineMs,
+    deadlineMs: testRoomMs < minTestTimeoutMs ? undefined : deadlineMs,
   };
 }
 
@@ -100,7 +102,7 @@ export interface ArmedDeadline {
 }
 
 // setTimeout fires at once for a longer delay.
-const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
+const maxTimerDelayMs = 2 ** 31 - 1;
 
 // Playwright's stopTests() does nothing while runTests is still loading the config, and a second call
 // is harmless.
@@ -120,9 +122,9 @@ export function armDeadline(
     () => {
       firedAt = now();
       call();
-      retry = setInterval(call, STOP_RETRY_MS);
+      retry = setInterval(call, stopRetryMs);
     },
-    Math.min(Math.max(0, at - now()), MAX_TIMER_DELAY_MS),
+    Math.min(Math.max(0, at - now()), maxTimerDelayMs),
   );
 
   return {

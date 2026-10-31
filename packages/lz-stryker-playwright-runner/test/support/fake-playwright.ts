@@ -1,69 +1,85 @@
 // A fake Playwright install that loadPlaywright resolves from the config's folder, as it resolves a real
 // one, with a fake TestRunner that plays what Playwright and the worker hook do.
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { TestContext } from 'node:test';
 
-import type { FullResult, Reporter, TestCase } from '@playwright/test/reporter';
+import type { FullResult, Reporter } from '@playwright/test/reporter';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
 import type {
   RunTestsParams,
   TestRunner,
 } from '../../src/playwright-internals.ts';
-import { LzStrykerPlaywrightTestRunner } from '../../src/playwright-test-runner.ts';
 import {
-  RUN_SETTINGS,
+  LzStrykerPlaywrightTestRunner,
+  setEnv,
+} from '../../src/playwright-test-runner.ts';
+import {
+  readRunSettings,
+  runSettingsEnv,
   type RunSettings,
   serializeSnapshot,
   type SnapshotLine,
 } from '../../src/protocol.ts';
-import { LzStrykerCollectingReporter } from '../../src/reporter.ts';
-import { finishedTest, logger, strykerOptions } from './doubles.ts';
+import {
+  LzStrykerCollectingReporter,
+  type ReportedTest,
+} from '../../src/reporter.ts';
+import { finishedTest, logger, strykerOptions, tempTree } from './doubles.ts';
 
 export type Status = FullResult['status'];
 
-export const ACTIVE_MUTANT = INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
-const FAKE = '__fakePlaywright__';
-
-/** The runners of the running test, which its fake's cleanup disposes before it removes the fake. */
-const live: LzStrykerPlaywrightTestRunner[] = [];
+export const activeMutantEnv =
+  INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
+const fakeGlobal = '__fakePlaywright__';
 
 interface Project {
-  default: boolean;
-  expect?: { timeout?: number };
-  project: { name: string; timeout: number };
+  readonly default: boolean;
+  readonly expect?: { readonly timeout?: number };
+  readonly project: { readonly name: string; readonly timeout: number };
 }
 
 interface WebServer {
-  url?: string;
-  port?: number;
-  ignoreHTTPSErrors?: boolean;
+  readonly url?: string;
+  readonly port?: number;
+  readonly ignoreHTTPSErrors?: boolean;
 }
 
 /** What one runTests call saw: its params, the run settings and the environment the workers get. */
 export interface Run {
-  reporter: LzStrykerCollectingReporter;
-  params: RunTestsParams;
-  settings: RunSettings;
-  env: Record<string, string | undefined>;
+  readonly reporter: LzStrykerCollectingReporter;
+  readonly params: RunTestsParams;
+  readonly settings: RunSettings;
+  readonly env: Record<string, string | undefined>;
 }
 
 export interface Behaviour {
-  projects?: Project[];
-  webServers?: WebServer[];
-  listed?: TestCase[];
-  initialize?: () => Promise<void>;
-  globalSetup?: (reporter: Reporter) => Status;
-  globalTeardown?: () => Promise<void>;
-  runTests?: (run: Run) => Promise<Status>;
-  urlUp?: (url: URL, ignoreHTTPSErrors: boolean) => Promise<boolean>;
+  readonly projects?: readonly Project[];
+  readonly webServers?: readonly WebServer[];
+  readonly listed?: readonly ReportedTest[];
+  readonly initialize?: () => Promise<void>;
+  readonly globalSetup?: (reporter: Reporter) => Status;
+  readonly globalTeardown?: () => Promise<void>;
+  readonly runTests?: (run: Run) => Promise<Status>;
+  readonly urlUp?: (url: URL, ignoreHTTPSErrors: boolean) => Promise<boolean>;
 }
 
 /** The fake's record of every call, in order. */
 type Call = [string, ...unknown[]];
+
+/** Sets `values` in process.env, an undefined value unsetting its variable, and restores them after the test. */
+export function stubEnv(
+  t: TestContext,
+  values: Readonly<Record<string, string | undefined>>,
+): void {
+  const previous = Object.fromEntries(
+    Object.keys(values).map((name) => [name, process.env[name]]),
+  );
+  t.after(() => setEnv(previous));
+  setEnv(values);
+}
 
 export function writeSnapshots(run: Run, lines: SnapshotLine[]) {
   writeFileSync(
@@ -82,27 +98,31 @@ export function fakePlaywright(
   behaviour: Behaviour = {},
   version = '1.63.0',
 ) {
-  const dir = mkdtempSync(path.join(tmpdir(), 'runner-shell-test-'));
+  const live: LzStrykerPlaywrightTestRunner[] = [];
+  const globals: Record<string, unknown> = globalThis;
+
+  // Registered first, so the runners are disposed before the folder goes and the temp variables are restored.
+  t.after(async () => {
+    await Promise.all(live.map((shell) => shell.dispose()));
+    delete globals[fakeGlobal];
+  });
+
+  const dir = tempTree(t, 'runner-shell-test-', {
+    'playwright.config.ts': '',
+    'node_modules/@playwright/test/package.json': '{"name":"@playwright/test"}',
+    'node_modules/@playwright/test/index.js': '',
+    'node_modules/playwright/package.json': JSON.stringify({
+      name: 'playwright',
+      version,
+    }),
+    'node_modules/playwright/lib/runner.js': `module.exports = globalThis.${fakeGlobal}.runner;`,
+    'node_modules/playwright/lib/common.js': `module.exports = globalThis.${fakeGlobal}.common;`,
+    'node_modules/playwright-core/package.json': '{"name":"playwright-core"}',
+    'node_modules/playwright-core/lib/coreBundle.js': `module.exports = globalThis.${fakeGlobal}.coreBundle;`,
+  });
   const tmp = path.join(dir, 'tmp');
-  const modules = path.join(dir, 'node_modules');
-  const files: Record<string, string> = {
-    '@playwright/test/package.json': '{"name":"@playwright/test"}',
-    '@playwright/test/index.js': '',
-    'playwright/package.json': JSON.stringify({ name: 'playwright', version }),
-    'playwright/lib/runner.js': `module.exports = globalThis.${FAKE}.runner;`,
-    'playwright/lib/common.js': `module.exports = globalThis.${FAKE}.common;`,
-    'playwright-core/package.json': '{"name":"playwright-core"}',
-    'playwright-core/lib/coreBundle.js': `module.exports = globalThis.${FAKE}.coreBundle;`,
-  };
-
-  for (const [file, content] of Object.entries(files)) {
-    mkdirSync(path.dirname(path.join(modules, file)), { recursive: true });
-    writeFileSync(path.join(modules, file), content);
-  }
-
   mkdirSync(tmp);
   const configFile = path.join(dir, 'playwright.config.ts');
-  writeFileSync(configFile, '');
   const calls: Call[] = [];
   const runs: Run[] = [];
   let stopRequested = Promise.withResolvers<void>();
@@ -139,11 +159,12 @@ export function fakePlaywright(
       return { status: 'passed' };
     }
 
-    async runGlobalSetup(reporters: Reporter[]): Promise<{ status: Status }> {
+    async runGlobalSetup([reporter]: Reporter[]): Promise<{ status: Status }> {
       calls.push(['runGlobalSetup']);
+      assert.ok(reporter);
 
       return {
-        status: behaviour.globalSetup?.(reporters[0]) ?? 'passed',
+        status: behaviour.globalSetup?.(reporter) ?? 'passed',
       };
     }
 
@@ -156,16 +177,18 @@ export function fakePlaywright(
       const env = Object.fromEntries(
         [
           'NODE_OPTIONS',
-          RUN_SETTINGS,
-          ACTIVE_MUTANT,
+          runSettingsEnv,
+          activeMutantEnv,
           'PLAYWRIGHT_NO_COPY_PROMPT',
         ].map((name) => [name, process.env[name]]),
       );
+      const settings = readRunSettings(env);
+      assert.ok(settings);
       const run: Run = {
         reporter: collecting(reporter),
         params,
         env,
-        settings: JSON.parse(env[RUN_SETTINGS] ?? 'null'),
+        settings,
       };
       calls.push(['runTests']);
       runs.push(run);
@@ -199,31 +222,9 @@ export function fakePlaywright(
       },
     },
   };
-  const globals: Record<string, unknown> = globalThis;
-  const tmpEnv = ['TMPDIR', 'TEMP', 'TMP'].map(
-    (name) => [name, process.env[name]] as const,
-  );
-  globals[FAKE] = fake;
-
+  globals[fakeGlobal] = fake;
   // init() and the temp root read os.tmpdir(), so the fake's own folder stands in for it.
-  for (const [name] of tmpEnv) {
-    process.env[name] = tmp;
-  }
-
-  t.after(async () => {
-    await Promise.all(live.splice(0).map((shell) => shell.dispose()));
-
-    for (const [name, value] of tmpEnv) {
-      if (value === undefined) {
-        delete process.env[name];
-      } else {
-        process.env[name] = value;
-      }
-    }
-
-    delete globals[FAKE];
-    rmSync(dir, { recursive: true, force: true });
-  });
+  stubEnv(t, { TMPDIR: tmp, TEMP: tmp, TMP: tmp });
 
   return {
     dir,
@@ -232,6 +233,26 @@ export function fakePlaywright(
     calls,
     runs,
     names: () => calls.map(([name]) => name),
+    /**
+     * A runner on `configFile`, unless `lzStrykerPlaywright` overrides it, that the fake's cleanup disposes, and the
+     * lines it logs.
+     */
+    runner: ({
+      timeoutMS = 10_000,
+      lzStrykerPlaywright = {},
+    }: { timeoutMS?: number; lzStrykerPlaywright?: object } = {}) => {
+      const { log, lines } = logger();
+      const shell = new LzStrykerPlaywrightTestRunner(
+        strykerOptions({
+          timeoutMS,
+          lzStrykerPlaywright: { configFile, ...lzStrykerPlaywright },
+        }),
+        log,
+      );
+      live.push(shell);
+
+      return { shell, lines };
+    },
     /** Resolves when the runner calls stopTests; each await gets the next call. */
     stopped: () => {
       const { promise } = stopRequested;
@@ -262,25 +283,4 @@ export async function passAll(run: Run): Promise<Status> {
   ]);
 
   return 'passed';
-}
-
-/** A runner on `configFile` that the fake's cleanup disposes, and the lines it logs. */
-export function runner(
-  configFile: string | undefined,
-  {
-    timeoutMS = 10_000,
-    lzStrykerPlaywright = {},
-  }: { timeoutMS?: number; lzStrykerPlaywright?: object } = {},
-) {
-  const { log, lines } = logger();
-  const shell = new LzStrykerPlaywrightTestRunner(
-    strykerOptions({
-      timeoutMS,
-      lzStrykerPlaywright: { configFile, ...lzStrykerPlaywright },
-    }),
-    log,
-  );
-  live.push(shell);
-
-  return { runner: shell, lines };
 }

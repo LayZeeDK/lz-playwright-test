@@ -4,23 +4,24 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import type { Mutant } from '@stryker-mutator/api/core';
+import type { MutantStatus, Position } from '@stryker-mutator/api/core';
 
+import { fieldOf, isRecord } from './is-record.ts';
 import {
+  babelTypeMembers,
   toNodeMutator,
   type BabelTypes,
-  type NodeMutatorLike,
   type Operator,
 } from './mutator.ts';
-import { withJsxPlacement, type MutantPlacerLike } from './placer.ts';
+import { withJsxPlacement, type PlacerMethods } from './placer.ts';
 
-export const TESTED_VERSION = '10.1.1';
-const CORE_BIN = /[\\/]@stryker-mutator[\\/]core[\\/]bin[\\/]stryker\.js$/;
-const NAME = /^[A-Za-z]+$/;
+export const testedVersion = '10.1.1';
+const coreBin = /[\\/]@stryker-mutator[\\/]core[\\/]bin[\\/]stryker\.js$/;
+const namePattern = /^[A-Za-z]+$/;
 // `Symbol.for`, so a second copy of this package in the process sees the marks of the first.
-const OWN: unique symbol = Symbol.for('@layzee/lz-stryker-ui-mutators');
+const ownMark: unique symbol = Symbol.for('@layzee/lz-stryker-ui-mutators');
 const nothing = (): undefined => undefined;
-const SILENT = {
+const silentLogger = {
   debug: nothing,
   info: nothing,
   warn: nothing,
@@ -36,14 +37,32 @@ export interface SourceFile {
   readonly content: string;
 }
 
-export type InstrumentedMutant = Pick<
-  Mutant,
-  'id' | 'fileName' | 'mutatorName' | 'replacement' | 'location' | 'status'
->;
+export interface InstrumentedMutant {
+  readonly id: string;
+  readonly fileName: string;
+  readonly mutatorName: string;
+  readonly replacement: string;
+  readonly location: {
+    readonly start: Readonly<Position>;
+    readonly end: Readonly<Position>;
+  };
+  readonly status?: MutantStatus | undefined;
+}
 
 export interface InstrumentResult {
   readonly files: readonly SourceFile[];
   readonly mutants: readonly InstrumentedMutant[];
+}
+
+/** What this package reads of a mutator in Stryker's list; only Stryker calls `mutate`. */
+export interface ListedMutator {
+  readonly name: string;
+  readonly mutate: (...args: readonly never[]) => unknown;
+}
+
+/** Stryker's own list: this package reads it and appends its operators, nothing more. */
+export interface MutatorList extends ReadonlyArray<ListedMutator> {
+  push(...mutators: ListedMutator[]): number;
 }
 
 export interface Instrumenter {
@@ -51,9 +70,15 @@ export interface Instrumenter {
   readonly version: string;
   readonly types: BabelTypes;
   /** The array `transformBabel` reads by default on every file (`babel-transformer.js:8`). */
-  readonly allMutators: NodeMutatorLike[];
-  /** First entry of the frozen `allMutantPlacers`; the array is frozen, this object is not (`mutant-placers/index.js:6`). */
-  readonly expressionPlacer: MutantPlacerLike;
+  readonly allMutators: MutatorList;
+  /**
+   * `target` is the first entry of the frozen `allMutantPlacers`; the array is frozen, this object is not
+   * (`mutant-placers/index.js:6`). `original` calls the methods `target` had when it was resolved.
+   */
+  readonly expressionPlacer: {
+    readonly target: object;
+    readonly original: PlacerMethods;
+  };
   instrument(
     files: readonly SourceFile[],
     excludedMutations?: readonly string[],
@@ -71,9 +96,9 @@ export async function install(
   register(instrumenter, operators);
   await selfCheck(instrumenter, operators);
 
-  if (instrumenter.version !== TESTED_VERSION) {
+  if (instrumenter.version !== testedVersion) {
     warn(
-      `lz-stryker-ui-mutators was tested with @stryker-mutator/instrumenter ${TESTED_VERSION}, not ` +
+      `lz-stryker-ui-mutators was tested with @stryker-mutator/instrumenter ${testedVersion}, not ` +
         `${instrumenter.version} in ${instrumenter.dir}; its self-check passed.`,
     );
   }
@@ -81,10 +106,10 @@ export async function install(
 
 function checkNames(
   operators: readonly Operator[],
-  present: readonly NodeMutatorLike[],
+  present: readonly ListedMutator[],
 ): void {
   const names = operators.map(({ name }) => name);
-  const invalid = names.filter((name) => !NAME.test(name));
+  const invalid = names.filter((name) => !namePattern.test(name));
 
   if (invalid.length > 0) {
     throw new Error(
@@ -94,14 +119,15 @@ function checkNames(
   }
 
   // Stryker's directives match mutator names ignoring case (directive-bookkeeper.ts:63, :73).
-  const keys = names.map((name) => name.toLowerCase());
+  const keyOf = (name: string): string => name.toLowerCase();
+  const keys = names.map(keyOf);
   const others = new Set(
     present
-      .filter((mutator) => !(OWN in mutator))
-      .map(({ name }) => name.toLowerCase()),
+      .filter((mutator) => !(ownMark in mutator))
+      .map(({ name }) => keyOf(name)),
   );
   const taken = names.filter((name, index) => {
-    const key = name.toLowerCase();
+    const key = keyOf(name);
 
     return keys.indexOf(key) !== index || others.has(key);
   });
@@ -118,21 +144,23 @@ function register(
   operators: readonly Operator[],
 ): void {
   const { allMutators, expressionPlacer, types } = instrumenter;
-  const registered = new Set(
-    // Stryker disable next-line MethodExpression: equivalent, as checkNames has thrown for any operator whose name an unmarked mutator has
-    allMutators.filter((mutator) => OWN in mutator).map(({ name }) => name),
-  );
+  const registered = new Set(allMutators.map(({ name }) => name));
 
   allMutators.push(
     ...operators
       .filter(({ name }) => !registered.has(name))
-      .map((operator) => ({ ...toNodeMutator(operator, types), [OWN]: OWN })),
+      .map((operator) => ({
+        ...toNodeMutator(operator, types),
+        [ownMark]: ownMark,
+      })),
   );
 
-  if (!(OWN in expressionPlacer)) {
-    Object.assign(expressionPlacer, withJsxPlacement(expressionPlacer, types), {
-      [OWN]: OWN,
-    });
+  if (!(ownMark in expressionPlacer.target)) {
+    Object.assign(
+      expressionPlacer.target,
+      withJsxPlacement(expressionPlacer.original, types),
+      { [ownMark]: ownMark },
+    );
   }
 }
 
@@ -147,12 +175,15 @@ async function selfCheck(
       content: sample,
     })),
   );
-  const made = new Set(
-    mutants.map(({ fileName, mutatorName }) => `${fileName}\n${mutatorName}`),
-  );
   const silent = operators
     .map(({ name }) => name)
-    .filter((name) => !made.has(`${fileOf(name)}\n${name}`));
+    .filter(
+      (name) =>
+        !mutants.some(
+          ({ fileName, mutatorName }) =>
+            fileName === fileOf(name) && mutatorName === name,
+        ),
+    );
 
   if (silent.length > 0) {
     throw new Error(
@@ -177,7 +208,7 @@ export function corePackageJson(
     // argv1 names no file on disk; fall back to the core this module resolves.
   }
 
-  return bin !== undefined && CORE_BIN.test(bin)
+  return bin !== undefined && coreBin.test(bin)
     ? join(bin, '..', '..', 'package.json')
     : resolveHere('@stryker-mutator/core/package.json');
 }
@@ -190,21 +221,26 @@ export async function resolveFromCore(
     '@stryker-mutator/instrumenter/package.json',
   );
   const dir = dirname(packageJson);
-  const version = String(fromCore(packageJson).version);
-  // `import()` types each namespace as `any`; these checks are what this module relies on in each one.
-  const [{ allMutators }, { allMutantPlacers }, { Instrumenter }, { types }] =
-    await Promise.all([
-      importFile(join(dir, 'dist', 'src', 'mutators', 'mutate.js')),
-      importFile(join(dir, 'dist', 'src', 'mutant-placers', 'index.js')),
-      importFile(join(dir, 'dist', 'src', 'index.js')),
-      importFile(createRequire(packageJson).resolve('@babel/core')),
-    ]);
+  const manifest: unknown = fromCore(packageJson);
+  const version = String(fieldOf(manifest, 'version'));
+  // These checks are what this module relies on in each namespace. The signatures of the Babel types and of each
+  // mutator's mutate stay unchecked; the self-check in install() runs them.
+  const [mutate, placers, index, babel] = await Promise.all([
+    importFile(join(dir, 'dist', 'src', 'mutators', 'mutate.js')),
+    importFile(join(dir, 'dist', 'src', 'mutant-placers', 'index.js')),
+    importFile(join(dir, 'dist', 'src', 'index.js')),
+    importFile(createRequire(packageJson).resolve('@babel/core')),
+  ]);
+  const allMutators = fieldOf(mutate, 'allMutators');
+  const allMutantPlacers = fieldOf(placers, 'allMutantPlacers');
+  const Instrumenter = fieldOf(index, 'Instrumenter');
+  const types = fieldOf(babel, 'types');
   const missing = (name: string): Error =>
     new Error(
       `lz-stryker-ui-mutators: the instrumenter ${version} in ${dir} has no ${name}.`,
     );
 
-  if (!Array.isArray(allMutators)) {
+  if (!Array.isArray(allMutators) || !allMutators.every(isListedMutator)) {
     throw missing('allMutators');
   }
 
@@ -212,40 +248,201 @@ export async function resolveFromCore(
     throw missing('allMutantPlacers');
   }
 
-  if (typeof Instrumenter !== 'function') {
+  const instrument =
+    typeof Instrumenter === 'function'
+      ? fieldOf(Instrumenter.prototype, 'instrument')
+      : undefined;
+
+  if (typeof Instrumenter !== 'function' || typeof instrument !== 'function') {
     throw missing('Instrumenter');
   }
 
-  if (typeof types?.isJSXText !== 'function') {
-    throw missing('Babel types');
-  }
+  assertBabelTypes(types, missing);
 
-  const expressionPlacer = allMutantPlacers.find(
-    ({ name }) => name === 'expressionMutantPlacer',
-  );
+  const placer = allMutantPlacers
+    .filter(isRecord)
+    .find(({ name }) => name === 'expressionMutantPlacer');
 
-  if (expressionPlacer === undefined) {
+  if (
+    placer === undefined ||
+    typeof placer['canPlace'] !== 'function' ||
+    typeof placer['place'] !== 'function'
+  ) {
     throw missing('expressionMutantPlacer');
   }
+
+  const { canPlace, place } = placer;
+
+  const changed = (what: string): Error =>
+    new Error(
+      `lz-stryker-ui-mutators: the instrumenter ${version} in ${dir} resolved Instrumenter.instrument() to a ` +
+        `value whose ${what} is missing or of the wrong type.`,
+    );
 
   return {
     dir,
     version,
     types,
     allMutators,
-    expressionPlacer,
+    expressionPlacer: {
+      target: placer,
+      original: {
+        canPlace(path) {
+          const placeable: unknown = Reflect.apply(canPlace, placer, [path]);
+
+          if (typeof placeable !== 'boolean') {
+            throw new Error(
+              `lz-stryker-ui-mutators: the instrumenter ${version} in ${dir} has an expressionMutantPlacer whose ` +
+                `canPlace returned a ${typeof placeable}, not a boolean.`,
+            );
+          }
+
+          return placeable;
+        },
+        place(path, appliedMutants) {
+          Reflect.apply(place, placer, [path, appliedMutants]);
+        },
+      },
+    },
     async instrument(files, excludedMutations = []) {
-      return new Instrumenter(SILENT).instrument(
-        files.map((file): SourceFile & { mutate: true } => ({
-          ...file,
-          mutate: true,
-        })),
+      const created: unknown = Reflect.construct(Instrumenter, [silentLogger]);
+      const result: unknown = await Reflect.apply(instrument, created, [
+        files.map((file) => ({ ...file, mutate: true })),
         { plugins: null, excludedMutations, ignorers: [] },
-      );
+      ]);
+
+      return parseResult(result, changed);
     },
   };
 }
 
-function importFile(path: string) {
+function importFile(path: string): Promise<unknown> {
   return import(pathToFileURL(path).href);
+}
+
+function isListedMutator(value: unknown): value is ListedMutator {
+  return (
+    isRecord(value) &&
+    typeof value['name'] === 'string' &&
+    typeof value['mutate'] === 'function'
+  );
+}
+
+function assertBabelTypes(
+  value: unknown,
+  missing: (name: string) => Error,
+): asserts value is BabelTypes {
+  const absent = [
+    ...babelTypeMembers.filter(
+      (member) => typeof fieldOf(value, member) !== 'function',
+    ),
+    ...(typeof fieldOf(fieldOf(value, 'react'), 'buildChildren') === 'function'
+      ? []
+      : ['react.buildChildren']),
+  ];
+
+  if (absent.length > 0) {
+    throw missing(`Babel types with ${absent.join(', ')}`);
+  }
+}
+
+// Stryker's own list, annotated rather than `as const` so that a mutant of a status fails to compile.
+const statuses: readonly MutantStatus[] = [
+  'Killed',
+  'Survived',
+  'NoCoverage',
+  'CompileError',
+  'RuntimeError',
+  'Timeout',
+  'Ignored',
+  'Pending',
+];
+
+function parseResult(
+  value: unknown,
+  changed: (what: string) => Error,
+): InstrumentResult {
+  const files = fieldOf(value, 'files');
+  const mutants = fieldOf(value, 'mutants');
+
+  if (!Array.isArray(files)) {
+    throw changed('files');
+  }
+
+  if (!Array.isArray(mutants)) {
+    throw changed('mutants');
+  }
+
+  return {
+    files: files.map((file: unknown) => ({
+      name: stringOf(fieldOf(file, 'name'), 'files[].name', changed),
+      content: stringOf(fieldOf(file, 'content'), 'files[].content', changed),
+    })),
+    mutants: mutants.map((mutant: unknown) => parseMutant(mutant, changed)),
+  };
+}
+
+function parseMutant(
+  mutant: unknown,
+  changed: (what: string) => Error,
+): InstrumentedMutant {
+  const field = (name: string): string =>
+    stringOf(fieldOf(mutant, name), `mutants[].${name}`, changed);
+  const location = fieldOf(mutant, 'location');
+  const status = fieldOf(mutant, 'status');
+
+  return {
+    id: field('id'),
+    fileName: field('fileName'),
+    mutatorName: field('mutatorName'),
+    replacement: field('replacement'),
+    location: {
+      start: positionOf(fieldOf(location, 'start'), 'start', changed),
+      end: positionOf(fieldOf(location, 'end'), 'end', changed),
+    },
+    status: status === undefined ? undefined : statusOf(status, changed),
+  };
+}
+
+function positionOf(
+  value: unknown,
+  name: string,
+  changed: (what: string) => Error,
+): Position {
+  const numberOf = (key: string): number => {
+    const found = fieldOf(value, key);
+
+    if (typeof found !== 'number') {
+      throw changed(`mutants[].location.${name}.${key}`);
+    }
+
+    return found;
+  };
+
+  return { line: numberOf('line'), column: numberOf('column') };
+}
+
+function statusOf(
+  value: unknown,
+  changed: (what: string) => Error,
+): MutantStatus {
+  const known = statuses.find((status) => status === value);
+
+  if (known === undefined) {
+    throw changed('mutants[].status');
+  }
+
+  return known;
+}
+
+function stringOf(
+  value: unknown,
+  what: string,
+  changed: (what: string) => Error,
+): string {
+  if (typeof value !== 'string') {
+    throw changed(what);
+  }
+
+  return value;
 }

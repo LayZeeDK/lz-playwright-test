@@ -1,16 +1,15 @@
-import type { Suite, TestCase } from '@playwright/test/reporter';
-
+import { isRecord } from './is-record.ts';
 import { isSerialSuite, type TestRunner } from './playwright-internals.ts';
-import { LzStrykerCollectingReporter } from './reporter.ts';
+import { LzStrykerCollectingReporter, type ReportedTest } from './reporter.ts';
 
 /** The ids of a describe.serial group's tests, by the id of each test in it. */
 export type SerialGroups = ReadonlyMap<string, readonly string[]>;
 
 // Given no names, listTests would also load the default: false projects.
 export function projectsThatRun(
-  option: string[] | undefined,
-  projects: { default: boolean; project: { name: string } }[],
-): string[] {
+  option: readonly string[] | undefined,
+  projects: readonly { default: boolean; project: { name: string } }[],
+): readonly string[] {
   return option?.length
     ? option
     : projects
@@ -20,7 +19,7 @@ export function projectsThatRun(
 
 export async function listSerialGroups(
   playwright: Pick<TestRunner, 'listTests'>,
-  projects: string[],
+  projects: readonly string[],
 ): Promise<SerialGroups> {
   const reporter = new LzStrykerCollectingReporter();
   const result = await playwright.listTests(reporter, { projects });
@@ -47,22 +46,12 @@ export async function listSerialGroups(
   return serialGroups(reporter.listedTests);
 }
 
-export function serialGroups(testCases: Iterable<TestCase>): SerialGroups {
+export function serialGroups(testCases: Iterable<ReportedTest>): SerialGroups {
   const bySuite = new Map<object, string[]>();
   const byTest = new Map<string, string[]>();
 
-  for (const test of testCases) {
-    let group: object | undefined;
-
-    for (
-      let suite: Suite | undefined = test.parent;
-      suite;
-      suite = suite.parent
-    ) {
-      if (isSerialSuite(suite)) {
-        group = suite;
-      }
-    }
+  [...testCases].forEach((test) => {
+    const group = outermostSerialSuite(test);
 
     if (group) {
       const ids = bySuite.get(group) ?? [];
@@ -70,9 +59,26 @@ export function serialGroups(testCases: Iterable<TestCase>): SerialGroups {
       bySuite.set(group, ids);
       byTest.set(test.id, ids);
     }
-  }
+  });
 
   return byTest;
+}
+
+// The walk goes from the test outwards, so the last serial suite it meets is the outermost.
+function outermostSerialSuite(test: ReportedTest): object | undefined {
+  let outermost: object | undefined;
+
+  for (
+    let suite: unknown = test.parent;
+    isRecord(suite);
+    suite = suite['parent']
+  ) {
+    if (isSerialSuite(suite)) {
+      outermost = suite;
+    }
+  }
+
+  return outermost;
 }
 
 export function withSerialGroups(

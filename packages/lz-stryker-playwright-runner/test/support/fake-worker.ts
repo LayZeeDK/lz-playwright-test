@@ -1,39 +1,84 @@
 // The worker hook's install against a fake Playwright in this process.
 import assert from 'node:assert/strict';
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { TestContext } from 'node:test';
 
-import type { Browser, BrowserContext, Frame, Page } from '@playwright/test';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
-import type {
-  Instrumentation,
-  SlotType,
+import { isRecord } from '../../src/is-record.ts';
+import {
+  type HookedBrowser,
+  type HookedContext,
+  type HookedFrame,
+  type HookedPage,
+  type Instrumentation,
+  type SlotType,
 } from '../../src/playwright-internals.ts';
+import { setEnv } from '../../src/playwright-test-runner.ts';
 import type { RunSettings } from '../../src/protocol.ts';
 import type {
   install,
   PageSettings,
   StrykerNamespace,
 } from '../../src/worker-hook.ts';
+import { tempTree } from './doubles.ts';
 
-const ACTIVE_MUTANT = INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
+const activeMutantEnv = INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
 
 type Listener = Parameters<Instrumentation['addListener']>[0];
 
 /** The shape of Playwright's TestInfo._timeoutManager._running.runnable. */
 export interface Runnable {
-  type: SlotType;
-  fixture?: { title: string };
+  readonly type: SlotType;
+  readonly fixture?: { readonly title: string };
 }
 
 interface FakeFrame {
   /** The global name the frame's namespace has; undefined reads the name the hook asks for. */
-  name?: string;
-  evaluate?: (fn: (name: string) => unknown, name: string) => Promise<unknown>;
-  detached?: boolean;
+  readonly name?: string;
+  readonly evaluate?: (
+    fn: (name: string) => unknown,
+    name: string,
+  ) => Promise<unknown>;
+  readonly detached?: boolean;
+}
+
+function frame({
+  name,
+  evaluate,
+  detached = false,
+}: FakeFrame = {}): HookedFrame {
+  return {
+    evaluate: (fn, asked) =>
+      evaluate ? evaluate(fn, asked) : Promise.resolve(fn(name ?? asked)),
+    isDetached: () => detached,
+  };
+}
+
+function page(frames: HookedFrame[] = [frame()]) {
+  const closed: unknown[] = [];
+  const created: HookedPage = {
+    frames: () => frames,
+    close: async (options) => {
+      closed.push(options);
+    },
+  };
+
+  return { page: created, closed };
+}
+
+function browser() {
+  const contexts: HookedContext[] = [];
+  const closed: unknown[] = [];
+  const created: HookedBrowser = {
+    contexts: () => contexts,
+    close: async (options) => {
+      closed.push(options);
+    },
+  };
+
+  return { browser: created, contexts, closed };
 }
 
 /**
@@ -47,35 +92,39 @@ export function fakeInstall(
   {
     activeMutant,
     prepare,
+    info,
   }: {
     activeMutant?: string;
     /** Runs before install, as the worker's earlier code would. */
     prepare?: (outDir: string, ns: string) => void;
+    /** Replaces test.info(), as a Playwright whose TestInfo changed would. */
+    info?: () => unknown;
   } = {},
 ) {
   const ns = `__hookTest${Math.random().toString(36).slice(2)}__`;
-  const outDir = mkdtempSync(path.join(tmpdir(), 'worker-hook-install-'));
+  const outDir = tempTree(t, 'worker-hook-install-');
   const scope: Record<string, unknown> = globalThis;
   prepare?.(outDir, ns);
   const exitListeners = process.listeners('exit');
-  const previousMutant = process.env[ACTIVE_MUTANT];
   let running: string | undefined;
   let runnable: Runnable = { type: 'test' };
   let listener: Listener | undefined;
   const test = {
-    info: () => {
-      if (running === undefined) {
-        throw new Error(
-          'test.info() can only be called while a test is running',
-        );
-      }
+    info:
+      info ??
+      (() => {
+        if (running === undefined) {
+          throw new Error(
+            'test.info() can only be called while a test is running',
+          );
+        }
 
-      return {
-        testId: running,
-        config: { version: '1.64.1' },
-        _timeoutManager: { _running: { runnable } },
-      };
-    },
+        return {
+          testId: running,
+          config: { version: '1.64.1' },
+          _timeoutManager: { _running: { runnable } },
+        };
+      }),
   };
   const modules: Record<string, unknown> = {
     'playwright/test': { test },
@@ -88,24 +137,13 @@ export function fakeInstall(
     },
   };
 
-  if (activeMutant === undefined) {
-    delete process.env[ACTIVE_MUTANT];
-  } else {
-    process.env[ACTIVE_MUTANT] = activeMutant;
-  }
+  const previousMutant = process.env[activeMutantEnv];
+  setEnv({ [activeMutantEnv]: activeMutant });
 
   try {
-    installHook(
-      ((id: string) => modules[id]) as NodeJS.Require,
-      { outDir, ...settings },
-      ns,
-    );
+    installHook((id) => modules[id], { outDir, ...settings }, ns);
   } finally {
-    if (previousMutant === undefined) {
-      delete process.env[ACTIVE_MUTANT];
-    } else {
-      process.env[ACTIVE_MUTANT] = previousMutant;
-    }
+    setEnv({ [activeMutantEnv]: previousMutant });
   }
 
   const added = process
@@ -114,63 +152,35 @@ export function fakeInstall(
   t.after(() => {
     added.forEach((exit) => process.off('exit', exit));
     delete scope[ns];
-    rmSync(outDir, { recursive: true, force: true });
   });
 
   assert.ok(listener);
   const hooks = listener;
 
-  function frame({ name, evaluate, detached = false }: FakeFrame = {}): Frame {
-    return {
-      evaluate: (fn: (name: string) => unknown, asked: string) =>
-        evaluate ? evaluate(fn, asked) : Promise.resolve(fn(name ?? asked)),
-      isDetached: () => detached,
-    } as unknown as Frame;
-  }
+  function read() {
+    const [file, ...more] = readdirSync(outDir);
+    assert.ok(file !== undefined && more.length === 0, 'one snapshot file');
 
-  function page(frames: Frame[] = [frame()]) {
-    const closed: unknown[] = [];
-    const fake = {
-      frames: () => frames,
-      close: async (options?: unknown) => {
-        closed.push(options);
-      },
-    };
-
-    return { page: fake as unknown as Page, closed };
-  }
-
-  function browser() {
-    const contexts: BrowserContext[] = [];
-    const closed: unknown[] = [];
-    const fake = {
-      contexts: () => contexts,
-      close: async (options?: unknown) => {
-        closed.push(options);
-      },
-    };
-
-    return { browser: fake as unknown as Browser, contexts, closed };
+    return readFileSync(path.join(outDir, file), 'utf8');
   }
 
   /** A context as Playwright creates it, which the hook sees through the instrumentation. */
   async function context(owner: ReturnType<typeof browser> | null = null) {
-    const pages: Page[] = [];
-    const onPage: ((page: Page) => void)[] = [];
+    const pages: HookedPage[] = [];
+    const onPage: ((page: HookedPage) => void)[] = [];
     const scripts: [unknown, PageSettings][] = [];
     const events: string[] = [];
-    const fake = {
+    const created: HookedContext = {
       pages: () => pages,
       browser: () => owner?.browser ?? null,
-      on: (event: string, handler: (page: Page) => void) => {
+      on: (event, handler) => {
         events.push(event);
         onPage.push(handler);
       },
-      addInitScript: async (script: unknown, arg: PageSettings) => {
-        scripts.push([script, arg]);
+      addInitScript: async (script, settings) => {
+        scripts.push([script, settings]);
       },
     };
-    const created = fake as unknown as BrowserContext;
     owner?.contexts.push(created);
     await hooks.runAfterCreateBrowserContext?.(created);
 
@@ -178,7 +188,7 @@ export function fakeInstall(
       context: created,
       scripts,
       events,
-      open: (opened: Page) => {
+      open: (opened: HookedPage) => {
         pages.push(opened);
         onPage.forEach((handler) => handler(opened));
       },
@@ -196,12 +206,8 @@ export function fakeInstall(
     },
     hooks,
     files: () => readdirSync(outDir),
-    read: () => {
-      const [file, ...more] = readdirSync(outDir);
-      assert.ok(file !== undefined && more.length === 0, 'one snapshot file');
-
-      return readFileSync(path.join(outDir, file), 'utf8');
-    },
+    read,
+    lines: () => parsedLines(read()),
     /** `runs` is what Playwright's timeout manager runs for that test: its body by default. */
     setTest: (id: string | undefined, runs: Runnable = { type: 'test' }) => {
       running = id;
@@ -215,9 +221,14 @@ export function fakeInstall(
   };
 }
 
-export function parsedLines(content: string) {
+function parsedLines(content: string) {
   return content
     .split('\n')
     .filter(Boolean)
-    .map((line) => JSON.parse(line));
+    .map((line) => {
+      const parsed: unknown = JSON.parse(line);
+      assert.ok(isRecord(parsed));
+
+      return parsed;
+    });
 }

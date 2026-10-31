@@ -1,27 +1,60 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import type { TestContext } from 'node:test';
+
 import type { TestCase, TestResult } from '@playwright/test/reporter';
-import type { StrykerOptions } from '@stryker-mutator/api/core';
 import type { Logger } from '@stryker-mutator/api/logging';
 import type {
   DryRunOptions,
   MutantRunOptions,
 } from '@stryker-mutator/api/test-runner';
 
+import type { RunnerStrykerOptions } from '../../src/options.ts';
+import {
+  LzStrykerCollectingReporter,
+  type ReportedTest,
+} from '../../src/reporter.ts';
 import type { DryRunRequest, MutantRunRequest } from '../../src/run-request.ts';
-import { DRY_RUN_BUDGET } from '../../src/timeouts.ts';
+import type { RunOutput } from '../../src/run-result.ts';
+import { dryRunBudget } from '../../src/timeouts.ts';
 
 export type Outcome = ReturnType<TestCase['outcome']>;
 
-/**
- * A TestCase with no attempts yet. The runner reads only these members; a complete TestCase would need
- * a Suite and a project, so this is the one cast for it.
- */
+/** A temp dir holding `files` by relative path, removed after the test. */
+export function tempTree(
+  t: TestContext,
+  prefix: string,
+  files: Readonly<Record<string, string>> = {},
+): string {
+  const dir = mkdtempSync(path.join(tmpdir(), prefix));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  Object.entries(files).forEach(([file, content]) => {
+    mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    writeFileSync(path.join(dir, file), content);
+  });
+
+  return dir;
+}
+
+/** An Error with a Node.js system error `code`, such as `ENOENT`. */
+export function codedError(code: string): Error & { code: string } {
+  return Object.assign(new Error(code), { code });
+}
+
+// Coverage maps have no prototype, which deepEqual tells apart from object literals; the JSON copy compares their content.
+export function plain(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value));
+}
+
+/** A test with no attempts yet. */
 export function fakeTestCase(
   id: string,
   {
     expectedStatus = 'passed',
     parent = { _parallelMode: 'default' },
   }: { expectedStatus?: TestCase['expectedStatus']; parent?: object } = {},
-): TestCase {
+): ReportedTest {
   return {
     id,
     expectedStatus,
@@ -30,34 +63,38 @@ export function fakeTestCase(
     location: { file: 'app.spec.ts', line: 3, column: 5 },
     outcome: (): Outcome => 'expected',
     parent,
-  } as unknown as TestCase;
+  };
 }
 
-/** Appends an attempt, as Playwright appends each attempt of a test to the same TestCase. */
+/** The test with one more attempt, as Playwright appends each attempt of a test to its TestCase. */
 export function addAttempt(
-  testCase: TestCase,
+  testCase: ReportedTest,
   outcome: Outcome,
   status: TestResult['status'],
-): void {
-  // A TestResult also carries stdout, steps and attachments, which the runner never reads.
-  testCase.results.push({
-    status,
-    duration: 7,
-    error:
-      status === 'passed' ? undefined : { message: `${testCase.id} ${status}` },
-  } as unknown as TestResult);
-  testCase.outcome = () => outcome;
+): ReportedTest {
+  return {
+    ...testCase,
+    results: [
+      ...testCase.results,
+      {
+        status,
+        duration: 7,
+        error:
+          status === 'passed'
+            ? undefined
+            : { message: `${testCase.id} ${status}` },
+      },
+    ],
+    outcome: () => outcome,
+  };
 }
 
 export function finishedTest(
   id: string,
   status: TestResult['status'],
   outcome: Outcome = status === 'passed' ? 'expected' : 'unexpected',
-): TestCase {
-  const testCase = fakeTestCase(id);
-  addAttempt(testCase, outcome, status);
-
-  return testCase;
+): ReportedTest {
+  return addAttempt(fakeTestCase(id), outcome, status);
 }
 
 export function logger({
@@ -65,7 +102,7 @@ export function logger({
   onLine,
 }: {
   debug?: boolean;
-  onLine?: (level: string, ...args: unknown[]) => void;
+  onLine?: ((level: string, ...args: unknown[]) => void) | undefined;
 } = {}) {
   const lines: [string, string][] = [];
   const record =
@@ -92,12 +129,11 @@ export function logger({
   return { log, lines };
 }
 
-/**
- * Stryker options with the given fields and a 10 s timeoutMS. StrykerOptions has many required fields
- * that the runner never reads, so this is the one cast for it.
- */
-export function strykerOptions(options: object): StrykerOptions {
-  return { timeoutMS: 10_000, ...options } as unknown as StrykerOptions;
+/** The Stryker options the runner reads, with the given fields and a 10 s timeoutMS. */
+export function strykerOptions(
+  options: Partial<RunnerStrykerOptions>,
+): RunnerStrykerOptions {
+  return { timeoutMS: 10_000, ...options };
 }
 
 export function dryRequest(
@@ -107,7 +143,7 @@ export function dryRequest(
     kind: 'dry',
     disableBail: true,
     coverageAnalysis: 'perTest',
-    budget: DRY_RUN_BUDGET,
+    budget: dryRunBudget,
     ...request,
   };
 }
@@ -121,8 +157,20 @@ export function mutantRequest(
     activeMutant: '1',
     testFilter: undefined,
     hitLimit: undefined,
-    budget: DRY_RUN_BUDGET,
+    budget: dryRunBudget,
     ...request,
+  };
+}
+
+/** A passed run with the hook installed, an empty reporter and no snapshots, with the given fields. */
+export function runOutput(output: Partial<RunOutput> = {}): RunOutput {
+  return {
+    status: 'passed',
+    reporter: new LzStrykerCollectingReporter(),
+    snapshots: [],
+    hookInstalled: true,
+    installErrors: [],
+    ...output,
   };
 }
 

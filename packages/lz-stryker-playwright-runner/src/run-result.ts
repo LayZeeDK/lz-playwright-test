@@ -1,17 +1,23 @@
 import type { FullResult, TestCase } from '@playwright/test/reporter';
 import type { MutantCoverage } from '@stryker-mutator/api/core';
 import {
+  type CompleteDryRunResult,
   determineHitLimitReached,
   type DryRunResult,
   DryRunStatus,
+  type ErrorDryRunResult,
   type MutantRunResult,
   type TestResult,
   TestStatus,
   toMutantRunResult,
 } from '@stryker-mutator/api/test-runner';
 
-import type { Snapshot } from './protocol.ts';
-import { type LzStrykerCollectingReporter, errorText } from './reporter.ts';
+import { emptyRecord, type Snapshot } from './protocol.ts';
+import {
+  type LzStrykerCollectingReporter,
+  errorText,
+  type ReportedTest,
+} from './reporter.ts';
 import type {
   DryRunRequest,
   MutantRunRequest,
@@ -20,20 +26,19 @@ import type {
 import { timeoutReason } from './timeouts.ts';
 
 export type RunResult =
-  | {
-      status: DryRunStatus.Complete;
-      tests: TestResult[];
-      snapshots: Snapshot[];
-    }
-  | Exclude<DryRunResult, { status: DryRunStatus.Complete }>;
+  | (Omit<CompleteDryRunResult, 'mutantCoverage'> & {
+      readonly snapshots: readonly Snapshot[];
+    })
+  | Exclude<DryRunResult, { readonly status: DryRunStatus.Complete }>;
 
 export type RunStatus = FullResult['status'] | 'deadline';
 
 export interface RunOutput {
   readonly status: RunStatus;
   readonly reporter: LzStrykerCollectingReporter;
-  readonly snapshots: Snapshot[];
+  readonly snapshots: readonly Snapshot[];
   readonly hookInstalled: boolean;
+  readonly installErrors: readonly string[];
 }
 
 export interface CoverageGaps {
@@ -41,7 +46,7 @@ export interface CoverageGaps {
   readonly sharedFrames: number;
 }
 
-const OUTCOME: Record<ReturnType<TestCase['outcome']>, TestStatus> = {
+const statusByOutcome: Record<ReturnType<TestCase['outcome']>, TestStatus> = {
   expected: TestStatus.Success,
   flaky: TestStatus.Success,
   unexpected: TestStatus.Failed,
@@ -59,7 +64,9 @@ export interface AttemptSummary {
   readonly timedOut: boolean;
 }
 
-export function attemptSummary(testCases: Iterable<TestCase>): AttemptSummary {
+export function attemptSummary(
+  testCases: Iterable<ReportedTest>,
+): AttemptSummary {
   const attempts = [...testCases].flatMap((test) =>
     test.results.map(({ status }) => ({
       status,
@@ -87,7 +94,7 @@ export function mayHaveLostItsServer(output: RunOutput): boolean {
 }
 
 export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
-  const { status, reporter, snapshots, hookInstalled } = output;
+  const { status, reporter, snapshots, hookInstalled, installErrors } = output;
   const isMutantRun = request.kind === 'mutant';
   const testCases = [...reporter.testCases.values()];
   const tests = testCases.map((test) => toTestResult(test, isMutantRun));
@@ -100,10 +107,7 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
   });
 
   if (status === 'interrupted') {
-    return {
-      status: DryRunStatus.Error,
-      errorMessage: 'The Playwright run was interrupted',
-    };
+    return errorRun('The Playwright run was interrupted');
   }
 
   // Before the empty-run rules: a stop during the config load leaves no tests at all.
@@ -111,37 +115,32 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
     return { status: DryRunStatus.Timeout, reason };
   }
 
-  const failed = tests.some((test) => test.status === TestStatus.Failed);
-
-  if (reporter.errors.length && !failed) {
-    return {
-      status: DryRunStatus.Error,
-      errorMessage: reporter.errors.join('\n'),
-    };
+  if (reporter.errors.length && !anyTestFailed(tests)) {
+    return errorRun(reporter.errors.join('\n'));
   }
 
   // Playwright catches its own internal errors, prints them, and fails the run without reporting them.
   if (status === 'failed' && tests.length === 0) {
-    return {
-      status: DryRunStatus.Error,
-      errorMessage:
-        'Playwright failed without running a test; rerun Stryker with --logLevel trace to see its error.',
-    };
+    return errorRun(
+      'Playwright failed without running a test; rerun Stryker with --logLevel trace to see its error.',
+    );
   }
 
   if (tests.length === 0) {
     return emptyRunResult(request);
   }
 
-  if (
-    !hookInstalled &&
-    tests.some((test) => test.status !== TestStatus.Skipped)
-  ) {
-    return {
-      status: DryRunStatus.Error,
-      errorMessage:
-        'Tests ran but the Stryker worker hook did not install in any Playwright worker; this Playwright version may have changed its worker entry point.',
-    };
+  // A worker that dies at the hook's install is to Playwright only a crash; the hook left the cause.
+  if (installErrors.length > 0) {
+    return errorRun(
+      `The Stryker worker hook failed to install in a Playwright worker: ${[...new Set(installErrors)].join('\n')}`,
+    );
+  }
+
+  if (!hookInstalled && anyRan(tests)) {
+    return errorRun(
+      'Tests ran but the Stryker worker hook did not install in any Playwright worker; this Playwright version may have changed its worker entry point.',
+    );
   }
 
   if (reason) {
@@ -155,10 +154,11 @@ export function missingCoverageError(
   tests: readonly TestResult[],
   snapshots: readonly Snapshot[],
 ): string | undefined {
-  const ran = tests.some((test) => test.status !== TestStatus.Skipped);
-  const failed = tests.some((test) => test.status === TestStatus.Failed);
-
-  if (!ran || failed || snapshots.some((snapshot) => snapshot.coverage)) {
+  if (
+    !anyRan(tests) ||
+    anyTestFailed(tests) ||
+    snapshots.some((snapshot) => snapshot.coverage)
+  ) {
     return undefined;
   }
 
@@ -166,10 +166,10 @@ export function missingCoverageError(
     return 'Tests ran, but no instrumented code ran, neither in a page nor in a Playwright worker. The dry run needs at least one test that runs the app code, in a page or by importing it.';
   }
 
-  const lost = snapshots.filter((snapshot) => snapshot.lost).length;
+  const { lostFrames } = coverageGaps(snapshots);
 
-  if (lost === snapshots.length) {
-    return `No page reported coverage: all ${lost} frame(s) did not answer before their context closed.`;
+  if (lostFrames === snapshots.length) {
+    return `No page reported coverage: all ${lostFrames} frame(s) did not answer before their context closed.`;
   }
 
   return 'No page loaded instrumented code. Is the webServer serving the Stryker sandbox? A server that was already running (reuseExistingServer) serves the original sources.';
@@ -178,34 +178,33 @@ export function missingCoverageError(
 // The output maps have no prototype, so a test id such as __proto__ from a page stays an own key.
 export function mergeCoverage(snapshots: readonly Snapshot[]): MutantCoverage {
   const merged: MutantCoverage = {
-    static: Object.create(null),
-    perTest: Object.create(null),
+    static: emptyRecord(),
+    perTest: emptyRecord(),
   };
   const add = (
     target: Record<string, number>,
     hits: Record<string, number>,
   ) => {
-    for (const [mutantId, count] of Object.entries(hits)) {
+    Object.entries(hits).forEach(([mutantId, count]) => {
       target[mutantId] = (target[mutantId] ?? 0) + count;
-    }
+    });
   };
 
-  for (const { coverage, outlivedItsTest } of snapshots) {
+  snapshots.forEach(({ coverage, outlivedItsTest }) => {
     if (!coverage) {
-      continue;
+      return;
     }
 
     add(merged.static, coverage.static);
-
-    for (const [testId, hits] of Object.entries(coverage.perTest)) {
+    Object.entries(coverage.perTest).forEach(([testId, hits]) => {
       add(
         outlivedItsTest
           ? merged.static
-          : (merged.perTest[testId] ??= Object.create(null)),
+          : (merged.perTest[testId] ??= emptyRecord()),
         hits,
       );
-    }
-  }
+    });
+  });
 
   return merged;
 }
@@ -219,7 +218,7 @@ export function coverageGaps(snapshots: readonly Snapshot[]): CoverageGaps {
   };
 }
 
-export function sumHitCounts(snapshots: readonly Snapshot[]): number {
+function sumHitCounts(snapshots: readonly Snapshot[]): number {
   return snapshots.reduce((sum, { hitCount }) => sum + hitCount, 0);
 }
 
@@ -237,10 +236,7 @@ export function dryRunResult(
   const errorMessage = missingCoverageError(tests, snapshots);
 
   if (errorMessage) {
-    return {
-      result: { status: DryRunStatus.Error, errorMessage },
-      gaps: undefined,
-    };
+    return { result: errorRun(errorMessage), gaps: undefined };
   }
 
   if (request.coverageAnalysis === 'off') {
@@ -275,19 +271,27 @@ function emptyRunResult(request: RunRequest): RunResult {
   }
 
   if (request.testFilter?.length) {
-    return {
-      status: DryRunStatus.Error,
-      errorMessage: `None of the ${request.testFilter.length} selected tests ran; their Playwright test ids no longer match.`,
-    };
+    return errorRun(
+      `None of the ${request.testFilter.length} selected tests ran; their Playwright test ids no longer match.`,
+    );
   }
 
-  return {
-    status: DryRunStatus.Error,
-    errorMessage: 'Playwright ran no tests.',
-  };
+  return errorRun('Playwright ran no tests.');
 }
 
-function toTestResult(test: TestCase, isMutantRun: boolean): TestResult {
+function errorRun(errorMessage: string): ErrorDryRunResult {
+  return { status: DryRunStatus.Error, errorMessage };
+}
+
+function anyRan(tests: readonly TestResult[]): boolean {
+  return tests.some((test) => test.status !== TestStatus.Skipped);
+}
+
+function anyTestFailed(tests: readonly TestResult[]): boolean {
+  return tests.some((test) => test.status === TestStatus.Failed);
+}
+
+function toTestResult(test: ReportedTest, isMutantRun: boolean): TestResult {
   // The root suite's title is the empty first one.
   const titles = test.titlePath().filter(Boolean);
   const last = test.results.at(-1);
@@ -296,7 +300,9 @@ function toTestResult(test: TestCase, isMutantRun: boolean): TestResult {
   // through describe.configure({ retries }), which outranks the retries: 0 that Playwright's
   // runTests sets.
   const status =
-    outcome === 'flaky' && isMutantRun ? TestStatus.Failed : OUTCOME[outcome];
+    outcome === 'flaky' && isMutantRun
+      ? TestStatus.Failed
+      : statusByOutcome[outcome];
   const base = {
     id: test.id,
     name: `[${titles[0]}] › ${titles.slice(1).join(' › ')}`,

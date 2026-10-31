@@ -4,84 +4,157 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { isMainThread } from 'node:worker_threads';
 
-import type {
-  Browser,
-  BrowserContext,
-  Frame,
-  Page,
-  TestInfo,
-  TestType,
-} from '@playwright/test';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
+import { fieldOf, isRecord } from './is-record.ts';
 import {
+  type HookedBrowser,
+  type HookedContext,
+  type HookedFrame,
+  type HookedPage,
   instrumentationOf,
-  isRecord,
+  type RunningSlot,
   runningSlotOf,
   type SlotType,
-  WORKER_ENTRY,
+  workerEntry,
 } from './playwright-internals.ts';
 import {
-  FRAME_READ_TIMEOUT_MS,
+  frameReadTimeoutMs,
+  installErrorSuffix,
   readRunSettings,
   type RunSettings,
   serializeSnapshot,
-  SNAPSHOT_SUFFIX,
+  snapshotSuffix,
   type SnapshotLine,
 } from './protocol.ts';
 
 type FrameRead = Omit<SnapshotLine, 'outlivedItsTest'>;
 
+interface FrameReads extends ReadonlyArray<FrameRead> {
+  push(...items: FrameRead[]): number;
+}
+
 interface ContextState {
-  testId?: string;
-  closedPageSnapshots: FrameRead[];
-  collected: boolean;
+  readonly testId?: string | undefined;
+  readonly closedPageSnapshots: FrameReads;
 }
 
-export interface PageSettings {
-  ns: string;
-  activeMutant?: string;
-  testId?: string;
-  hitLimit?: number;
+type Writable<T> = { -readonly [K in keyof T]: T[K] };
+
+export interface PageSettings extends Pick<RunSettings, 'hitLimit'> {
+  readonly ns: string;
+  readonly activeMutant?: string | undefined;
+  readonly testId?: string | undefined;
 }
 
-type Test = TestType<object, object>;
+interface RunningTest {
+  readonly testId: string;
+  readonly slot: RunningSlot | undefined;
+}
 
-// Undefined under `node -e`, which a worker's NODE_OPTIONS can reach; RegExp.test reads it as "undefined".
+/** The test that runs now, read through test.info(); undefined while none runs. */
+type CurrentTest = () => RunningTest | undefined;
+
+// Playwright's `test` is a function, and playwright/test exports that function as the module itself.
+function memberOf(value: unknown, key: string): unknown {
+  return typeof value === 'function' || isRecord(value)
+    ? Reflect.get(value, key)
+    : undefined;
+}
+
+/** Reads test.info() of playwright/test's `test`, and parses what it returns. */
+function currentTestOf(playwrightTest: unknown): CurrentTest {
+  const test = memberOf(playwrightTest, 'test');
+  const info = memberOf(test, 'info');
+
+  if (typeof info !== 'function') {
+    throw new Error(
+      'The worker hook needs test.info() from playwright/test, which tells it the test that runs.',
+    );
+  }
+
+  return () => {
+    let found: unknown;
+
+    try {
+      found = info.call(test);
+    } catch {
+      // test.info() throws while no test runs.
+      return undefined;
+    }
+
+    const version = fieldOf(fieldOf(found, 'config'), 'version');
+
+    if (
+      !isRecord(found) ||
+      typeof found['testId'] !== 'string' ||
+      typeof version !== 'string'
+    ) {
+      throw new Error(
+        "The worker hook needs test.info() from playwright/test to return the running test's testId and config.version.",
+      );
+    }
+
+    return { testId: found['testId'], slot: runningSlotOf(found, version) };
+  };
+}
+
+// Undefined under `node -e`, which a worker's NODE_OPTIONS can reach.
 const entry = process.argv[1];
 const settings = readRunSettings(process.env);
 // `Symbol.for`, so a second copy of this package in the worker, from another install, sees the mark
 // of the first and leaves the worker's coverage to it.
-const INSTALLED: unique symbol = Symbol.for(
+const installed: unique symbol = Symbol.for(
   '@layzee/lz-stryker-playwright-runner/worker-hook',
 );
 
 if (
   settings &&
   isMainThread &&
-  WORKER_ENTRY.test(entry) &&
-  !(INSTALLED in globalThis)
+  entry !== undefined &&
+  workerEntry.test(entry) &&
+  !(installed in globalThis)
 ) {
-  Reflect.set(globalThis, INSTALLED, INSTALLED);
-  install(createRequire(entry), settings);
+  Reflect.set(globalThis, installed, installed);
+
+  try {
+    install(createRequire(entry), settings);
+  } catch (error) {
+    try {
+      fs.writeFileSync(
+        path.join(
+          settings.outDir,
+          `worker-${process.pid}${installErrorSuffix}`,
+        ),
+        String(error),
+      );
+    } catch {
+      // The worker still exits with the install error; the run then reports only a crashed worker.
+    }
+
+    throw error;
+  }
 }
 
 export function install(
-  playwrightRequire: NodeJS.Require,
+  playwrightRequire: (id: string) => unknown,
   { outDir, perTest, hitLimit }: RunSettings,
   ns: string = INSTRUMENTER_CONSTANTS.NAMESPACE,
 ): void {
-  const { test }: { test: Test } = playwrightRequire('playwright/test');
-  const instrumentation = instrumentationOf(playwrightRequire);
+  const test = currentTestOf(playwrightRequire('playwright/test'));
+  const instrumentation = instrumentationOf(
+    playwrightRequire('playwright-core'),
+  );
   const activeMutant =
     process.env[INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE];
   const outFile = path.join(
     outDir,
-    `worker-${process.pid}-${randomUUID()}${SNAPSHOT_SUFFIX}`,
+    `worker-${process.pid}-${randomUUID()}${snapshotSuffix}`,
   );
-  const contexts = new WeakMap<BrowserContext, ContextState>();
-  const alreadyRead = new WeakSet<Page>();
-  const patchedBrowsers = new WeakSet<Browser>();
+  const contexts = new WeakMap<HookedContext, ContextState>();
+  const collected = new WeakSet<HookedContext>();
+  const alreadyRead = new WeakSet<HookedPage>();
+  const patchedBrowsers = new WeakSet<HookedBrowser>();
 
   fs.writeFileSync(outFile, '');
   recordNodeCoverage(
@@ -92,21 +165,21 @@ export function install(
   );
 
   // Closing a page that owns its context closes the context first, so the same page can come up twice.
-  function readOnce(pages: Page[]): Promise<FrameRead[]> {
+  function readOnce(pages: HookedPage[]): Promise<FrameRead[]> {
     const fresh = pages.filter((page) => !alreadyRead.has(page));
     fresh.forEach((page) => alreadyRead.add(page));
 
     return readPages(fresh, ns);
   }
 
-  async function collect(context: BrowserContext) {
+  async function collect(context: HookedContext) {
     const state = contexts.get(context);
 
-    if (!state || state.collected) {
+    if (!state || collected.has(context)) {
       return;
     }
 
-    state.collected = true;
+    collected.add(context);
     const snapshots = [
       ...state.closedPageSnapshots,
       ...(await readOnce(context.pages())),
@@ -125,7 +198,7 @@ export function install(
 
   // browser.close(), and page.close() on a page whose context stays open, skip the before-close hook for
   // what they close, so read first.
-  function collectBeforePageCloses(state: ContextState, page: Page) {
+  function collectBeforePageCloses(state: ContextState, page: HookedPage) {
     const close = page.close.bind(page);
     page.close = async (options) => {
       state.closedPageSnapshots.push(...(await readOnce([page])));
@@ -134,7 +207,7 @@ export function install(
     };
   }
 
-  function collectBeforeBrowserCloses(browser: Browser | null) {
+  function collectBeforeBrowserCloses(browser: HookedBrowser | null) {
     if (!browser || patchedBrowsers.has(browser)) {
       return;
     }
@@ -153,7 +226,6 @@ export function install(
       const state: ContextState = {
         testId: perTest ? contextTestId(test) : undefined,
         closedPageSnapshots: [],
-        collected: false,
       };
       contexts.set(context, state);
       collectBeforeBrowserCloses(context.browser());
@@ -173,12 +245,14 @@ export function install(
  * The global that Stryker's instrumented code and this hook share, in the worker and in every page.
  * Instrumented code may create it first, so each field claims nothing.
  */
-export interface StrykerNamespace {
-  activeMutant?: unknown;
-  currentTestId?: unknown;
-  mutantCoverage?: unknown;
-  hitCount?: unknown;
-  hitLimit?: unknown;
+export type StrykerNamespace = Writable<StrykerNamespaceFields>;
+
+interface StrykerNamespaceFields {
+  readonly activeMutant?: unknown;
+  readonly currentTestId?: unknown;
+  readonly mutantCoverage?: unknown;
+  readonly hitCount?: unknown;
+  readonly hitLimit?: unknown;
 }
 
 function workerNamespace(name: string): StrykerNamespace {
@@ -197,7 +271,7 @@ function workerNamespace(name: string): StrykerNamespace {
 
 export function recordNodeCoverage(
   ns: StrykerNamespace,
-  { perTest, hitLimit }: { perTest: boolean; hitLimit?: number },
+  { perTest, hitLimit }: Pick<RunSettings, 'perTest' | 'hitLimit'>,
   currentTestId: () => string | undefined,
   write: (line: string) => void,
   onExit: (listener: () => void) => void = (listener) => {
@@ -206,6 +280,10 @@ export function recordNodeCoverage(
 ): void {
   let written = false;
   const writeOnce = () => {
+    if (written) {
+      return;
+    }
+
     written = true;
 
     // After a failure that reaches maxFailures the runner may have read and removed the run's
@@ -232,7 +310,7 @@ export function recordNodeCoverage(
       set: (value: number) => {
         hits = value;
 
-        if (hits > hitLimit && !written) {
+        if (hits > hitLimit) {
           writeOnce();
         }
       },
@@ -244,7 +322,7 @@ export function recordNodeCoverage(
   }
 
   onExit(() => {
-    if (written || (ns.mutantCoverage === undefined && !ns.hitCount)) {
+    if (ns.mutantCoverage === undefined && !ns.hitCount) {
       return;
     }
 
@@ -256,25 +334,25 @@ export function recordNodeCoverage(
 // needs, so test.info() alone names the first test of a group for code that serves the whole group.
 // Fixtures differ between the two rules: Node code cannot tell a worker fixture from a test's own, so
 // it counts for no test, while a context a fixture opens is checked again at close (outlivedItsTest).
-const PER_TEST_SLOTS: ReadonlySet<SlotType> = new Set([
+const perTestSlots: ReadonlySet<SlotType> = new Set([
   'test',
   'beforeEach',
   'afterEach',
 ]);
-const GROUP_HOOKS: ReadonlySet<SlotType> = new Set(['beforeAll', 'afterAll']);
+const groupHooks: ReadonlySet<SlotType> = new Set(['beforeAll', 'afterAll']);
 
 /** The test that Node code running now belongs to: none in a beforeAll or afterAll hook or a fixture. */
-function nodeTestId(test: Test): string | undefined {
-  const info = testInfoOf(test);
+function nodeTestId(test: CurrentTest): string | undefined {
+  const running = test();
 
-  if (info === undefined) {
+  if (running === undefined) {
     return undefined;
   }
 
-  const slot = runningSlotOf(info, info.config.version);
+  const { slot } = running;
 
-  return slot && !slot.inFixture && PER_TEST_SLOTS.has(slot.type)
-    ? info.testId
+  return slot && !slot.inFixture && perTestSlots.has(slot.type)
+    ? running.testId
     : undefined;
 }
 
@@ -282,22 +360,19 @@ function nodeTestId(test: Test): string | undefined {
  * The test a context opened or closed now belongs to: none in a beforeAll or afterAll hook. A fixture's
  * context, a worker fixture's too, gets the current test until it outlives that test.
  */
-function contextTestId(test: Test): string | undefined {
-  const info = testInfoOf(test);
-  const type = info && runningSlotOf(info, info.config.version)?.type;
+function contextTestId(test: CurrentTest): string | undefined {
+  const running = test();
+  const type = running?.slot?.type;
 
-  return type !== undefined && GROUP_HOOKS.has(type) ? undefined : info?.testId;
+  return type !== undefined && groupHooks.has(type)
+    ? undefined
+    : running?.testId;
 }
 
-function testInfoOf(test: Test): TestInfo | undefined {
-  try {
-    return test.info();
-  } catch {
-    return undefined;
-  }
-}
-
-async function readPages(pages: Page[], ns: string): Promise<FrameRead[]> {
+async function readPages(
+  pages: HookedPage[],
+  ns: string,
+): Promise<FrameRead[]> {
   const snapshots = await Promise.all(
     pages
       .flatMap((page) => page.frames())
@@ -308,14 +383,11 @@ async function readPages(pages: Page[], ns: string): Promise<FrameRead[]> {
 }
 
 async function readNamespace(
-  frame: Frame,
+  frame: HookedFrame,
   ns: string,
 ): Promise<FrameRead | undefined> {
   const { promise: lost, resolve } = Promise.withResolvers<FrameRead>();
-  const timer = setTimeout(
-    () => resolve({ lost: true }),
-    FRAME_READ_TIMEOUT_MS,
-  );
+  const timer = setTimeout(() => resolve({ lost: true }), frameReadTimeoutMs);
   const read = frame
     .evaluate((name) => {
       const scope: Record<string, unknown> = globalThis;
@@ -329,6 +401,7 @@ async function readNamespace(
 
       return { mutantCoverage, hitCount };
     }, ns)
+    .then(frameRead)
     .catch(() =>
       frame.isDetached() ? undefined : ({ lost: true } satisfies FrameRead),
     );
@@ -338,6 +411,13 @@ async function readNamespace(
   } finally {
     clearTimeout(timer);
   }
+}
+
+// What a page's evaluate returns has crossed a serialization boundary.
+function frameRead(value: unknown): FrameRead | undefined {
+  return isRecord(value)
+    ? { mutantCoverage: value['mutantCoverage'], hitCount: value['hitCount'] }
+    : undefined;
 }
 
 export function initPage({

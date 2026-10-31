@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { isRecord } from './is-record.ts';
+
 /**
  * Playwright deletes and recreates `outputDir` in global setup, so both directories live in a root it
  * never touches: on a shared /tmp no other user can claim either name in between.
@@ -15,13 +17,13 @@ export interface TempRoot {
   remove(): void;
 }
 
-export const ROOT_PREFIX = 'lz-stryker-playwright-';
-export const OWNER_FILE = 'owner';
+export const rootPrefix = 'lz-stryker-playwright-';
+export const ownerFile = 'owner';
 
 // mkdtemp appends six letters or digits.
 export function rootPid(name: string): number | undefined {
-  const pid = name.startsWith(ROOT_PREFIX)
-    ? Number(/^(\d+)-[A-Za-z0-9]{6}$/.exec(name.slice(ROOT_PREFIX.length))?.[1])
+  const pid = name.startsWith(rootPrefix)
+    ? Number(/^(\d+)-[A-Za-z0-9]{6}$/.exec(name.slice(rootPrefix.length))?.[1])
     : undefined;
 
   return Number.isSafeInteger(pid) ? pid : undefined;
@@ -62,7 +64,7 @@ export function isRunning(
 
     return true;
   } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM';
+    return isRecord(error) && error['code'] === 'EPERM';
   }
 }
 
@@ -98,56 +100,69 @@ export function removeLeftRoots(
     owned = isOwnDir,
     remove = removeDir,
     ownPid = process.pid,
-    token = namespaceToken(),
+    token,
   }: {
     running?: (pid: number) => boolean;
     owned?: (dir: string) => boolean;
     remove?: (dir: string) => void;
     ownPid?: number;
-    token?: string;
-  } = {},
+    token: string;
+  },
 ): string[] {
-  const removed: string[] = [];
-
-  for (const name of fs.readdirSync(tmp)) {
+  return fs.readdirSync(tmp).flatMap((name) => {
     const pid = rootPid(name);
     const dir = path.join(tmp, name);
 
     if (pid === undefined || pid === ownPid || running(pid) || !owned(dir)) {
-      continue;
+      return [];
     }
 
     try {
-      if (fs.readFileSync(path.join(dir, OWNER_FILE), 'utf8') === token) {
+      if (fs.readFileSync(path.join(dir, ownerFile), 'utf8') === token) {
         remove(dir);
-        removed.push(name);
+
+        return [name];
       }
     } catch {
       // A root whose owner file cannot be read is kept; one that cannot be removed now, the next
       // runner that starts tries again.
     }
-  }
 
-  return removed;
+    return [];
+  });
 }
 
 export function removeDir(dir: string): void {
   fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
 }
 
+/**
+ * Sweeps the roots dead runners left, reports them, then creates this runner's root, both with one
+ * namespace token.
+ */
+export function claimTempRoot(
+  onRemoved: (removed: readonly string[]) => void,
+): TempRoot {
+  const tmp = os.tmpdir();
+  const token = namespaceToken();
+  onRemoved(removeLeftRoots(tmp, { token }));
+
+  return createTempRoot(tmp, process.pid, token);
+}
+
 export function createTempRoot(
-  tmp: string = os.tmpdir(),
-  pid: number = process.pid,
-  token: string = namespaceToken(),
+  tmp: string,
+  pid: number,
+  token: string,
   writeFile: (file: string, data: string) => void = fs.writeFileSync,
 ): TempRoot {
-  const dir = fs.mkdtempSync(path.join(tmp, `${ROOT_PREFIX}${pid}-`));
+  const dir = fs.mkdtempSync(path.join(tmp, `${rootPrefix}${pid}-`));
   const outputDir = path.join(dir, 'output');
   const runsDir = path.join(dir, 'runs');
   let runs = 0;
 
   try {
-    writeFile(path.join(dir, OWNER_FILE), token);
+    writeFile(path.join(dir, ownerFile), token);
     fs.mkdirSync(runsDir);
   } catch (error) {
     removeDir(dir);

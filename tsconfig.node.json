@@ -7,6 +7,13 @@
     "target": "es2024",
     "types": ["node"],
     "erasableSyntaxOnly": true,
-    "verbatimModuleSyntax": true
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "noUnusedParameters": true,
+    "noUncheckedSideEffectImports": true,
+    "noUncheckedIndexedAccess": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false
   }
 }

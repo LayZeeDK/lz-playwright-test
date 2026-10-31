@@ -94,7 +94,8 @@ test('a worker thread it starts does not install the Stryker hook', async () => 
       '../thread-probe/playwright/lib/worker/workerProcessEntry.js',
     ),
   );
-  const [probe] = await once(worker, 'message');
+  const messages: unknown[] = await once(worker, 'message');
+  const [probe] = messages;
   await worker.terminate();
 
   expect(probe).toMatchObject({ isMainThread: false, hookInstalled: false });

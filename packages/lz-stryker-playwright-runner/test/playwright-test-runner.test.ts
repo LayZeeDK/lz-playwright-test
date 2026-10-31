@@ -16,29 +16,42 @@ import {
 } from '@stryker-mutator/api/test-runner';
 
 import { strykerPlugins, strykerValidationSchema } from '../src/index.ts';
-import { OPTION_PROPERTIES } from '../src/options.ts';
+import { optionProperties } from '../src/options.ts';
+import { fieldOf } from '../src/is-record.ts';
+import { installErrorSuffix } from '../src/protocol.ts';
 import {
   acceptsConnections,
   LzStrykerPlaywrightTestRunner,
   withEnv,
 } from '../src/playwright-test-runner.ts';
-import { namespaceToken, OWNER_FILE, ROOT_PREFIX } from '../src/temp-root.ts';
+import { namespaceToken, ownerFile, rootPrefix } from '../src/temp-root.ts';
 import {
   dryRunOptions,
   finishedTest,
   logger,
   mutantRunOptions,
+  plain,
   strykerOptions,
 } from './support/doubles.ts';
 import {
-  ACTIVE_MUTANT,
+  activeMutantEnv,
   fakePlaywright,
   passAll,
-  runner,
+  stubEnv,
   writeSnapshots,
 } from './support/fake-playwright.ts';
 
-const HOOK = new URL('../src/worker-hook.ts', import.meta.url).href;
+const workerHookUrl = new URL('../src/worker-hook.ts', import.meta.url).href;
+
+/** A server listening on a free localhost port, and that port. */
+async function listening(): Promise<{ server: net.Server; port: number }> {
+  const server = net.createServer();
+  await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
+  const address = server.address();
+  assert.ok(typeof address === 'object' && address !== null);
+
+  return { server, port: address.port };
+}
 
 test('the package declares the runner as the lz-stryker-playwright test runner, with its options schema', () => {
   assert.deepEqual(strykerPlugins, [
@@ -50,14 +63,18 @@ test('the package declares the runner as the lz-stryker-playwright test runner, 
   ]);
   assert.equal(
     strykerValidationSchema.properties.lzStrykerPlaywright.properties,
-    OPTION_PROPERTIES,
+    optionProperties,
   );
 });
 
 test('the runner can reload its environment', () => {
-  assert.deepEqual(runner(undefined).runner.capabilities(), {
-    reloadEnvironment: true,
-  });
+  assert.deepEqual(
+    new LzStrykerPlaywrightTestRunner(
+      strykerOptions({}),
+      logger().log,
+    ).capabilities(),
+    { reloadEnvironment: true },
+  );
 });
 
 test('init creates the TestRunner on the resolved config with the run overrides, then sets up and lists', async (t) => {
@@ -67,12 +84,15 @@ test('init creates the TestRunner on the resolved config with the run overrides,
       { default: false, project: { name: 'manual', timeout: 30_000 } },
     ],
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner();
 
   await shell.init();
 
-  const [, configLocation, overrides] = fake.calls[0];
-  const { outputDir } = overrides as { outputDir: string };
+  const [first, ...rest] = fake.calls;
+  assert.ok(first);
+  const [, configLocation, overrides] = first;
+  const outputDir = fieldOf(overrides, 'outputDir');
+  assert.ok(typeof outputDir === 'string');
 
   assert.deepEqual(configLocation, { resolved: fake.configFile });
   assert.deepEqual(overrides, {
@@ -84,7 +104,7 @@ test('init creates the TestRunner on the resolved config with the run overrides,
     /^lz-stryker-playwright-\d+-/,
   );
   assert.equal(path.dirname(path.dirname(outputDir)), fake.tmp);
-  assert.deepEqual(fake.calls.slice(1), [
+  assert.deepEqual(rest, [
     ['initialize', {}],
     ['loadConfig'],
     ['runGlobalSetup'],
@@ -94,7 +114,7 @@ test('init creates the TestRunner on the resolved config with the run overrides,
 
 test('init lists the projects the option names', async (t) => {
   const fake = fakePlaywright(t);
-  const { runner: shell } = runner(fake.configFile, {
+  const { shell } = fake.runner({
     lzStrykerPlaywright: { projects: ['manual'] },
   });
 
@@ -106,7 +126,9 @@ test('init lists the projects the option names', async (t) => {
 test('without a config file, Playwright is found from the working directory', async (t) => {
   const fake = fakePlaywright(t);
   const cwd = process.cwd();
-  const { runner: shell } = runner(undefined);
+  const { shell } = fake.runner({
+    lzStrykerPlaywright: { configFile: undefined },
+  });
   process.chdir(fake.dir);
 
   try {
@@ -115,28 +137,45 @@ test('without a config file, Playwright is found from the working directory', as
     process.chdir(cwd);
   }
 
-  assert.deepEqual(fake.calls[0][1], { resolved: undefined });
+  const [first] = fake.calls;
+  assert.ok(first);
+  assert.deepEqual(first[1], { resolved: undefined });
 });
 
-for (const version of ['1.62.9', '2.0.0']) {
+['1.62.9', '2.0.0'].forEach((version) => {
   test(`init refuses Playwright ${version}`, async (t) => {
     const fake = fakePlaywright(t, {}, version);
-    const { runner: shell } = runner(fake.configFile);
+    const { shell } = fake.runner();
 
     await assert.rejects(shell.init(), {
       message: `The Playwright test runner needs Playwright 1.63 or a later 1.x release, found ${version}.`,
     });
     assert.deepEqual(fake.calls, []);
   });
-}
+});
+
+test('init refuses a Playwright whose package.json names no version', async (t) => {
+  const fake = fakePlaywright(t);
+  writeFileSync(
+    path.join(fake.dir, 'node_modules', 'playwright', 'package.json'),
+    '{"name":"playwright"}',
+  );
+  const { shell } = fake.runner();
+
+  await assert.rejects(shell.init(), {
+    message:
+      'The Playwright test runner needs Playwright 1.63 or a later 1.x release, found undefined.',
+  });
+  assert.deepEqual(fake.calls, []);
+});
 
 test('init warns when timeoutMS is below twice the expect timeout, and only then', async (t) => {
   const fake = fakePlaywright(t);
-  const low = runner(fake.configFile, { timeoutMS: 9_999 });
-  const enough = runner(fake.configFile, { timeoutMS: 10_000 });
+  const low = fake.runner({ timeoutMS: 9_999 });
+  const enough = fake.runner({ timeoutMS: 10_000 });
 
-  await low.runner.init();
-  await enough.runner.init();
+  await low.shell.init();
+  await enough.shell.init();
 
   assert.deepEqual(
     low.lines.filter(([level]) => level === 'warn'),
@@ -150,15 +189,23 @@ test('init warns when timeoutMS is below twice the expect timeout, and only then
   assert.deepEqual(enough.lines, []);
 });
 
+/** Leaves in `tmp` one temp root per suffix, as a runner that no longer runs leaves them, and returns their names. */
+function leaveDeadRoots(tmp: string, suffixes: string[]): string[] {
+  const dead = spawnSync(process.execPath, ['-e', '']).pid;
+
+  return suffixes.map((suffix) => {
+    const name = `${rootPrefix}${dead}-${suffix}`;
+    mkdirSync(path.join(tmp, name));
+    writeFileSync(path.join(tmp, name, ownerFile), namespaceToken());
+
+    return name;
+  });
+}
+
 test('init removes the temp roots of runners that no longer run, and says so', async (t) => {
   const fake = fakePlaywright(t);
-  const dead = spawnSync(process.execPath, ['-e', '']).pid;
-  const left = [`${ROOT_PREFIX}${dead}-abc123`, `${ROOT_PREFIX}${dead}-def456`];
-  left.forEach((name) => {
-    mkdirSync(path.join(fake.tmp, name));
-    writeFileSync(path.join(fake.tmp, name, OWNER_FILE), namespaceToken());
-  });
-  const { runner: shell, lines } = runner(fake.configFile);
+  const left = leaveDeadRoots(fake.tmp, ['abc123', 'def456']);
+  const { shell, lines } = fake.runner();
   const prefix = 'Removed the temp directories of runners that no longer run: ';
 
   await shell.init();
@@ -168,11 +215,46 @@ test('init removes the temp roots of runners that no longer run, and says so', a
     [false, false],
   );
   assert.equal(lines.length, 1);
-  const [[level, message]] = lines;
+  const [line] = lines;
+  assert.ok(line);
+  const [level, message] = line;
   assert.equal(level, 'debug');
   assert.ok(message.startsWith(prefix), message);
   // In the order the directory lists them, which depends on the file system.
   assert.deepEqual(message.slice(prefix.length).split(', ').sort(), left);
+});
+
+test('init says which temp roots it removed before it creates its own, so a failed create keeps the line', async (t) => {
+  const fake = fakePlaywright(t);
+  const left = leaveDeadRoots(fake.tmp, ['abc123']);
+  const { shell, lines } = fake.runner();
+  t.mock.method(fs, 'mkdtempSync', () => {
+    throw new Error('ENOSPC');
+  });
+
+  await assert.rejects(shell.init(), { message: 'ENOSPC' });
+  t.mock.restoreAll();
+
+  assert.deepEqual(lines, [
+    [
+      'debug',
+      `Removed the temp directories of runners that no longer run: ${left.join(', ')}`,
+    ],
+  ]);
+});
+
+test('the temp root init creates holds the namespace token its sweep matches', async (t) => {
+  const fake = fakePlaywright(t);
+  const { shell } = fake.runner();
+
+  await shell.init();
+
+  const [rootName] = readdirSync(fake.tmp);
+  assert.ok(rootName);
+  assert.equal(
+    fs.readFileSync(path.join(fake.tmp, rootName, ownerFile), 'utf8'),
+    namespaceToken(),
+  );
 });
 
 test('a failed global setup fails init with its errors and output, and cleans up', async (t) => {
@@ -188,7 +270,7 @@ test('a failed global setup fails init with its errors and output, and cleans up
       throw new Error('teardown broke too');
     },
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner();
 
   await assert.rejects(shell.init(), {
     message:
@@ -204,7 +286,7 @@ test('a TestRunner that fails to initialize fails init without a teardown, and c
       throw new Error('no config');
     },
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner();
 
   await assert.rejects(shell.init(), { message: 'no config' });
   assert.deepEqual(fake.names(), ['new', 'initialize']);
@@ -220,14 +302,17 @@ test('a temp root that cannot be removed after a failed init leaves the init err
       throw new Error('no config');
     },
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner();
 
   await assert.rejects(shell.init(), { message: 'no config' });
   t.mock.restoreAll();
 });
 
 test('a run before init finished fails with a clear error', async () => {
-  const { runner: shell } = runner(undefined);
+  const shell = new LzStrykerPlaywrightTestRunner(
+    strykerOptions({}),
+    logger().log,
+  );
 
   await assert.rejects(shell.dryRun(dryRunOptions()), {
     message: 'The Playwright test runner was used before init() finished.',
@@ -239,7 +324,7 @@ test('a run before init finished fails with a clear error', async () => {
 
 test('dispose stops the tests, tears down and removes the temp root, once', async (t) => {
   const fake = fakePlaywright(t);
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner();
   await shell.init();
   fake.calls.length = 0;
 
@@ -251,7 +336,10 @@ test('dispose stops the tests, tears down and removes the temp root, once', asyn
 });
 
 test('dispose without init does nothing', async () => {
-  await runner(undefined).runner.dispose();
+  await new LzStrykerPlaywrightTestRunner(
+    strykerOptions({}),
+    logger().log,
+  ).dispose();
 });
 
 test('dispose removes the run folders and output before it waits for the workers', async (t) => {
@@ -262,21 +350,23 @@ test('dispose removes the run folders and output before it waits for the workers
       seen = readdirSync(root);
     },
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner();
   await shell.init();
-  root = path.join(fake.tmp, readdirSync(fake.tmp)[0]);
+  const [rootName] = readdirSync(fake.tmp);
+  assert.ok(rootName);
+  root = path.join(fake.tmp, rootName);
   // Playwright creates the output folder; the runner creates the runs folder.
   mkdirSync(path.join(root, 'output'));
-  assert.deepEqual(readdirSync(root).sort(), ['output', OWNER_FILE, 'runs']);
+  assert.deepEqual(readdirSync(root).sort(), ['output', ownerFile, 'runs']);
 
   await shell.dispose();
 
-  assert.deepEqual(seen, [OWNER_FILE]);
+  assert.deepEqual(seen, [ownerFile]);
 });
 
 test('a dry run runs every test with the hook and the run settings in the workers environment', async (t) => {
   const fake = fakePlaywright(t);
-  const { runner: shell } = runner(fake.configFile, {
+  const { shell } = fake.runner({
     lzStrykerPlaywright: { projects: ['chromium'], workers: 3 },
   });
   await shell.init();
@@ -284,6 +374,7 @@ test('a dry run runs every test with the hook and the run settings in the worker
 
   const result = await shell.dryRun(dryRunOptions({ disableBail: true }));
   const [run] = fake.runs;
+  assert.ok(run);
 
   assert.deepEqual(run.params, {
     locations: [],
@@ -298,12 +389,11 @@ test('a dry run runs every test with the hook and the run settings in the worker
     outDir: run.settings.outDir,
     perTest: true,
   });
-  assert.equal(run.env[ACTIVE_MUTANT], undefined);
-  assert.equal(run.env.PLAYWRIGHT_NO_COPY_PROMPT, '1');
+  assert.equal(run.env[activeMutantEnv], undefined);
+  assert.equal(run.env['PLAYWRIGHT_NO_COPY_PROMPT'], '1');
   assert.equal(existsSync(run.settings.outDir), false);
   assert.deepEqual({ ...process.env }, before);
-  // The coverage maps have no prototype; the JSON copy compares their content.
-  assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+  assert.deepEqual(plain(result), {
     status: DryRunStatus.Complete,
     tests: [
       {
@@ -321,19 +411,11 @@ test('a dry run runs every test with the hook and the run settings in the worker
 
 test('the hook is preloaded before the NODE_OPTIONS the runner started with, so its own copy installs first', async (t) => {
   const fake = fakePlaywright(t);
-  const original = process.env.NODE_OPTIONS;
-  t.after(() => {
-    if (original === undefined) {
-      delete process.env.NODE_OPTIONS;
-    } else {
-      process.env.NODE_OPTIONS = original;
-    }
-  });
-  delete process.env.NODE_OPTIONS;
-  const bare = runner(fake.configFile).runner;
-  process.env.NODE_OPTIONS = '--max-old-space-size=100';
-  const based = runner(fake.configFile).runner;
-  process.env.NODE_OPTIONS = '--changed-later';
+  stubEnv(t, { NODE_OPTIONS: undefined });
+  const bare = fake.runner().shell;
+  process.env['NODE_OPTIONS'] = '--max-old-space-size=100';
+  const based = fake.runner().shell;
+  process.env['NODE_OPTIONS'] = '--changed-later';
 
   for (const shell of [bare, based]) {
     await shell.init();
@@ -341,21 +423,26 @@ test('the hook is preloaded before the NODE_OPTIONS the runner started with, so 
   }
 
   assert.deepEqual(
-    fake.runs.map((run) => run.env.NODE_OPTIONS),
-    [`--import "${HOOK}"`, `--import "${HOOK}" --max-old-space-size=100`],
+    fake.runs.map((run) => run.env['NODE_OPTIONS']),
+    [
+      `--import "${workerHookUrl}"`,
+      `--import "${workerHookUrl}" --max-old-space-size=100`,
+    ],
   );
-  assert.equal(existsSync(fileURLToPath(HOOK)), true);
+  assert.equal(existsSync(fileURLToPath(workerHookUrl)), true);
 });
 
 test('a dry run stops at the first failure unless bail is disabled, and asks for coverage only per test', async (t) => {
   const fake = fakePlaywright(t);
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner();
   await shell.init();
 
   await shell.dryRun(dryRunOptions({ coverageAnalysis: 'all' }));
 
-  assert.equal(fake.runs[0].params.maxFailures, 1);
-  assert.equal(fake.runs[0].settings.perTest, false);
+  const [run] = fake.runs;
+  assert.ok(run);
+  assert.equal(run.params.maxFailures, 1);
+  assert.equal(run.settings.perTest, false);
 });
 
 test('a dry run logs the frames that lost or shared their coverage', async (t) => {
@@ -374,7 +461,7 @@ test('a dry run logs the frames that lost or shared their coverage', async (t) =
       return 'passed';
     },
   });
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner();
   await shell.init();
 
   await shell.dryRun(dryRunOptions());
@@ -393,7 +480,7 @@ test('a dry run logs the frames that lost or shared their coverage', async (t) =
 
 test('a dry run with coverage off or no gaps logs nothing', async (t) => {
   const fake = fakePlaywright(t);
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner();
   await shell.init();
 
   await shell.dryRun(dryRunOptions());
@@ -416,15 +503,16 @@ test('a mutant run activates the mutant and runs its tests with their serial gro
       return 'failed';
     },
   });
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner();
   await shell.init();
 
   const result = await shell.mutantRun(
     mutantRunOptions({ testFilter: ['s1'], hitLimit: 5, timeout: 9_000 }),
   );
   const [run] = fake.runs;
+  assert.ok(run);
 
-  assert.equal(run.env[ACTIVE_MUTANT], '7');
+  assert.equal(run.env[activeMutantEnv], '7');
   assert.deepEqual(run.settings, {
     outDir: run.settings.outDir,
     perTest: false,
@@ -457,7 +545,7 @@ test('a mutant run that the deadline stops is a Timeout, and the stop is logged'
       return 'interrupted';
     },
   });
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner();
   await shell.init();
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
 
@@ -471,7 +559,9 @@ test('a mutant run that the deadline stops is a Timeout, and the stop is logged'
     status: MutantRunStatus.Timeout,
     reason: "The run reached the runner's deadline before Stryker's timeout",
   });
-  const [, stopTook] = /^deadline stop took (\d+) ms$/.exec(lines[0][1]) ?? [];
+  const [line] = lines;
+  assert.ok(line);
+  const [, stopTook] = /^deadline stop took (\d+) ms$/.exec(line[1]) ?? [];
   assert.ok(
     Number(stopTook) <= Math.ceil(took),
     `stop took ${stopTook} ms of a ${took} ms run`,
@@ -487,7 +577,7 @@ test('a run that ends on its own after the deadline fired is no deadline stop', 
       return passAll(run);
     },
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner();
   await shell.init();
   t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
 
@@ -499,7 +589,7 @@ test('a run that ends on its own after the deadline fired is no deadline stop', 
 
 test('a run that someone else interrupted is no deadline stop', async (t) => {
   const fake = fakePlaywright(t, { runTests: async () => 'interrupted' });
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner();
   await shell.init();
 
   const result = await shell.mutantRun(mutantRunOptions());
@@ -520,7 +610,7 @@ test('a run whose workers wrote no snapshot file reports that the hook never ins
       return 'passed';
     },
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner();
   await shell.init();
 
   const result = await shell.dryRun(dryRunOptions());
@@ -532,19 +622,45 @@ test('a run whose workers wrote no snapshot file reports that the hook never ins
   });
 });
 
+test('a run whose worker failed to install the hook reports the error the worker left', async (t) => {
+  const fake = fakePlaywright(t, {
+    runTests: async (run) => {
+      run.reporter.onTestEnd(finishedTest('a', 'failed'));
+      writeFileSync(
+        path.join(run.settings.outDir, `worker-1${installErrorSuffix}`),
+        'Error: no test.info()',
+      );
+
+      return 'failed';
+    },
+  });
+  const { shell } = fake.runner();
+  await shell.init();
+
+  const result = await shell.dryRun(dryRunOptions());
+
+  assert.deepEqual(result, {
+    status: DryRunStatus.Error,
+    errorMessage:
+      'The Stryker worker hook failed to install in a Playwright worker: Error: no test.info()',
+  });
+});
+
 test('each run gets its own run folder, removed after the run', async (t) => {
   const fake = fakePlaywright(t);
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner();
   await shell.init();
 
   await shell.dryRun(dryRunOptions());
   await shell.mutantRun(mutantRunOptions());
 
-  const [first, second] = fake.runs.map((run) => run.settings.outDir);
+  const outDirs = fake.runs.map((run) => run.settings.outDir);
 
-  assert.notEqual(first, second);
-  assert.equal(existsSync(first), false);
-  assert.equal(existsSync(second), false);
+  assert.equal(new Set(outDirs).size, 2);
+  assert.deepEqual(
+    outDirs.map((outDir) => existsSync(outDir)),
+    [false, false],
+  );
 });
 
 test('a webServer url is checked over HTTP, with its HTTPS setting', async (t) => {
@@ -554,7 +670,7 @@ test('a webServer url is checked over HTTP, with its HTTPS setting', async (t) =
       { url: 'https://localhost:2/', ignoreHTTPSErrors: true },
     ],
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner();
   await shell.init();
 
   await shell.dryRun(dryRunOptions());
@@ -585,7 +701,7 @@ test('a webServer that died is restarted through global setup before the run, an
       return 'passed';
     },
   });
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner();
   await shell.init();
   up = false;
   fake.calls.length = 0;
@@ -625,7 +741,7 @@ test('a run that failed while its server died is rerun once after the restart', 
       return passAll(run);
     },
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner();
   await shell.init();
 
   const result = await shell.mutantRun(mutantRunOptions());
@@ -644,7 +760,7 @@ test('a failed run whose server still answers is not rerun', async (t) => {
       return 'failed';
     },
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner();
   await shell.init();
 
   const result = await shell.mutantRun(mutantRunOptions());
@@ -660,7 +776,7 @@ test('a restart whose global setup fails fails the run', async (t) => {
     urlUp: async () => false,
     globalSetup: () => (++setups === 1 ? 'passed' : 'timedout'),
   });
-  const { runner: shell } = runner(fake.configFile);
+  const { shell } = fake.runner();
   await shell.init();
 
   await assert.rejects(shell.dryRun(dryRunOptions()), {
@@ -670,12 +786,10 @@ test('a restart whose global setup fails fails the run', async (t) => {
 });
 
 test('a webServer port is checked by connecting to it, and one without url or port is not checked', async (t) => {
-  const server = net.createServer();
-  await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
+  const { server, port } = await listening();
   t.after(() => server.close());
-  const { port } = server.address() as net.AddressInfo;
   const fake = fakePlaywright(t, { webServers: [{ port }, {}] });
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner();
   await shell.init();
 
   await shell.dryRun(dryRunOptions());
@@ -685,12 +799,10 @@ test('a webServer port is checked by connecting to it, and one without url or po
 });
 
 test('a webServer port that stopped answering is restarted and named by its port', async (t) => {
-  const server = net.createServer();
-  await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
-  const { port } = server.address() as net.AddressInfo;
+  const { server, port } = await listening();
   await new Promise((resolve) => server.close(resolve));
   const fake = fakePlaywright(t, { webServers: [{ port }] });
-  const { runner: shell, lines } = runner(fake.configFile);
+  const { shell, lines } = fake.runner();
   await shell.init();
 
   await shell.dryRun(dryRunOptions());
@@ -714,7 +826,7 @@ test('a port check that neither connects nor fails gives up at its timeout, and 
   const answer = acceptsConnections(4321, (options) => {
     asked.push(options);
 
-    return socket as unknown as net.Socket;
+    return socket;
   });
 
   socket.emit('timeout');
@@ -727,7 +839,7 @@ test('a port check that neither connects nor fails gives up at its timeout, and 
   assert.equal(socket.destroyed, true);
 });
 
-for (const loopback of ['::1', '127.0.0.1']) {
+['::1', '127.0.0.1'].forEach((loopback) => {
   test(`a port answers when only ${loopback} accepts connections on it`, async () => {
     const answer = acceptsConnections(4321, (options) => {
       const socket = new net.Socket();
@@ -744,17 +856,15 @@ for (const loopback of ['::1', '127.0.0.1']) {
 
     assert.equal(await answer, true);
   });
-}
+});
 
 test('a port accepts connections while a server listens on it, and not after', async (t) => {
-  const server = net.createServer();
+  const { server, port } = await listening();
   t.after(() => {
     if (server.listening) {
       server.close();
     }
   });
-  await new Promise<void>((resolve) => server.listen(0, 'localhost', resolve));
-  const { port } = server.address() as net.AddressInfo;
 
   assert.equal(await acceptsConnections(port), true);
 
@@ -763,30 +873,25 @@ test('a port accepts connections while a server listens on it, and not after', a
   assert.equal(await acceptsConnections(port), false);
 });
 
-test('a run leaves no run settings behind in the environment, also when it throws', async () => {
-  process.env.WITH_ENV_KEPT = 'before';
-  delete process.env.WITH_ENV_ADDED;
+test('a run leaves no run settings behind in the environment, also when it throws', async (t) => {
+  stubEnv(t, { WITH_ENV_KEPT: 'before', WITH_ENV_ADDED: undefined });
 
-  try {
-    const seen = await withEnv(
-      { WITH_ENV_KEPT: undefined, WITH_ENV_ADDED: 'during' },
-      async () => [process.env.WITH_ENV_KEPT, process.env.WITH_ENV_ADDED],
-    );
+  const seen = await withEnv(
+    { WITH_ENV_KEPT: undefined, WITH_ENV_ADDED: 'during' },
+    async () => [process.env['WITH_ENV_KEPT'], process.env['WITH_ENV_ADDED']],
+  );
 
-    assert.deepEqual(seen, [undefined, 'during']);
-    assert.equal(process.env.WITH_ENV_KEPT, 'before');
-    assert.equal('WITH_ENV_ADDED' in process.env, false);
+  assert.deepEqual(seen, [undefined, 'during']);
+  assert.equal(process.env['WITH_ENV_KEPT'], 'before');
+  assert.equal('WITH_ENV_ADDED' in process.env, false);
 
-    await assert.rejects(
-      withEnv({ WITH_ENV_KEPT: 'during' }, async () => {
-        throw new Error('run failed');
-      }),
-      { message: 'run failed' },
-    );
-    assert.equal(process.env.WITH_ENV_KEPT, 'before');
-  } finally {
-    delete process.env.WITH_ENV_KEPT;
-  }
+  await assert.rejects(
+    withEnv({ WITH_ENV_KEPT: 'during' }, async () => {
+      throw new Error('run failed');
+    }),
+    { message: 'run failed' },
+  );
+  assert.equal(process.env['WITH_ENV_KEPT'], 'before');
 });
 
 test('init refuses --testFiles before it loads the Playwright config', async () => {
