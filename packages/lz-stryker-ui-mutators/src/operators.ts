@@ -23,26 +23,41 @@ const comparisonOperators: ReadonlySet<string> = new Set([
   '>=',
 ]);
 const listMethods: ReadonlySet<string> = new Set(['map', 'filter', 'flatMap']);
-const unrenderedText: ReadonlySet<string | undefined> = new Set([
-  'style',
-  'script',
-]);
-const decorativeElements: ReadonlySet<string | undefined> = new Set([
-  'svg',
-  'img',
-  'i',
-]);
-const labelableElements: ReadonlySet<string | undefined> = new Set([
+const unrenderedText: ReadonlySet<string> = new Set(['style', 'script']);
+const decorativeElements: ReadonlySet<string> = new Set(['svg', 'img', 'i']);
+const labelableElements: ReadonlySet<string> = new Set([
   'input',
   'select',
   'textarea',
 ]);
-/** A span cannot take these under @types/react 19.3.0 (TS2322); a span ignores them at run time. */
-const notOnSpan: ReadonlySet<string | undefined> = new Set([
-  'href',
-  'type',
+/**
+ * The attributes of `a`, `area` and `button` that a span cannot take under @types/react 19.3.0 (TS2322); a span
+ * ignores them at run time.
+ */
+const notOnSpan: ReadonlySet<string> = new Set([
+  'alt',
+  'coords',
   'disabled',
+  'download',
+  'form',
+  'formAction',
+  'formEncType',
+  'formMethod',
+  'formNoValidate',
+  'formTarget',
+  'href',
+  'hrefLang',
+  'media',
+  'name',
+  'ping',
+  'referrerPolicy',
+  'shape',
+  'target',
+  'type',
+  'value',
 ]);
+export const spanSwapTags: readonly string[] = ['a', 'area', 'button'];
+
 export function operatorsFor(roles: RoleTable) {
   return operatorTable([
     {
@@ -55,7 +70,9 @@ export function operatorsFor(roles: RoleTable) {
             if (
               path.isJSXText() &&
               hasWord.test(path.node.value) &&
-              !unrenderedText.has(elementSiteOf(path.parentPath.node, t)?.name)
+              !unrenderedText.has(
+                elementSiteOf(path.parentPath.node, t)?.name ?? '',
+              )
             ) {
               yield t.jsxText('');
             }
@@ -259,7 +276,7 @@ function asSpan(element: ElementSite, t: BabelTypes): types.JSXElement {
   const span = t.cloneNode(element.node, true);
   span.openingElement.name = t.jsxIdentifier('span');
   span.openingElement.attributes = span.openingElement.attributes.filter(
-    (attribute) => !notOnSpan.has(attributeName(attribute, t)),
+    (attribute) => !notOnSpan.has(attributeName(attribute, t) ?? ''),
   );
 
   if (span.closingElement) {
@@ -288,7 +305,7 @@ function wrapsControl(label: ElementSite, t: BabelTypes): boolean {
     children.some(
       (child) =>
         (t.isJSXElement(child) &&
-          (labelableElements.has(elementSiteOf(child, t)?.name) ||
+          (labelableElements.has(elementSiteOf(child, t)?.name ?? '') ||
             holds(child.children))) ||
         (t.isJSXFragment(child) && holds(child.children)),
     );

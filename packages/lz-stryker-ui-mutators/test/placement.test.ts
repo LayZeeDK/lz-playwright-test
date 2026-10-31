@@ -13,13 +13,16 @@ import { pathToFileURL } from 'node:url';
 
 import {
   resolveFromCore,
-  type InstrumentedMutant,
-  type InstrumentResult,
-  type Instrumenter,
+  type CoreInstrumenter,
   type SourceFile,
 } from '../src/install.ts';
 import { defined } from './support/defined.ts';
 import { exportedFunction } from './support/exports.ts';
+import {
+  instrumentFully,
+  type InstrumentedMutant,
+  type InstrumentResult,
+} from './support/instrument-result.ts';
 import { installInto, operatorNames, ours } from './support/installed.ts';
 
 const root = join(import.meta.dirname, '..', '..', '..');
@@ -31,7 +34,7 @@ const corpus: readonly SourceFile[] = [
   join(import.meta.dirname, 'corpus', 'vue-tsx-sample.vue'),
 ].map((name) => ({ name, content: readFileSync(name, 'utf8') }));
 
-let instrumenter: Instrumenter;
+let instrumenter: CoreInstrumenter;
 let parseTsx: (code: string) => unknown;
 let stock: InstrumentResult[];
 let excluded: InstrumentResult[];
@@ -55,7 +58,7 @@ const firstContent = (result: InstrumentResult | undefined): string =>
 async function instrumentEach(excludedMutations: readonly string[]) {
   return Promise.all(
     corpus.map(async (file) =>
-      instrumenter.instrument([file], excludedMutations),
+      instrumentFully(instrumenter, [file], excludedMutations),
     ),
   );
 }
@@ -145,7 +148,7 @@ describe('the JSX placement, with the UI operators on', () => {
   });
 
   it('places an attribute mutant inside the attribute value, a text mutant as null, and an element switch among JSX children in braces', async () => {
-    const { files } = await instrumenter.instrument([
+    const { files } = await instrumentFully(instrumenter, [
       {
         name: 'placement.tsx',
         content:
@@ -170,7 +173,7 @@ describe('the JSX placement, with the UI operators on', () => {
   });
 
   it('places an attribute, a text and an element switch on one <a href> at once', async () => {
-    const { files, mutants } = await instrumenter.instrument([
+    const { files, mutants } = await instrumentFully(instrumenter, [
       {
         name: 'link.tsx',
         content: 'export const a = <p><a href="/x">X</a></p>;\n',

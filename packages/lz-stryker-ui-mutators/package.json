@@ -53,15 +53,12 @@
         },
         "cache": true,
         "inputs": [
-          "{projectRoot}/scripts/**/*",
-          "{projectRoot}/src/**/*.ts",
-          "!{projectRoot}/src/bundled-roles.ts",
-          {
-            "env": "LZ_UI_MUTATORS_ROLES_FROM"
-          },
-          {
-            "env": "LZ_UI_MUTATORS_ROLES_OUT"
-          },
+          "{projectRoot}/scripts/generate-roles.ts",
+          "{projectRoot}/scripts/roles-generator.ts",
+          "{projectRoot}/src/playwright-roles.ts",
+          "{projectRoot}/src/operators.ts",
+          "{projectRoot}/src/mutator.ts",
+          "{projectRoot}/src/is-record.ts",
           {
             "externalDependencies": [
               "playwright-core"

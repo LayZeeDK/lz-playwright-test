@@ -10,9 +10,9 @@ export const operatorNames: readonly OperatorName[] = operatorsFor(
 
 export const ours: ReadonlySet<string> = new Set(operatorNames);
 
-export async function installInto(
-  instrumenter: Instrumenter,
-): Promise<Instrumenter> {
+export async function installInto<T extends Instrumenter>(
+  instrumenter: T,
+): Promise<T> {
   await install(operatorsFor(bundled.roles), async () => instrumenter);
 
   return instrumenter;

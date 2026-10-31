@@ -3,23 +3,19 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
 import { fieldOf } from './is-record.ts';
+import { spanSwapTags } from './operators.ts';
 
 export interface ImplicitRole {
   readonly role: string;
   readonly requiredAttribute?: string;
 }
 
-/** Keyed by lowercase tag name; `undefined` is the name of a JSX element that is not a plain identifier. */
-export type RoleTable = ReadonlyMap<string | undefined, ImplicitRole>;
+/** Keyed by lowercase tag name. */
+export type RoleTable = ReadonlyMap<string, ImplicitRole>;
 
 export interface BundledRoles {
   readonly version: string;
   readonly roles: RoleTable;
-}
-
-export interface PlaywrightCore {
-  readonly version: string;
-  readonly bundlePath: string;
 }
 
 export function findManifest(
@@ -40,13 +36,27 @@ export function findManifest(
   }
 }
 
-export function readPlaywrightCore(manifest: string): PlaywrightCore {
-  return {
-    version: String(
-      fieldOf(JSON.parse(readFileSync(manifest, 'utf8')), 'version'),
-    ),
-    bundlePath: join(dirname(manifest), 'lib', 'coreBundle.js'),
-  };
+export function readRoleTable(manifest: string): BundledRoles {
+  const version = unreadable(` in ${manifest}`, () =>
+    String(fieldOf(JSON.parse(readFileSync(manifest, 'utf8')), 'version')),
+  );
+  const bundlePath = join(dirname(manifest), 'lib', 'coreBundle.js');
+  const roles = unreadable(` ${version} in ${bundlePath}`, () =>
+    parseRoleTable(readFileSync(bundlePath, 'utf8')),
+  );
+
+  return { version, roles };
+}
+
+function unreadable<T>(where: string, step: () => T): T {
+  try {
+    return step();
+  } catch (error) {
+    throw new Error(
+      `cannot read the implicit role table of playwright-core${where}`,
+      { cause: error },
+    );
+  }
 }
 
 export function consumerRoles(
@@ -55,29 +65,22 @@ export function consumerRoles(
     .resolve,
   warn: (message: string) => void = console.warn,
 ): RoleTable {
-  let found = '';
-
   try {
-    const manifest = findManifest(resolve);
+    const manifest = unreadable('', () => findManifest(resolve));
 
-    if (manifest === undefined) {
-      return bundled.roles;
-    }
-
-    found = ` in ${manifest}`;
-    const core = readPlaywrightCore(manifest);
-    found = ` ${core.version} in ${core.bundlePath}`;
-
-    return parseRoleTable(readFileSync(core.bundlePath, 'utf8'));
+    return manifest === undefined
+      ? bundled.roles
+      : readRoleTable(manifest).roles;
   } catch (error) {
-    const code = fieldOf(error, 'code');
+    const cause = fieldOf(error, 'cause');
+    const code = fieldOf(cause, 'code');
     const reason =
       code === undefined
-        ? String(error)
-        : `${String(error)}, code ${String(code)}`;
+        ? String(cause)
+        : `${String(cause)}, code ${String(code)}`;
 
     warn(
-      `lz-stryker-ui-mutators: cannot read the implicit role table of playwright-core${found} (${reason}); ` +
+      `lz-stryker-ui-mutators: ${String(fieldOf(error, 'message'))} (${reason}); ` +
         `LzElementRole uses the table bundled from playwright-core ${bundled.version}.`,
     );
 
@@ -85,7 +88,6 @@ export function consumerRoles(
   }
 }
 
-const spanSwapTags: readonly string[] = ['a', 'area', 'button'];
 const start = 'kImplicitRoleByTagName = {';
 // The table sits in playwright-core/lib/coreBundle.js inside one string literal, so its line breaks are the two
 // characters `\n`. An entry is a line indented by two spaces; deeper lines belong to an entry's function body.

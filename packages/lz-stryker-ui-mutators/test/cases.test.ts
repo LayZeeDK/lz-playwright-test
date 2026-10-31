@@ -5,9 +5,13 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { before, test } from 'node:test';
 
-import { resolveFromCore, type InstrumentResult } from '../src/install.ts';
+import { resolveFromCore } from '../src/install.ts';
 import { cases, type Case } from './cases.ts';
 import { defined } from './support/defined.ts';
+import {
+  instrumentFully,
+  type InstrumentResult,
+} from './support/instrument-result.ts';
 import { installInto, ours } from './support/installed.ts';
 
 function source(testCase: Case): string {
@@ -26,7 +30,7 @@ let result: InstrumentResult;
 
 before(async () => {
   const instrumenter = await installInto(await resolveFromCore());
-  result = await instrumenter.instrument(files);
+  result = await instrumentFully(instrumenter, files);
 });
 
 cases.forEach((testCase, index) => {

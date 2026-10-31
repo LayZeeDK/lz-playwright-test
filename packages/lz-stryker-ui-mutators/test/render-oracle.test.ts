@@ -16,13 +16,14 @@ import { pathToFileURL } from 'node:url';
 
 import ts from 'typescript';
 
-import {
-  resolveFromCore,
-  type InstrumentedMutant,
-  type InstrumentResult,
-} from '../src/install.ts';
+import { resolveFromCore } from '../src/install.ts';
 import { defined } from './support/defined.ts';
 import { exportedFunction } from './support/exports.ts';
+import {
+  instrumentFully,
+  type InstrumentedMutant,
+  type InstrumentResult,
+} from './support/instrument-result.ts';
 import { installInto, ours } from './support/installed.ts';
 
 type Component = (props: unknown) => unknown;
@@ -57,7 +58,7 @@ before(async () => {
   mkdirSync(tmpDir, { recursive: true });
   outDir = mkdtempSync(join(tmpDir, 'render-oracle-'));
   const instrumenter = await installInto(await resolveFromCore());
-  result = await instrumenter.instrument([
+  result = await instrumentFully(instrumenter, [
     { name: samplePath, content: source },
   ]);
   original = renderAll(await load(source));

@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describe, it } from 'node:test';
 
+import { generateRoles } from '../scripts/roles-generator.ts';
 import { parseRoleTable } from '../src/playwright-roles.ts';
 import { exported } from './support/exports.ts';
 import {
@@ -14,93 +14,69 @@ import {
 } from './support/fake-playwright-core.ts';
 import { tempRoot } from './support/temp-tree.ts';
 
-const script = join(import.meta.dirname, '..', 'scripts', 'generate-roles.ts');
-
-function generate(root: string) {
-  const out = join(root, 'bundled-roles.mts');
-  const child = spawnSync(process.execPath, [script], {
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      LZ_UI_MUTATORS_ROLES_FROM: join(root, 'index.js'),
-      LZ_UI_MUTATORS_ROLES_OUT: out,
-    },
-  });
-
-  return { status: child.status, stderr: child.stderr, out };
+function paths(root: string) {
+  return { from: join(root, 'index.js'), out: join(root, 'bundled-roles.mts') };
 }
 
-describe('generate-roles', () => {
+describe('generateRoles', () => {
   it('writes the table and version of the playwright-core it resolves as the bundled table', async (t) => {
     const { root } = fakePlaywrightCore(t, '1.63.0', excerpt('1.63.0'));
+    const { from, out } = paths(root);
 
-    const { status, stderr, out } = generate(root);
+    generateRoles(from, out);
 
-    assert.equal(status, 0, stderr);
-    assert.equal(stderr, '');
     assert.deepEqual(
       exported(await import(pathToFileURL(out).href), 'bundled'),
       { version: '1.63.0', roles: parseRoleTable(excerpt('1.63.0')) },
     );
   });
 
-  it('exits 1 with one line naming the version, the path and what is missing, and writes nothing, when the table is unreadable', (t) => {
+  it('throws naming the version, the path and what is missing, and writes nothing, when the table is unreadable', (t) => {
     const { root, bundlePath } = fakePlaywrightCore(t, '1.99.0', 'export {};');
+    const { from, out } = paths(root);
 
-    const { status, stderr, out } = generate(root);
-
-    assert.equal(status, 1);
-    assert.equal(
-      stderr,
-      `lz-stryker-ui-mutators build: cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath}: kImplicitRoleByTagName not found.\n`,
-    );
+    assert.throws(() => generateRoles(from, out), {
+      message: `cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath}: kImplicitRoleByTagName not found.`,
+    });
     assert.equal(existsSync(out), false);
   });
 
-  it('exits 1 with one line naming the missing tags, and writes nothing, when the table lacks entries LzElementRole reads', (t) => {
+  it('throws naming the missing tags, and writes nothing, when the table lacks entries LzElementRole reads', (t) => {
     const { root, bundlePath } = fakePlaywrightCore(t, '1.99.0', buttonOnly);
+    const { from, out } = paths(root);
 
-    const { status, stderr, out } = generate(root);
-
-    assert.equal(status, 1);
-    assert.equal(
-      stderr,
-      `lz-stryker-ui-mutators build: cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath}: kImplicitRoleByTagName lacks the entries for a, area that LzElementRole reads.\n`,
-    );
+    assert.throws(() => generateRoles(from, out), {
+      message: `cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath}: kImplicitRoleByTagName lacks the entries for a, area that LzElementRole reads.`,
+    });
     assert.equal(existsSync(out), false);
   });
 
-  it('exits 1 with one line, and writes nothing, when resolving playwright-core fails for another reason', (t) => {
+  it('throws, and writes nothing, when resolving playwright-core fails for another reason', (t) => {
     const { root, manifestPath } = fakePlaywrightCore(
       t,
       '1.99.0',
       excerpt('1.64.1'),
     );
+    const { from, out } = paths(root);
     writeFileSync(
       manifestPath,
       JSON.stringify({ name: 'playwright-core', exports: { '.': './x.js' } }),
     );
 
-    const { status, stderr, out } = generate(root);
-
-    assert.equal(status, 1);
-    assert.match(
-      stderr,
-      /^lz-stryker-ui-mutators build: cannot resolve playwright-core from .+index\.js: Package subpath '\.\/package\.json' is not defined by "exports" in .+\.\n$/,
-    );
+    assert.throws(() => generateRoles(from, out), {
+      message:
+        /^cannot resolve playwright-core from .+index\.js: Package subpath '\.\/package\.json' is not defined by "exports" in .+\.$/,
+    });
     assert.equal(existsSync(out), false);
   });
 
-  it('exits 1 with one line, and writes nothing, when playwright-core is not installed', (t) => {
+  it('throws, and writes nothing, when playwright-core is not installed', (t) => {
     const root = tempRoot(t, 'ui-mutators-pw-');
+    const { from, out } = paths(root);
 
-    const { status, stderr, out } = generate(root);
-
-    assert.equal(status, 1);
-    assert.equal(
-      stderr,
-      `lz-stryker-ui-mutators build: playwright-core is not installed where ${join(root, 'index.js')} resolves it; it is a dev dependency of this package.\n`,
-    );
+    assert.throws(() => generateRoles(from, out), {
+      message: `playwright-core is not installed where ${from} resolves it; it is a dev dependency of this package.`,
+    });
     assert.equal(existsSync(out), false);
   });
 });

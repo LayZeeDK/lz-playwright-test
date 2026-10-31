@@ -13,8 +13,8 @@ import {
   install,
   resolveFromCore,
   testedVersion,
-  type InstrumentedMutant,
   type Instrumenter,
+  type MutantOrigin,
   type SourceFile,
 } from '../src/install.ts';
 import {
@@ -25,13 +25,10 @@ import {
 import type { MutantPlacerLike } from '../src/placer.ts';
 import { firstPath, parse } from './support/babel.ts';
 import { exported, exportedFunction } from './support/exports.ts';
+import { instrumentFully } from './support/instrument-result.ts';
 import { tempRoot, writeTree } from './support/temp-tree.ts';
 
 const ownMark = Symbol.for('@layzee/lz-stryker-ui-mutators');
-const anyLocation = {
-  start: { line: 0, column: 0 },
-  end: { line: 0, column: 1 },
-};
 const strykerMutators = ['StringLiteral', 'BooleanLiteral'] as const;
 
 function operator(name: string): Operator {
@@ -69,21 +66,15 @@ function setup({
     expressionPlacer: { target: expressionPlacer, original: expressionPlacer },
     async instrument(files) {
       instrumented.push([...files]);
-      const mutants = allMutators
+
+      return allMutators
         .filter(
           (mutator) => ownMark in mutator && !silent.includes(mutator.name),
         )
-        .map(
-          (mutator): InstrumentedMutant => ({
-            id: mutator.name,
-            fileName: `${mutator.name}.self-check.tsx`,
-            mutatorName: mutator.name,
-            replacement: '',
-            location: anyLocation,
-          }),
-        );
-
-      return { files, mutants };
+        .map((mutator) => ({
+          fileName: `${mutator.name}.self-check.tsx`,
+          mutatorName: mutator.name,
+        }));
     },
   };
   const run = (operators: Operator[], target: Instrumenter = instrumenter) =>
@@ -270,19 +261,16 @@ describe('install', () => {
         'a mutant in the sample file of an operator only when that operator made it',
         { mutatorName: 'StringLiteral' },
       ],
-    ] satisfies [string, Partial<InstrumentedMutant>][]
+    ] satisfies [string, Partial<MutantOrigin>][]
   ).forEach(([title, fields]) => {
     it(`counts ${title}`, async () => {
       const { run, instrumenter } = setup();
       const changed: Instrumenter = {
         ...instrumenter,
         async instrument(files) {
-          const { mutants } = await instrumenter.instrument(files);
+          const mutants = await instrumenter.instrument(files);
 
-          return {
-            files,
-            mutants: mutants.map((mutant) => ({ ...mutant, ...fields })),
-          };
+          return mutants.map((mutant) => ({ ...mutant, ...fields }));
         },
       };
 
@@ -435,12 +423,12 @@ describe('resolveFromCore', () => {
     );
   });
 
-  it('instruments with excludedMutations, reporting those mutants as Ignored', async () => {
+  it('runs with excludedMutations, reporting those mutants as Ignored', async () => {
     const instrumenter = await resolveFromCore();
     const files = [{ name: 'sample.ts', content: "export const a = 'x';\n" }];
 
     const statuses = async (excluded?: string[]) =>
-      (await instrumenter.instrument(files, excluded)).mutants.map(
+      (await instrumentFully(instrumenter, files, excluded)).mutants.map(
         ({ mutatorName, status }) => `${mutatorName} ${status ?? 'placed'}`,
       );
 
@@ -667,94 +655,36 @@ describe('resolveFromCore against a fake instrumenter', () => {
     });
   });
 
-  const mutant = {
-    id: '1',
-    fileName: 'a.tsx',
-    mutatorName: 'StringLiteral',
-    replacement: '""',
-    location: { start: { line: 1, column: 2 }, end: { line: 1, column: 5 } },
-  };
-  const withMutant = (fields: Readonly<Record<string, unknown>>) => ({
-    files: [],
-    mutants: [{ ...mutant, ...fields }],
-  });
+  const mutant = { fileName: 'a.tsx', mutatorName: 'StringLiteral' };
 
-  it('instruments to new objects of the fields the package reads, with the status or undefined', async (t) => {
+  it('instruments to the file and mutator name of each mutant, whatever else the result holds', async (t) => {
     const { corePackage } = fakeCore(t, ['expressionMutantPlacer'], {
       [indexPath]: instrumenterFile({
-        files: [{ name: 'a.tsx', content: 'x', mutate: true }],
         mutants: [
-          { ...mutant, status: 'Ignored', static: false },
-          { ...mutant, id: '2' },
+          { ...mutant, id: 1, status: 'Done', location: null },
+          { fileName: 'b.tsx', mutatorName: 'LzTextLiteral' },
         ],
-        extra: true,
       }),
     });
     const instrumenter = await resolveFromCore(corePackage);
 
     assert.deepEqual(
       await instrumenter.instrument([{ name: 'a.tsx', content: 'x' }]),
-      {
-        files: [{ name: 'a.tsx', content: 'x' }],
-        mutants: [
-          { ...mutant, status: 'Ignored' },
-          { ...mutant, id: '2', status: undefined },
-        ],
-      },
+      [mutant, { fileName: 'b.tsx', mutatorName: 'LzTextLiteral' }],
     );
   });
 
   (
     [
-      ['files', null],
-      ['files', { mutants: [] }],
-      ['files[].name', { files: [null], mutants: [] }],
-      ['files[].name', { files: [{ name: 1, content: 'x' }], mutants: [] }],
-      ['files[].content', { files: [{ name: 'a.tsx' }], mutants: [] }],
-      ['mutants', { files: [] }],
-      ['mutants[].id', { files: [], mutants: [null] }],
-      ['mutants[].id', withMutant({ id: 1 })],
-      ['mutants[].fileName', withMutant({ fileName: 1 })],
-      ['mutants[].mutatorName', withMutant({ mutatorName: 1 })],
-      ['mutants[].replacement', withMutant({ replacement: 1 })],
-      ['mutants[].location.start.line', withMutant({ location: null })],
-      [
-        'mutants[].location.start.line',
-        withMutant({ location: { ...mutant.location, start: null } }),
-      ],
-      [
-        'mutants[].location.start.line',
-        withMutant({
-          location: { ...mutant.location, start: { line: '1', column: 2 } },
-        }),
-      ],
-      [
-        'mutants[].location.start.column',
-        withMutant({
-          location: { ...mutant.location, start: { line: 1, column: '2' } },
-        }),
-      ],
-      [
-        'mutants[].location.end.line',
-        withMutant({ location: { ...mutant.location, end: null } }),
-      ],
-      [
-        'mutants[].location.end.line',
-        withMutant({
-          location: { ...mutant.location, end: { line: '1', column: 5 } },
-        }),
-      ],
-      [
-        'mutants[].location.end.column',
-        withMutant({
-          location: { ...mutant.location, end: { line: 1, column: '5' } },
-        }),
-      ],
-      ['mutants[].status', withMutant({ status: 'Done' })],
-      ['mutants[].status', withMutant({ status: null })],
+      null,
+      { files: [] },
+      { mutants: {} },
+      { mutants: [null] },
+      { mutants: [{ ...mutant, fileName: 1 }] },
+      { mutants: [{ ...mutant, mutatorName: undefined }] },
     ] as const
-  ).forEach(([what, result]) => {
-    it(`throws, naming the version and dir, when the instrumenter resolves instrument() to a wrong ${what} (${JSON.stringify(result)})`, async (t) => {
+  ).forEach((result) => {
+    it(`throws, naming the version and dir, when the instrumenter resolves instrument() to mutants without names (${JSON.stringify(result)})`, async (t) => {
       const { corePackage, dir } = fakeCore(t, ['expressionMutantPlacer'], {
         [indexPath]: instrumenterFile(result),
       });
@@ -763,7 +693,7 @@ describe('resolveFromCore against a fake instrumenter', () => {
       await assert.rejects(
         instrumenter.instrument([{ name: 'a.tsx', content: 'x' }]),
         {
-          message: `lz-stryker-ui-mutators: the instrumenter 9.9.8 in ${dir} resolved Instrumenter.instrument() to a value whose ${what} is missing or of the wrong type.`,
+          message: `lz-stryker-ui-mutators: the instrumenter 9.9.8 in ${dir} resolved Instrumenter.instrument() to a value whose mutants are missing or have no string fileName and mutatorName.`,
         },
       );
     });

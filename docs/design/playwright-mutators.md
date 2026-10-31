@@ -47,7 +47,7 @@ are in the Opus draft, section 2. Where this list differs from the draft, this l
 5. `LzUrlAttribute`: `href`, `to`, and `action` become `""`, from a string or a bound expression; a template literal is left to `StringLiteral`, as for `LzLabelAttribute`. Killed by `toHaveURL`.
 6. `LzDisabledAttribute`: forces `disabled`, `readOnly`, and `aria-disabled` off, and skips boolean-literal values (`disabled={true}`), which `BooleanLiteral` already flips. Killed by `toBeDisabled`, `toBeEditable`.
 7. `LzHiddenAttribute`: forces `hidden` and `aria-hidden` off. It never forces an element hidden. It skips `aria-hidden` on `svg`, `img`, and `i`, as the Opus draft did (2.7): those are decorative icons, and exposing one changes nothing a role, label, or text query sees. Killed by `toBeVisible`, `getByRole` (hidden elements leave the tree).
-8. `LzElementRole`: removes `role`, or swaps a tag for `span` when Playwright's role table gives it the role `button` or `link`: `button` always, and `a` and `area` only when they have an `href`. An `<a>` without `href` has no `link` role, so swapping it would be an equivalent mutant. The `span` drops `href`, `type`, and `disabled`, which a `span` cannot take (see "Rules the synthetic cases settled"). Killed by `getByRole`.
+8. `LzElementRole`: removes `role`, or swaps a tag for `span` when Playwright's role table gives it the role `button` or `link`: `button` always, and `a` and `area` only when they have an `href`. An `<a>` without `href` has no `link` role, so swapping it would be an equivalent mutant. The `span` drops every attribute of `a`, `area`, and `button` that a `span` cannot take, such as `href`, `type`, `disabled`, and `alt` (see "Rules the synthetic cases settled"). Killed by `getByRole`.
 9. `LzChildExpression`: a `{value}` child becomes `null`. Killed by `toHaveText`.
 10. `LzStateAttribute`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, `aria-selected`. A string value flips between `"true"` and `"false"`, and an expression is negated, except where negating would give a constant: a ternary flips each branch instead, and a `String()` or `.toString()` call gets no mutant (see "Rules the synthetic cases settled"). Killed by `toHaveAttribute` and role queries with state options.
 
@@ -158,13 +158,16 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
   `!` wrapper, and a flipped value drops it: `(s ? 'true' : 'false') as 'true' | 'false'` becomes
   `s ? "false" : "true"`, while a negated one keeps it (`!(flag as boolean)`). Cases tldraw-1, tldraw-2,
   design-15, design-16 and design-43 to design-45 cover this.
-- `ElementToSpan` drops `href`, `type`, and `disabled` from the `span`. React's types do not allow them
-  on a `span` (`HTMLAttributes` in `@types/react` 19.3.0), so a swap that kept them fails to compile under
-  Stryker's TypeScript checker and reports CompileError, not a test result. A `span` ignores them at run
-  time, so dropping them keeps the same role change. Claude measured the compile errors with
-  `npx tsc --jsx react-jsx --strict` on `<span href="/a">`, `<span type="submit">`, and
-  `<span disabled>`: each gives TS2322. Other attributes a `span` accepts, such as `className`, `id`,
-  `aria-*`, and handlers, stay.
+- `ElementToSpan` drops from the `span` every attribute that `@types/react` 19.3.0 declares on `a`, `area`,
+  or `button` but not in `HTMLAttributes`: `alt`, `coords`, `disabled`, `download`, `form`, `formAction`,
+  `formEncType`, `formMethod`, `formNoValidate`, `formTarget`, `href`, `hrefLang`, `media`, `name`, `ping`,
+  `referrerPolicy`, `shape`, `target`, `type`, and `value`. React's types do not allow them on a `span`, so a
+  swap that kept them fails to compile under Stryker's TypeScript checker and reports CompileError, not a
+  test result. A `span` ignores them at run time, so dropping them keeps the same role change. Claude
+  measured the compile errors with `npx tsc --jsx react-jsx --strict` on `<span href="/a">`,
+  `<span type="submit">`, `<span disabled>`, `<span alt="A">`, and `<span media="print">`: each gives
+  TS2322. Other attributes a `span` accepts, such as `className`, `id`, `rel`, `aria-*`, and handlers,
+  stay. Case design-47 covers the list.
 - Three skips from the Opus draft (section 2) hold here too. `LzLabelAttribute` skips `htmlFor` on a
   `label` that also wraps its control, because nesting keeps the association. `LzTextLiteral` skips text
   inside `style` and `script`, which is CSS or code, not rendered text. `LzElementRole` skips a `role` equal

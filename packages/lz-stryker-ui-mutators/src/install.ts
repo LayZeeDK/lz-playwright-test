@@ -4,8 +4,6 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import type { MutantStatus, Position } from '@stryker-mutator/api/core';
-
 import { fieldOf, isRecord } from './is-record.ts';
 import {
   babelTypeMembers,
@@ -37,21 +35,9 @@ export interface SourceFile {
   readonly content: string;
 }
 
-export interface InstrumentedMutant {
-  readonly id: string;
+export interface MutantOrigin {
   readonly fileName: string;
   readonly mutatorName: string;
-  readonly replacement: string;
-  readonly location: {
-    readonly start: Readonly<Position>;
-    readonly end: Readonly<Position>;
-  };
-  readonly status?: MutantStatus | undefined;
-}
-
-export interface InstrumentResult {
-  readonly files: readonly SourceFile[];
-  readonly mutants: readonly InstrumentedMutant[];
 }
 
 export interface ListedMutator {
@@ -77,10 +63,14 @@ export interface Instrumenter {
     readonly target: object;
     readonly original: PlacerMethods;
   };
-  instrument(
+  instrument(files: readonly SourceFile[]): Promise<readonly MutantOrigin[]>;
+}
+
+export interface CoreInstrumenter extends Instrumenter {
+  run(
     files: readonly SourceFile[],
     excludedMutations?: readonly string[],
-  ): Promise<InstrumentResult>;
+  ): Promise<unknown>;
 }
 
 export async function install(
@@ -167,7 +157,7 @@ async function selfCheck(
   operators: readonly Operator[],
 ): Promise<void> {
   const fileOf = (name: string): string => `${name}.self-check.tsx`;
-  const { mutants } = await instrumenter.instrument(
+  const mutants = await instrumenter.instrument(
     operators.map(({ name, sample }) => ({
       name: fileOf(name),
       content: sample,
@@ -213,7 +203,7 @@ export function corePackageJson(
 
 export async function resolveFromCore(
   corePackage: string = corePackageJson(),
-): Promise<Instrumenter> {
+): Promise<CoreInstrumenter> {
   const fromCore = createRequire(corePackage);
   const packageJson = fromCore.resolve(
     '@stryker-mutator/instrumenter/package.json',
@@ -269,11 +259,21 @@ export async function resolveFromCore(
 
   const { canPlace, place } = placer;
 
-  const changed = (what: string): Error =>
-    new Error(
-      `lz-stryker-ui-mutators: the instrumenter ${version} in ${dir} resolved Instrumenter.instrument() to a ` +
-        `value whose ${what} is missing or of the wrong type.`,
+  const run: CoreInstrumenter['run'] = async (
+    files,
+    excludedMutations = [],
+  ) => {
+    const result: unknown = await Reflect.apply(
+      instrument,
+      Reflect.construct(Instrumenter, [silentLogger]),
+      [
+        files.map((file) => ({ ...file, mutate: true })),
+        { plugins: null, excludedMutations, ignorers: [] },
+      ],
     );
+
+    return result;
+  };
 
   return {
     dir,
@@ -300,16 +300,30 @@ export async function resolveFromCore(
         },
       },
     },
-    async instrument(files, excludedMutations = []) {
-      const created: unknown = Reflect.construct(Instrumenter, [silentLogger]);
-      const result: unknown = await Reflect.apply(instrument, created, [
-        files.map((file) => ({ ...file, mutate: true })),
-        { plugins: null, excludedMutations, ignorers: [] },
-      ]);
+    run,
+    async instrument(files) {
+      const mutants = fieldOf(await run(files), 'mutants');
 
-      return parseResult(result, changed);
+      if (!Array.isArray(mutants) || !mutants.every(isMutantOrigin)) {
+        throw new Error(
+          `lz-stryker-ui-mutators: the instrumenter ${version} in ${dir} resolved Instrumenter.instrument() to a ` +
+            'value whose mutants are missing or have no string fileName and mutatorName.',
+        );
+      }
+
+      return mutants.map(({ fileName, mutatorName }) => ({
+        fileName,
+        mutatorName,
+      }));
     },
   };
+}
+
+function isMutantOrigin(value: unknown): value is MutantOrigin {
+  return (
+    typeof fieldOf(value, 'fileName') === 'string' &&
+    typeof fieldOf(value, 'mutatorName') === 'string'
+  );
 }
 
 function importFile(path: string): Promise<unknown> {
@@ -340,105 +354,4 @@ function assertBabelTypes(
   if (absent.length > 0) {
     throw missing(`Babel types with ${absent.join(', ')}`);
   }
-}
-
-// Annotated, not `as const`, so a mutant of a status fails to compile (https://github.com/stryker-mutator/stryker-js/issues/6208).
-const statuses: readonly MutantStatus[] = [
-  'Killed',
-  'Survived',
-  'NoCoverage',
-  'CompileError',
-  'RuntimeError',
-  'Timeout',
-  'Ignored',
-  'Pending',
-];
-
-function parseResult(
-  value: unknown,
-  changed: (what: string) => Error,
-): InstrumentResult {
-  const files = fieldOf(value, 'files');
-  const mutants = fieldOf(value, 'mutants');
-
-  if (!Array.isArray(files)) {
-    throw changed('files');
-  }
-
-  if (!Array.isArray(mutants)) {
-    throw changed('mutants');
-  }
-
-  return {
-    files: files.map((file: unknown) => ({
-      name: stringOf(fieldOf(file, 'name'), 'files[].name', changed),
-      content: stringOf(fieldOf(file, 'content'), 'files[].content', changed),
-    })),
-    mutants: mutants.map((mutant: unknown) => parseMutant(mutant, changed)),
-  };
-}
-
-function parseMutant(
-  mutant: unknown,
-  changed: (what: string) => Error,
-): InstrumentedMutant {
-  const field = (name: string): string =>
-    stringOf(fieldOf(mutant, name), `mutants[].${name}`, changed);
-  const location = fieldOf(mutant, 'location');
-  const status = fieldOf(mutant, 'status');
-
-  return {
-    id: field('id'),
-    fileName: field('fileName'),
-    mutatorName: field('mutatorName'),
-    replacement: field('replacement'),
-    location: {
-      start: positionOf(fieldOf(location, 'start'), 'start', changed),
-      end: positionOf(fieldOf(location, 'end'), 'end', changed),
-    },
-    status: status === undefined ? undefined : statusOf(status, changed),
-  };
-}
-
-function positionOf(
-  value: unknown,
-  name: string,
-  changed: (what: string) => Error,
-): Position {
-  const numberOf = (key: string): number => {
-    const found = fieldOf(value, key);
-
-    if (typeof found !== 'number') {
-      throw changed(`mutants[].location.${name}.${key}`);
-    }
-
-    return found;
-  };
-
-  return { line: numberOf('line'), column: numberOf('column') };
-}
-
-function statusOf(
-  value: unknown,
-  changed: (what: string) => Error,
-): MutantStatus {
-  const known = statuses.find((status) => status === value);
-
-  if (known === undefined) {
-    throw changed('mutants[].status');
-  }
-
-  return known;
-}
-
-function stringOf(
-  value: unknown,
-  what: string,
-  changed: (what: string) => Error,
-): string {
-  if (typeof value !== 'string') {
-    throw changed(what);
-  }
-
-  return value;
 }
