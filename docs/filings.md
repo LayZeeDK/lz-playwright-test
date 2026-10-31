@@ -612,3 +612,40 @@ beside the judge's verdict.
 
 **Local workaround.** Lars's own skills carry both rules: `lars-principle-own-delegated-work` (model check from
 the transcript) and the `pstack:arena` trigger line in `lars-mode` (override rule).
+
+## microsoft/playwright: a supported API for running Playwright Test from another tool
+
+Status: draft, not filed (2026-11-01). Searched the repo's issues on 2026-11-01 (REST search; the control query
+"webServer" returned 399 hits): "Stryker" 0, "TestRunner programmatic API" 0, "run tests programmatically" 2.
+Related, closed: [#27664](https://github.com/microsoft/playwright/issues/27664) (a test filter API, closed
+2025-09-08 for limited engagement) and [#8027](https://github.com/microsoft/playwright/issues/8027) (a question,
+folded into #7275 in 2021); [#7275](https://github.com/microsoft/playwright/issues/7275) "[Feature] expose
+@playwright/test runner API" (2021-06-23) is closed. None asks for the context listener in point 2.
+
+**Why now.** Nico Jansen, on how StrykerJS got coverage analysis into Jest: Stryker asked the Jest maintainers
+for the hooks it needed instead of working around Jest (The Deep Dive episode 6, 24:31-24:51,
+`D:/projects/sandbox/deep-dive-ep6-mutation-testing-stryker-nico-jansen.transcript.txt`).
+
+**Versions.** `@playwright/test` and `playwright-core` 1.63 and 1.64.1, Node 22 and 24.
+
+**What a mutation testing runner needs, and what it uses today.** `@layzee/lz-stryker-playwright-runner` runs
+Playwright Test in-process, once per mutant, and reads only internals for it
+(`packages/lz-stryker-playwright-runner/src/playwright-internals.ts`, checked at load by `probeInternals`, so a
+Playwright release that moves them fails with a named error):
+
+1. A test runner object: `initialize`, `loadConfig` (projects and webServers), `listTests`, `runGlobalSetup`,
+   `runGlobalTeardown`, `runTests` with test ids, projects, workers, `maxFailures` and timeout, and `stopTests`.
+   It looks like the runner behind UI mode and the VS Code extension (inferred from its methods, not traced).
+2. A listener for each browser context a test creates (`runAfterCreateBrowserContext`,
+   `runBeforeCloseBrowserContext` on the client instrumentation), to add an init script and read coverage from
+   every frame.
+3. The webServer availability check (`isURLAvailable`), so the runner can tell a server already running on the
+   port from one it must wait for.
+4. The worker entry path (`lib/worker/workerProcessEntry.js`), to recognise Playwright's worker processes.
+5. `PLAYWRIGHT_NO_COPY_PROMPT`, to stop the failed-test aria snapshot, which waits out 5 s on a page stuck in a
+   loop.
+
+**Ask.** A documented, semver-covered API for points 1 and 2; points 3 to 5 follow from it or can stay private.
+
+**Before filing.** Read #7275's closing comments, cut the list to what Playwright maintainers would accept as one
+feature request, and decide whether it is a new issue or a comment on a closed one.
