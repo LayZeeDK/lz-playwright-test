@@ -30,16 +30,21 @@ import {
 
 type FrameRead = Omit<SnapshotLine, 'outlivedItsTest'>;
 
-interface ContextState {
-  testId?: string | undefined;
-  closedPageSnapshots: FrameRead[];
-  collected: boolean;
+interface FrameReads extends ReadonlyArray<FrameRead> {
+  push(...items: FrameRead[]): number;
 }
 
+interface ContextState {
+  readonly testId?: string | undefined;
+  readonly closedPageSnapshots: FrameReads;
+}
+
+type Writable<T> = { -readonly [K in keyof T]: T[K] };
+
 export interface PageSettings extends Pick<RunSettings, 'hitLimit'> {
-  ns: string;
-  activeMutant?: string | undefined;
-  testId?: string | undefined;
+  readonly ns: string;
+  readonly activeMutant?: string | undefined;
+  readonly testId?: string | undefined;
 }
 
 interface RunningTest {
@@ -147,6 +152,7 @@ export function install(
     `worker-${process.pid}-${randomUUID()}${snapshotSuffix}`,
   );
   const contexts = new WeakMap<HookedContext, ContextState>();
+  const collected = new WeakSet<HookedContext>();
   const alreadyRead = new WeakSet<HookedPage>();
   const patchedBrowsers = new WeakSet<HookedBrowser>();
 
@@ -169,11 +175,11 @@ export function install(
   async function collect(context: HookedContext) {
     const state = contexts.get(context);
 
-    if (!state || state.collected) {
+    if (!state || collected.has(context)) {
       return;
     }
 
-    state.collected = true;
+    collected.add(context);
     const snapshots = [
       ...state.closedPageSnapshots,
       ...(await readOnce(context.pages())),
@@ -220,7 +226,6 @@ export function install(
       const state: ContextState = {
         testId: perTest ? contextTestId(test) : undefined,
         closedPageSnapshots: [],
-        collected: false,
       };
       contexts.set(context, state);
       collectBeforeBrowserCloses(context.browser());
@@ -240,12 +245,14 @@ export function install(
  * The global that Stryker's instrumented code and this hook share, in the worker and in every page.
  * Instrumented code may create it first, so each field claims nothing.
  */
-export interface StrykerNamespace {
-  activeMutant?: unknown;
-  currentTestId?: unknown;
-  mutantCoverage?: unknown;
-  hitCount?: unknown;
-  hitLimit?: unknown;
+export type StrykerNamespace = Writable<StrykerNamespaceFields>;
+
+interface StrykerNamespaceFields {
+  readonly activeMutant?: unknown;
+  readonly currentTestId?: unknown;
+  readonly mutantCoverage?: unknown;
+  readonly hitCount?: unknown;
+  readonly hitLimit?: unknown;
 }
 
 function workerNamespace(name: string): StrykerNamespace {

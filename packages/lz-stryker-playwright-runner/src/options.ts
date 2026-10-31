@@ -3,9 +3,9 @@ import path from 'node:path';
 import { isRecord } from './is-record.ts';
 
 export interface LzStrykerPlaywrightOptions {
-  configFile?: string;
-  projects?: string[];
-  workers?: number;
+  readonly configFile?: string;
+  readonly projects?: readonly string[];
+  readonly workers?: number;
 }
 
 type JsonType<T> = T extends string
@@ -18,11 +18,11 @@ type JsonType<T> = T extends string
 
 type OptionSchemas = {
   [K in keyof Required<LzStrykerPlaywrightOptions>]: {
-    type: JsonType<Required<LzStrykerPlaywrightOptions>[K]>;
-    description: string;
-    default?: Required<LzStrykerPlaywrightOptions>[K];
-    minimum?: number;
-    items?: { type: 'string' };
+    readonly type: JsonType<Required<LzStrykerPlaywrightOptions>[K]>;
+    readonly description: string;
+    readonly default?: Required<LzStrykerPlaywrightOptions>[K];
+    readonly minimum?: number;
+    readonly items?: { readonly type: 'string' };
   };
 };
 
@@ -61,7 +61,7 @@ export const strykerValidationSchema = {
 
 export interface RunnerOptions {
   readonly configFile: string | undefined;
-  readonly projects: string[] | undefined;
+  readonly projects: readonly string[] | undefined;
   readonly workers: number;
   readonly strykerTimeoutMS: number;
 }

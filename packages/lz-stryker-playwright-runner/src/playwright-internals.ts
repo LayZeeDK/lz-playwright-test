@@ -8,47 +8,49 @@ import type { PageSettings } from './worker-hook.ts';
 type Status = FullResult['status'];
 
 export interface RunTestsParams {
-  locations: string[];
-  testIds?: string[] | undefined;
-  projects?: string[] | undefined;
-  workers?: number;
-  maxFailures?: number | undefined;
-  timeout?: number | undefined;
-  disableConfigReporters?: boolean;
+  readonly locations: readonly string[];
+  readonly testIds?: readonly string[] | undefined;
+  readonly projects?: readonly string[] | undefined;
+  readonly workers?: number;
+  readonly maxFailures?: number | undefined;
+  readonly timeout?: number | undefined;
+  readonly disableConfigReporters?: boolean;
 }
 
 /** The fields of a project of Playwright's loaded config that the runner reads. */
 export interface ConfigProject {
-  default: boolean;
-  expect?: { timeout?: number | undefined } | undefined;
-  project: { name: string; timeout: number };
+  readonly default: boolean;
+  readonly expect?: { readonly timeout?: number | undefined } | undefined;
+  readonly project: { readonly name: string; readonly timeout: number };
 }
 
 /** The fields of a webServer of Playwright's loaded config that the runner reads. */
 export interface ConfigWebServer {
-  url?: string | undefined;
-  port?: number | undefined;
-  ignoreHTTPSErrors?: boolean | undefined;
+  readonly url?: string | undefined;
+  readonly port?: number | undefined;
+  readonly ignoreHTTPSErrors?: boolean | undefined;
 }
 
 /** The runner's calls into Playwright's TestRunner, each result parsed to what the runner reads. */
 export interface TestRunner {
   initialize(params: Record<string, never>): Promise<void>;
   loadConfig(): Promise<{
-    projects: readonly ConfigProject[];
-    webServers: readonly ConfigWebServer[];
+    readonly projects: readonly ConfigProject[];
+    readonly webServers: readonly ConfigWebServer[];
   }>;
   // Resolves to undefined when Playwright throws, after printing the error to stderr.
   listTests(
     reporter: Reporter,
-    params: { projects?: string[] },
-  ): Promise<{ status: Status } | undefined>;
-  runGlobalSetup(reporters: Reporter[]): Promise<{ status: Status }>;
+    params: { readonly projects?: readonly string[] },
+  ): Promise<{ readonly status: Status } | undefined>;
+  runGlobalSetup(
+    reporters: readonly Reporter[],
+  ): Promise<{ readonly status: Status }>;
   runGlobalTeardown(): Promise<void>;
   runTests(
     reporter: Reporter,
     params: RunTestsParams,
-  ): Promise<{ status: Status }>;
+  ): Promise<{ readonly status: Status }>;
   stopTests(): Promise<void>;
 }
 
@@ -63,13 +65,13 @@ export const testRunnerMethods = [
 ] as const satisfies readonly (keyof TestRunner)[];
 
 export interface CoreBundleModule {
-  utils: {
+  readonly utils: {
     isURLAvailable(url: URL, ignoreHTTPSErrors: boolean): Promise<boolean>;
   };
 }
 
 export interface CommonModule {
-  configLoader: {
+  readonly configLoader: {
     resolveConfigLocation(configFile: string | undefined): unknown;
   };
 }
@@ -130,7 +132,7 @@ export interface Playwright {
     configFile: string | undefined,
     overrides: Record<string, unknown>,
   ): Promise<TestRunner>;
-  isURLAvailable: CoreBundleModule['utils']['isURLAvailable'];
+  readonly isURLAvailable: CoreBundleModule['utils']['isURLAvailable'];
 }
 
 export function supportsPlaywright(version: string): boolean {

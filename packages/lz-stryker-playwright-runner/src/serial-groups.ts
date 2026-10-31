@@ -7,9 +7,9 @@ export type SerialGroups = ReadonlyMap<string, readonly string[]>;
 
 // Given no names, listTests would also load the default: false projects.
 export function projectsThatRun(
-  option: string[] | undefined,
+  option: readonly string[] | undefined,
   projects: readonly { default: boolean; project: { name: string } }[],
-): string[] {
+): readonly string[] {
   return option?.length
     ? option
     : projects
@@ -19,7 +19,7 @@ export function projectsThatRun(
 
 export async function listSerialGroups(
   playwright: Pick<TestRunner, 'listTests'>,
-  projects: string[],
+  projects: readonly string[],
 ): Promise<SerialGroups> {
   const reporter = new LzStrykerCollectingReporter();
   const result = await playwright.listTests(reporter, { projects });

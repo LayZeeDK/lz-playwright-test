@@ -158,15 +158,7 @@ export default [
         tsconfigRootDir: import.meta.dirname,
       },
     },
-    rules: typeSafetyRules,
-  },
-  {
-    files: [
-      'packages/lz-stryker-ui-mutators/**/*.ts',
-      'packages/lz-stryker-playwright-runner/test/**/*.ts',
-    ],
-    ignores: ['packages/lz-stryker-ui-mutators/test/corpus/**'],
-    rules: readonlyRules,
+    rules: { ...typeSafetyRules, ...readonlyRules },
   },
   {
     files: ['**/*.spec.ts', '**/playwright*.config.{ts,mts}'],

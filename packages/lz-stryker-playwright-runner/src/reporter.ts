@@ -31,18 +31,18 @@ export class LzStrykerCollectingReporter {
   outputTail = '';
   // Playwright reports each attempt of a retried test with the same TestCase, which holds them all.
   readonly testCases = new Map<string, ReportedTest>();
-  private suite?: ReportedSuite;
+  #suite: ReportedSuite | undefined;
 
   printsToStdio() {
     return false;
   }
 
   onBegin(_config: unknown, suite: ReportedSuite) {
-    this.suite = suite;
+    this.#suite = suite;
   }
 
   get listedTests(): readonly ReportedTest[] {
-    return this.suite?.allTests() ?? [];
+    return this.#suite?.allTests() ?? [];
   }
 
   onTestEnd(test: ReportedTest) {

@@ -1,6 +1,7 @@
 import type { FullResult, TestCase } from '@playwright/test/reporter';
 import type { MutantCoverage } from '@stryker-mutator/api/core';
 import {
+  type CompleteDryRunResult,
   determineHitLimitReached,
   type DryRunResult,
   DryRunStatus,
@@ -25,19 +26,17 @@ import type {
 import { timeoutReason } from './timeouts.ts';
 
 export type RunResult =
-  | {
-      status: DryRunStatus.Complete;
-      tests: TestResult[];
-      snapshots: Snapshot[];
-    }
-  | Exclude<DryRunResult, { status: DryRunStatus.Complete }>;
+  | (Omit<CompleteDryRunResult, 'mutantCoverage'> & {
+      readonly snapshots: readonly Snapshot[];
+    })
+  | Exclude<DryRunResult, { readonly status: DryRunStatus.Complete }>;
 
 export type RunStatus = FullResult['status'] | 'deadline';
 
 export interface RunOutput {
   readonly status: RunStatus;
   readonly reporter: LzStrykerCollectingReporter;
-  readonly snapshots: Snapshot[];
+  readonly snapshots: readonly Snapshot[];
   readonly hookInstalled: boolean;
   readonly installErrors: readonly string[];
 }

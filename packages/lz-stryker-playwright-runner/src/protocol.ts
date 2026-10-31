@@ -15,16 +15,16 @@ export const installErrorSuffix = '.install-error';
 export const frameReadTimeoutMs = 2000;
 
 export interface RunSettings {
-  outDir: string;
-  perTest: boolean;
-  hitLimit?: number | undefined;
+  readonly outDir: string;
+  readonly perTest: boolean;
+  readonly hitLimit?: number | undefined;
 }
 
 export interface SnapshotLine {
-  mutantCoverage?: unknown;
-  hitCount?: unknown;
-  outlivedItsTest: boolean;
-  lost?: boolean;
+  readonly mutantCoverage?: unknown;
+  readonly hitCount?: unknown;
+  readonly outlivedItsTest: boolean;
+  readonly lost?: boolean;
 }
 
 export interface Snapshot {
@@ -35,9 +35,9 @@ export interface Snapshot {
 }
 
 export interface SnapshotDir {
-  snapshots: Snapshot[];
-  hookInstalled: boolean;
-  installErrors: string[];
+  readonly snapshots: readonly Snapshot[];
+  readonly hookInstalled: boolean;
+  readonly installErrors: readonly string[];
 }
 
 export function isHitCount(value: unknown): value is number {
