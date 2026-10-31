@@ -35,27 +35,37 @@ jobs:
       - run: npx nx run-many -t typecheck
       - run: npx nx run-many -t test --projects=@layzee/lz-stryker-playwright-runner,@layzee/lz-stryker-ui-mutators
 
-  mutation:
-    name: Browser tests and demo mutation testing
+  browser:
+    name: ${{ matrix.target }}
     needs: gates
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    container: mcr.microsoft.com/playwright:v1.64.1-noble
+    timeout-minutes: 30
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --init
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: '@layzee/lz-stryker-playwright-runner:test-browser'
+          - target: '@layzee/demo-app-e2e:mutate-e2e'
+            report: e2e
+          - target: '@layzee/demo-app-e2e:mutate-e2e-ui'
+            report: e2e-ui
+          - target: '@layzee/demo-app:mutate-ct'
+            report: ct
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          cache: npm
       - run: npm ci --no-audit --no-fund
-      - run: npx nx run @layzee/lz-stryker-playwright-runner:test-browser
-      - if: ${{ !cancelled() }}
-        run: npx nx run @layzee/demo-app-e2e:mutate-e2e
-      - if: ${{ !cancelled() }}
-        run: npx nx run @layzee/demo-app-e2e:mutate-e2e-ui
-      - if: ${{ !cancelled() }}
-        run: npx nx run @layzee/demo-app:mutate-ct
-      - if: ${{ !cancelled() }}
+      - run: npx nx run ${{ matrix.target }}
+      - if: ${{ !cancelled() && matrix.report }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: mutation-reports
-          path: reports/
-          if-no-files-found: ignore
+          name: mutation-report-${{ matrix.report }}
+          path: reports/${{ matrix.report }}/
+          if-no-files-found: error
