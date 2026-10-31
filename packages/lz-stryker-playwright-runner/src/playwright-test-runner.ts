@@ -368,31 +368,46 @@ async function runGlobalSetup(playwright: TestRunner) {
   }
 }
 
+export type ServerTarget = { readonly port: number } | { readonly url: string };
+
+export function serverTarget({
+  url,
+  port,
+}: ConfigWebServer): ServerTarget | undefined {
+  if (port !== undefined) {
+    return { port };
+  }
+
+  return url === undefined ? undefined : { url };
+}
+
 function serverCheck(
   server: ConfigWebServer,
   isURLAvailable: Playwright['isURLAvailable'],
 ): ServerCheck[] {
-  const { url, port } = server;
+  const target = serverTarget(server);
 
-  if (port !== undefined) {
+  if (target === undefined) {
+    return [];
+  }
+
+  if ('port' in target) {
+    const { port } = target;
+
     return [
       {
-        name: url ?? `port ${port}`,
+        name: server.url ?? `port ${port}`,
         isUp: () => acceptsConnections(port),
       },
     ];
   }
 
-  if (url === undefined) {
-    return [];
-  }
-
-  const target = new URL(url);
+  const url = new URL(target.url);
 
   return [
     {
-      name: url,
-      isUp: () => isURLAvailable(target, server.ignoreHTTPSErrors),
+      name: target.url,
+      isUp: () => isURLAvailable(url, server.ignoreHTTPSErrors),
     },
   ];
 }
