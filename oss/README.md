@@ -87,4 +87,7 @@ dev server (`npm run dev`), which compiles Stryker's sandbox on the fly.
    `npx playwright install chromium`, and `npx react-router typegen` for the checker. Plain `npx playwright test --workers=1` then passes 25 tests and skips 1.
 5. Run `npx stryker run stryker.playwright.config.ts`. Keep the copy's `reuseExistingServer: true`:
    when the type checker finishes, Stryker starts a second test runner, which would otherwise fail
-   with "http://localhost:3313 is already used".
+   with "http://localhost:3313 is already used". So from then on two test runners share one dev
+   server and one SQLite database, even at `concurrency: 1`. A test that one runner's data breaks can
+   fail without a mutant at fault, which turns a survivor into a kill; that may be why two mutants
+   killed on 2026-10-29 survived on 2026-10-31.
