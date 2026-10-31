@@ -265,8 +265,8 @@ export async function resolveFromCore(
 
   if (
     placer === undefined ||
-    typeof placer.canPlace !== 'function' ||
-    typeof placer.place !== 'function'
+    typeof placer['canPlace'] !== 'function' ||
+    typeof placer['place'] !== 'function'
   ) {
     throw missing('expressionMutantPlacer');
   }
@@ -323,8 +323,8 @@ function importFile(path: string): Promise<unknown> {
 function isListedMutator(value: unknown): value is ListedMutator {
   return (
     isRecord(value) &&
-    typeof value.name === 'string' &&
-    typeof value.mutate === 'function'
+    typeof value['name'] === 'string' &&
+    typeof value['mutate'] === 'function'
   );
 }
 

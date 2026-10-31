@@ -8,7 +8,7 @@ import { consumerRoles } from './playwright-roles.ts';
 
 // Core sets this in every test-runner and checker child process (child-process-proxy.js:32), which re-import plugin
 // modules but never instrument.
-const installRan = process.env.STRYKER_MUTATOR_WORKER === undefined;
+const installRan = process.env['STRYKER_MUTATOR_WORKER'] === undefined;
 
 if (installRan) {
   // A failure rejects this module's evaluation, and every later import of it rejects with the same error. A config

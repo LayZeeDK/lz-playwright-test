@@ -14,7 +14,7 @@ function runEntry(
   ...args: string[]
 ) {
   const env = { ...process.env };
-  delete env.STRYKER_MUTATOR_WORKER;
+  delete env['STRYKER_MUTATOR_WORKER'];
   const child = spawnSync(process.execPath, [entryPath, ...args], {
     encoding: 'utf8',
     env: { ...env, ...extraEnv },

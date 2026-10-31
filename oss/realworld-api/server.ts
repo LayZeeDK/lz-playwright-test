@@ -304,7 +304,7 @@ const cookieHeader = (value: string, maxAge: number) => ({
 });
 
 export function createApiServer({
-  stateFile = process.env.STATE_FILE,
+  stateFile = process.env['STATE_FILE'],
 }: { stateFile?: string | undefined } = {}) {
   const db = loadDb(stateFile);
   const issue = (user: User) => issueToken(db.secret, user);
@@ -442,12 +442,12 @@ export function createApiServer({
         const input = body?.user;
         const errors = required(input, ['username', 'email', 'password']);
 
-        if (!errors.email && db.users.some((u) => u.email === input.email)) {
-          errors.email = ['has already been taken'];
+        if (!errors['email'] && db.users.some((u) => u.email === input.email)) {
+          errors['email'] = ['has already been taken'];
         }
 
-        if (!errors.username && userByName(input.username)) {
-          errors.username = ['has already been taken'];
+        if (!errors['username'] && userByName(input.username)) {
+          errors['username'] = ['has already been taken'];
         }
 
         if (hasErrors(errors)) {
@@ -520,9 +520,9 @@ export function createApiServer({
 
         if (typeof input.email === 'string' && input.email !== me.email) {
           if (!input.email.trim()) {
-            errors.email = ["can't be blank"];
+            errors['email'] = ["can't be blank"];
           } else if (db.users.some((u) => u.email === input.email)) {
-            errors.email = ['has already been taken'];
+            errors['email'] = ['has already been taken'];
           }
         }
 
@@ -531,9 +531,9 @@ export function createApiServer({
           input.username !== me.username
         ) {
           if (!input.username.trim()) {
-            errors.username = ["can't be blank"];
+            errors['username'] = ["can't be blank"];
           } else if (userByName(input.username)) {
-            errors.username = ['has already been taken'];
+            errors['username'] = ['has already been taken'];
           }
         }
 
@@ -781,7 +781,7 @@ export function createApiServer({
       ({ params, me }) => {
         const article = findArticle(param(params, 'slug'));
         const comment = db.comments.find(
-          (c) => c.id === Number(params.id) && c.articleId === article.id,
+          (c) => c.id === Number(params['id']) && c.articleId === article.id,
         );
 
         if (!comment) {
@@ -851,7 +851,7 @@ export function createApiServer({
     });
     res.end(body === undefined ? undefined : JSON.stringify(body));
 
-    if (process.env.DEBUG) {
+    if (process.env['DEBUG']) {
       console.log(req.method, req.url, status);
     }
   };
@@ -964,7 +964,7 @@ function decodeParam(value: string): string {
 }
 
 if (import.meta.main) {
-  const port = Number(process.env.PORT ?? 3100);
+  const port = Number(process.env['PORT'] ?? 3100);
 
   createApiServer().listen(port, HOST, () => {
     console.log(`RealWorld API double listening on http://${HOST}:${port}/api`);
