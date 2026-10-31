@@ -976,7 +976,8 @@ export const cases: readonly Case[] = [
     id: 'design-11',
     title:
       'a guard and a ternary inside an attribute value: the guard is removed, the ternary is left alone',
-    origin: 'design:Tradeoffs accepted (candidate-opus), LzConditionalElement',
+    origin:
+      'docs/design/playwright-mutators-opus.md:64 and docs/design/playwright-mutators.md:139, LzConditionalElement',
     jsx: '<Card icon={busy && <Spinner />} badge={busy ? <Dot /> : null} />',
     expect: [['LzConditionalElement', '<Spinner />']],
   },
