@@ -113,6 +113,27 @@ describe('parseRoleTable', () => {
         ),
         'kImplicitRoleByTagName lacks the entries for button that LzElementRole reads',
       ],
+      [
+        'the BUTTON entry names a role the span swap does not take',
+        excerpt('1.64.1').replace(
+          '"BUTTON": () => "button"',
+          '"BUTTON": () => "generic"',
+        ),
+        'kImplicitRoleByTagName changes the roles LzElementRole reads: button is generic, not button',
+      ],
+      [
+        'the A and AREA entries name a role the span swap does not take',
+        excerpt('1.64.1').replaceAll('? "link" :', '? "generic" :'),
+        'kImplicitRoleByTagName changes the roles LzElementRole reads: a is generic, not link; area is generic, not link',
+      ],
+      [
+        'the BUTTON entry names the role of the A entry',
+        excerpt('1.64.1').replace(
+          '"BUTTON": () => "button"',
+          '"BUTTON": () => "link"',
+        ),
+        'kImplicitRoleByTagName changes the roles LzElementRole reads: button is link, not button',
+      ],
     ] as const
   ).forEach(([title, bundle, message]) => {
     it(`throws when ${title}`, () => {

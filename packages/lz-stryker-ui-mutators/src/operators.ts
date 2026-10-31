@@ -10,7 +10,7 @@ import {
   type ElementSite,
 } from './mutator.ts';
 import type { RoleTable } from './playwright-roles.ts';
-import { notOnSpan } from './span-swap.ts';
+import { notOnSpan, swapsToSpan } from './span-swap.ts';
 
 const hasWord = /[\p{L}\p{N}]/u;
 const comparisonOperators: ReadonlySet<string> = new Set([
@@ -178,7 +178,10 @@ export function operatorsFor(roles: RoleTable) {
           *mutate(path, t) {
             const element = elementSiteOf(path.node, t);
 
-            if (element === undefined || !swapsToSpan(element, roles)) {
+            if (
+              element === undefined ||
+              !swapsToSpan(implicitRole(element, roles))
+            ) {
               return;
             }
 
@@ -246,12 +249,6 @@ function builtInForces(test: types.Node, t: BabelTypes): boolean {
     (t.isBinaryExpression(test) && comparisonOperators.has(test.operator)) ||
     (t.isLogicalExpression(test) && test.operator !== '??')
   );
-}
-
-function swapsToSpan(element: ElementSite, roles: RoleTable): boolean {
-  const role = implicitRole(element, roles);
-
-  return role === 'button' || role === 'link';
 }
 
 function asSpan(element: ElementSite, t: BabelTypes): types.JSXElement {

@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
 import { fieldOf } from './is-record.ts';
-import { spanSwapTags } from './span-swap.ts';
+import { spanSwapRoleByTag } from './span-swap.ts';
 
 export interface ImplicitRole {
   readonly role: string;
@@ -135,11 +135,27 @@ export function parseRoleTable(bundle: string): RoleTable {
     ),
   ]);
 
-  const missing = spanSwapTags.filter((tag) => !roles.has(tag));
+  const missing = [...spanSwapRoleByTag.keys()].filter(
+    (tag) => !roles.has(tag),
+  );
 
   if (missing.length > 0) {
     throw new Error(
       `kImplicitRoleByTagName lacks the entries for ${missing.join(', ')} that LzElementRole reads`,
+    );
+  }
+
+  const changed = [...spanSwapRoleByTag].flatMap(([tag, expected]) => {
+    const found = roles.get(tag)?.role;
+
+    return found === undefined || found === expected
+      ? []
+      : [`${tag} is ${found}, not ${expected}`];
+  });
+
+  if (changed.length > 0) {
+    throw new Error(
+      `kImplicitRoleByTagName changes the roles LzElementRole reads: ${changed.join('; ')}`,
     );
   }
 

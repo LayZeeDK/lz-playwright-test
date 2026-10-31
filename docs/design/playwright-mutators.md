@@ -177,7 +177,8 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
   takes every tag whose role there is fixed, plus `a` and `area` with `href` (`link`). It reads the table
   of the consumer's `playwright-core` when the plugin loads, and falls back to a table generated from
   `playwright-core` when the package is built, as the package README describes. A table that lacks the
-  entry for `a`, `area` or `button` counts as unreadable. When the plugin loads, it then uses the bundled
+  entry for `a`, `area` or `button`, or gives one of them a role other than the one the span swap reads
+  (`link` for `a` and `area`, `button` for `button`), counts as unreadable. When the plugin loads, it then uses the bundled
   table and prints a warning. When the package is built, the generator fails. The span swap reads the
   same table. In 1.64.1 the tags with a fixed role are `article`, `aside`, `blockquote`, `button`, `caption`,
   `code`, `datalist`, `dd`, `del`, `details`, `dfn`, `dialog`, `dt`, `em`, `fieldset`, `figure`, `h1` to
