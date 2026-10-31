@@ -82,9 +82,9 @@ dev server (`npm run dev`), which compiles Stryker's sandbox on the fly.
    - marks "Users can update their profile photo" `test.fixme`. It failed in every plain run: its
      `/change/i` button locator matches the previous page's "Save changes" button before the photo
      page renders.
-4. Run the repo's setup steps: `npx prisma generate --sql`, `npx prisma migrate deploy`,
-   `npm run build`, `npx playwright install chromium`, and `npx react-router typegen` for the
-   checker. Plain `npx playwright test --workers=1` then passes 25 tests and skips 1.
+4. Run the repo's setup steps: `npx prisma migrate deploy`, then `npx prisma generate --sql`, which
+   reads the tables the migration creates ("no such table: User" otherwise), then `npm run build`,
+   `npx playwright install chromium`, and `npx react-router typegen` for the checker. Plain `npx playwright test --workers=1` then passes 25 tests and skips 1.
 5. Run `npx stryker run stryker.playwright.config.ts`. Keep the copy's `reuseExistingServer: true`:
    when the type checker finishes, Stryker starts a second test runner, which would otherwise fail
    with "http://localhost:3313 is already used".
