@@ -44,9 +44,11 @@ list names it too.
 Each Stryker test runner process starts the Playwright `webServer` itself. Without `concurrency`, Stryker
 starts one process per CPU core, less one on a machine with more than 4 cores, and with a fixed port in
 the Playwright config every process after the first fails at startup because the port is taken. A Stryker
-checker adds one more test runner when it finishes, even at `concurrency` 1. So either give each process
-its own port, for example from `STRYKER_MUTATOR_WORKER` (see Faster mutation runs), or set the
-`webServer`'s `reuseExistingServer` to `true` so that the processes share one server.
+checker hands its processes to new test runners when it finishes, so even at `concurrency` 1 a second
+test runner starts. So either give each process its own port, for example from `STRYKER_MUTATOR_WORKER`
+(see Faster mutation runs), or set the `webServer`'s `reuseExistingServer` to `true` so that the
+processes share one server. With `reuseExistingServer`, stop any dev server of your own first: a server
+that was already running serves the original sources, not Stryker's instrumented copy.
 
 Stryker's default `timeoutMS` is 5000 ms, the same as Playwright's default `expect.timeout`. Keep
 `timeoutMS` at least twice the expect timeout, or a killed mutant's failing assertion runs out Stryker's
@@ -147,7 +149,7 @@ otherwise:
 
 - Only code that runs in the page or in a Playwright test worker gets the active mutant. Server-side code
   (SSR, API routes) runs in the `webServer`, which starts once without one, so its mutants are
-  NoCoverage. On a server-rendered app, a mutant that changes text or an element breaks hydration and
+  NoCoverage, or Survived with `coverageAnalysis: 'off'`. On a server-rendered app, a mutant that changes text or an element breaks hydration and
   counts as Killed even when no test checks it, and one that changes an attribute never reaches the DOM.
 - One server serves every mutant run, so what one run writes to the server or its backend is still
   there in the next. A suite that needs a fresh backend can report a mutant wrongly.
