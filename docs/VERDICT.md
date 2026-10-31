@@ -76,7 +76,8 @@ tests cover all ten. The plugin patches StrykerJS internals, so it supports Stry
   same run took about 7 s. Both times are from the decision log and were not rerun.
 - Before each run, and again after a run with a failing test, the runner checks every `webServer` that
   has a `url` or a `port` the way Playwright does at startup (an HTTP request for a `url`, a TCP
-  connection for a `port`). It does not check a `webServer` that has neither. When a server is
+  connection for a `port`, and a TCP connection to the url's port for a `url` with any `port` set
+  next to it). It does not check a `webServer` that has neither. When a server is
   down, the runner reruns global setup and, after a failing run, reruns the mutant once. A server that dies does
   not turn mutants into kills. The restart counts against the mutant's timeout, so a restart that takes
   long (a server that builds first) turns that mutant into a Timeout instead.

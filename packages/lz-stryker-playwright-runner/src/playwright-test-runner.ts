@@ -372,22 +372,29 @@ function serverCheck(
   server: ConfigWebServer,
   isURLAvailable: Playwright['isURLAvailable'],
 ): ServerCheck[] {
-  if (server.url) {
-    const url = new URL(server.url);
+  const { url, port } = server;
 
+  if (port !== undefined) {
     return [
       {
-        name: server.url,
-        isUp: () => isURLAvailable(url, server.ignoreHTTPSErrors),
+        name: url ?? `port ${port}`,
+        isUp: () => acceptsConnections(port),
       },
     ];
   }
 
-  const port = server.port;
+  if (url === undefined) {
+    return [];
+  }
 
-  return port === undefined
-    ? []
-    : [{ name: `port ${port}`, isUp: () => acceptsConnections(port) }];
+  const target = new URL(url);
+
+  return [
+    {
+      name: url,
+      isUp: () => isURLAvailable(target, server.ignoreHTTPSErrors),
+    },
+  ];
 }
 
 function logCoverageGaps(

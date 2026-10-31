@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import {
   instrumentationOf,
   isSerialSuite,
+  playwrightVersion,
   probeInternals,
   runningSlotOf,
   supportsPlaywright,
@@ -44,6 +45,27 @@ test('the runner supports Playwright 1.63 and later 1.x releases', () => {
   assert.equal(supportsPlaywright('2.0.0'), false);
   assert.equal(supportsPlaywright('0.70.0'), false);
   assert.equal(supportsPlaywright('1'), false);
+});
+
+test("Playwright's version is read from its package.json, and one that is no string fails loudly", () => {
+  const requireManifest =
+    (manifest: unknown) =>
+    (id: string): unknown => {
+      assert.equal(id, 'playwright/package.json');
+
+      return manifest;
+    };
+
+  assert.equal(
+    playwrightVersion(requireManifest({ version: '1.64.1' })),
+    '1.64.1',
+  );
+  [{ version: 1 }, {}, null].forEach((manifest) => {
+    assert.throws(() => playwrightVersion(requireManifest(manifest)), {
+      message:
+        'Playwright changed the internals this runner calls (playwright/package.json with a string version).',
+    });
+  });
 });
 
 test("the worker entry is Playwright's workerProcessEntry.js, by either path separator", () => {
@@ -234,7 +256,7 @@ test('the test runner reads loaded config values the way Playwright does: a nume
   });
 });
 
-test('the test runner reads what Playwright runs though its types refuse it: a falsy port or url as none, a URL object as its string, a null expect.timeout as none', async () => {
+test('the test runner reads what Playwright runs though its types refuse it: a falsy port or url as none, any port next to a url as the port of that url, a URL object as its string, a null expect.timeout as none', async () => {
   const runner = await testRunnerAnswering({
     loadConfig: {
       projects: [
@@ -251,6 +273,8 @@ test('the test runner reads what Playwright runs though its types refuse it: a f
         { port: 0 },
         { url: null },
         { url: new URL('http://127.0.0.1:41234/') },
+        { url: 'http://localhost:3000/health', port: null },
+        { url: 'http://localhost/health', port: false },
       ],
     },
   });
@@ -274,6 +298,12 @@ test('the test runner reads what Playwright runs though its types refuse it: a f
         port: undefined,
         ignoreHTTPSErrors: false,
       },
+      {
+        url: 'http://localhost:3000/health',
+        port: 3000,
+        ignoreHTTPSErrors: false,
+      },
+      { url: 'http://localhost/health', port: 0, ignoreHTTPSErrors: false },
     ],
   });
 });
@@ -331,6 +361,14 @@ const refusedConfigs = [
   [
     'has a web server whose port is a string of no digits',
     { projects: [], webServers: [{ ...validServer, port: 'auto' }] },
+  ],
+  [
+    'has a web server whose port is a string that only starts with digits',
+    { projects: [], webServers: [{ ...validServer, port: '3000x' }] },
+  ],
+  [
+    'has a web server whose port is a string that only ends with digits',
+    { projects: [], webServers: [{ ...validServer, port: 'x3000' }] },
   ],
   [
     'has a web server whose port is no number or string',

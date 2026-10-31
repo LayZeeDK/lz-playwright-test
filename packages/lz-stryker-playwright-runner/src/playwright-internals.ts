@@ -25,6 +25,11 @@ export interface ConfigProject {
 
 export interface ConfigWebServer {
   readonly url?: string | undefined;
+  /**
+   * The port to check with a TCP connection instead of fetching the url, as Playwright's `checkPortOnly`
+   * does: the config's port, or the url's port when the config sets a port that is not `undefined` next to
+   * a url.
+   */
   readonly port?: number | undefined;
   readonly ignoreHTTPSErrors: boolean;
 }
@@ -306,7 +311,8 @@ function parseConfig(
     webServers: webServers.map((server: unknown): ConfigWebServer => {
       const configUrl = fieldOf(server, 'url') || undefined;
       const url = configUrl instanceof URL ? configUrl.href : configUrl;
-      const port = fieldOf(server, 'port') || undefined;
+      const configPort = fieldOf(server, 'port');
+      const port = configPort || undefined;
 
       if (
         !isRecord(server) ||
@@ -318,13 +324,36 @@ function parseConfig(
         throw changed();
       }
 
+      const checkedPort =
+        url !== undefined && configPort !== undefined
+          ? new URL(url).port
+          : port;
+
       return {
         url,
-        port: port === undefined ? undefined : Number(port),
+        port: checkedPort === undefined ? undefined : Number(checkedPort),
         ignoreHTTPSErrors: !!server['ignoreHTTPSErrors'],
       };
     }),
   };
+}
+
+export function playwrightVersion(
+  playwrightRequire: (id: string) => unknown,
+): string {
+  const version = fieldOf(
+    playwrightRequire('playwright/package.json'),
+    'version',
+  );
+
+  if (typeof version !== 'string') {
+    throw internalsChanged(
+      undefined,
+      'playwright/package.json with a string version',
+    );
+  }
+
+  return version;
 }
 
 export function loadPlaywright(configFile: string | undefined): Playwright {
@@ -338,8 +367,7 @@ export function loadPlaywright(configFile: string | undefined): Playwright {
   const playwrightRequire = createRequire(
     testRequire.resolve('playwright/package.json'),
   );
-  const manifest: unknown = playwrightRequire('./package.json');
-  const version = String(fieldOf(manifest, 'version'));
+  const version = playwrightVersion(playwrightRequire);
 
   if (!supportsPlaywright(version)) {
     throw new Error(
@@ -439,9 +467,15 @@ function timeoutManagerChanged(version: string): Error {
   );
 }
 
-export function internalsChanged(version: string, what: string): Error {
+export function internalsChanged(
+  version: string | undefined,
+  what: string,
+): Error {
+  const playwright =
+    version === undefined ? 'Playwright' : `Playwright ${version}`;
+
   return new Error(
-    `Playwright ${version} changed the internals this runner calls (${what}).`,
+    `${playwright} changed the internals this runner calls (${what}).`,
   );
 }
 

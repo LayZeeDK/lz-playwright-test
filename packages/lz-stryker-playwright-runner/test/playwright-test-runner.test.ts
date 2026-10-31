@@ -163,7 +163,7 @@ test('init refuses a Playwright whose package.json names no version', async (t) 
 
   await assert.rejects(shell.init(), {
     message:
-      'The Playwright test runner needs Playwright 1.63 or a later 1.x release, found undefined.',
+      'Playwright changed the internals this runner calls (playwright/package.json with a string version).',
   });
   assert.deepEqual(fake.calls, []);
 });
@@ -794,6 +794,25 @@ test('a webServer port is checked by connecting to it, and one without url or po
 
   assert.deepEqual(lines, []);
   assert.equal(fake.runs.length, 1);
+});
+
+test('a webServer url with a port set next to it, even a falsy one, is checked by connecting to the url port, as Playwright does', async (t) => {
+  const { server, port } = await listening();
+  t.after(() => server.close());
+  const fake = fakePlaywright(t, {
+    webServers: [{ url: `http://localhost:${port}/health`, port: 0 }],
+    urlUp: async () => false,
+  });
+  const { shell, lines } = fake.runner();
+  await shell.init();
+
+  await shell.dryRun(dryRunOptions());
+
+  assert.deepEqual(lines, []);
+  assert.deepEqual(
+    fake.names().filter((name) => name === 'isURLAvailable'),
+    [],
+  );
 });
 
 test('a webServer port that stopped answering is restarted and named by its port', async (t) => {

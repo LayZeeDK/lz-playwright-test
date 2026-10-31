@@ -6,7 +6,7 @@ import { isMainThread } from 'node:worker_threads';
 
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
-import { fieldOf, isRecord } from './is-record.ts';
+import { isRecord } from './is-record.ts';
 import {
   type HookedBrowser,
   type HookedContext,
@@ -14,6 +14,7 @@ import {
   type HookedPage,
   instrumentationOf,
   internalsChanged,
+  playwrightVersion,
   type RunningSlot,
   runningSlotOf,
   type SlotType,
@@ -147,9 +148,7 @@ export function install(
   { outDir, perTest, hitLimit }: RunSettings,
   ns: string = INSTRUMENTER_CONSTANTS.NAMESPACE,
 ): void {
-  const version = String(
-    fieldOf(playwrightRequire('playwright/package.json'), 'version'),
-  );
+  const version = playwrightVersion(playwrightRequire);
   const test = currentTestOf(playwrightRequire('playwright/test'), version);
   const instrumentation = instrumentationOf(
     playwrightRequire('playwright-core'),
