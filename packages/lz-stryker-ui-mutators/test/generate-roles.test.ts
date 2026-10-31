@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
-import { existsSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, posix } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describe, it } from 'node:test';
 
 import { generateRoles } from '../scripts/roles-generator.ts';
+import { fieldOf } from '../src/is-record.ts';
 import { parseRoleTable } from '../src/playwright-roles.ts';
+import { parse } from './support/babel.ts';
 import { exported } from './support/exports.ts';
 import {
   buttonOnly,
@@ -31,12 +33,13 @@ describe('generateRoles', () => {
     );
   });
 
-  it('throws naming the version, the path and what is missing, and writes nothing, when the table is unreadable', (t) => {
+  it('throws naming the version, the path and what is missing, with the reading error as its cause, and writes nothing, when the table is unreadable', (t) => {
     const { root, bundlePath } = fakePlaywrightCore(t, '1.99.0', 'export {};');
     const { from, out } = paths(root);
 
     assert.throws(() => generateRoles(from, out), {
       message: `cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} (Error: kImplicitRoleByTagName not found)`,
+      cause: new Error('kImplicitRoleByTagName not found'),
     });
     assert.equal(existsSync(out), false);
   });
@@ -78,5 +81,54 @@ describe('generateRoles', () => {
       message: `playwright-core is not installed where ${from} resolves it; it is a dev dependency of this package.`,
     });
     assert.equal(existsSync(out), false);
+  });
+});
+
+describe('the generate-roles target', () => {
+  const projectRoot = join(import.meta.dirname, '..');
+
+  function importsOf(file: string, seen: ReadonlySet<string>): Set<string> {
+    if (seen.has(file)) {
+      return new Set(seen);
+    }
+
+    return parse(readFileSync(join(projectRoot, file), 'utf8'))
+      .program.body.flatMap((node) =>
+        node.type === 'ImportDeclaration' && node.source.value.startsWith('.')
+          ? [posix.join(posix.dirname(file), node.source.value)]
+          : [],
+      )
+      .reduce(
+        (found, imported) => importsOf(imported, found),
+        new Set([...seen, file]),
+      );
+  }
+
+  it('lists as inputs every file that scripts/generate-roles.ts imports, directly or through another import', () => {
+    const inputs = fieldOf(
+      fieldOf(
+        fieldOf(
+          fieldOf(
+            JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf8')),
+            'nx',
+          ),
+          'targets',
+        ),
+        'generate-roles',
+      ),
+      'inputs',
+    );
+    assert.ok(Array.isArray(inputs));
+
+    assert.deepEqual(
+      inputs
+        .flatMap((input: unknown) =>
+          typeof input === 'string'
+            ? [input.replace('{projectRoot}/', '')]
+            : [],
+        )
+        .sort(),
+      [...importsOf('scripts/generate-roles.ts', new Set())].sort(),
+    );
   });
 });
