@@ -582,3 +582,33 @@ or with no suffix gives ArrayDeclaration and ArithmeticOperator. The UI operator
 package now builds the table through a helper with a `const` type parameter, and the run then found 15
 survivors. Worth a comment on #6208 if Lars wants one: a `const` assertion is the common case, and it
 hides the most code.
+
+## michael-denyer/pstack-claude: `arena` trusts the runner's model and lets the parent overrule the judge unchecked
+
+Status: draft, not filed (2026-10-31). Observed 2026-10-26 in one arena run. Not searched for existing issues
+yet; before filing, search the repo's issues with a single-word positive control ("arena") as well as the
+specific words. Lars decides whether it goes to this port or to the original pstack.
+
+**Versions.** pstack (Claude Code port) 0.9.81, `skills/arena/SKILL.md`; Claude Code on Windows 11 arm64; arena
+runners `opus, fable, sonnet` from `pstack-models.md`.
+
+**Observation 1: a runner can run on a model other than the one it was spawned for.** A runner spawned for Fable
+at high effort ran on Opus for 46 turns, with no notice in its report. Phase C then nearly scored two Opus designs
+as a cross-family panel. Phase B and Phase C never check which model ran. The subagent's transcript records it in
+every assistant message (`"model":"..."`).
+
+**Suggestion 1.** Add to Phase B: after each runner finishes, count the model names in its transcript, label each
+candidate with the model that ran, and treat a mismatch like a dropout ("proceed with N-1 and note the dropout").
+Phase C's "prefer a different model family" then rests on the measured model.
+
+**Observation 2: Phase D lets the parent overrule the cross-judge on an unmeasured claim.** Phase D says
+"Disagreement means one of you is biased or the rubric was ambiguous. Read both rationales before deciding." The
+parent overruled the judge with "my role table already settles that case". A later study showed the table covered
+17 of Playwright's 52 tags.
+
+**Suggestion 2.** Add to Phase D: an override of the cross-judge names the measured fact it rests on, and a claim
+that something is complete is checked against the primary source first. Record that fact in the synthesis note
+beside the judge's verdict.
+
+**Local workaround.** Lars's own skills carry both rules: `lars-principle-own-delegated-work` (model check from
+the transcript) and the `pstack:arena` trigger line in `lars-mode` (override rule).
