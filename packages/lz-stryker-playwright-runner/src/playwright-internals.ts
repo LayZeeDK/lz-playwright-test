@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import { inspect } from 'node:util';
 
 import type { FullResult, Reporter } from '@playwright/test/reporter';
 
@@ -314,14 +315,24 @@ function parseConfig(
       const configPort = fieldOf(server, 'port');
       const port = configPort || undefined;
 
+      if (!isRecord(server)) {
+        throw misconfigured('webServer', 'an object', server);
+      }
+
+      if (url !== undefined && typeof url !== 'string') {
+        throw misconfigured('webServer.url', 'a string or a URL', url);
+      }
+
       if (
-        !isRecord(server) ||
-        (url !== undefined && typeof url !== 'string') ||
-        (port !== undefined &&
-          typeof port !== 'number' &&
-          !(typeof port === 'string' && /^\d+$/.test(port)))
+        port !== undefined &&
+        typeof port !== 'number' &&
+        !(typeof port === 'string' && /^\d+$/.test(port))
       ) {
-        throw changed();
+        throw misconfigured(
+          'webServer.port',
+          'a number or a string of digits',
+          port,
+        );
       }
 
       const checkedPort =
@@ -458,6 +469,12 @@ export function runningSlotOf(
     type: runnable['type'],
     inFixture: runnable['fixture'] !== undefined,
   };
+}
+
+function misconfigured(field: string, expected: string, value: unknown): Error {
+  return new Error(
+    `The Playwright config's ${field} must be ${expected}, got ${inspect(value)}.`,
+  );
 }
 
 function timeoutManagerChanged(version: string): Error {

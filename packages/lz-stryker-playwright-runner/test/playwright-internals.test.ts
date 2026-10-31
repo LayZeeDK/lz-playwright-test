@@ -353,28 +353,56 @@ const refusedConfigs = [
       webServers: [],
     },
   ],
-  ['has a web server that is no object', { projects: [], webServers: [null] }],
+] as const;
+
+// Playwright passes webServer entries on unread, so these are mistakes in the consumer's config.
+const misconfiguredServers = [
   [
-    'has a web server with no string url',
-    { projects: [], webServers: [{ ...validServer, url: 1 }] },
+    'that is no object',
+    1,
+    "The Playwright config's webServer must be an object, got 1.",
   ],
   [
-    'has a web server whose port is a string of no digits',
-    { projects: [], webServers: [{ ...validServer, port: 'auto' }] },
+    'with no string url',
+    { ...validServer, url: 1 },
+    "The Playwright config's webServer.url must be a string or a URL, got 1.",
   ],
   [
-    'has a web server whose port is a string that only starts with digits',
-    { projects: [], webServers: [{ ...validServer, port: '3000x' }] },
+    'whose port is a string of no digits',
+    { ...validServer, port: 'auto' },
+    "The Playwright config's webServer.port must be a number or a string of digits, got 'auto'.",
   ],
   [
-    'has a web server whose port is a string that only ends with digits',
-    { projects: [], webServers: [{ ...validServer, port: 'x3000' }] },
+    'whose port is a string that only starts with digits',
+    { ...validServer, port: '3000x' },
+    "The Playwright config's webServer.port must be a number or a string of digits, got '3000x'.",
   ],
   [
-    'has a web server whose port is no number or string',
-    { projects: [], webServers: [{ ...validServer, port: [3000] }] },
+    'whose port is a string that only ends with digits',
+    { ...validServer, port: 'x3000' },
+    "The Playwright config's webServer.port must be a number or a string of digits, got 'x3000'.",
+  ],
+  [
+    'whose port is no number or string',
+    { ...validServer, port: [3000] },
+    "The Playwright config's webServer.port must be a number or a string of digits, got [ 3000 ].",
+  ],
+  [
+    'whose port is a bigint',
+    { ...validServer, port: 3000n },
+    "The Playwright config's webServer.port must be a number or a string of digits, got 3000n.",
   ],
 ] as const;
+
+misconfiguredServers.forEach(([title, server, message]) => {
+  test(`the test runner names the config's mistake for a web server ${title}`, async () => {
+    const runner = await testRunnerAnswering({
+      loadConfig: { projects: [], webServers: [server] },
+    });
+
+    await assert.rejects(runner.loadConfig(), { message });
+  });
+});
 
 refusedConfigs.forEach(([title, config]) => {
   test(`the test runner refuses a loaded config that ${title}`, async () => {
@@ -634,5 +662,9 @@ test('playwright-internals.ts imports no runner code at run time', () => {
     ),
   ].map(([, specifier]) => specifier);
 
-  assert.deepEqual(runtimeImports, ['node:module', './is-record.ts']);
+  assert.deepEqual(runtimeImports, [
+    'node:module',
+    'node:util',
+    './is-record.ts',
+  ]);
 });
