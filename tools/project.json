@@ -2,6 +2,14 @@
   "name": "tools",
   "$schema": "../node_modules/nx/schemas/project-schema.json",
   "targets": {
+    "lint": {
+      "inputs": [
+        "...",
+        "{workspaceRoot}/tsconfig.tools.json",
+        "{workspaceRoot}/tsconfig.node.json",
+        "{workspaceRoot}/tsconfig.base.json"
+      ]
+    },
     "typecheck": {
       "command": "tsc -p tsconfig.tools.json",
       "options": { "cwd": "{workspaceRoot}" },

@@ -44,6 +44,10 @@
       "lint": {
         "dependsOn": [
           "@layzee/lz-stryker-ui-mutators:generate-roles"
+        ],
+        "inputs": [
+          "...",
+          "{workspaceRoot}/tsconfig.base.json"
         ]
       },
       "test-browser": {

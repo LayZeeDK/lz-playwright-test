@@ -85,6 +85,10 @@
       "lint": {
         "dependsOn": [
           "generate-roles"
+        ],
+        "inputs": [
+          "...",
+          "{workspaceRoot}/tsconfig.base.json"
         ]
       },
       "test": {
