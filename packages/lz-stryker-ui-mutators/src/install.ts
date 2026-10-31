@@ -66,13 +66,6 @@ export interface Instrumenter {
   instrument(files: readonly SourceFile[]): Promise<readonly MutantOrigin[]>;
 }
 
-export interface CoreInstrumenter extends Instrumenter {
-  run(
-    files: readonly SourceFile[],
-    excludedMutations?: readonly string[],
-  ): Promise<unknown>;
-}
-
 export async function install(
   operators: readonly Operator[],
   resolve: () => Promise<Instrumenter> = resolveFromCore,
@@ -203,7 +196,7 @@ export function corePackageJson(
 
 export async function resolveFromCore(
   corePackage: string = corePackageJson(),
-): Promise<CoreInstrumenter> {
+): Promise<Instrumenter> {
   const fromCore = createRequire(corePackage);
   const packageJson = fromCore.resolve(
     '@stryker-mutator/instrumenter/package.json',
@@ -259,22 +252,6 @@ export async function resolveFromCore(
 
   const { canPlace, place } = placer;
 
-  const run: CoreInstrumenter['run'] = async (
-    files,
-    excludedMutations = [],
-  ) => {
-    const result: unknown = await Reflect.apply(
-      instrument,
-      Reflect.construct(Instrumenter, [silentLogger]),
-      [
-        files.map((file) => ({ ...file, mutate: true })),
-        { plugins: null, excludedMutations, ignorers: [] },
-      ],
-    );
-
-    return result;
-  };
-
   return {
     dir,
     version,
@@ -300,9 +277,16 @@ export async function resolveFromCore(
         },
       },
     },
-    run,
     async instrument(files) {
-      const mutants = fieldOf(await run(files), 'mutants');
+      const result: unknown = await Reflect.apply(
+        instrument,
+        Reflect.construct(Instrumenter, [silentLogger]),
+        [
+          files.map((file) => ({ ...file, mutate: true })),
+          { plugins: null, excludedMutations: [], ignorers: [] },
+        ],
+      );
+      const mutants = fieldOf(result, 'mutants');
 
       if (!Array.isArray(mutants) || !mutants.every(isMutantOrigin)) {
         throw new Error(

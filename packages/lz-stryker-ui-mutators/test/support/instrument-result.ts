@@ -1,7 +1,11 @@
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
 import type { MutantStatus, Position } from '@stryker-mutator/api/core';
 
-import type { CoreInstrumenter, SourceFile } from '../../src/install.ts';
+import type { Instrumenter, SourceFile } from '../../src/install.ts';
 import { fieldOf } from '../../src/is-record.ts';
+import { exportedFunction } from './exports.ts';
 
 export interface InstrumentedMutant {
   readonly id: string;
@@ -31,12 +35,44 @@ const statuses: readonly MutantStatus[] = [
   'Pending',
 ];
 
+const nothing = (): undefined => undefined;
+const silentLogger = {
+  debug: nothing,
+  info: nothing,
+  warn: nothing,
+  error: nothing,
+  trace: nothing,
+  fatal: nothing,
+  isDebugEnabled: () => false,
+  isTraceEnabled: () => false,
+};
+
+async function run(
+  { dir }: Instrumenter,
+  files: readonly SourceFile[],
+  excludedMutations: readonly string[],
+): Promise<unknown> {
+  const coreInstrumenter = exportedFunction(
+    await import(pathToFileURL(join(dir, 'dist', 'src', 'index.js')).href),
+    'Instrumenter',
+  );
+  const instrumenter: unknown = Reflect.construct(coreInstrumenter, [
+    silentLogger,
+  ]);
+  const instrument = exportedFunction(instrumenter, 'instrument');
+
+  return Reflect.apply(instrument, instrumenter, [
+    files.map((file) => ({ ...file, mutate: true })),
+    { plugins: null, excludedMutations, ignorers: [] },
+  ]);
+}
+
 export async function instrumentFully(
-  instrumenter: CoreInstrumenter,
+  instrumenter: Instrumenter,
   files: readonly SourceFile[],
   excludedMutations: readonly string[] = [],
 ): Promise<InstrumentResult> {
-  const result = await instrumenter.run(files, excludedMutations);
+  const result = await run(instrumenter, files, excludedMutations);
   const fileList = fieldOf(result, 'files');
   const mutants = fieldOf(result, 'mutants');
 

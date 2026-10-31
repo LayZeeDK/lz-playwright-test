@@ -19,23 +19,37 @@ function tarballOf(versions: Record<string, unknown>, version: string): string {
   const tarball = fieldOf(fieldOf(versions[version], 'dist'), 'tarball');
 
   if (typeof tarball !== 'string') {
-    throw new Error(`playwright-core ${version} has no dist.tarball`);
+    throw new Error('no dist.tarball');
   }
 
   return tarball;
 }
 
-function excerptOf(bundle: string, version: string): string {
-  try {
-    return roleTableExcerpt(bundle);
-  } catch (error) {
-    throw new Error(
-      `playwright-core ${version} has no kImplicitRoleByTagName`,
-      {
-        cause: error,
-      },
-    );
+async function writeExcerpt(
+  work: string,
+  version: string,
+  tarball: string,
+): Promise<void> {
+  const download = await fetch(tarball);
+
+  if (!download.ok) {
+    throw new Error(`the tarball answered ${String(download.status)}`);
   }
+
+  writeFileSync(
+    path.join(work, `${version}.tgz`),
+    Buffer.from(await download.arrayBuffer()),
+  );
+  // A relative path, because Git Bash's GNU tar reads `D:` in an absolute one as a remote host.
+  execFileSync('tar', ['-xzf', `${version}.tgz`, 'package/lib/coreBundle.js'], {
+    cwd: work,
+  });
+  const excerpt = roleTableExcerpt(
+    readFileSync(path.join(work, 'package', 'lib', 'coreBundle.js'), 'utf8'),
+  );
+
+  writeFileSync(path.join(fixtures, `${version}.txt`), `${excerpt}\n`);
+  console.log(`${version}: ${String(excerpt.length)} characters`);
 }
 
 const response = await fetch('https://registry.npmjs.org/playwright-core', {
@@ -81,34 +95,12 @@ const work = mkdtempSync(path.join(process.argv[2] ?? tmpdir(), 'pw-roles-'));
 try {
   for (const [minor, patch] of [...newestPatch].sort(([a], [b]) => a - b)) {
     const version = `1.${String(minor)}.${String(patch)}`;
-    const download = await fetch(tarballOf(versions, version));
 
-    if (!download.ok) {
-      throw new Error(
-        `the playwright-core ${version} tarball answered ${String(download.status)}`,
-      );
+    try {
+      await writeExcerpt(work, version, tarballOf(versions, version));
+    } catch (error) {
+      throw new Error(`playwright-core ${version}`, { cause: error });
     }
-
-    writeFileSync(
-      path.join(work, `${version}.tgz`),
-      Buffer.from(await download.arrayBuffer()),
-    );
-    // A relative path, because Git Bash's GNU tar reads `D:` in an absolute one as a remote host.
-    execFileSync(
-      'tar',
-      ['-xzf', `${version}.tgz`, 'package/lib/coreBundle.js'],
-      {
-        cwd: work,
-      },
-    );
-    const bundle = readFileSync(
-      path.join(work, 'package', 'lib', 'coreBundle.js'),
-      'utf8',
-    );
-    const excerpt = excerptOf(bundle, version);
-
-    writeFileSync(path.join(fixtures, `${version}.txt`), `${excerpt}\n`);
-    console.log(`${version}: ${String(excerpt.length)} characters`);
   }
 } finally {
   rmSync(work, { recursive: true, force: true });

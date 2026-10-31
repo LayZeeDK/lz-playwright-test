@@ -93,7 +93,7 @@ export type AttributeValue =
   | { readonly kind: 'expression'; readonly expression: types.Expression };
 
 export interface ElementSite {
-  readonly name: string;
+  readonly name: string | undefined;
   readonly attributes: ReadonlySet<string>;
   readonly node: types.JSXElement;
 }
@@ -183,7 +183,7 @@ export function elementSiteOf(
   const names = attributes.flatMap((entry) => attributeName(entry, t) ?? []);
 
   return {
-    name: t.isJSXIdentifier(name) ? name.name : '',
+    name: t.isJSXIdentifier(name) ? name.name : undefined,
     attributes: new Set(names),
     node,
   };

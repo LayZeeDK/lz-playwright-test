@@ -13,7 +13,7 @@ import { pathToFileURL } from 'node:url';
 
 import {
   resolveFromCore,
-  type CoreInstrumenter,
+  type Instrumenter,
   type SourceFile,
 } from '../src/install.ts';
 import { defined } from './support/defined.ts';
@@ -34,7 +34,7 @@ const corpus: readonly SourceFile[] = [
   join(import.meta.dirname, 'corpus', 'vue-tsx-sample.vue'),
 ].map((name) => ({ name, content: readFileSync(name, 'utf8') }));
 
-let instrumenter: CoreInstrumenter;
+let instrumenter: Instrumenter;
 let parseTsx: (code: string) => unknown;
 let stock: InstrumentResult[];
 let excluded: InstrumentResult[];

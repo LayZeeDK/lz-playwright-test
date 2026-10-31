@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
 import { fieldOf } from './is-record.ts';
-import { spanSwapTags } from './operators.ts';
+import { spanSwapTags } from './span-swap.ts';
 
 export interface ImplicitRole {
   readonly role: string;
@@ -37,23 +37,30 @@ export function findManifest(
 }
 
 export function readRoleTable(manifest: string): BundledRoles {
-  const version = unreadable(` in ${manifest}`, () =>
+  const version = unreadable(['in', manifest], () =>
     String(fieldOf(JSON.parse(readFileSync(manifest, 'utf8')), 'version')),
   );
   const bundlePath = join(dirname(manifest), 'lib', 'coreBundle.js');
-  const roles = unreadable(` ${version} in ${bundlePath}`, () =>
+  const roles = unreadable([version, 'in', bundlePath], () =>
     parseRoleTable(readFileSync(bundlePath, 'utf8')),
   );
 
   return { version, roles };
 }
 
-function unreadable<T>(where: string, step: () => T): T {
+class RoleTableError extends Error {}
+
+function unreadable<T>(where: readonly string[], step: () => T): T {
   try {
     return step();
   } catch (error) {
-    throw new Error(
-      `cannot read the implicit role table of playwright-core${where}`,
+    const reason =
+      error instanceof Error && 'code' in error
+        ? `${String(error)}, code ${String(error.code)}`
+        : String(error);
+
+    throw new RoleTableError(
+      `${['cannot read the implicit role table of playwright-core', ...where].join(' ')} (${reason})`,
       { cause: error },
     );
   }
@@ -66,21 +73,18 @@ export function consumerRoles(
   warn: (message: string) => void = console.warn,
 ): RoleTable {
   try {
-    const manifest = unreadable('', () => findManifest(resolve));
+    const manifest = unreadable([], () => findManifest(resolve));
 
     return manifest === undefined
       ? bundled.roles
       : readRoleTable(manifest).roles;
   } catch (error) {
-    const cause = fieldOf(error, 'cause');
-    const code = fieldOf(cause, 'code');
-    const reason =
-      code === undefined
-        ? String(cause)
-        : `${String(cause)}, code ${String(code)}`;
+    if (!(error instanceof RoleTableError)) {
+      throw error;
+    }
 
     warn(
-      `lz-stryker-ui-mutators: ${String(fieldOf(error, 'message'))} (${reason}); ` +
+      `lz-stryker-ui-mutators: ${error.message}; ` +
         `LzElementRole uses the table bundled from playwright-core ${bundled.version}.`,
     );
 

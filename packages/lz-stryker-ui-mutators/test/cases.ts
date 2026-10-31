@@ -1152,8 +1152,8 @@ export const cases: readonly Case[] = [
       'the span swap drops every attribute of an a, area or button that a span cannot take, and keeps the rest',
     origin: `${release}, LzElementRole`,
     jsx:
-      '<div><area href="/x" alt="Map" coords="0,0,1,1" shape="rect" target="_blank" download="m" hrefLang="en" media="print" ping="/p" referrerPolicy="no-referrer" id="m" />' +
-      '<a href="/a" target="_blank" rel="noopener" type="text/html" id="a">A</a>' +
+      '<div><area href="/x" alt="Map" coords="0,0,1,1" shape="rect" target="_blank" download="m" hrefLang="en" media="print" referrerPolicy="no-referrer" id="m" />' +
+      '<a href="/a" target="_blank" rel="noopener" type="text/html" ping="/p" id="a">A</a>' +
       '<button type="submit" name="n" value="v" form="f" formAction="/b" formEncType="text/plain" formMethod="post" formNoValidate formTarget="_self" className="b">B</button></div>',
     expect: [
       ['LzElementRole', '<span id="m" />'],

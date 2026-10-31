@@ -36,7 +36,7 @@ describe('generateRoles', () => {
     const { from, out } = paths(root);
 
     assert.throws(() => generateRoles(from, out), {
-      message: `cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath}: kImplicitRoleByTagName not found.`,
+      message: `cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} (Error: kImplicitRoleByTagName not found)`,
     });
     assert.equal(existsSync(out), false);
   });
@@ -46,7 +46,7 @@ describe('generateRoles', () => {
     const { from, out } = paths(root);
 
     assert.throws(() => generateRoles(from, out), {
-      message: `cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath}: kImplicitRoleByTagName lacks the entries for a, area that LzElementRole reads.`,
+      message: `cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} (Error: kImplicitRoleByTagName lacks the entries for a, area that LzElementRole reads)`,
     });
     assert.equal(existsSync(out), false);
   });

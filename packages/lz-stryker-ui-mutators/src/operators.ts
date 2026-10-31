@@ -10,6 +10,7 @@ import {
   type ElementSite,
 } from './mutator.ts';
 import type { RoleTable } from './playwright-roles.ts';
+import { notOnSpan } from './span-swap.ts';
 
 const hasWord = /[\p{L}\p{N}]/u;
 const comparisonOperators: ReadonlySet<string> = new Set([
@@ -30,33 +31,6 @@ const labelableElements: ReadonlySet<string> = new Set([
   'select',
   'textarea',
 ]);
-/**
- * The attributes of `a`, `area` and `button` that a span cannot take under @types/react 19.3.0 (TS2322); a span
- * ignores them at run time.
- */
-const notOnSpan: ReadonlySet<string> = new Set([
-  'alt',
-  'coords',
-  'disabled',
-  'download',
-  'form',
-  'formAction',
-  'formEncType',
-  'formMethod',
-  'formNoValidate',
-  'formTarget',
-  'href',
-  'hrefLang',
-  'media',
-  'name',
-  'ping',
-  'referrerPolicy',
-  'shape',
-  'target',
-  'type',
-  'value',
-]);
-export const spanSwapTags: readonly string[] = ['a', 'area', 'button'];
 
 export function operatorsFor(roles: RoleTable) {
   return operatorTable([
@@ -70,8 +44,9 @@ export function operatorsFor(roles: RoleTable) {
             if (
               path.isJSXText() &&
               hasWord.test(path.node.value) &&
-              !unrenderedText.has(
-                elementSiteOf(path.parentPath.node, t)?.name ?? '',
+              !isNamed(
+                unrenderedText,
+                elementSiteOf(path.parentPath.node, t)?.name,
               )
             ) {
               yield t.jsxText('');
@@ -182,7 +157,7 @@ export function operatorsFor(roles: RoleTable) {
           on: { bare: 'remove', string: 'remove', expression: 'false' },
           skip: (site) =>
             site.name === 'aria-hidden' &&
-            decorativeElements.has(site.element.name),
+            isNamed(decorativeElements, site.element.name),
         },
       ],
     },
@@ -254,6 +229,13 @@ export function operatorsFor(roles: RoleTable) {
 
 export type OperatorName = ReturnType<typeof operatorsFor>[number]['name'];
 
+function isNamed(
+  names: ReadonlySet<string>,
+  name: string | undefined,
+): boolean {
+  return name !== undefined && names.has(name);
+}
+
 function isJsxBranch(node: types.Node, t: BabelTypes): boolean {
   return t.isJSXElement(node) || t.isJSXFragment(node) || t.isNullLiteral(node);
 }
@@ -276,7 +258,7 @@ function asSpan(element: ElementSite, t: BabelTypes): types.JSXElement {
   const span = t.cloneNode(element.node, true);
   span.openingElement.name = t.jsxIdentifier('span');
   span.openingElement.attributes = span.openingElement.attributes.filter(
-    (attribute) => !notOnSpan.has(attributeName(attribute, t) ?? ''),
+    (attribute) => !isNamed(notOnSpan, attributeName(attribute, t)),
   );
 
   if (span.closingElement) {
@@ -290,7 +272,8 @@ function implicitRole(
   element: ElementSite,
   roles: RoleTable,
 ): string | undefined {
-  const entry = roles.get(element.name);
+  const entry =
+    element.name === undefined ? undefined : roles.get(element.name);
 
   return entry !== undefined &&
     (entry.requiredAttribute === undefined ||
@@ -305,7 +288,7 @@ function wrapsControl(label: ElementSite, t: BabelTypes): boolean {
     children.some(
       (child) =>
         (t.isJSXElement(child) &&
-          (labelableElements.has(elementSiteOf(child, t)?.name ?? '') ||
+          (isNamed(labelableElements, elementSiteOf(child, t)?.name) ||
             holds(child.children))) ||
         (t.isJSXFragment(child) && holds(child.children)),
     );

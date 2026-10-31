@@ -1,12 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
-import { fieldOf } from '../src/is-record.ts';
-import {
-  findManifest,
-  readRoleTable,
-  type BundledRoles,
-} from '../src/playwright-roles.ts';
+import { findManifest, readRoleTable } from '../src/playwright-roles.ts';
 
 function reason(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -32,18 +27,8 @@ function manifestFrom(from: string): string {
   return manifest;
 }
 
-function rolesFrom(from: string): BundledRoles {
-  const manifest = manifestFrom(from);
-
-  try {
-    return readRoleTable(manifest);
-  } catch (error) {
-    throw new Error(`${reason(error)}: ${reason(fieldOf(error, 'cause'))}.`);
-  }
-}
-
 export function generateRoles(from: string, out: string): void {
-  const { version, roles } = rolesFrom(from);
+  const { version, roles } = readRoleTable(manifestFrom(from));
   const entries = [...roles]
     .map(([tag, { role, requiredAttribute }]) =>
       requiredAttribute === undefined
