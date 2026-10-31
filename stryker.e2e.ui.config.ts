@@ -3,7 +3,7 @@ import base from './stryker.base.ts';
 
 export default {
   ...base,
-  plugins: [
+  appendPlugins: [
     '@layzee/lz-stryker-playwright-runner',
     '@layzee/lz-stryker-ui-mutators',
   ],

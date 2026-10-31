@@ -3,7 +3,7 @@ import base from './stryker.base.ts';
 
 export default {
   ...base,
-  plugins: ['@layzee/lz-stryker-playwright-runner'],
+  appendPlugins: ['@layzee/lz-stryker-playwright-runner'],
   testRunner: 'lz-stryker-playwright',
   lzStrykerPlaywright: {
     configFile: 'apps/demo-app/playwright.components.config.mts',
