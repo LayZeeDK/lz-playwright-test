@@ -64,9 +64,12 @@ Use one of two ways:
   prints a warning, and the run goes on without UI mutants.
 
   ```ts
-  plugins: ['@layzee/lz-stryker-playwright-runner', '@layzee/lz-stryker-ui-mutators'],
+  appendPlugins: ['@layzee/lz-stryker-playwright-runner', '@layzee/lz-stryker-ui-mutators'],
   ignorers: ['lz-stryker-ui-mutators'],
   ```
+
+  `appendPlugins` keeps the plugins Stryker loads by default. `plugins` replaces them, so a checker such
+  as `@stryker-mutator/typescript-checker` no longer loads unless the list names it too.
 
 - In a JavaScript or TypeScript config, import the plugin on the first line instead, and list nothing:
 
@@ -80,8 +83,52 @@ patches is missing.
 
 ## Turn an operator off
 
-Exclude an operator by name with `mutator.excludedMutations`, or with a `// Stryker disable <name>`
-comment on the code.
+For the whole project, list the operator in `mutator.excludedMutations`. The names are case sensitive,
+and Stryker does not check them, so `lzTextLiteral` excludes nothing and logs nothing.
+
+For one mutant, use a Stryker disable comment with a reason. StrykerJS reads such a comment only where
+Babel attaches it to the code that follows, so in JSX only these forms work:
+
+- An attribute: a line comment inside the opening tag, on the line before the attribute.
+
+  ```tsx
+  <input
+    // Stryker disable next-line LzLabelAttribute: the visible label names this field
+    aria-label="Search"
+  />
+  ```
+
+- An element that fits on one line: a line comment in a `{ }` container before it.
+
+  ```tsx
+  <header>
+    {
+      // Stryker disable next-line LzTextLiteral: a decorative heading
+      <h1>Welcome</h1>
+    }
+  </header>
+  ```
+
+- Anything else: `// Stryker disable <name>: <reason>` on the line before the statement that holds the
+  JSX, and `// Stryker restore <name>` on the line before the next statement or declaration. A restore
+  after the last statement of a block is never read, so the disable then runs to the end of the file.
+
+A JSX comment, `{/* Stryker disable ... */}`, is never read, and Stryker logs nothing about it. A
+`next-line` comment before a multi-line element covers only that element's first line.
+
+A comment or exclusion names an operator, not one of its mutations, so it turns off both branches of an
+`LzConditionalElement` ternary, and both the `role` removal and the span swap of `LzElementRole`.
+
+## Survivors to expect
+
+The operators skip the mutants that are cheap to detect as changing nothing a test can see. These
+remain:
+
+- An `LzEventHandler` mutant can behave like StrykerJS's own `BlockStatement` mutant, which empties the
+  handler's body. They differ only when the handler is shared or a parent handler relies on the event
+  bubbling.
+- An `LzConditionalElement` mutant on an empty list renders an empty list element, which Playwright
+  reports as hidden. `toBeHidden` does not kill it; `toHaveCount(0)` on the items does.
 
 ## Develop this package
 
