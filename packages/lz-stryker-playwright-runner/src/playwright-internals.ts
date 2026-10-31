@@ -297,10 +297,10 @@ function parseConfig(
 
       if (
         !isRecord(project) ||
-        typeof project.default !== 'boolean' ||
+        typeof project['default'] !== 'boolean' ||
         !isRecord(settings) ||
-        typeof settings.name !== 'string' ||
-        typeof settings.timeout !== 'number' ||
+        typeof settings['name'] !== 'string' ||
+        typeof settings['timeout'] !== 'number' ||
         (expect !== undefined && !isRecord(expect)) ||
         (expectTimeout !== undefined && typeof expectTimeout !== 'number')
       ) {
@@ -308,26 +308,26 @@ function parseConfig(
       }
 
       return {
-        default: project.default,
+        default: project['default'],
         expect: expect === undefined ? undefined : { timeout: expectTimeout },
-        project: { name: settings.name, timeout: settings.timeout },
+        project: { name: settings['name'], timeout: settings['timeout'] },
       };
     }),
     webServers: webServers.map((server: unknown): ConfigWebServer => {
       if (
         !isRecord(server) ||
-        (server.url !== undefined && typeof server.url !== 'string') ||
-        (server.port !== undefined && typeof server.port !== 'number') ||
-        (server.ignoreHTTPSErrors !== undefined &&
-          typeof server.ignoreHTTPSErrors !== 'boolean')
+        (server['url'] !== undefined && typeof server['url'] !== 'string') ||
+        (server['port'] !== undefined && typeof server['port'] !== 'number') ||
+        (server['ignoreHTTPSErrors'] !== undefined &&
+          typeof server['ignoreHTTPSErrors'] !== 'boolean')
       ) {
         throw changed();
       }
 
       return {
-        url: server.url,
-        port: server.port,
-        ignoreHTTPSErrors: server.ignoreHTTPSErrors,
+        url: server['url'],
+        port: server['port'],
+        ignoreHTTPSErrors: server['ignoreHTTPSErrors'],
       };
     }),
   };
@@ -413,23 +413,26 @@ export function runningSlotOf(
     return undefined;
   }
 
-  const manager = testInfo._timeoutManager;
+  const manager = testInfo['_timeoutManager'];
 
   if (!isRecord(manager)) {
     throw timeoutManagerChanged(version);
   }
 
-  const runnable = fieldOf(manager._running, 'runnable');
+  const runnable = fieldOf(manager['_running'], 'runnable');
 
   if (!isRecord(runnable)) {
     return undefined;
   }
 
-  if (!isSlotType(runnable.type)) {
+  if (!isSlotType(runnable['type'])) {
     throw timeoutManagerChanged(version);
   }
 
-  return { type: runnable.type, inFixture: runnable.fixture !== undefined };
+  return {
+    type: runnable['type'],
+    inFixture: runnable['fixture'] !== undefined,
+  };
 }
 
 function timeoutManagerChanged(version: string): Error {

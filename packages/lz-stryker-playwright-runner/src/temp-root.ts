@@ -64,7 +64,7 @@ export function isRunning(
 
     return true;
   } catch (error) {
-    return isRecord(error) && error.code === 'EPERM';
+    return isRecord(error) && error['code'] === 'EPERM';
   }
 }
 

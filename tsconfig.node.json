@@ -12,6 +12,7 @@
     "noUnusedParameters": true,
     "noUncheckedSideEffectImports": true,
     "noUncheckedIndexedAccess": true,
+    "noPropertyAccessFromIndexSignature": true,
     "allowUnreachableCode": false,
     "allowUnusedLabels": false
   }

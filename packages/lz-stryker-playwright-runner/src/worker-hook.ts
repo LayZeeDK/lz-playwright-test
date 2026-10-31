@@ -87,7 +87,7 @@ function currentTestOf(playwrightTest: unknown): CurrentTest {
 
     if (
       !isRecord(found) ||
-      typeof found.testId !== 'string' ||
+      typeof found['testId'] !== 'string' ||
       typeof version !== 'string'
     ) {
       throw new Error(
@@ -95,7 +95,7 @@ function currentTestOf(playwrightTest: unknown): CurrentTest {
       );
     }
 
-    return { testId: found.testId, slot: runningSlotOf(found, version) };
+    return { testId: found['testId'], slot: runningSlotOf(found, version) };
   };
 }
 
@@ -416,7 +416,7 @@ async function readNamespace(
 // What a page's evaluate returns has crossed a serialization boundary.
 function frameRead(value: unknown): FrameRead | undefined {
   return isRecord(value)
-    ? { mutantCoverage: value.mutantCoverage, hitCount: value.hitCount }
+    ? { mutantCoverage: value['mutantCoverage'], hitCount: value['hitCount'] }
     : undefined;
 }
 

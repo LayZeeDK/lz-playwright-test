@@ -37,7 +37,7 @@ const oldSchemeRoot = path.join(tmpdir(), 'stryker-pw-0-runner-test');
 const fixture = (file: string) =>
   fileURLToPath(new URL(`./fixture/${file}`, import.meta.url));
 // RUNNER_TEST_LOG=1 prints the runner's log, with seconds since start.
-const verbose = process.env.RUNNER_TEST_LOG !== undefined;
+const verbose = process.env['RUNNER_TEST_LOG'] !== undefined;
 const start = Date.now();
 // Every line the runner logged, at any level.
 const { log, lines: logged } = logger({

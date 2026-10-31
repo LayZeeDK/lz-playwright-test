@@ -97,9 +97,9 @@ function parseCoverage(value: unknown): MutantCoverage | undefined {
   }
 
   return {
-    static: hitCounts(value.static),
+    static: hitCounts(value['static']),
     perTest: recordOf(
-      entriesOf(value.perTest).map(
+      entriesOf(value['perTest']).map(
         ([testId, hits]) => [testId, hitCounts(hits)] as const,
       ),
     ),
@@ -120,10 +120,10 @@ export function parseSnapshotLine(line: string): Snapshot | undefined {
   }
 
   return {
-    coverage: parseCoverage(raw.mutantCoverage),
-    hitCount: isHitCount(raw.hitCount) ? raw.hitCount : 0,
-    outlivedItsTest: raw.outlivedItsTest === true,
-    lost: raw.lost === true,
+    coverage: parseCoverage(raw['mutantCoverage']),
+    hitCount: isHitCount(raw['hitCount']) ? raw['hitCount'] : 0,
+    outlivedItsTest: raw['outlivedItsTest'] === true,
+    lost: raw['lost'] === true,
   };
 }
 

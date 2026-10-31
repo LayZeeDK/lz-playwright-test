@@ -18,7 +18,7 @@ test('a snapshot with a BigInt hit count is written as a lost frame', () => {
 
 test('a snapshot with cyclic coverage is written as a lost frame', () => {
   const cyclic: Record<string, unknown> = {};
-  cyclic.self = cyclic;
+  cyclic['self'] = cyclic;
 
   assert.deepEqual(
     JSON.parse(

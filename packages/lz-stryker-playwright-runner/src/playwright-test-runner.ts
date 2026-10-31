@@ -79,7 +79,7 @@ export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
 
   readonly #strykerOptions: RunnerStrykerOptions;
   readonly #log: Logger;
-  readonly #baseNodeOptions = process.env.NODE_OPTIONS;
+  readonly #baseNodeOptions = process.env['NODE_OPTIONS'];
   #session: Session | undefined;
 
   constructor(options: RunnerStrykerOptions, log: Logger) {

@@ -390,7 +390,7 @@ test('a dry run runs every test with the hook and the run settings in the worker
     perTest: true,
   });
   assert.equal(run.env[activeMutantEnv], undefined);
-  assert.equal(run.env.PLAYWRIGHT_NO_COPY_PROMPT, '1');
+  assert.equal(run.env['PLAYWRIGHT_NO_COPY_PROMPT'], '1');
   assert.equal(existsSync(run.settings.outDir), false);
   assert.deepEqual({ ...process.env }, before);
   assert.deepEqual(plain(result), {
@@ -413,9 +413,9 @@ test('the hook is preloaded before the NODE_OPTIONS the runner started with, so 
   const fake = fakePlaywright(t);
   stubEnv(t, { NODE_OPTIONS: undefined });
   const bare = fake.runner().shell;
-  process.env.NODE_OPTIONS = '--max-old-space-size=100';
+  process.env['NODE_OPTIONS'] = '--max-old-space-size=100';
   const based = fake.runner().shell;
-  process.env.NODE_OPTIONS = '--changed-later';
+  process.env['NODE_OPTIONS'] = '--changed-later';
 
   for (const shell of [bare, based]) {
     await shell.init();
@@ -423,7 +423,7 @@ test('the hook is preloaded before the NODE_OPTIONS the runner started with, so 
   }
 
   assert.deepEqual(
-    fake.runs.map((run) => run.env.NODE_OPTIONS),
+    fake.runs.map((run) => run.env['NODE_OPTIONS']),
     [
       `--import "${workerHookUrl}"`,
       `--import "${workerHookUrl}" --max-old-space-size=100`,
@@ -878,11 +878,11 @@ test('a run leaves no run settings behind in the environment, also when it throw
 
   const seen = await withEnv(
     { WITH_ENV_KEPT: undefined, WITH_ENV_ADDED: 'during' },
-    async () => [process.env.WITH_ENV_KEPT, process.env.WITH_ENV_ADDED],
+    async () => [process.env['WITH_ENV_KEPT'], process.env['WITH_ENV_ADDED']],
   );
 
   assert.deepEqual(seen, [undefined, 'during']);
-  assert.equal(process.env.WITH_ENV_KEPT, 'before');
+  assert.equal(process.env['WITH_ENV_KEPT'], 'before');
   assert.equal('WITH_ENV_ADDED' in process.env, false);
 
   await assert.rejects(
@@ -891,7 +891,7 @@ test('a run leaves no run settings behind in the environment, also when it throw
     }),
     { message: 'run failed' },
   );
-  assert.equal(process.env.WITH_ENV_KEPT, 'before');
+  assert.equal(process.env['WITH_ENV_KEPT'], 'before');
 });
 
 test('init refuses --testFiles before it loads the Playwright config', async () => {

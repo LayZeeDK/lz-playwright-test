@@ -50,6 +50,8 @@ export const typeSafetyRules = {
     { assertionStyle: 'never' },
   ],
   '@typescript-eslint/no-non-null-assertion': 'error',
+  'dot-notation': 'off',
+  '@typescript-eslint/dot-notation': 'error',
   '@typescript-eslint/naming-convention': [
     'error',
     {

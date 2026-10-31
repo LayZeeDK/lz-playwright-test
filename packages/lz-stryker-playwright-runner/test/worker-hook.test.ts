@@ -410,9 +410,9 @@ test('a frame whose namespace is null holds nothing to read', async (t) => {
     hooked.page([hooked.frame({ name: '__nullNamespaceHere__' })]).page,
   );
   const scope: Record<string, unknown> = globalThis;
-  scope.__nullNamespaceHere__ = null;
+  scope['__nullNamespaceHere__'] = null;
   t.after(() => {
-    delete scope.__nullNamespaceHere__;
+    delete scope['__nullNamespaceHere__'];
   });
 
   await created.close();
@@ -632,7 +632,7 @@ test('per-test coverage of a context that outlived its test, or began outside on
   await noTest.close();
 
   assert.deepEqual(
-    hooked.lines().map((line) => line.outlivedItsTest),
+    hooked.lines().map((line) => line['outlivedItsTest']),
     [false, true, true],
   );
 });
@@ -657,7 +657,7 @@ test('a context a beforeAll or afterAll hook opens and closes counts as shared, 
     [[undefined], [undefined]],
   );
   assert.deepEqual(
-    hooked.lines().map((line) => line.outlivedItsTest),
+    hooked.lines().map((line) => line['outlivedItsTest']),
     [true, true],
   );
 });
@@ -675,7 +675,7 @@ test("a context a test's own fixture opens belongs to that test", async (t) => {
     ['t1'],
   );
   assert.deepEqual(
-    hooked.lines().map((line) => line.outlivedItsTest),
+    hooked.lines().map((line) => line['outlivedItsTest']),
     [false],
   );
 });
@@ -690,7 +690,7 @@ test('a context that began outside a test and closes inside one counts as shared
   await created.close();
 
   assert.deepEqual(
-    hooked.lines().map((line) => line.outlivedItsTest),
+    hooked.lines().map((line) => line['outlivedItsTest']),
     [true],
   );
 });
@@ -706,7 +706,7 @@ test('without per-test coverage no context counts as shared', async (t) => {
   await created.close();
 
   assert.deepEqual(
-    hooked.lines().map((line) => line.outlivedItsTest),
+    hooked.lines().map((line) => line['outlivedItsTest']),
     [false],
   );
 });
@@ -724,7 +724,7 @@ test('a page closed before its context is read first, once, and closes with its 
 
   assert.deepEqual(closed, [{ reason: 'done' }]);
   assert.deepEqual(
-    hooked.lines().map((line) => line.hitCount),
+    hooked.lines().map((line) => line['hitCount']),
     [1],
   );
 });

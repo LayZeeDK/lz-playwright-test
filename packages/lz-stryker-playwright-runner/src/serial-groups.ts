@@ -71,7 +71,7 @@ function outermostSerialSuite(test: ReportedTest): object | undefined {
   for (
     let suite: unknown = test.parent;
     isRecord(suite);
-    suite = suite.parent
+    suite = suite['parent']
   ) {
     if (isSerialSuite(suite)) {
       outermost = suite;
