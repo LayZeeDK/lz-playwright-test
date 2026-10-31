@@ -135,23 +135,24 @@ export function parseRoleTable(bundle: string): RoleTable {
     ),
   ]);
 
-  const missing = [...spanSwapRoleByTag.keys()].filter(
-    (tag) => !roles.has(tag),
-  );
+  const missing: string[] = [];
+  const changed: string[] = [];
+
+  for (const [tag, expected] of spanSwapRoleByTag) {
+    const found = roles.get(tag)?.role;
+
+    if (found === undefined) {
+      missing.push(tag);
+    } else if (found !== expected) {
+      changed.push(`${tag} is ${found}, not ${expected}`);
+    }
+  }
 
   if (missing.length > 0) {
     throw new Error(
       `kImplicitRoleByTagName lacks the entries for ${missing.join(', ')} that LzElementRole reads`,
     );
   }
-
-  const changed = [...spanSwapRoleByTag].flatMap(([tag, expected]) => {
-    const found = roles.get(tag)?.role;
-
-    return found === undefined || found === expected
-      ? []
-      : [`${tag} is ${found}, not ${expected}`];
-  });
 
   if (changed.length > 0) {
     throw new Error(
