@@ -27,19 +27,43 @@ Then select it in the Stryker config:
 import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 
 export default {
-  plugins: ['@layzee/lz-stryker-playwright-runner'],
+  appendPlugins: ['@layzee/lz-stryker-playwright-runner'],
   testRunner: 'lz-stryker-playwright',
   lzStrykerPlaywright: { configFile: 'playwright.config.ts' },
   coverageAnalysis: 'perTest',
+  concurrency: 1,
+  timeoutMS: 10_000,
   mutate: ['src/**/*.tsx'],
 } satisfies PartialStrykerOptions;
 ```
 
+`appendPlugins` adds the runner to the plugins Stryker loads by default. Setting `plugins` instead
+replaces that list, so a checker such as `@stryker-mutator/typescript-checker` no longer loads unless the
+list names it too.
+
+Each Stryker test runner process starts the Playwright `webServer` itself. Without `concurrency`, Stryker
+starts one process per CPU core, less one on a machine with more than 4 cores, and with a fixed port in
+the Playwright config every process after the first fails at startup because the port is taken. A Stryker
+checker adds one more test runner when it finishes, even at `concurrency` 1. So either give each process
+its own port, for example from `STRYKER_MUTATOR_WORKER` (see Faster mutation runs), or set the
+`webServer`'s `reuseExistingServer` to `true` so that the processes share one server.
+
+Stryker's default `timeoutMS` is 5000 ms, the same as Playwright's default `expect.timeout`. Keep
+`timeoutMS` at least twice the expect timeout, or a killed mutant's failing assertion runs out Stryker's
+timeout and the mutant counts as a Timeout. The runner warns at startup when it is lower.
+
 `coverageAnalysis` can be `off`, `all`, or `perTest`. With `perTest`, Stryker runs only the tests that
-reached a mutant. Coverage from the browser pages counts for the test that opened the page. Coverage of
-code that the Playwright worker itself imports counts too: for the test whose body or `beforeEach` and
-`afterEach` hooks ran it, and as shared coverage when a `beforeAll` or `afterAll` hook or a fixture ran
-it.
+reached a mutant, except for a mutant reached outside any test, which Stryker runs against every test.
+Coverage from the browser pages counts for the test that opened the page. Coverage of code that the
+Playwright worker itself imports counts for the test whose body or `beforeEach` and `afterEach` hooks ran
+it. Code that a `beforeAll` or `afterAll` hook, a fixture, or the import itself ran is reached outside
+any test.
+
+## Break threshold
+
+Stryker's `thresholds.break` defaults to none, so a run passes at any score. Set it a mutant or two below
+the first measured score: a browser test that waits on timing can flip one mutant between Killed and
+Survived from one run to the next.
 
 ## Options
 
@@ -86,8 +110,13 @@ run from 111 s to 56 s. Those are 5 runs per side, interleaved, at concurrency 3
 more: the default side ranged from 89 s to 150 s, a spread larger than the 55 s gain. No mutant changed
 between Killed and Survived. If the page needs longer than the shorter wait to show the right result, the
 assertion fails without any mutant at fault, and the mutant counts as killed. So run once with each setting and compare the statuses in the
-two JSON reports before you keep the shorter wait. Keep `timeoutMS` at least twice the expect timeout;
-the runner warns at startup when it is lower.
+two JSON reports before you keep the shorter wait.
+
+Set `use.actionTimeout` too, since Playwright's default is none. A mutant that removes an element makes a
+click on it wait out the whole test timeout, and the mutant counts as a Timeout instead of Killed. On the
+RealWorld app, `use.actionTimeout: 5000` turned the 15 timeouts among 26 detected mutants into kills, and
+the run took 4 min 46 s, against 7 min 18 s and 8 min 48 s in two runs without it. Keep `actionTimeout`
+below the per-test timeout, so that a killed mutant's failing test says what broke.
 
 ## What the runner changes in the Playwright config
 
@@ -116,9 +145,22 @@ otherwise:
 
 ## Limits
 
-The repository's `docs/VERDICT.md` (Limits) lists what the runner cannot do, among them: on a
-server-rendered app the mutant is active in the browser only, and Stryker's `ignoreStatic` skips mutants
-that only `beforeAll` pages, `beforeAll` and `afterAll` hooks, or fixtures reach.
+- Only code that runs in the page or in a Playwright test worker gets the active mutant. Server-side code
+  (SSR, API routes) runs in the `webServer`, which starts once without one, so its mutants are
+  NoCoverage. On a server-rendered app, a mutant that changes text or an element breaks hydration and
+  counts as Killed even when no test checks it, and one that changes an attribute never reaches the DOM.
+- One server serves every mutant run, so what one run writes to the server or its backend is still
+  there in the next. A suite that needs a fresh backend can report a mutant wrongly.
+- Dependency projects, such as a `setup` project that logs in, run on every mutant run with the mutant
+  active. Login in `globalSetup` runs once instead.
+- Web workers and service workers get no coverage, and coverage is lost across a cross-origin
+  navigation.
+- Stryker's `ignoreStatic` skips the mutants that only `beforeAll` pages, `beforeAll` and `afterAll`
+  hooks, fixtures, or imports reach.
+- The runner refuses Stryker's `--testFiles` option.
+- In an Nx workspace, `.stryker-tmp` must be in `.gitignore` or `.nxignore`. A failed Stryker run leaves
+  its sandbox there, a full copy of the workspace, and Nx then refuses every task.
+- A Vite `define` of `globalThis.__stryker__.activeMutant` overrides the runner's value. Remove it.
 
 ## License
 
