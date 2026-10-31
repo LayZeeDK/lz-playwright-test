@@ -1,15 +1,34 @@
 // Times the phases of repeated in-process Playwright runs, the way the Stryker runner drives them.
 // BENCH_SHARED_BROWSER=1 connects every run to one browser server instead of launching a browser per run.
 // Usage: node tools/bench-playwright-runs.ts <playwright config> [runs=3] [testId...]
+import { createRequire } from 'node:module';
 import path from 'node:path';
 
-import { chromium } from '@playwright/test';
+import type { BrowserType } from '@playwright/test';
 import type { TestError } from '@playwright/test/reporter';
 
+import { fieldOf } from '../packages/lz-stryker-playwright-runner/src/is-record.ts';
 import {
   loadPlaywright,
   type RunTestsParams,
 } from '../packages/lz-stryker-playwright-runner/src/playwright-internals.ts';
+
+function isBrowserType(value: unknown): value is BrowserType {
+  return typeof fieldOf(value, 'launchServer') === 'function';
+}
+
+function chromiumNextTo(configFile: string): BrowserType {
+  const playwrightTest: unknown = createRequire(configFile)('@playwright/test');
+  const chromium = fieldOf(playwrightTest, 'chromium');
+
+  if (!isBrowserType(chromium)) {
+    throw new Error(
+      `The @playwright/test next to ${configFile} has no chromium.launchServer.`,
+    );
+  }
+
+  return chromium;
+}
 
 const [configArg, runsArg = '3', ...testIds] = process.argv.slice(2);
 
@@ -22,7 +41,7 @@ if (configArg === undefined) {
 const configFile = path.resolve(configArg);
 
 const browserServer = process.env['BENCH_SHARED_BROWSER']
-  ? await chromium.launchServer()
+  ? await chromiumNextTo(configFile).launchServer()
   : undefined;
 const runner = await loadPlaywright(configFile).createTestRunner(
   configFile,
