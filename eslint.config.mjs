@@ -36,7 +36,10 @@ function dependencyChecks(ignoredDependencies) {
   ];
 }
 
+const declaredType = ':matches(TSInterfaceDeclaration, TSTypeAliasDeclaration)';
+
 export const typeSafetyRules = {
+  '@typescript-eslint/no-explicit-any': 'error',
   '@typescript-eslint/switch-exhaustiveness-check': 'error',
   '@typescript-eslint/use-unknown-in-catch-callback-variable': 'error',
   '@typescript-eslint/no-unsafe-assignment': 'error',
@@ -74,24 +77,19 @@ export const typeSafetyRules = {
       custom: { regex: '^T([A-Z][A-Za-z0-9]*)?$', match: true },
     },
   ],
-};
-
-const declaredType = ':matches(TSInterfaceDeclaration, TSTypeAliasDeclaration)';
-
-export const readonlyRules = {
   'no-restricted-syntax': [
     'error',
     {
       selector: `${declaredType} TSPropertySignature:not([readonly=true])`,
-      message: 'readonly member',
+      message: 'Mark the member readonly.',
     },
     {
       selector: `${declaredType} TSPropertySignature :not(TSTypeOperator[operator='readonly']) > TSArrayType`,
-      message: 'readonly array',
+      message: 'Use readonly T[] or ReadonlyArray<T>.',
     },
     {
       selector: `${declaredType} TSPropertySignature TSTypeReference[typeName.name='Array']`,
-      message: 'readonly array',
+      message: 'Use readonly T[] or ReadonlyArray<T>.',
     },
     {
       selector:
@@ -167,7 +165,7 @@ export default [
         tsconfigRootDir: import.meta.dirname,
       },
     },
-    rules: { ...typeSafetyRules, ...readonlyRules },
+    rules: typeSafetyRules,
   },
   {
     files: ['**/*.spec.ts', '**/playwright*.config.{ts,mts}'],

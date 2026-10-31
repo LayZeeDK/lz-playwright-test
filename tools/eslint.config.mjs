@@ -1,7 +1,4 @@
-import baseConfig, {
-  readonlyRules,
-  typeSafetyRules,
-} from '../eslint.config.mjs';
+import baseConfig, { typeSafetyRules } from '../eslint.config.mjs';
 
 export default [
   ...baseConfig,
@@ -14,7 +11,7 @@ export default [
         tsconfigRootDir: import.meta.dirname,
       },
     },
-    rules: { ...typeSafetyRules, ...readonlyRules },
+    rules: typeSafetyRules,
   },
   {
     files: ['bench-playwright-runs.ts'],
