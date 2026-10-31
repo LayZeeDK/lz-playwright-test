@@ -17,4 +17,7 @@ export default {
   jsonReporter: {
     fileName: `reports/e2e-command-${define ? 'define' : 'off'}/mutation.json`,
   },
+  htmlReporter: {
+    fileName: `reports/e2e-command-${define ? 'define' : 'off'}/mutation.html`,
+  },
 } satisfies PartialStrykerOptions;
