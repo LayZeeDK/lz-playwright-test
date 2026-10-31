@@ -204,20 +204,15 @@ export async function resolveFromCore(
   const dir = dirname(packageJson);
   const manifest: unknown = fromCore(packageJson);
   const version = String(fieldOf(manifest, 'version'));
-  const [mutate, placers, index, babel] = await Promise.all([
+  const [mutate, placers, babel] = await Promise.all([
     importFile(join(dir, 'dist', 'src', 'mutators', 'mutate.js')),
     importFile(join(dir, 'dist', 'src', 'mutant-placers', 'index.js')),
-    importFile(join(dir, 'dist', 'src', 'index.js')),
     importFile(createRequire(packageJson).resolve('@babel/core')),
   ]);
   const allMutators = fieldOf(mutate, 'allMutators');
   const allMutantPlacers = fieldOf(placers, 'allMutantPlacers');
-  const Instrumenter = fieldOf(index, 'Instrumenter');
   const types = fieldOf(babel, 'types');
-  const missing = (name: string): Error =>
-    new Error(
-      `lz-stryker-ui-mutators: the instrumenter ${version} in ${dir} has no ${name}.`,
-    );
+  const missing = hasNo({ dir, version });
 
   if (!Array.isArray(allMutators) || !allMutators.every(isListedMutator)) {
     throw missing('allMutators');
@@ -227,14 +222,7 @@ export async function resolveFromCore(
     throw missing('allMutantPlacers');
   }
 
-  const instrument =
-    typeof Instrumenter === 'function'
-      ? fieldOf(Instrumenter.prototype, 'instrument')
-      : undefined;
-
-  if (typeof Instrumenter !== 'function' || typeof instrument !== 'function') {
-    throw missing('Instrumenter');
-  }
+  const instrument = await coreInstrument({ dir, version });
 
   assertBabelTypes(types, missing);
 
@@ -278,15 +266,7 @@ export async function resolveFromCore(
       },
     },
     async instrument(files) {
-      const result: unknown = await Reflect.apply(
-        instrument,
-        Reflect.construct(Instrumenter, [silentLogger]),
-        [
-          files.map((file) => ({ ...file, mutate: true })),
-          { plugins: null, excludedMutations: [], ignorers: [] },
-        ],
-      );
-      const mutants = fieldOf(result, 'mutants');
+      const mutants = fieldOf(await instrument(files), 'mutants');
 
       if (!Array.isArray(mutants) || !mutants.every(isMutantOrigin)) {
         throw new Error(
@@ -300,6 +280,53 @@ export async function resolveFromCore(
         mutatorName,
       }));
     },
+  };
+}
+
+interface Located {
+  readonly dir: string;
+  readonly version: string;
+}
+
+function hasNo({ dir, version }: Located): (name: string) => Error {
+  return (name) =>
+    new Error(
+      `lz-stryker-ui-mutators: the instrumenter ${version} in ${dir} has no ${name}.`,
+    );
+}
+
+export async function coreInstrument(
+  instrumenter: Located,
+): Promise<
+  (
+    files: readonly SourceFile[],
+    excludedMutations?: readonly string[],
+  ) => Promise<unknown>
+> {
+  const Instrumenter = fieldOf(
+    await importFile(join(instrumenter.dir, 'dist', 'src', 'index.js')),
+    'Instrumenter',
+  );
+  const instrument =
+    typeof Instrumenter === 'function'
+      ? fieldOf(Instrumenter.prototype, 'instrument')
+      : undefined;
+
+  if (typeof Instrumenter !== 'function' || typeof instrument !== 'function') {
+    throw hasNo(instrumenter)('Instrumenter');
+  }
+
+  return async (files, excludedMutations = []) => {
+    const result: unknown = await Reflect.apply(
+      instrument,
+      Reflect.construct(Instrumenter, [silentLogger]),
+      [
+        files.map((file) => ({ ...file, mutate: true })),
+        { plugins: null, excludedMutations, ignorers: [] },
+      ],
+    );
+
+    return result;
   };
 }
 
