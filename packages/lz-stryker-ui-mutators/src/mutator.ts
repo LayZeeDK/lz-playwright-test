@@ -251,10 +251,12 @@ function* replaced(
     }
 
     case 'remove': {
-      yield t.jsxAttribute(
-        name,
-        t.jsxExpressionContainer(t.identifier('undefined')),
-      );
+      if (!removalChangesNothing(site, t)) {
+        yield t.jsxAttribute(
+          name,
+          t.jsxExpressionContainer(t.identifier('undefined')),
+        );
+      }
 
       return;
     }
@@ -287,6 +289,22 @@ function* replaced(
       return;
     }
   }
+}
+
+// WAI-ARIA makes "false" the default of both, so removing a "false" value leaves the accessibility tree as it was.
+const falseByDefault = new Set(['aria-disabled', 'aria-hidden']);
+
+function removalChangesNothing(
+  { name, value }: AttributeSite,
+  t: BabelTypes,
+): boolean {
+  return (
+    (value.kind === 'string' &&
+      value.text === 'false' &&
+      falseByDefault.has(name)) ||
+    (value.kind === 'expression' &&
+      t.isIdentifier(value.expression, { name: 'undefined' }))
+  );
 }
 
 // `!(expr)` is always false for a string value, as in `!(c ? 'true' : 'false')` and `!String(open)`.

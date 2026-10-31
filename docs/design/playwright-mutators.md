@@ -131,7 +131,9 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
 - `LzHiddenAttribute` skips a boolean-literal value, as `LzDisabledAttribute` does, because `BooleanLiteral`
   already flips it.
 - Forcing an attribute off removes a string or bare value (`disabled={undefined}`) and sets an expression to
-  `{false}`; both give the same accessibility tree as `"false"`. `RoleRemoval` prints `role={undefined}`.
+  `{false}`; both give the same accessibility tree as `"false"`. So `aria-disabled="false"` and
+  `aria-hidden="false"` get no removal, and neither does any attribute already bound to `{undefined}`.
+  `RoleRemoval` prints `role={undefined}`.
 - `LzChildExpression` empties an identifier, a member expression, an optional chain, or a call, and skips a
   string literal, a conditional (left to `LzConditionalElement`), and a `.map`, `.filter` or `.flatMap` list,
   which the later `ListExpression` owns. Until then a rendered list gets no UI mutant of its own.

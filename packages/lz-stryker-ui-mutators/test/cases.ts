@@ -1372,4 +1372,29 @@ export const cases: readonly Case[] = [
       '<time role="time" /><tr role="row" /><ul role="list" /></div>',
     expect: [['LzElementRole', '<span role="button" />']],
   },
+  {
+    id: 'design-48',
+    title:
+      'aria-disabled="false" and aria-hidden="false" are not removed, since removal gives the same tree; "true" is',
+    origin:
+      'docs/design/playwright-mutators.md:133, LzDisabledAttribute and LzHiddenAttribute',
+    jsx: '<form><button aria-disabled="false">One</button><p aria-hidden="false">Two</p><p aria-hidden="true">Three</p></form>',
+    expect: [
+      ['LzElementRole', '<span aria-disabled="false">One</span>'],
+      ['LzTextLiteral', ''],
+      ['LzTextLiteral', ''],
+      ['LzHiddenAttribute', 'aria-hidden={undefined}'],
+      ['LzTextLiteral', ''],
+    ],
+  },
+  {
+    id: 'design-49',
+    title: 'a handler already bound to undefined gets no removal mutant',
+    origin: `${release}, LzEventHandler`,
+    jsx: '<button onClick={undefined}>Three</button>',
+    expect: [
+      ['LzElementRole', '<span onClick={undefined}>Three</span>'],
+      ['LzTextLiteral', ''],
+    ],
+  },
 ];
