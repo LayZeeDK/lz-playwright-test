@@ -30,7 +30,8 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - run: npx nx run-many -t lint build --projects=@layzee/lz-stryker-playwright-runner,@layzee/lz-stryker-ui-mutators
+      - run: npx nx run-many -t lint
+      - run: npx nx run-many -t build --projects=@layzee/lz-stryker-playwright-runner,@layzee/lz-stryker-ui-mutators
       - run: npx nx run-many -t typecheck
       - run: npx nx run-many -t test --projects=@layzee/lz-stryker-playwright-runner,@layzee/lz-stryker-ui-mutators
 
