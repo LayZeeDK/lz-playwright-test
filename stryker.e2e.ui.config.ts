@@ -18,6 +18,8 @@ export default {
   ],
   coverageAnalysis: 'perTest',
   timeoutMS: 10_000,
+  // One mutant below the last measured score (31 of 65), since a browser run can flip one mutant.
+  thresholds: { high: 80, low: 60, break: 46 },
   jsonReporter: { fileName: 'reports/e2e-ui/mutation.json' },
   htmlReporter: { fileName: 'reports/e2e-ui/mutation.html' },
 } satisfies PartialStrykerOptions;
