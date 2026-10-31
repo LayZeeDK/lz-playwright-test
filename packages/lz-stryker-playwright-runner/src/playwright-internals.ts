@@ -17,21 +17,18 @@ export interface RunTestsParams {
   readonly disableConfigReporters?: boolean;
 }
 
-/** The fields of a project of Playwright's loaded config that the runner reads. */
 export interface ConfigProject {
   readonly default: boolean;
   readonly expect?: { readonly timeout?: number | undefined } | undefined;
   readonly project: { readonly name: string; readonly timeout: number };
 }
 
-/** The fields of a webServer of Playwright's loaded config that the runner reads. */
 export interface ConfigWebServer {
   readonly url?: string | undefined;
   readonly port?: number | undefined;
   readonly ignoreHTTPSErrors?: boolean | undefined;
 }
 
-/** The runner's calls into Playwright's TestRunner, each result parsed to what the runner reads. */
 export interface TestRunner {
   initialize(params: Record<string, never>): Promise<void>;
   loadConfig(): Promise<{
@@ -90,25 +87,21 @@ export const workerEntry =
  */
 export const noCopyPromptEnv = 'PLAYWRIGHT_NO_COPY_PROMPT';
 
-/** The members of a Playwright Frame the worker hook calls; the page function reads one global. */
 export interface HookedFrame {
   evaluate(fn: (name: string) => unknown, name: string): Promise<unknown>;
   isDetached(): boolean;
 }
 
-/** The members of a Playwright Page the worker hook calls; it replaces `close`. */
 export interface HookedPage {
   frames(): HookedFrame[];
   close(options?: unknown): Promise<void>;
 }
 
-/** The members of a Playwright Browser the worker hook calls; it replaces `close`. */
 export interface HookedBrowser {
   contexts(): HookedContext[];
   close(options?: unknown): Promise<void>;
 }
 
-/** The members of a Playwright BrowserContext the worker hook calls. */
 export interface HookedContext {
   pages(): HookedPage[];
   browser(): HookedBrowser | null;
@@ -141,10 +134,6 @@ export function supportsPlaywright(version: string): boolean {
   return major === minPlaywright.major && minor >= minPlaywright.minor;
 }
 
-/**
- * Checks each internal the runner calls, and parses what each TestRunner method resolves to where the
- * runner reads it; whether a method takes the arguments it is given only a run can tell.
- */
 export function probeInternals(
   version: string,
   modules: {
@@ -360,7 +349,6 @@ export function loadPlaywright(configFile: string | undefined): Playwright {
   });
 }
 
-/** The instrumentation of the `playwright-core` module a worker loads. */
 export function instrumentationOf(core: unknown): Instrumentation {
   const instrumentation = fieldOf(core, '_instrumentation');
   const addListener = fieldOf(instrumentation, 'addListener');

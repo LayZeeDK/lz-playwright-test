@@ -469,7 +469,6 @@ describe('resolveFromCore against a fake instrumenter', () => {
     '@stryker-mutator/instrumenter/dist/src/mutators/mutate.js';
   const babelPath = '@babel/core/index.js';
 
-  /** The array a fake module at `path` under `modules` exports as `calls`, from the same module instance. */
   async function callsOf(modules: string, path: string): Promise<unknown> {
     return exported(
       await import(pathToFileURL(join(modules, path)).href),
@@ -477,12 +476,6 @@ describe('resolveFromCore against a fake instrumenter', () => {
     );
   }
 
-  /**
-   * A core, an instrumenter whose `Instrumenter.instrument` records the logger, files and options it got in its
-   * module's `calls`, and a Babel core that re-exports the real types, as node_modules under a fresh directory that
-   * `t` removes after the test; `replace` swaps the content of any of those files. Returns core's package.json, the
-   * instrumenter's dir and the node_modules dir.
-   */
   function fakeCore(
     t: TestContext,
     placers: readonly string[],

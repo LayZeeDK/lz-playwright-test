@@ -36,7 +36,6 @@ function dependencyChecks(ignoredDependencies) {
   ];
 }
 
-// Type-aware rules for the packages and the tools; tools/eslint.config.mjs applies them with its own tsconfig.
 export const typeSafetyRules = {
   '@typescript-eslint/switch-exhaustiveness-check': 'error',
   '@typescript-eslint/use-unknown-in-catch-callback-variable': 'error',
@@ -50,6 +49,15 @@ export const typeSafetyRules = {
     { assertionStyle: 'never' },
   ],
   '@typescript-eslint/no-non-null-assertion': 'error',
+  '@typescript-eslint/ban-ts-comment': [
+    'error',
+    {
+      'ts-expect-error': true,
+      'ts-ignore': true,
+      'ts-nocheck': true,
+      'ts-check': false,
+    },
+  ],
   'dot-notation': 'off',
   '@typescript-eslint/dot-notation': 'error',
   '@typescript-eslint/naming-convention': [
@@ -152,7 +160,6 @@ export default [
   },
   {
     files: ['packages/**/*.ts', 'packages/**/*.tsx'],
-    // Fixture input for the operators, in no tsconfig.
     ignores: ['packages/lz-stryker-ui-mutators/test/corpus/**'],
     languageOptions: {
       parserOptions: {

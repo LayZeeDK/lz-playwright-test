@@ -16,7 +16,6 @@ interface FakePage {
   readonly top?: boolean;
   readonly carried?: string | null;
   readonly storageThrows?: boolean;
-  /** Runs before the init script, as the page's earlier code would. */
   readonly prepare?: (ns: string) => void;
 }
 

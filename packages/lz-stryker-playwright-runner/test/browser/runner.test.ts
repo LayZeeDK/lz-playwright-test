@@ -116,27 +116,21 @@ function mutantsReached(called: string[], pageLoad = true): string[] {
     .sort();
 }
 
-/** The run that kills a known mutant, which shows the runner is clean after the run before it. */
 function runKnownKill(): Promise<MutantRunResult> {
   return session.mutantRun(mutant('ArithmeticOperator', 'a - b'), {
     testFilter: [testId('shows the greeting')],
   });
 }
 
-// The budget of the two deadline tests' loop runs, so their deadline comparisons mean the same.
-const timeout = 8000;
-const deadlineMs = timeout - stopHeadroomMs;
+const loopRunTimeout = 8000;
+const deadlineMs = loopRunTimeout - stopHeadroomMs;
 
-/**
- * Runs the endless-loop mutant against the test `title` under `timeout`, timing the run, then the known kill.
- * `stopTook` is how long a deadline stop logged during the run took, if one fired.
- */
 async function timedLoopRun(title: string) {
   const loggedBefore = logged.length;
   const started = performance.now();
   const timedOut = await session.mutantRun(mutant('UpdateOperator', 'i--'), {
     testFilter: [testId(title)],
-    timeout,
+    timeout: loopRunTimeout,
   });
   // Past its budget, Stryker would kill and restart the worker, webServer and all.
   const elapsed = performance.now() - started;
@@ -222,10 +216,8 @@ test('the hook stays out of worker threads that a test starts', () => {
   assert.equal(probe?.status, TestStatus.Success, JSON.stringify(probe));
 });
 
-// No test of the group or of the greeting calls `double`, so the mutant survives and the run's test
-// count shows how many tests ran. The `countTo` mutant fails every test that counts, and Playwright
-// skips the rest of a serial group after a failure, so the kill names the group's first test, which
-// the filter left out, and no counting test outside the group.
+// Playwright skips the rest of a serial group after a failure, so the `countTo` kill names only the group's first
+// test, and the test count shows the group ran whole while the `double` mutant survives.
 test('a mutant run filtered to one test of a describe.serial group runs the whole group, and only that', async () => {
   const doubleMutant = mutant('ArithmeticOperator', 'n / 2');
   const serial = await session.mutantRun(doubleMutant, {

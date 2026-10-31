@@ -9,7 +9,6 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import type { TestContext } from 'node:test';
 
-/** A temp dir whose name starts with `prefix`, removed after the test. */
 export function tempRoot(t: TestContext, prefix: string): string {
   const root = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -17,7 +16,6 @@ export function tempRoot(t: TestContext, prefix: string): string {
   return root;
 }
 
-/** Writes `files` under `dir` by relative path, creating their parent dirs. */
 export function writeTree(
   dir: string,
   files: Readonly<Record<string, string>>,

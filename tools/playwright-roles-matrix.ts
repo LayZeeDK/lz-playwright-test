@@ -1,10 +1,3 @@
-// Refreshes ui-mutators' role-table fixtures, packages/lz-stryker-ui-mutators/test/fixture/roles/<version>.txt: one
-// per minor version of playwright-core from 1.63.0, the oldest the span swap supports, to the registry's `latest`,
-// each from that minor's newest patch. A fixture is the kImplicitRoleByTagName excerpt of lib/coreBundle.js, escaped
-// as in the bundle. It downloads each tarball from registry.npmjs.org and unpacks only that file with `tar`, so it
-// runs no package manager. Run it when a Playwright minor ships, then run the ui-mutators tests: a new fixture that
-// the parser cannot read fails them. Existing fixtures for other versions stay.
-// Run: node tools/playwright-roles-matrix.ts [download parent dir, default the OS temp dir]
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

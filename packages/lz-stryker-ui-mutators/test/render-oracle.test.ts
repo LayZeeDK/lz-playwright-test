@@ -179,7 +179,6 @@ function offsetOf(line: number, column: number): number {
 const namespace: { activeMutant?: string | undefined } = {};
 Reflect.set(globalThis, '__renderOracle__', namespace);
 
-/** Each mutant's render through the build and through the hand-applied source. */
 async function renders(mutant: InstrumentedMutant) {
   const start = offsetOf(
     mutant.location.start.line,

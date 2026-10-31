@@ -7,7 +7,7 @@ import {
   runSettingsEnv,
   serializeSnapshot,
 } from '../src/protocol.ts';
-import { plain } from './support/doubles.ts';
+import { withoutPrototypes } from './support/doubles.ts';
 
 test('a snapshot with a BigInt hit count is written as a lost frame', () => {
   const line = serializeSnapshot({ hitCount: 1n, outlivedItsTest: true });
@@ -58,7 +58,7 @@ test('a parsed line sets every flag and a valid hit count', () => {
 test('a parsed line keeps no coverage that is not a map', () => {
   assert.equal(parseSnapshotLine('{"mutantCoverage":3}')?.coverage, undefined);
   assert.deepEqual(
-    plain(
+    withoutPrototypes(
       parseSnapshotLine('{"mutantCoverage":{"static":3,"perTest":{"a":3}}}')
         ?.coverage,
     ),

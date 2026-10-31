@@ -24,7 +24,6 @@ const configFile = path.resolve(configArg);
 const browserServer = process.env['BENCH_SHARED_BROWSER']
   ? await chromium.launchServer()
   : undefined;
-// The same internals, resolved from the config's folder and checked, that the runner drives.
 const runner = await loadPlaywright(configFile).createTestRunner(
   configFile,
   {},

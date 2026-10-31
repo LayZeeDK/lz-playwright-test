@@ -1,7 +1,3 @@
-// Writes src/bundled-roles.ts from the implicit role table of the playwright-core this repository installs, with the
-// same extractor that reads the consumer's table at run time. Exits 1 with one line on stderr, and writes nothing,
-// when that table cannot be read.
-// Run: node scripts/generate-roles.ts
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
@@ -48,10 +44,10 @@ let entries: string;
 
 try {
   entries = [...parseRoleTable(readFileSync(core.bundlePath, 'utf8'))]
-    .map(([tag, { role, attribute }]) =>
-      attribute === undefined
+    .map(([tag, { role, requiredAttribute }]) =>
+      requiredAttribute === undefined
         ? `    ['${String(tag)}', { role: '${role}' }],`
-        : `    ['${String(tag)}', { role: '${role}', attribute: '${attribute}' }],`,
+        : `    ['${String(tag)}', { role: '${role}', requiredAttribute: '${requiredAttribute}' }],`,
     )
     .sort()
     .join('\n');

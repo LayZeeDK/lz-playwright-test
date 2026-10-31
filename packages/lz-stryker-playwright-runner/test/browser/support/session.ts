@@ -12,7 +12,6 @@ import ts from 'typescript';
 
 import { LzStrykerPlaywrightTestRunner } from '../../../src/playwright-test-runner.ts';
 
-/** A runner started on a fixture, with its completed per-test dry run and that run's coverage. */
 export interface Session {
   readonly dryRun: CompleteDryRunResult;
   readonly mutantCoverage: MutantCoverage;
@@ -26,7 +25,6 @@ export interface Session {
   dispose(): Promise<void>;
 }
 
-// The browser and the Playwright worker load the instrumented fixture as JavaScript.
 export function transpile(
   code: string,
   compilerOptions: ts.CompilerOptions = {},
@@ -40,7 +38,6 @@ export function transpile(
   }).outputText;
 }
 
-/** Inits a runner on a fixture's Playwright config and asserts that its dry run completes and reports coverage. */
 export async function startSession(
   configFile: string,
   sandboxFileName: string,
@@ -73,7 +70,7 @@ export async function startSession(
     mutantRun(m, options = {}) {
       return runner.mutantRun({
         activeMutant: m,
-        // Kills and survivors end when their tests do; a wide budget keeps a loaded machine from turning them into timeouts.
+        // A wide budget keeps a loaded machine from turning kills and survivors into timeouts.
         timeout: 60_000,
         disableBail: false,
         mutantActivation: 'runtime',

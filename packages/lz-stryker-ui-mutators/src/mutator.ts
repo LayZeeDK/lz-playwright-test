@@ -1,7 +1,6 @@
 import type { NodePath, types } from '@babel/core';
 
-// `as const` on purpose, though Stryker leaves it unmutated: the compiler fails the build when the code calls a
-// member this list lacks, which no test of the list could do.
+// `as const` though Stryker leaves it unmutated (https://github.com/stryker-mutator/stryker-js/issues/6208): the compiler rejects a call to a member it lacks.
 export const babelTypeMembers = [
   'booleanLiteral',
   'cloneNode',
@@ -42,7 +41,6 @@ export const babelTypeMembers = [
   'unaryExpression',
 ] as const satisfies readonly (keyof typeof types)[];
 
-/** The members of Babel's `types` this package calls; their signatures are those of the Babel it was built with. */
 export type BabelTypes = Pick<
   typeof types,
   (typeof babelTypeMembers)[number]

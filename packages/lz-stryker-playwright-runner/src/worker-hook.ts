@@ -52,7 +52,6 @@ interface RunningTest {
   readonly slot: RunningSlot | undefined;
 }
 
-/** The test that runs now, read through test.info(); undefined while none runs. */
 type CurrentTest = () => RunningTest | undefined;
 
 // Playwright's `test` is a function, and playwright/test exports that function as the module itself.
@@ -413,7 +412,6 @@ async function readNamespace(
   }
 }
 
-// What a page's evaluate returns has crossed a serialization boundary.
 function frameRead(value: unknown): FrameRead | undefined {
   return isRecord(value)
     ? { mutantCoverage: value['mutantCoverage'], hitCount: value['hitCount'] }

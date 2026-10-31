@@ -56,20 +56,16 @@ function worker(
 const workerHookUrl = new URL('../src/worker-hook.ts', import.meta.url).href;
 
 test('a Playwright worker outside a Stryker run loads the hook and installs nothing', (t) => {
-  // A path that ends like Playwright's worker entry, so only the run-settings check keeps the hook out.
   const entry = 'playwright/lib/worker/workerProcessEntry.js';
   const dir = tempTree(t, 'worker-hook-test-', {
     [entry]: `console.log('entry ran');`,
   });
 
-  // An install without run settings throws at import, before the entry runs.
   const child = spawnSync(
     process.execPath,
     ['--import', workerHookUrl, path.join(dir, entry)],
     {
       encoding: 'utf8',
-      // The child keeps NODE_OPTIONS: under Stryker, the test runner's preload there reports the
-      // coverage the gate makes in the child.
       env: { ...process.env, [runSettingsEnv]: undefined },
     },
   );
@@ -78,7 +74,6 @@ test('a Playwright worker outside a Stryker run loads the hook and installs noth
   assert.equal(child.stdout.trim(), 'entry ran');
 });
 
-// As Playwright's own playwright/test: the module is its test, a function with info() and `test`.
 const playwrightTestModule = [
   'const test = Object.assign(() => {}, { info() { throw new Error("no test"); } });',
   'module.exports = Object.assign(test, { test });',
@@ -125,7 +120,6 @@ function runWorker(
   return { child, outDir };
 }
 
-// A Playwright install with the given playwright/test, and a require from its worker entry.
 function playwrightWith(t: TestContext, playwrightTest: string) {
   const dir = tempTree(t, 'worker-hook-api-', {
     'node_modules/playwright/test.js': playwrightTest,

@@ -42,8 +42,6 @@ test('serial grouping fails loudly when Playwright suites lose _parallelMode', (
   );
 });
 
-// Stands in for Playwright's TestRunner: reports the given errors and tests, then resolves to the status, or to
-// undefined when there is none, as when Playwright throws.
 function listing({
   status,
   errors = [],

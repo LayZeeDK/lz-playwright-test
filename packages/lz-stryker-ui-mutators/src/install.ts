@@ -54,13 +54,11 @@ export interface InstrumentResult {
   readonly mutants: readonly InstrumentedMutant[];
 }
 
-/** What this package reads of a mutator in Stryker's list; only Stryker calls `mutate`. */
 export interface ListedMutator {
   readonly name: string;
   readonly mutate: (...args: readonly never[]) => unknown;
 }
 
-/** Stryker's own list: this package reads it and appends its operators, nothing more. */
 export interface MutatorList extends ReadonlyArray<ListedMutator> {
   push(...mutators: ListedMutator[]): number;
 }
@@ -73,7 +71,7 @@ export interface Instrumenter {
   readonly allMutators: MutatorList;
   /**
    * `target` is the first entry of the frozen `allMutantPlacers`; the array is frozen, this object is not
-   * (`mutant-placers/index.js:6`). `original` calls the methods `target` had when it was resolved.
+   * (`mutant-placers/index.js:6`).
    */
   readonly expressionPlacer: {
     readonly target: object;
@@ -223,8 +221,6 @@ export async function resolveFromCore(
   const dir = dirname(packageJson);
   const manifest: unknown = fromCore(packageJson);
   const version = String(fieldOf(manifest, 'version'));
-  // These checks are what this module relies on in each namespace. The signatures of the Babel types and of each
-  // mutator's mutate stay unchecked; the self-check in install() runs them.
   const [mutate, placers, index, babel] = await Promise.all([
     importFile(join(dir, 'dist', 'src', 'mutators', 'mutate.js')),
     importFile(join(dir, 'dist', 'src', 'mutant-placers', 'index.js')),
@@ -346,7 +342,7 @@ function assertBabelTypes(
   }
 }
 
-// Stryker's own list, annotated rather than `as const` so that a mutant of a status fails to compile.
+// Annotated, not `as const`, so a mutant of a status fails to compile (https://github.com/stryker-mutator/stryker-js/issues/6208).
 const statuses: readonly MutantStatus[] = [
   'Killed',
   'Survived',

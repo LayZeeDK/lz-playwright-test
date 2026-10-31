@@ -69,7 +69,6 @@ export interface Behaviour {
 /** The fake's record of every call, in order. */
 type Call = [string, ...unknown[]];
 
-/** Sets `values` in process.env, an undefined value unsetting its variable, and restores them after the test. */
 export function stubEnv(
   t: TestContext,
   values: Readonly<Record<string, string | undefined>>,
@@ -233,10 +232,6 @@ export function fakePlaywright(
     calls,
     runs,
     names: () => calls.map(([name]) => name),
-    /**
-     * A runner on `configFile`, unless `lzStrykerPlaywright` overrides it, that the fake's cleanup disposes, and the
-     * lines it logs.
-     */
     runner: ({
       timeoutMS = 10_000,
       lzStrykerPlaywright = {},

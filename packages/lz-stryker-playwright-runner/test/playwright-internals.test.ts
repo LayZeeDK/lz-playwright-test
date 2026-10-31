@@ -14,7 +14,6 @@ import {
 
 const src = new URL('../src/', import.meta.url);
 
-/** `answers` holds what each TestRunner method resolves to, by method name. */
 function fakeModules(
   methods: readonly string[] = testRunnerMethods,
   answers: Readonly<Record<string, unknown>> = {},
@@ -150,7 +149,6 @@ function testRunnerAnswering(answers: Readonly<Record<string, unknown>>) {
   ).createTestRunner(undefined, {});
 }
 
-/** Calls each status method of the test runner with arguments it accepts. */
 function statusCalls(runner: Awaited<ReturnType<typeof testRunnerAnswering>>) {
   return {
     listTests: () => runner.listTests({}, {}),

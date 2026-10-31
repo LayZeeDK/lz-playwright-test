@@ -21,7 +21,6 @@ import { dryRunBudget } from '../../src/timeouts.ts';
 
 export type Outcome = ReturnType<TestCase['outcome']>;
 
-/** A temp dir holding `files` by relative path, removed after the test. */
 export function tempTree(
   t: TestContext,
   prefix: string,
@@ -37,17 +36,14 @@ export function tempTree(
   return dir;
 }
 
-/** An Error with a Node.js system error `code`, such as `ENOENT`. */
 export function codedError(code: string): Error & { code: string } {
   return Object.assign(new Error(code), { code });
 }
 
-// Coverage maps have no prototype, which deepEqual tells apart from object literals; the JSON copy compares their content.
-export function plain(value: unknown): unknown {
+export function withoutPrototypes(value: unknown): unknown {
   return JSON.parse(JSON.stringify(value));
 }
 
-/** A test with no attempts yet. */
 export function fakeTestCase(
   id: string,
   {
@@ -66,7 +62,6 @@ export function fakeTestCase(
   };
 }
 
-/** The test with one more attempt, as Playwright appends each attempt of a test to its TestCase. */
 export function addAttempt(
   testCase: ReportedTest,
   outcome: Outcome,
@@ -129,7 +124,6 @@ export function logger({
   return { log, lines };
 }
 
-/** The Stryker options the runner reads, with the given fields and a 10 s timeoutMS. */
 export function strykerOptions(
   options: Partial<RunnerStrykerOptions>,
 ): RunnerStrykerOptions {
@@ -162,7 +156,6 @@ export function mutantRequest(
   };
 }
 
-/** A passed run with the hook installed, an empty reporter and no snapshots, with the given fields. */
 export function runOutput(output: Partial<RunOutput> = {}): RunOutput {
   return {
     status: 'passed',

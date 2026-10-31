@@ -5,7 +5,6 @@ import type { TestContext } from 'node:test';
 
 import { tempRoot, writeTree } from './temp-tree.ts';
 
-/** A playwright-core `version` whose lib/coreBundle.js holds `bundle`, under a directory `t` removes; its resolve. */
 export function fakePlaywrightCore(
   t: TestContext,
   version: string,
@@ -26,11 +25,9 @@ export function fakePlaywrightCore(
   };
 }
 
-// A table whose only entry is BUTTON, so it lacks the A and AREA entries that LzElementRole reads.
 export const buttonOnly =
   'kImplicitRoleByTagName = {\\n  "BUTTON": () => "button"\\n};';
 
-/** The kImplicitRoleByTagName excerpt of playwright-core/lib/coreBundle.js at `version`, escaped as in the bundle. */
 export function excerpt(version: string): string {
   return readFileSync(
     join(import.meta.dirname, '..', 'fixture', 'roles', `${version}.txt`),

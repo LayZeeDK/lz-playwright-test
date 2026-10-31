@@ -6,8 +6,7 @@ import { fieldOf } from './is-record.ts';
 
 export interface ImplicitRole {
   readonly role: string;
-  /** The element has the role only while it has this attribute. */
-  readonly attribute?: string;
+  readonly requiredAttribute?: string;
 }
 
 /** Keyed by lowercase tag name; `undefined` is the name of a JSX element that is not a plain identifier. */
@@ -20,14 +19,9 @@ export interface BundledRoles {
 
 export interface PlaywrightCore {
   readonly version: string;
-  /** The path of lib/coreBundle.js, which holds the role table. */
   readonly bundlePath: string;
 }
 
-/**
- * The path of the playwright-core package.json that `resolve` finds, or undefined when it finds none. Throws when
- * resolving fails for another reason, such as a subpath its `exports` leave out.
- */
 export function findManifest(
   resolve: (specifier: string) => string,
 ): string | undefined {
@@ -46,7 +40,6 @@ export function findManifest(
   }
 }
 
-/** The playwright-core whose package.json is at `manifest`. Throws when that file is unreadable or not JSON. */
 export function readPlaywrightCore(manifest: string): PlaywrightCore {
   return {
     version: String(
@@ -56,11 +49,6 @@ export function readPlaywrightCore(manifest: string): PlaywrightCore {
   };
 }
 
-/**
- * The role table of the playwright-core this package resolves (a peer dependency, so the consumer's), else the
- * bundled table. Only a missing playwright-core is silent: every other failure warns once through `warn`, with the
- * version, path, error and its code as far as they are known, and gives the bundled table.
- */
 export function consumerRoles(
   bundled: BundledRoles,
   resolve: (specifier: string) => string = createRequire(import.meta.url)
@@ -97,11 +85,7 @@ export function consumerRoles(
   }
 }
 
-/**
- * The tags whose implicit role is button or link, which LzElementRole's span swap needs. The redundant-role skip
- * reads whatever entries the table holds.
- */
-const readTags: readonly string[] = ['a', 'area', 'button'];
+const spanSwapTags: readonly string[] = ['a', 'area', 'button'];
 const start = 'kImplicitRoleByTagName = {';
 // The table sits in playwright-core/lib/coreBundle.js inside one string literal, so its line breaks are the two
 // characters `\n`. An entry is a line indented by two spaces; deeper lines belong to an entry's function body.
@@ -118,7 +102,6 @@ function captured(value: string | undefined): string {
   return value;
 }
 
-/** The `kImplicitRoleByTagName` table in the text of playwright-core/lib/coreBundle.js. Throws when it is missing. */
 export function roleTableExcerpt(bundle: string): string {
   const from = bundle.indexOf(start);
   const to = bundle.indexOf(end, from);
@@ -130,11 +113,6 @@ export function roleTableExcerpt(bundle: string): string {
   return bundle.slice(from, to + end.length);
 }
 
-/**
- * The entries of Playwright's `kImplicitRoleByTagName` whose role is constant or depends on one attribute, read from
- * the text of playwright-core/lib/coreBundle.js. Entries whose role depends on more are left out. Throws when the table
- * is missing or lacks an entry of that shape for `a`, `area` or `button`, naming the missing tags.
- */
 export function parseRoleTable(bundle: string): RoleTable {
   const table = roleTableExcerpt(bundle);
   const roles: RoleTable = new Map([
@@ -146,12 +124,12 @@ export function parseRoleTable(bundle: string): RoleTable {
       ([, tag, attribute, role]) =>
         [
           captured(tag).toLowerCase(),
-          { role: captured(role), attribute: captured(attribute) },
+          { role: captured(role), requiredAttribute: captured(attribute) },
         ] as const,
     ),
   ]);
 
-  const missing = readTags.filter((tag) => !roles.has(tag));
+  const missing = spanSwapTags.filter((tag) => !roles.has(tag));
 
   if (missing.length > 0) {
     throw new Error(

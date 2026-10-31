@@ -136,10 +136,6 @@ export function removeDir(dir: string): void {
   fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
 }
 
-/**
- * Sweeps the roots dead runners left, reports them, then creates this runner's root, both with one
- * namespace token.
- */
 export function claimTempRoot(
   onRemoved: (removed: readonly string[]) => void,
 ): TempRoot {
