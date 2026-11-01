@@ -52,4 +52,9 @@ test('stryker init writes the settings the README recommends', async () => {
   for (const key of settings) {
     assert.deepEqual(field(config, key), field(init, key), key);
   }
+
+  assert.deepEqual(
+    Object.keys(config ?? {}).filter((key) => key !== 'mutate'),
+    settings,
+  );
 });

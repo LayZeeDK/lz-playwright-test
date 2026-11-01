@@ -29,7 +29,6 @@ import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 export default {
   appendPlugins: ['@layzee/stryker-playwright-runner'],
   testRunner: 'lz-stryker-playwright',
-  lzStrykerPlaywright: { configFile: 'playwright.config.ts' },
   coverageAnalysis: 'perTest',
   concurrency: 1,
   timeoutMS: 11_000,
