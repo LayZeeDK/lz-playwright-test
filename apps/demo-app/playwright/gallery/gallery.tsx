@@ -41,8 +41,10 @@ Object.assign(window, {
     props?: Record<string, unknown>;
   }) {
     const Story = await resolveStory(story);
-    root ??= createRoot(document.getElementById('root') as HTMLElement);
-    flushSync(() => root!.render(<Story {...props} />));
+    const target = (root ??= createRoot(
+      document.getElementById('root') as HTMLElement,
+    ));
+    flushSync(() => target.render(<Story {...props} />));
   },
   unmount() {
     root?.unmount();

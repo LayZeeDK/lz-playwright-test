@@ -23,7 +23,9 @@ export function PriceTag({ cents, compareAtCents }: PriceTagProps) {
       {off > 0 && (
         <>
           {' '}
-          <s data-testid="compare-at">{formatPrice(compareAtCents!)}</s>{' '}
+          <s data-testid="compare-at">
+            {formatPrice(compareAtCents ?? cents)}
+          </s>{' '}
           <strong data-testid="badge">
             {off >= 50 ? 'Half price or better' : `${off}% off`}
           </strong>

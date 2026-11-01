@@ -1,1 +1,1 @@
-const app = <Html foo={bar}></Html>;
+export const app = <Html foo={bar}></Html>;
