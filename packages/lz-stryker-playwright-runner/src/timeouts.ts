@@ -42,10 +42,12 @@ export function assertionTimeoutWarning(
   config: ConfigTimeouts,
   strykerTimeoutMS: number,
 ): string | undefined {
-  const needed = config.expectTimeout * 2;
+  // Stryker measures no start overhead when tests run on more than one Playwright worker.
+  const runHeadroomMs = runStartMs + stopHeadroomMs;
+  const needed = config.expectTimeout + runHeadroomMs;
 
   return strykerTimeoutMS < needed
-    ? `timeoutMS (${strykerTimeoutMS}) is below twice the Playwright expect timeout (${config.expectTimeout}); killed mutants may be reported as timeouts. Set timeoutMS to at least ${needed}.`
+    ? `timeoutMS (${strykerTimeoutMS}) is below the Playwright expect timeout (${config.expectTimeout}) plus the runner's ${runHeadroomMs} ms to start and stop a run; killed mutants may be reported as timeouts. Set timeoutMS to at least ${needed}.`
     : undefined;
 }
 

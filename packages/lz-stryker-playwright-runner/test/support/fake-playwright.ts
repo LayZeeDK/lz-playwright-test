@@ -236,7 +236,7 @@ export function fakePlaywright(
     runs,
     names: () => calls.map(([name]) => name),
     runner: ({
-      timeoutMS = 10_000,
+      timeoutMS = 11_000,
       lzStrykerPlaywright = {},
     }: { timeoutMS?: number; lzStrykerPlaywright?: object } = {}) => {
       const { log, lines } = logger();

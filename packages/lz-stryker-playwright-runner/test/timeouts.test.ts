@@ -54,14 +54,25 @@ test('the expect timeout is the largest over the projects, with Playwright defau
   );
 });
 
-test('the assertion warning fires below twice the expect timeout', () => {
+test('the assertion warning fires below the expect timeout plus the run start and stop headroom', () => {
   const config = { testTimeoutCap: Infinity, expectTimeout: 5000 };
 
   assert.equal(
-    assertionTimeoutWarning(config, 9999),
-    'timeoutMS (9999) is below twice the Playwright expect timeout (5000); killed mutants may be reported as timeouts. Set timeoutMS to at least 10000.',
+    assertionTimeoutWarning(config, 10_599),
+    "timeoutMS (10599) is below the Playwright expect timeout (5000) plus the runner's 5600 ms to start and stop a run; killed mutants may be reported as timeouts. Set timeoutMS to at least 10600.",
   );
-  assert.equal(assertionTimeoutWarning(config, 10_000), undefined);
+  assert.equal(assertionTimeoutWarning(config, 10_600), undefined);
+});
+
+test('at the lowest timeoutMS the warning accepts, a test gets the whole expect timeout with no Stryker overhead', () => {
+  const config = { testTimeoutCap: Infinity, expectTimeout: 5000 };
+  const lowest = config.expectTimeout + runStartMs + stopHeadroomMs;
+
+  assert.equal(assertionTimeoutWarning(config, lowest), undefined);
+  assert.equal(
+    mutantRunBudget(lowest, config).testTimeout,
+    config.expectTimeout,
+  );
 });
 
 test('a mutant run gets the timeout less the headroom as its test timeout, and a deadline', () => {

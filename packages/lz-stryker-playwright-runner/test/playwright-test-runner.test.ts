@@ -168,10 +168,10 @@ test('init refuses a Playwright whose package.json names no version', async (t) 
   assert.deepEqual(fake.calls, []);
 });
 
-test('init warns when timeoutMS is below twice the expect timeout, and only then', async (t) => {
+test('init warns when timeoutMS is below the expect timeout plus the start and stop headroom, and only then', async (t) => {
   const fake = fakePlaywright(t);
-  const low = fake.runner({ timeoutMS: 9_999 });
-  const enough = fake.runner({ timeoutMS: 10_000 });
+  const low = fake.runner({ timeoutMS: 10_599 });
+  const enough = fake.runner({ timeoutMS: 10_600 });
 
   await low.shell.init();
   await enough.shell.init();
@@ -181,7 +181,7 @@ test('init warns when timeoutMS is below twice the expect timeout, and only then
     [
       [
         'warn',
-        'timeoutMS (9999) is below twice the Playwright expect timeout (5000); killed mutants may be reported as timeouts. Set timeoutMS to at least 10000.',
+        "timeoutMS (10599) is below the Playwright expect timeout (5000) plus the runner's 5600 ms to start and stop a run; killed mutants may be reported as timeouts. Set timeoutMS to at least 10600.",
       ],
     ],
   );
