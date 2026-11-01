@@ -77,16 +77,17 @@ Use one of two ways:
   ```
 
   `appendPlugins` keeps the plugins Stryker loads by default. `plugins` replaces them, so a checker such
-  as `@stryker-mutator/typescript-checker` no longer loads unless the list names it too. Stryker finds
-  its default plugins by listing the `@stryker-mutator` folder next to its own install, which under pnpm
-  does not hold your checker. With pnpm, name every plugin in the list, the checker included, as in
-  `'@stryker-mutator/typescript-checker'`.
+  as `@stryker-mutator/typescript-checker` no longer loads unless the list names it too.
 
 - In a JavaScript or TypeScript config, import the plugin on the first line instead, and list nothing:
 
   ```ts
   import '@layzee/lz-stryker-ui-mutators';
   ```
+
+Stryker finds its default plugins by listing the `@stryker-mutator` folder next to its own install, which
+under pnpm or Yarn Plug'n'Play does not hold your checker. With either, name the checker in
+`appendPlugins` whichever way you load this plugin, as in `'@stryker-mutator/typescript-checker'`.
 
 Either way, the install checks that each mutator makes a mutant of a sample. It stops the run with the
 names of the mutators that do not, and with the instrumenter's folder and version when an internal it
@@ -141,10 +142,11 @@ remain:
 - An `LzConditionalElement` mutant on an empty list renders an empty list element, which Playwright
   reports as hidden. `toBeHidden` does not kill it; `toHaveCount(0)` on the items does.
 
-With `@stryker-mutator/typescript-checker`, an `LzEventHandler` mutant on a component prop that the
-component's type requires, such as `onClick: () => void`, fails to compile. Stryker reports it as a
-CompileError and leaves it out of the score, so no test runs against it. The mutator cannot see prop
-types. To keep such a mutant out of the report, use a disable comment on that attribute.
+With `@stryker-mutator/typescript-checker` and `strictNullChecks` on, an `LzEventHandler` mutant on a
+component prop that the component's type requires, such as `onClick: () => void`, fails to compile.
+Stryker reports it as a CompileError and leaves it out of the score, so no test runs against it. The
+mutator cannot see prop types. A disable comment on that attribute turns the mutant into an Ignored one,
+which the report still lists and the score also leaves out.
 
 ## Develop this package
 

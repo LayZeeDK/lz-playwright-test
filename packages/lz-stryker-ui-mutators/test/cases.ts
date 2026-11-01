@@ -906,7 +906,7 @@ export const cases: readonly Case[] = [
   {
     id: 'design-51',
     title:
-      'text inside noscript is not rendered while scripts run, as in every Playwright test',
+      'text inside noscript is not rendered while scripts run, as in a Playwright test unless javaScriptEnabled is false',
     origin: rulesOrigin,
     jsx: '<noscript>Enable JavaScript to use this app</noscript>',
     expect: [],
