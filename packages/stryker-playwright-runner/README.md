@@ -204,6 +204,9 @@ change:
 - Application files outside `mutate` that the app under test loads: other modules, styles and assets.
 - Code in a spec file outside every test: imports, top-level helpers, and hooks above the first test. A hook
   between two tests counts as part of the test above it.
+- In a spec file that starts with a block comment, such as a license header, Stryker places each test one
+  line below its `test(` call. An edit on that line counts against the test above it, unless the edit
+  changes the title.
 - Fixtures, page objects and other modules that the specs import.
 - The Playwright config, its `webServer` included.
 - This runner, Playwright, Stryker, and the Stryker options. The UI mutators too, unless the change alters
