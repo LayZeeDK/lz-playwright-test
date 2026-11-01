@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
 import { fieldOf } from './is-record.ts';
+import { pluginName } from './plugin-name.ts';
 import { spanSwapRoleByTag } from './span-swap.ts';
 
 export interface ImplicitRole {
@@ -84,7 +85,7 @@ export function consumerRoles(
     }
 
     warn(
-      `stryker-playwright-mutators: ${error.message}; ` +
+      `${pluginName}: ${error.message}; ` +
         `LzElementRole uses the table bundled from playwright-core ${bundled.version}.`,
     );
 

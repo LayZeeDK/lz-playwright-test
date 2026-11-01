@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 
+import { pluginName } from '../src/plugin-name.ts';
 import { generateRoles } from './roles-generator.ts';
 
 try {
@@ -9,7 +10,7 @@ try {
   );
 } catch (error) {
   process.stderr.write(
-    `stryker-playwright-mutators build: ${error instanceof Error ? error.message : String(error)}\n`,
+    `${pluginName} build: ${error instanceof Error ? error.message : String(error)}\n`,
   );
   process.exitCode = 1;
 }

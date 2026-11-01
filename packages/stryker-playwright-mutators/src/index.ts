@@ -4,6 +4,7 @@ import { declareFactoryPlugin, PluginKind } from '@stryker-mutator/api/plugin';
 import { bundled } from './bundled-roles.ts';
 import { install } from './install.ts';
 import { operatorsFor } from './operators.ts';
+import { pluginName } from './plugin-name.ts';
 import { consumerRoles } from './playwright-roles.ts';
 
 // Core sets this in every test-runner and checker child process (child-process-proxy.js:32), which re-import plugin
@@ -13,14 +14,14 @@ const installRan = process.env['STRYKER_MUTATOR_WORKER'] === undefined;
 if (installRan) {
   // A failure rejects this module's evaluation, and every later import of it rejects with the same error. A config
   // that imports it stops at once; under `plugins`, core only warns with the message, and the run then stops where
-  // core creates the `stryker-playwright-mutators` ignorer this module never got to export.
+  // core creates the ignorer this module never got to export.
   await install(operatorsFor(consumerRoles(bundled)));
 }
 
 function uiMutatorsIgnorer(): Ignorer {
   if (!installRan) {
     throw new Error(
-      'stryker-playwright-mutators: the install did not run, because STRYKER_MUTATOR_WORKER is set in a process that ' +
+      `${pluginName}: the install did not run, because STRYKER_MUTATOR_WORKER is set in a process that ` +
         'instruments. Unset it for the Stryker run.',
     );
   }
@@ -30,9 +31,5 @@ function uiMutatorsIgnorer(): Ignorer {
 uiMutatorsIgnorer.inject = [] satisfies [];
 
 export const strykerPlugins = [
-  declareFactoryPlugin(
-    PluginKind.Ignore,
-    'stryker-playwright-mutators',
-    uiMutatorsIgnorer,
-  ),
+  declareFactoryPlugin(PluginKind.Ignore, pluginName, uiMutatorsIgnorer),
 ];
