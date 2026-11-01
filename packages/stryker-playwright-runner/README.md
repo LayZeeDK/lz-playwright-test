@@ -196,7 +196,8 @@ otherwise:
   2 s, and at most the largest test timeout in the Playwright config. The dry run keeps the config's
   timeouts.
 - A mutant run that is still going 2.6 s before Stryker's timeout is stopped, and the mutant is a
-  Timeout unless a test already killed it. This catches a looping test that raised its own timeout. When
+  Timeout unless a test already killed it or every selected test has passed, which makes it Survived.
+  This catches a looping test that raised its own timeout. When
   Stryker's timeout is under 7.6 s, there is no such stop, and Stryker's own timer ends the run. The dry
   run has no such stop either.
 - `retries` is 0 and `repeatEach` is 1. Retries set with `describe.configure({ retries })` still apply.

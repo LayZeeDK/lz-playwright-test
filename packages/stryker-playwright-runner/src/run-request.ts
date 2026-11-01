@@ -29,6 +29,7 @@ export interface MutantRunRequest {
   readonly activeMutant: string;
   /** The Playwright test ids to run, serial groups included; undefined runs every test. */
   readonly testFilter: readonly string[] | undefined;
+  /** The test ids Stryker selected, before the serial groups widen them. */
   readonly coveringTests: readonly string[] | undefined;
   readonly hitLimit: number | undefined;
   readonly budget: RunBudget;
