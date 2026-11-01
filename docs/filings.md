@@ -538,6 +538,37 @@ node carries it as a leading comment.
 in its `innerComments`, apply the directive to the next JSX sibling, the way a leading comment applies
 to the next statement.
 
+## stryker-mutator/stryker-js: incremental mode places tests one line low in a file that starts with a block comment
+
+Status: draft, not filed (2026-11-01). A search of the repo's issues for "ts-nocheck line", "startPosition
+disableTypeChecks", "incremental test location comment" and "incremental" found no existing report on
+2026-11-01. lz-node-test found the same bug with its node:test runner (its scenario W11) and keeps its own
+draft; file once, with both runners' reproductions.
+
+**Versions.** `@stryker-mutator/core` and `instrumenter` 10.1.1, `@playwright/test` 1.64.1, Node 24.22.0,
+Windows 11 arm64, `disableTypeChecks` at its default (`true`).
+
+**Reproduction (measured 2026-11-01).** On this repository's e2e demo, put a 3-line block comment above
+`apps/demo-app-e2e/src/cart.spec.ts` and run
+`npx stryker run stryker.e2e.config.ts --mutate apps/demo-app/src/app/cart.ts:28-28 --incremental`. The
+incremental file then records each test at line 11, 18, 24, 29 and 38, one more than the `test(` calls at
+lines 10, 17, 23, 28 and 37. Without the comment the recorded lines equal the `test(` lines (measured in
+`reports/e2e/mutation.json`).
+
+**Cause (read, not debugged).** `prefixWithNoCheck` keeps a leading block comment, then appends `'\n'` and
+`// @ts-nocheck\n` and keeps the original newline after the comment, so the file grows by 2 lines
+(`packages/instrumenter/src/disable-type-checks.ts`). With no leading comment it grows by 1. The dry-run
+executor always subtracts 1 (`packages/core/src/process/3-dry-run-executor.ts`, the `test.startPosition.line--`
+"HACK" in `remapSandboxFilesToOriginalFiles`).
+
+**Effect.** Each test's region for change detection starts one line late. An edit on a test's `test(` line
+that keeps its title (for example adding a fixture to `async ({ page })`) counts against the test above it.
+The edited test keeps its reused results, so a Killed result can be stale. lz-node-test measured a stale
+Killed, with Survived when forced, for one-line tests.
+
+**Possible fix.** Have the preprocessor report how many lines it inserted per file and subtract that, or
+insert `// @ts-nocheck` without the extra newline so the shift is always 1.
+
 ## stryker-mutator/stryker-js: `ConditionalExpression` gives two mutants that render the same for a JSX `&&`
 
 Status: draft, not filed (2026-10-26). A search of the repo's issues for "ConditionalExpression jsx
