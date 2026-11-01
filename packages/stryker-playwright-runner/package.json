@@ -54,9 +54,6 @@
     ],
     "testRunner": "lz-stryker-playwright",
     "testRunner_comment": "Take a look at https://github.com/LayZeeDK/lz-playwright-test/tree/main/packages/stryker-playwright-runner#readme for information about the lz-stryker-playwright plugin.",
-    "lzStrykerPlaywright": {
-      "configFile": "playwright.config.ts"
-    },
     "coverageAnalysis": "perTest",
     "concurrency": 1,
     "timeoutMS": 11000
