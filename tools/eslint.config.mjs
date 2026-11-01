@@ -1,6 +1,9 @@
-import baseConfig, { typeSafetyRules } from '../eslint.config.mjs';
+import baseConfig, {
+  typeSafetyRules,
+  withWarningsAsErrors,
+} from '../eslint.config.mjs';
 
-export default [
+export default withWarningsAsErrors([
   ...baseConfig,
   {
     files: ['**/*.ts'],
@@ -20,4 +23,4 @@ export default [
       '@nx/enforce-module-boundaries': 'off',
     },
   },
-];
+]);

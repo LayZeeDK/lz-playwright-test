@@ -1,8 +1,8 @@
 import nx from '@nx/eslint-plugin';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
-import baseConfig from '../../eslint.config.mjs';
+import baseConfig, { withWarningsAsErrors } from '../../eslint.config.mjs';
 
-export default [
+export default withWarningsAsErrors([
   ...nx.configs['flat/react'],
   ...baseConfig,
   {
@@ -12,4 +12,4 @@ export default [
     plugins: { 'jsx-a11y': jsxA11y },
     rules: jsxA11y.flatConfigs.strict.rules,
   },
-];
+]);

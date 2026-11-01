@@ -5,7 +5,7 @@ import jsoncParser from 'jsonc-eslint-parser';
 const playwrightRecommended = playwright.configs['flat/recommended'];
 
 function raiseWarning(level) {
-  if (level === 'warn') {
+  if (level === 'warn' || level === 1) {
     return 'error';
   }
 
@@ -16,12 +16,30 @@ function raiseWarning(level) {
   return level;
 }
 
-const playwrightRecommendedAsErrors = Object.fromEntries(
-  Object.entries(playwrightRecommended.rules).map(([rule, level]) => [
-    rule,
-    raiseWarning(level),
-  ]),
-);
+/** Every enabled rule reports at error, including those a preset or plugin sets to warn. */
+export function withWarningsAsErrors(configs) {
+  return [
+    ...configs.map((config) =>
+      config.rules
+        ? {
+            ...config,
+            rules: Object.fromEntries(
+              Object.entries(config.rules).map(([rule, level]) => [
+                rule,
+                raiseWarning(level),
+              ]),
+            ),
+          }
+        : config,
+    ),
+    {
+      linterOptions: {
+        reportUnusedDisableDirectives: 'error',
+        reportUnusedInlineConfigs: 'error',
+      },
+    },
+  ];
+}
 
 function dependencyChecks(ignoredDependencies) {
   return [
@@ -99,7 +117,7 @@ export const typeSafetyRules = {
   ],
 };
 
-export default [
+export default withWarningsAsErrors([
   ...nx.configs['flat/base'],
   ...nx.configs['flat/typescript'],
   ...nx.configs['flat/javascript'],
@@ -171,7 +189,7 @@ export default [
     files: ['**/*.spec.ts', '**/playwright*.config.{ts,mts}'],
     ...playwrightRecommended,
     rules: {
-      ...playwrightRecommendedAsErrors,
+      ...playwrightRecommended.rules,
       'playwright/no-commented-out-tests': 'error',
       'playwright/no-get-by-title': 'error',
       'playwright/no-raw-locators': 'error',
@@ -215,4 +233,4 @@ export default [
       ]),
     },
   },
-];
+]);
