@@ -18,7 +18,7 @@ export default {
     'app/routes/users/$username/notes/_layout.tsx',
   ],
   coverageAnalysis: 'perTest',
-  timeoutMS: 10_000,
+  timeoutMS: 11_000,
   concurrency: 1,
   reporters: ['clear-text', 'progress', 'json'],
   jsonReporter: { fileName: 'reports/mutation/mutation.json' },

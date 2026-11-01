@@ -10,6 +10,6 @@ export default {
   lzStrykerPlaywright: { configFile: 'playwright.config.mjs' },
   mutate: ['app/src/app/app.tsx', 'app/src/app/price-tag.tsx'],
   coverageAnalysis: 'perTest',
-  timeoutMS: 10_000,
+  timeoutMS: 11_000,
   jsonReporter: { fileName: 'reports/mutation.json' },
 };

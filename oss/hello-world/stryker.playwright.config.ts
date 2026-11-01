@@ -5,7 +5,7 @@ export default {
   testRunner: 'lz-stryker-playwright',
   mutate: ['src/**/*.js'],
   coverageAnalysis: 'perTest',
-  timeoutMS: 10_000,
+  timeoutMS: 11_000,
   concurrency: 1,
   reporters: ['clear-text', 'progress'],
   tempDirName: '.stryker-tmp-pw',

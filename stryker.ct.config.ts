@@ -10,7 +10,7 @@ export default {
   },
   mutate: ['apps/demo-app/src/app/price-tag.tsx'],
   coverageAnalysis: 'perTest',
-  timeoutMS: 10_000,
+  timeoutMS: 11_000,
   // One mutant below the last measured score (21 of 27), since a browser run can flip one mutant.
   thresholds: { high: 80, low: 60, break: 74 },
   jsonReporter: { fileName: 'reports/ct/mutation.json' },

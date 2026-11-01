@@ -350,7 +350,9 @@ A killed mutant usually costs more than a surviving one: the failing test waits 
 assertion (`expect.timeout`, 5 s by default) before it fails. Stryker sizes its timeout from passing
 tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In the first CT run, 8 of
 11 mutants timed out. That count is from the decision log, and the run's own log was not kept. Set
-`timeoutMS` to at least twice the expect timeout. The runner warns at startup when it is lower.
+`timeoutMS` to at least the expect timeout plus 5.6 s, the runner's time to start and stop a mutant run,
+which Stryker does not measure when tests run on more than one Playwright worker. The runner warns at startup
+when it is lower.
 
 That wait is most of a run. At concurrency 1, one run each, 2026-10-27:
 
