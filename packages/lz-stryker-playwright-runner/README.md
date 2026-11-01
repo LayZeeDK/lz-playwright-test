@@ -51,8 +51,9 @@ On any supported Node.js, save the same object without `import type` and `satisf
 
 `appendPlugins` adds the runner to the plugins Stryker loads by default. Setting `plugins` instead
 replaces that list, so a checker such as `@stryker-mutator/typescript-checker` no longer loads unless the
-list names it too. Stryker finds its default plugins next to its own install, which under pnpm holds
-only Stryker's own dependencies. So with pnpm, also name the checker in `appendPlugins`.
+list names it too. Stryker finds its default plugins next to its own install, which under pnpm or Yarn
+Plug'n'Play holds only Stryker's own dependencies. So with either, also name the checker in
+`appendPlugins`. With Yarn Plug'n'Play, run `yarn stryker run` instead of `npx stryker run`.
 
 Each Stryker test runner process starts the Playwright `webServer` itself. Without `concurrency`, Stryker
 starts one process per CPU core, less one on a machine with more than 4 cores, and with a fixed port in
@@ -63,10 +64,22 @@ and after every `maxTestRunnerReuse` runs. The new process starts the `webServer
 
 There are two ways to keep the processes from fighting over one port:
 
-- Give each process its own port from `STRYKER_MUTATOR_WORKER` (see Faster mutation runs). Every
-  process, a replacement included, gets the next number, so ports from `base + STRYKER_MUTATOR_WORKER`
-  climb past `base + concurrency - 1` after the first replacement. Keep the ports above that range free,
-  and allow them in a backend that checks the origin.
+- Give each process its own port from `STRYKER_MUTATOR_WORKER`, which Stryker sets in each test runner
+  process, in the Playwright config:
+
+  ```ts
+  const port = 4200 + Number(process.env['STRYKER_MUTATOR_WORKER'] ?? 0);
+
+  export default defineConfig({
+    use: { baseURL: `http://localhost:${port}` },
+    webServer: { command: `npm run dev -- --port ${port}`, port },
+  });
+  ```
+
+  Every process, a replacement included, gets the next number, so ports from
+  `base + STRYKER_MUTATOR_WORKER` climb past `base + concurrency - 1` after the first replacement. Keep
+  the ports above that range free, and allow them in a backend that checks the origin.
+
 - Set the `webServer`'s `reuseExistingServer` to `true`, so that the processes share one server and its
   state in memory. Stop any dev server of your own first: a server that was already running serves the
   original sources, not Stryker's instrumented copy.
@@ -81,9 +94,10 @@ once with Stryker's `buildCommand` and only serve in the `webServer`.
 Stryker's default `timeoutMS` is 5000 ms, the same as Playwright's default `expect.timeout`. Keep
 `timeoutMS` at least the expect timeout plus 5.6 s, so 10.6 s with Playwright's default, or a killed
 mutant's failing assertion runs out the runner's per-test timeout and the mutant counts as a Timeout.
-The runner takes about 3 s to start a mutant run and keeps 2.6 s to stop one. Stryker adds the start to
-its timeout only when tests run on one Playwright worker; with `workers` above 1 it measures no such
-overhead, so `timeoutMS` must cover both. The runner warns at startup when `timeoutMS` is lower.
+The runner takes about 3 s to start a mutant run and keeps 2.6 s to stop one. Stryker adds an overhead
+to its timeout: the dry run's time less the tests' own time. On one Playwright worker that covers the
+start; with `workers` above 1 the tests overlap, so it covers less of it, often none. It never covers the
+stop, so `timeoutMS` must. The runner warns at startup when `timeoutMS` is lower.
 
 `coverageAnalysis` can be `off`, `all`, or `perTest`. With `perTest`, Stryker runs only the tests that
 reached a mutant, except for a mutant reached outside any test, which Stryker runs against every test.
@@ -122,8 +136,8 @@ exports as `strykerValidationSchema`.
 ## Faster mutation runs
 
 Stryker's `concurrency` sets how many test runner processes run at once. Each one starts its own
-`webServer`, so give each process its own port, for example from `STRYKER_MUTATOR_WORKER`, as Configure
-Stryker describes. On this repository's demo, concurrency 2 ran 1.9 times as fast as concurrency 1
+`webServer`, so give each process its own port from `STRYKER_MUTATOR_WORKER`, as the example in Configure
+Stryker shows. On this repository's demo, concurrency 2 ran 1.9 times as fast as concurrency 1
 and concurrency 4 ran 3.2 times as fast, with the same status for every mutant (2 rounds each, e2e and
 component tests).
 

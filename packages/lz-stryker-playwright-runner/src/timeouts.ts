@@ -42,7 +42,7 @@ export function assertionTimeoutWarning(
   config: ConfigTimeouts,
   strykerTimeoutMS: number,
 ): string | undefined {
-  // Stryker measures no start overhead when tests run on more than one Playwright worker.
+  // Stryker's measured overhead (dry run time less test time) shrinks to 0 when Playwright workers overlap tests.
   const runHeadroomMs = runStartMs + stopHeadroomMs;
   const needed = config.expectTimeout + runHeadroomMs;
 
