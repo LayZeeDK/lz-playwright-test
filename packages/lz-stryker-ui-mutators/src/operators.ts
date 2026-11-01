@@ -24,7 +24,12 @@ const comparisonOperators: ReadonlySet<string> = new Set([
   '>=',
 ]);
 const listMethods: ReadonlySet<string> = new Set(['map', 'filter', 'flatMap']);
-const unrenderedText: ReadonlySet<string> = new Set(['style', 'script']);
+// A browser with scripts on, Playwright's default, never renders noscript content.
+const unrenderedText: ReadonlySet<string> = new Set([
+  'style',
+  'script',
+  'noscript',
+]);
 const decorativeElements: ReadonlySet<string> = new Set(['svg', 'img', 'i']);
 const labelableElements: ReadonlySet<string> = new Set([
   'input',
@@ -144,6 +149,7 @@ export function operatorsFor(roles: RoleTable) {
           kind: 'attribute',
           attributes: ['disabled', 'readOnly', 'aria-disabled'],
           on: { bare: 'remove', string: 'remove', expression: 'false' },
+          skip: builtInForcesValue,
         },
       ],
     },
@@ -155,9 +161,10 @@ export function operatorsFor(roles: RoleTable) {
           kind: 'attribute',
           attributes: ['hidden', 'aria-hidden'],
           on: { bare: 'remove', string: 'remove', expression: 'false' },
-          skip: (site) =>
-            site.name === 'aria-hidden' &&
-            isNamed(decorativeElements, site.element.name),
+          skip: (site, t) =>
+            (site.name === 'aria-hidden' &&
+              isNamed(decorativeElements, site.element.name)) ||
+            builtInForcesValue(site, t),
         },
       ],
     },
@@ -224,6 +231,7 @@ export function operatorsFor(roles: RoleTable) {
             'aria-selected',
           ],
           on: { string: 'flip', expression: 'negate' },
+          skip: builtInNegates,
         },
       ],
     },
@@ -246,9 +254,29 @@ function isJsxBranch(node: types.Node, t: BabelTypes): boolean {
 /** A comparison, or `&&`/`||`: built-in ConditionalExpression already makes the same mutants for this test. */
 function builtInForces(test: types.Node, t: BabelTypes): boolean {
   return (
-    (t.isBinaryExpression(test) && comparisonOperators.has(test.operator)) ||
+    isComparison(test, t) ||
     (t.isLogicalExpression(test) && test.operator !== '??')
   );
+}
+
+/** Built-in ConditionalExpression already sets this value to `false`. */
+function builtInForcesValue(site: AttributeSite, t: BabelTypes): boolean {
+  return (
+    site.value.kind === 'expression' && builtInForces(site.value.expression, t)
+  );
+}
+
+/** Built-in EqualityOperator already negates a comparison, and BooleanLiteral already drops a `!`. */
+function builtInNegates(site: AttributeSite, t: BabelTypes): boolean {
+  return (
+    site.value.kind === 'expression' &&
+    (isComparison(site.value.expression, t) ||
+      t.isUnaryExpression(site.value.expression, { operator: '!' }))
+  );
+}
+
+function isComparison(node: types.Node, t: BabelTypes): boolean {
+  return t.isBinaryExpression(node) && comparisonOperators.has(node.operator);
 }
 
 function asSpan(element: ElementSite, t: BabelTypes): types.JSXElement {

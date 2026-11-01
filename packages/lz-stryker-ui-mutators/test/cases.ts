@@ -136,21 +136,21 @@ export const cases: readonly Case[] = [
   {
     id: 'realworld-12+13',
     title:
-      'a submit button is swapped for a span, its logical disabled expression is forced off and its text is emptied',
+      'a submit button is swapped for a span and its text is emptied; its logical disabled expression is left to the built-in ConditionalExpression',
     origin: `${realworldOrigin}libs/auth/feature-auth/src/login/login.component.html:33,36`,
     jsx: '<button data-testid="sign-in" disabled={form.invalid || form.pending} type="submit">Sign in</button>',
     expect: [
       ['LzElementRole', '<span data-testid="sign-in">Sign in</span>'],
-      ['LzDisabledAttribute', 'disabled={false}'],
       ['LzTextLiteral', ''],
     ],
   },
   {
     id: 'realworld-14',
-    title: 'a comparison hidden expression is forced off',
+    title:
+      'a comparison hidden expression is not forced off; the built-in ConditionalExpression already gives {false}',
     origin: `${realworldOrigin}libs/articles/feature-article/src/article-comment/article-comment.component.html:16`,
     jsx: '<span className="mod-options" hidden={currentUser.username !== comment.author.username}></span>',
-    expect: [['LzHiddenAttribute', 'hidden={false}']],
+    expect: [],
   },
   {
     id: 'realworld-15',
@@ -904,6 +904,14 @@ export const cases: readonly Case[] = [
     expect: [],
   },
   {
+    id: 'design-51',
+    title:
+      'text inside noscript is not rendered while scripts run, as in every Playwright test',
+    origin: rulesOrigin,
+    jsx: '<noscript>Enable JavaScript to use this app</noscript>',
+    expect: [],
+  },
+  {
     id: 'design-4',
     title:
       'a role equal to the implicit role is skipped, and the button still swaps',
@@ -1042,12 +1050,12 @@ export const cases: readonly Case[] = [
   },
   {
     id: 'design-16',
-    title: 'a boolean state expression is negated',
+    title: 'a boolean or logical state expression is negated',
     origin: `${release}, LzStateAttribute`,
-    jsx: '<div aria-expanded={open} aria-selected={tab === current} />',
+    jsx: '<div aria-expanded={open} aria-selected={tab.active && !tab.locked} />',
     expect: [
       ['LzStateAttribute', 'aria-expanded={!open}'],
-      ['LzStateAttribute', 'aria-selected={!(tab === current)}'],
+      ['LzStateAttribute', 'aria-selected={!(tab.active && !tab.locked)}'],
     ],
   },
   {
@@ -1397,5 +1405,15 @@ export const cases: readonly Case[] = [
       ['LzElementRole', '<span onClick={undefined}>Three</span>'],
       ['LzTextLiteral', ''],
     ],
+  },
+  {
+    id: 'design-50',
+    title:
+      'no forced-off value for a comparison or logical value, and no negation for a comparison or a ! value: built-in mutants give the same',
+    origin: `${rulesOrigin}, LzDisabledAttribute, LzHiddenAttribute and LzStateAttribute`,
+    jsx:
+      '<form><input readOnly={n > 0} /><p aria-disabled={a && b} aria-hidden={a ?? b} />' +
+      '<p aria-selected={tab === current} aria-expanded={!open} aria-pressed={!(a && b)} /></form>',
+    expect: [['LzHiddenAttribute', 'aria-hidden={false}']],
   },
 ];
