@@ -175,6 +175,65 @@ RealWorld app, `use.actionTimeout: 5000` turned the 15 timeouts among 26 detecte
 the run took 4 min 46 s, against 7 min 18 s and 8 min 48 s in two runs without it. Keep `actionTimeout`
 below the per-test timeout, so that a killed mutant's failing test says what broke.
 
+### Incremental mode
+
+Stryker's `--incremental` option reuses the last run's result for each mutant whose code and tests did not
+change, and runs the rest. Stryker keeps the results in `reports/stryker-incremental.json`, or in the file
+that `--incrementalFile` names. To match tests from one run to the next, Stryker needs each test's file,
+start position and name. The runner reports all three. The name holds the project name, the file name, the
+`describe` titles and the test title.
+
+```shell
+npx stryker run --incremental
+```
+
+Stryker always runs the dry run, so an incremental run takes at least as long as the sandbox copy, the
+`webServer` start and the dry run. On this repository's demo e2e config, at concurrency 7, with the median of 5 alternated
+runs per side and the range in brackets:
+
+| Change since the last run  | Results reused | Incremental  | Full         |
+| -------------------------- | -------------- | ------------ | ------------ |
+| None                       | 32 of 32       | 16 s (16-18) | 68 s (65-73) |
+| One edit to a mutated file | 23 of 32       | 43 s (40-48) | 66 s (65-71) |
+| One edit to a test         | 18 of 32       | 45 s (44-46) | 66 s (65-66) |
+
+Stryker sees an edit to a file in `mutate`. It also sees an edit to a test, from the test's `test(` call to
+the next test in the file. It does not see the changes below, and keeps a result that one of them would
+change:
+
+- Application files outside `mutate` that the app under test loads: other modules, styles and assets.
+- Code in a spec file outside every test: imports, top-level helpers, and hooks above the first test. A hook
+  between two tests counts as part of the test above it.
+- Fixtures, page objects and other modules that the specs import.
+- The Playwright config, its `webServer` included.
+- This runner, Playwright, Stryker, and the Stryker options. The UI mutators too, unless the change alters
+  a mutant's replacement text.
+- The Node.js version and environment variables.
+
+On the demo, an edit to the `beforeEach` above the first test reused all 32 results and ran no mutant. After a
+change in that list, run `npx stryker run --incremental --force`. Stryker then runs every mutant in `mutate`
+and replaces the file.
+
+In CI, restore the file only when the inputs you can hash did not change. Hash them into the cache key, and add
+the run id and attempt so that each run saves its own file. With GitHub Actions:
+
+```yaml
+- uses: actions/cache@v4
+  with:
+    path: reports/stryker-incremental.json
+    key: stryker-incremental-${{ runner.os }}-${{ hashFiles('package-lock.json', '.nvmrc', 'stryker.config.*', 'e2e/playwright.config.*', 'e2e/fixtures/**') }}-${{ github.run_id }}-${{ github.run_attempt }}
+    restore-keys: stryker-incremental-${{ runner.os }}-${{ hashFiles('package-lock.json', '.nvmrc', 'stryker.config.*', 'e2e/playwright.config.*', 'e2e/fixtures/**') }}-
+- run: npx stryker run --incremental
+```
+
+Replace the paths with your lockfile, Node.js version file, Stryker config, Playwright config and fixture
+folders. If you set `incrementalFile`, put that path in `path`. The cache step saves the file only when the
+job succeeds, so a run that fails `thresholds.break` leaves the older file in the cache.
+
+The hash does not cover the hooks and helpers in the spec files, or the application files outside `mutate`.
+Add them to the hash if a full run after each such edit costs less than a result that is wrong and goes
+unnoticed.
+
 ## What the runner changes in the Playwright config
 
 On every run, these settings replace the ones in the Playwright config, except where a line says
