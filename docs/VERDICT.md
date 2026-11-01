@@ -351,7 +351,8 @@ assertion (`expect.timeout`, 5 s by default) before it fails. Stryker sizes its 
 tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In the first CT run, 8 of
 11 mutants timed out. That count is from the decision log, and the run's own log was not kept. Set
 `timeoutMS` to at least the expect timeout plus 5.6 s, the runner's time to start and stop a mutant run.
-Stryker's measured overhead covers the start only when tests run on one Playwright worker, and never the stop.
+Stryker's measured overhead covers the start on one Playwright worker, less of it or none with more, and never
+the stop.
 The runner warns at startup when it is lower.
 
 That wait is most of a run. At concurrency 1, one run each, 2026-10-27:
