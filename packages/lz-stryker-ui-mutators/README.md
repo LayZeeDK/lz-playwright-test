@@ -16,8 +16,8 @@ gets few mutants it can kill. This plugin adds ten mutators:
 - `LzChildExpression`: replaces a `{value}` child with `null`.
 - `LzStateAttribute`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, and `aria-selected`.
 
-The repository's `docs/design/playwright-mutators.md` says exactly what each mutator changes and which
-shapes it skips. Stryker's reports show these names as the mutator of each mutant.
+The [design document](https://github.com/LayZeeDK/lz-playwright-test/blob/main/docs/design/playwright-mutators.md)
+says exactly what each mutator changes and which shapes it skips. Stryker's reports show these names as the mutator of each mutant.
 
 ## Requirements
 

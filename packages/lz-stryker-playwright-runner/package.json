@@ -3,6 +3,18 @@
   "version": "0.0.0",
   "private": true,
   "description": "StrykerJS test runner plugin for Playwright Test (e2e and component tests)",
+  "keywords": [
+    "stryker",
+    "playwright",
+    "mutation testing",
+    "@stryker-mutator/test-runner-plugin"
+  ],
+  "homepage": "https://github.com/LayZeeDK/lz-playwright-test/tree/main/packages/lz-stryker-playwright-runner#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LayZeeDK/lz-playwright-test.git",
+    "directory": "packages/lz-stryker-playwright-runner"
+  },
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
@@ -35,6 +47,19 @@
   "devDependencies": {
     "@layzee/lz-stryker-ui-mutators": "*",
     "ajv": "8.20.0"
+  },
+  "initStrykerConfig": {
+    "appendPlugins": [
+      "@layzee/lz-stryker-playwright-runner"
+    ],
+    "testRunner": "lz-stryker-playwright",
+    "testRunner_comment": "Take a look at https://github.com/LayZeeDK/lz-playwright-test/tree/main/packages/lz-stryker-playwright-runner#readme for information about the lz-stryker-playwright plugin.",
+    "lzStrykerPlaywright": {
+      "configFile": "playwright.config.ts"
+    },
+    "coverageAnalysis": "perTest",
+    "concurrency": 1,
+    "timeoutMS": 11000
   },
   "nx": {
     "tags": [
