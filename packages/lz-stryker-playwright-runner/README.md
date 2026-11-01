@@ -21,7 +21,7 @@ Install the runner next to StrykerJS and Playwright:
 npm install -D @layzee/lz-stryker-playwright-runner @stryker-mutator/core @playwright/test
 ```
 
-Then select it in the Stryker config:
+Then select it in a Stryker config file, here `stryker.config.ts`:
 
 ```ts
 import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
@@ -32,27 +32,58 @@ export default {
   lzStrykerPlaywright: { configFile: 'playwright.config.ts' },
   coverageAnalysis: 'perTest',
   concurrency: 1,
-  timeoutMS: 10_000,
-  mutate: ['src/**/*.tsx'],
+  timeoutMS: 11_000,
+  mutate: ['src/**/*.tsx', '!src/**/*.spec.tsx', '!src/**/*.test.tsx'],
 } satisfies PartialStrykerOptions;
 ```
 
+Stryker finds a config file by itself only when it is JSON or JavaScript, so name a TypeScript config on
+the command line:
+
+```sh
+npx stryker run stryker.config.ts
+```
+
+Without the file name, Stryker runs with its defaults, which test every mutant with `npm test` instead of
+this runner. A `.ts` config needs Node.js 22.18 or later, which strips the types when Stryker imports it.
+On any supported Node.js, save the same object without `import type` and `satisfies` as
+`stryker.config.mjs`, which `npx stryker run` finds by itself.
+
 `appendPlugins` adds the runner to the plugins Stryker loads by default. Setting `plugins` instead
 replaces that list, so a checker such as `@stryker-mutator/typescript-checker` no longer loads unless the
-list names it too.
+list names it too. Stryker finds its default plugins next to its own install, which under pnpm holds
+only Stryker's own dependencies. So with pnpm, also name the checker in `appendPlugins`.
 
 Each Stryker test runner process starts the Playwright `webServer` itself. Without `concurrency`, Stryker
 starts one process per CPU core, less one on a machine with more than 4 cores, and with a fixed port in
 the Playwright config every process after the first fails at startup because the port is taken. A Stryker
 checker hands its processes to new test runners when it finishes, so even at `concurrency` 1 a second
-test runner starts. So either give each process its own port, for example from `STRYKER_MUTATOR_WORKER`
-(see Faster mutation runs), or set the `webServer`'s `reuseExistingServer` to `true` so that the
-processes share one server. With `reuseExistingServer`, stop any dev server of your own first: a server
-that was already running serves the original sources, not Stryker's instrumented copy.
+test runner starts. Stryker also replaces a test runner process when its own timer ends a mutant run,
+and after every `maxTestRunnerReuse` runs. The new process starts the `webServer` and global setup again.
+
+There are two ways to keep the processes from fighting over one port:
+
+- Give each process its own port from `STRYKER_MUTATOR_WORKER` (see Faster mutation runs). Every
+  process, a replacement included, gets the next number, so ports from `base + STRYKER_MUTATOR_WORKER`
+  climb past `base + concurrency - 1` after the first replacement. Keep the ports above that range free,
+  and allow them in a backend that checks the origin.
+- Set the `webServer`'s `reuseExistingServer` to `true`, so that the processes share one server and its
+  state in memory. Stop any dev server of your own first: a server that was already running serves the
+  original sources, not Stryker's instrumented copy.
+
+Either way, every process runs in the same Stryker sandbox, so what one server writes there, such as a
+SQLite file or a JSON store, the others read, and a test can fail because of another process's data,
+without a mutant at fault. Give each process its own store, from the same `STRYKER_MUTATOR_WORKER`. A
+`webServer` that builds the app before it serves it rebuilds the sandbox's one output folder in every
+process, while the others serve it. Under Stryker, serve the sandbox from a dev server instead, or build
+once with Stryker's `buildCommand` and only serve in the `webServer`.
 
 Stryker's default `timeoutMS` is 5000 ms, the same as Playwright's default `expect.timeout`. Keep
-`timeoutMS` at least twice the expect timeout, or a killed mutant's failing assertion runs out Stryker's
-timeout and the mutant counts as a Timeout. The runner warns at startup when it is lower.
+`timeoutMS` at least the expect timeout plus 5.6 s, so 10.6 s with Playwright's default, or a killed
+mutant's failing assertion runs out the runner's per-test timeout and the mutant counts as a Timeout.
+The runner takes about 3 s to start a mutant run and keeps 2.6 s to stop one. Stryker adds the start to
+its timeout only when tests run on one Playwright worker; with `workers` above 1 it measures no such
+overhead, so `timeoutMS` must cover both. The runner warns at startup when `timeoutMS` is lower.
 
 `coverageAnalysis` can be `off`, `all`, or `perTest`. With `perTest`, Stryker runs only the tests that
 reached a mutant, except for a mutant reached outside any test, which Stryker runs against every test.
@@ -60,6 +91,12 @@ Coverage from the browser pages counts for the test that opened the page. Covera
 Playwright worker itself imports counts for the test whose body or `beforeEach` and `afterEach` hooks ran
 it. Code that a `beforeAll` or `afterAll` hook, a fixture, or the import itself ran is reached outside
 any test.
+
+The runner runs more than the tests Stryker selects: the whole `describe.serial` group that a selected
+test belongs to, and the dependency projects, such as a `setup` project, of the selected tests'
+projects. Stryker's timeout for a mutant counts only the time of the tests it selected. So add the time
+of the longest serial group and of the dependency projects to the `timeoutMS` above, or such a run ends
+as a Timeout, which Stryker counts as detected even when no test would have failed.
 
 ## Break threshold
 
@@ -72,18 +109,21 @@ Survived from one run to the next.
 Set these under `lzStrykerPlaywright` in the Stryker config. Stryker checks them against the schema the package
 exports as `strykerValidationSchema`.
 
-- `configFile`: the Playwright config file, relative to the project root. Without it, Playwright looks
-  for `playwright.config.*` in the working directory.
+- `configFile`: the Playwright config file, relative to the folder you run Stryker from, not to an Nx
+  project's folder. Without it, Playwright looks for `playwright.config.*` in that folder.
 - `projects`: the Playwright projects to run. Without it, the runner runs the projects that Playwright
   runs without `--project`, so not those with `default: false`.
 - `workers`: the Playwright workers per Stryker test runner process. The default is 1. The `workers`
-  value in the Playwright config has no effect.
+  value in the Playwright config has no effect. The dry run runs the whole suite on these workers, and
+  Stryker fails the run when the dry run takes longer than `dryRunTimeoutMinutes`, 5 by default. A suite
+  that takes a few minutes on Playwright's default workers can take longer than that on one, so raise
+  `workers` or `dryRunTimeoutMinutes`.
 
 ## Faster mutation runs
 
 Stryker's `concurrency` sets how many test runner processes run at once. Each one starts its own
-`webServer`, so the Playwright config must give each process its own port, for example from
-`STRYKER_MUTATOR_WORKER`. On this repository's demo, concurrency 2 ran 1.9 times as fast as concurrency 1
+`webServer`, so give each process its own port, for example from `STRYKER_MUTATOR_WORKER`, as Configure
+Stryker describes. On this repository's demo, concurrency 2 ran 1.9 times as fast as concurrency 1
 and concurrency 4 ran 3.2 times as fast, with the same status for every mutant (2 rounds each, e2e and
 component tests).
 
@@ -156,13 +196,32 @@ otherwise:
   there in the next. A suite that needs a fresh backend can report a mutant wrongly.
 - Dependency projects, such as a `setup` project that logs in, run on every mutant run with the mutant
   active. Login in `globalSetup` runs once instead.
-- Web workers and service workers get no coverage, and coverage is lost across a cross-origin
-  navigation.
+- Web workers and service workers never get the active mutant, because the runner sets it with a script
+  that runs in pages only. A mutant in code that only a worker runs can never be killed: it is
+  NoCoverage, or Survived with `coverageAnalysis: 'off'`. Leave such code out of `mutate`. A mutant in
+  code that both a page and a worker run is active in the page only.
+- Coverage is lost across a cross-origin navigation.
 - Stryker's `ignoreStatic` skips the mutants that only `beforeAll` pages, `beforeAll` and `afterAll`
-  hooks, fixtures, or imports reach.
+  hooks, fixtures, or imports reach. A mutant that both such code and a test reach still runs, but only
+  with the tests whose own coverage reached it, and the runner keeps it active from the start of the
+  run, in hooks, fixtures, and imports too. So that code can still kill it, while a skipped test that
+  would have killed it does not run.
 - The runner refuses Stryker's `--testFiles` option.
-- In an Nx workspace, `.stryker-tmp` must be in `.gitignore` or `.nxignore`. A failed Stryker run leaves
-  its sandbox there, a full copy of the workspace, and Nx then refuses every task.
+- A build that type-checks Angular templates, such as an Angular or Analog production build that the
+  `webServer` runs, can reject Stryker's instrumented code: the `// @ts-nocheck` that Stryker adds to
+  each instrumented file does not reach Angular's template type check. Turn off the build's type
+  checking for the mutation run, with Analog `disableTypeChecking: true`.
+- In an Nx workspace:
+  - `.stryker-tmp`, or the folder your `tempDirName` names, must be in `.gitignore` or `.nxignore`. A
+    failed Stryker run leaves its sandbox there, a full copy of the workspace, and Nx then refuses every
+    task.
+  - Add `/.nx` to Stryker's `ignorePatterns`. Otherwise Stryker copies `.nx/workspace-data` into the
+    sandbox, the sandbox's Nx connects to the workspace's running Nx daemon, the daemon refuses a
+    different workspace, and a `webServer` that runs an Nx task fails to start.
+  - A `webServer` that runs an Nx task starts an Nx daemon in the sandbox, which outlives the run, and
+    Stryker then fails with "Failed to delete stryker temp directory". Run `npx nx daemon --stop` in the
+    sandbox folder, then delete the folder. `NX_DAEMON=false` in the `webServer`'s `env` should prevent this,
+    but is untested.
 - A Vite `define` of `globalThis.__stryker__.activeMutant` overrides the runner's value. Remove it.
 
 ## License
