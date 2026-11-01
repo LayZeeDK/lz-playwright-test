@@ -1420,4 +1420,31 @@ export const cases: readonly Case[] = [
       ['LzStateAttribute', 'aria-pressed={!!(a && b)}'],
     ],
   },
+  {
+    id: 'design-52',
+    title:
+      'no negation for a ! value whose operand is boolean by syntax: built-in BooleanLiteral drops the ! and renders the same as !!',
+    origin: `${rulesOrigin}, LzStateAttribute`,
+    jsx:
+      '<form><p aria-pressed={!(a === b)} aria-expanded={!!open} aria-checked={!true} aria-selected={!(a === b && !c)} />' +
+      '<p aria-pressed={!(a === b && c < d)} aria-expanded={!(false || a !== b)} /></form>',
+    expect: [],
+  },
+  {
+    id: 'design-53',
+    title:
+      'a ! value whose operand is not boolean by syntax is negated: a call, a member, a -, or a &&/|| with an unknown side; so is a - value, which is no ! value',
+    origin: `${rulesOrigin}, LzStateAttribute`,
+    jsx:
+      '<form><p aria-pressed={!isOn()} aria-expanded={!state.open} aria-checked={!(a === b && c)} />' +
+      '<p aria-pressed={!(a || b < c)} aria-expanded={-(a === b)} aria-checked={!-a} /></form>',
+    expect: [
+      ['LzStateAttribute', 'aria-expanded={!-(a === b)}'],
+      ['LzStateAttribute', 'aria-checked={!!-a}'],
+      ['LzStateAttribute', 'aria-pressed={!!isOn()}'],
+      ['LzStateAttribute', 'aria-expanded={!!state.open}'],
+      ['LzStateAttribute', 'aria-checked={!!(a === b && c)}'],
+      ['LzStateAttribute', 'aria-pressed={!!(a || b < c)}'],
+    ],
+  },
 ];
