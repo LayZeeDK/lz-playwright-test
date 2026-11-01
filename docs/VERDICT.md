@@ -1,6 +1,6 @@
 # Verdict: a StrykerJS test runner for Playwright Test
 
-Status: written for the prototype on 2026-10-25 and kept current since. The runner and the UI operators now
+Status: written for the prototype on 2026-10-25 and kept current since. The runner and the UI mutators now
 ship from `packages/` as built JavaScript.
 
 ## The question
@@ -193,7 +193,7 @@ every other row ran before it and used the old names (`@layzee/stryker-playwrigh
 | Analog 2.8.0 `beta` (Angular 22.2, Nx 23.2, SSR), 8 mutants in `(home).page.ts`, 11 e2e tests against the built SSR server                                            | this runner, `disableTypeChecking: true` in the copy's Vite config                           | ff95b44                          | 4 killed, 4 survived                                                                                             | 2m01s                          |
 | epic-stack at 893610d (React 19, React Router 7, SSR), 244 mutants in four files under `app/routes/users/` and `app/components/`, 26 e2e tests against the dev server | this runner and `@layzee/stryker-ui-mutators`, TypeScript checker, `use.actionTimeout: 5000` | cda2f95 (packages as at ff95b44) | UI: 22 killed, 16 survived, 7 no coverage. Built-in: 17 killed, 53 survived, 49 no coverage, 80 compile errors   | 27m59s                         |
 
-The UI operator rows match the statuses Claude wrote down before the first run, except that the
+The UI mutator rows match the statuses Claude wrote down before the first run, except that the
 three UI timeouts were predicted as kills. Each is a test that clicks or fills an element the mutant
 emptied the text or label of, and waits for it until the test timeout (see Limits). With
 `actionTimeout` set, those three and the eight built-in timeouts end as kills by the named tests. The
@@ -218,14 +218,14 @@ compiled. The 80 built-in compile errors are real type errors, mostly emptied ob
 literals. epic-stack needed a Prisma engine that runs on Windows arm64, a fixed port, a longer test
 timeout, and one upstream test marked `fixme`; `oss/README.md` lists each change.
 
-The UI operators have three more layers of evidence, all at or after 107505c.
+The UI mutators have three more layers of evidence, all at or after 107505c.
 `packages/lz-stryker-ui-mutators/test/` runs without a browser: 107 synthetic cases from the open-source
 repos and the design, each with the exact UI mutants it must give (0 todo); install checks for the
 name refusal, a second install, the self-check, and core resolution; an in-process check that the
 JSX placement leaves the built-in mutants of five files unchanged, with a negative control; and a
 render check that every mutant of the design spike's sample renders like the same edit made by hand.
 `packages/lz-stryker-playwright-runner/test/browser/ui-mutators.test.ts` runs the runner on a page
-instrumented with the UI operators: for each of the ten operators a Playwright test kills one of its
+instrumented with the UI mutators: for each of the ten mutators a Playwright test kills one of its
 mutants, and a test that does not observe that mutant lets it survive. `spikes/fail-loud/` runs
 `stryker run` with the plugin listed in `plugins` and with the plugin imported from the config. Both report UI mutants,
 and with one operator's sample broken on purpose both exit 1 and name that operator.
@@ -350,9 +350,9 @@ A killed mutant usually costs more than a surviving one: the failing test waits 
 assertion (`expect.timeout`, 5 s by default) before it fails. Stryker sizes its timeout from passing
 tests, so with the default `timeoutMS`, killed mutants turned into timeouts. In the first CT run, 8 of
 11 mutants timed out. That count is from the decision log, and the run's own log was not kept. Set
-`timeoutMS` to at least the expect timeout plus 5.6 s, the runner's time to start and stop a mutant run,
-which Stryker does not measure when tests run on more than one Playwright worker. The runner warns at startup
-when it is lower.
+`timeoutMS` to at least the expect timeout plus 5.6 s, the runner's time to start and stop a mutant run.
+Stryker's measured overhead covers the start only when tests run on one Playwright worker, and never the stop.
+The runner warns at startup when it is lower.
 
 That wait is most of a run. At concurrency 1, one run each, 2026-10-27:
 
@@ -471,7 +471,7 @@ All 12 reports give every mutant the same status as the first concurrency 1 run.
   the Playwright config all 15 were Killed, and the survivors and uncovered mutants did not change. Set
   `actionTimeout` below the per-test timeout, so that the failing test of a killed mutant says what
   broke. The wall time dropped from 7m41s to 6m00s in the first runs, and from 8m48s and 7m18s to
-  4m46s in the reruns at ff95b44; on the demo app with the UI operators it dropped from 5m15s to 4m26s.
+  4m46s in the reruns at ff95b44; on the demo app with the UI mutators it dropped from 5m15s to 4m26s.
   Those are one or two runs per side, not interleaved, and indicative only.
 - Stryker links the sandbox's `node_modules` to the original project's, and npm links each workspace
   package in `node_modules` to its folder in the original. So a workspace package's build output must
@@ -562,7 +562,7 @@ The demo forced-timeout run used a config file in the gitignored `.audit/` folde
 `mutate`, `timeoutMS`, and `timeoutFactor` as that command line. Its reporters and temp folder name
 differ. The command line itself was not run.
 
-For the second UI operator row, add `actionTimeout: 5000` to the top-level `use` block of
+For the second UI mutator row, add `actionTimeout: 5000` to the top-level `use` block of
 `apps/demo-app-e2e/playwright.config.mts` for that run only. `spikes/fail-loud/README.md` gives the
 fail-loud commands, and `tools/packed-demo/README.md` the packed-tarball row. For the RealWorld row with `use.actionTimeout: 5000`, add `actionTimeout: 5000` to the top-level `use` block of
 the copy's `apps/conduit-e2e/playwright.config.ts` after `prepare.ts` has run. `prepare.ts` does not

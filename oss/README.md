@@ -63,7 +63,7 @@ it uses is `oss/realworld-api`. Then run `npx stryker run stryker.playwright.con
 
 ## epic-stack: epicweb-dev/epic-stack at 893610d
 
-The run uses the UI operators and the TypeScript checker, against the repo's own e2e tests on its Vite
+The run uses the UI mutators and the TypeScript checker, against the repo's own e2e tests on its Vite
 dev server (`npm run dev`), which compiles Stryker's sandbox on the fly.
 
 1. Copy `.env.example` to `.env`, the repo's own setup step.

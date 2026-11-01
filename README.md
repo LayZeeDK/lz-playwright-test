@@ -51,7 +51,7 @@ npx nx run @layzee/lz-stryker-playwright-runner:test
 npx nx run @layzee/lz-stryker-playwright-runner:test-browser
 ```
 
-`test/browser/ui-mutators.test.ts` runs the runner against a page instrumented with the UI operators
+`test/browser/ui-mutators.test.ts` runs the runner against a page instrumented with the UI mutators
 and checks that a Playwright test kills each operator's mutant.
 
 The UI operators' tests need no browser:
