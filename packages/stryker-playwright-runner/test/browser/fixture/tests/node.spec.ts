@@ -39,13 +39,15 @@ withWorkerFixture('reads what a worker fixture computed', ({ decremented }) => {
 
 // Outranks the per-test timeout the runner sets, so only the runner's deadline stops the wait.
 const raisedTimeoutMs = 60_000;
+// Must outlast the deadline runner.test.ts gives this group: loopRunTimeout less the stop headroom.
+const pastDeadlineMs = 30_000;
 
 async function waitPastDeadlineWhenSlow(): Promise<boolean> {
   const slow = isSlow();
 
   if (slow) {
     test.setTimeout(raisedTimeoutMs);
-    await new Promise((resolve) => setTimeout(resolve, raisedTimeoutMs / 2));
+    await new Promise((resolve) => setTimeout(resolve, pastDeadlineMs));
   }
 
   return slow;

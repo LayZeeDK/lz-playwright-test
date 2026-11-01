@@ -474,7 +474,9 @@ test('a deadline stop after a test killed the mutant reports the kill', () => {
   assert.deepEqual(killed(result).killedBy, ['b']);
 });
 
-const coveringA = mutantRequest({ selection: selected(['a', 'b'], ['a']) });
+const coveringA = mutantRequest({
+  selection: { covering: ['a'], toRun: ['a', 'b'] },
+});
 
 function mutantRunOf(
   reporter: LzStrykerCollectingReporter,
@@ -527,6 +529,15 @@ test('a covering test that timed out keeps the run a Timeout', () => {
   assert.equal(mutantRunOf(reporter, 'failed').status, MutantRunStatus.Timeout);
 });
 
+test('a covering test that timed out and passed only on a retry keeps the run a Timeout', () => {
+  const reporter = new LzStrykerCollectingReporter();
+  attempt(reporter, 'b', 'expected', 'passed');
+  attempt(reporter, 'a', 'unexpected', 'timedOut');
+  attempt(reporter, 'a', 'flaky', 'passed');
+
+  assert.equal(mutantRunOf(reporter, 'passed').status, MutantRunStatus.Timeout);
+});
+
 test('a covering test that never ran keeps the run a Timeout', () => {
   const reporter = new LzStrykerCollectingReporter();
   attempt(reporter, 'a', 'expected', 'passed');
@@ -536,7 +547,9 @@ test('a covering test that never ran keeps the run a Timeout', () => {
     mutantRunOf(
       reporter,
       'deadline',
-      mutantRequest({ selection: selected(['a', 'b', 'c'], ['a', 'c']) }),
+      mutantRequest({
+        selection: { covering: ['a', 'c'], toRun: ['a', 'b', 'c'] },
+      }),
     ).status,
     MutantRunStatus.Timeout,
   );
@@ -550,7 +563,7 @@ test('an empty covering list counts as no covering test that passed', () => {
     mutantRunOf(
       reporter,
       'failed',
-      mutantRequest({ selection: selected(['a'], []) }),
+      mutantRequest({ selection: { covering: [], toRun: ['a'] } }),
     ).status,
     MutantRunStatus.Timeout,
   );

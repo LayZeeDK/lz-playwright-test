@@ -34,7 +34,7 @@ export interface MutantRunRequest {
 }
 
 export interface TestSelection {
-  /** The test ids Stryker selected. */
+  /** The test ids in Stryker's test filter. */
   readonly covering: readonly string[];
   /** The Playwright test ids to run: the covering tests and their serial groups. */
   readonly toRun: readonly string[];

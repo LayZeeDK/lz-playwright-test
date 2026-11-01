@@ -160,11 +160,9 @@ export function mutantRequest(
   };
 }
 
-export function selected(
-  toRun: readonly string[],
-  covering: readonly string[] = toRun,
-): TestSelection {
-  return { covering, toRun };
+/** A selection with no serial group to widen it. */
+export function selected(ids: readonly string[]): TestSelection {
+  return { covering: ids, toRun: ids };
 }
 
 export function runOutput(output: Partial<RunOutput> = {}): RunOutput {
