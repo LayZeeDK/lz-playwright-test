@@ -40,6 +40,7 @@ import {
   type Outcome,
   withoutPrototypes,
   runOutput,
+  selected,
 } from './support/doubles.ts';
 
 // A snapshot as the runner reads it from a line the hook wrote.
@@ -190,7 +191,7 @@ test('a mutant run without test results is an error, filtered or not', () => {
   assert.deepEqual(
     classify(new LzStrykerCollectingReporter(), {
       status: 'passed',
-      request: mutantRequest({ testFilter: ['gone', 'also gone'] }),
+      request: mutantRequest({ selection: selected(['gone', 'also gone']) }),
     }),
     {
       status: DryRunStatus.Error,
@@ -443,7 +444,7 @@ test('a deadline stop during config load, before any test, is a Timeout', () => 
   const output = runOutput({ status: 'deadline', hookInstalled: false });
 
   assert.equal(
-    toRunResult(output, mutantRequest({ testFilter: ['a'] })).status,
+    toRunResult(output, mutantRequest({ selection: selected(['a']) })).status,
     DryRunStatus.Timeout,
   );
   assert.equal(toRunResult(output, dryRequest()).status, DryRunStatus.Timeout);
@@ -467,16 +468,13 @@ test('a deadline stop after a test killed the mutant reports the kill', () => {
 
   const { result } = mutantRunResult(
     { ...output, status: 'deadline' },
-    mutantRequest({ testFilter: ['a', 'b', 'c'] }),
+    mutantRequest({ selection: selected(['a', 'b', 'c']) }),
   );
 
   assert.deepEqual(killed(result).killedBy, ['b']);
 });
 
-const coveringA = mutantRequest({
-  testFilter: ['a', 'b'],
-  coveringTests: ['a'],
-});
+const coveringA = mutantRequest({ selection: selected(['a', 'b'], ['a']) });
 
 function mutantRunOf(
   reporter: LzStrykerCollectingReporter,
@@ -510,31 +508,37 @@ test('an extra test that hit its test timeout after every covering test passed l
   });
 });
 
-test('a covering test the deadline interrupted, that timed out, or that never ran keeps the run a Timeout', () => {
-  const interrupted = new LzStrykerCollectingReporter();
-  attempt(interrupted, 'b', 'expected', 'passed');
-  attempt(interrupted, 'a', 'skipped', 'interrupted');
-  const timedOut = new LzStrykerCollectingReporter();
-  attempt(timedOut, 'b', 'expected', 'passed');
-  attempt(timedOut, 'a', 'unexpected', 'timedOut');
-  const neverRan = new LzStrykerCollectingReporter();
-  attempt(neverRan, 'a', 'expected', 'passed');
-  attempt(neverRan, 'b', 'skipped', 'interrupted');
+test('a covering test the deadline interrupted keeps the run a Timeout', () => {
+  const reporter = new LzStrykerCollectingReporter();
+  attempt(reporter, 'b', 'expected', 'passed');
+  attempt(reporter, 'a', 'skipped', 'interrupted');
 
-  assert.deepEqual(
-    [
-      mutantRunOf(interrupted, 'deadline'),
-      mutantRunOf(timedOut, 'failed'),
-      mutantRunOf(
-        neverRan,
-        'deadline',
-        mutantRequest({
-          testFilter: ['a', 'b', 'c'],
-          coveringTests: ['a', 'c'],
-        }),
-      ),
-    ].map((result) => result.status),
-    [MutantRunStatus.Timeout, MutantRunStatus.Timeout, MutantRunStatus.Timeout],
+  assert.equal(
+    mutantRunOf(reporter, 'deadline').status,
+    MutantRunStatus.Timeout,
+  );
+});
+
+test('a covering test that timed out keeps the run a Timeout', () => {
+  const reporter = new LzStrykerCollectingReporter();
+  attempt(reporter, 'b', 'expected', 'passed');
+  attempt(reporter, 'a', 'unexpected', 'timedOut');
+
+  assert.equal(mutantRunOf(reporter, 'failed').status, MutantRunStatus.Timeout);
+});
+
+test('a covering test that never ran keeps the run a Timeout', () => {
+  const reporter = new LzStrykerCollectingReporter();
+  attempt(reporter, 'a', 'expected', 'passed');
+  attempt(reporter, 'b', 'skipped', 'interrupted');
+
+  assert.equal(
+    mutantRunOf(
+      reporter,
+      'deadline',
+      mutantRequest({ selection: selected(['a', 'b', 'c'], ['a', 'c']) }),
+    ).status,
+    MutantRunStatus.Timeout,
   );
 });
 
@@ -546,7 +550,7 @@ test('an empty covering list counts as no covering test that passed', () => {
     mutantRunOf(
       reporter,
       'failed',
-      mutantRequest({ testFilter: ['a'], coveringTests: [] }),
+      mutantRequest({ selection: selected(['a'], []) }),
     ).status,
     MutantRunStatus.Timeout,
   );

@@ -38,7 +38,6 @@ test('a mutant run selects every test of a describe.serial group, not one test a
     'create',
     'edit',
   ]);
-  assert.equal(withSerialGroups(undefined, groups), undefined);
 });
 
 test('serial grouping fails loudly when Playwright suites lose _parallelMode', () => {

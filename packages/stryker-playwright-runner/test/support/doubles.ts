@@ -15,7 +15,11 @@ import {
   LzStrykerCollectingReporter,
   type ReportedTest,
 } from '../../src/reporter.ts';
-import type { DryRunRequest, MutantRunRequest } from '../../src/run-request.ts';
+import type {
+  DryRunRequest,
+  MutantRunRequest,
+  TestSelection,
+} from '../../src/run-request.ts';
 import type { RunOutput } from '../../src/run-result.ts';
 import { dryRunBudget } from '../../src/timeouts.ts';
 
@@ -149,12 +153,18 @@ export function mutantRequest(
     kind: 'mutant',
     disableBail: true,
     activeMutant: '1',
-    testFilter: undefined,
-    coveringTests: undefined,
+    selection: undefined,
     hitLimit: undefined,
     budget: dryRunBudget,
     ...request,
   };
+}
+
+export function selected(
+  toRun: readonly string[],
+  covering: readonly string[] = toRun,
+): TestSelection {
+  return { covering, toRun };
 }
 
 export function runOutput(output: Partial<RunOutput> = {}): RunOutput {

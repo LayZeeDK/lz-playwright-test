@@ -27,12 +27,17 @@ export interface MutantRunRequest {
   readonly kind: 'mutant';
   readonly disableBail: boolean;
   readonly activeMutant: string;
-  /** The Playwright test ids to run, serial groups included; undefined runs every test. */
-  readonly testFilter: readonly string[] | undefined;
-  /** The test ids Stryker selected, before the serial groups widen them. */
-  readonly coveringTests: readonly string[] | undefined;
+  /** Undefined runs every test. */
+  readonly selection: TestSelection | undefined;
   readonly hitLimit: number | undefined;
   readonly budget: RunBudget;
+}
+
+export interface TestSelection {
+  /** The test ids Stryker selected. */
+  readonly covering: readonly string[];
+  /** The Playwright test ids to run: the covering tests and their serial groups. */
+  readonly toRun: readonly string[];
 }
 
 export function dryRunRequest({
@@ -59,8 +64,10 @@ export function mutantRunRequest(
     kind: 'mutant',
     disableBail,
     activeMutant: activeMutant.id,
-    testFilter: withSerialGroups(testFilter, session.serialGroups),
-    coveringTests: testFilter,
+    selection: testFilter && {
+      covering: testFilter,
+      toRun: withSerialGroups(testFilter, session.serialGroups),
+    },
     hitLimit,
     budget: mutantRunBudget(timeout, session.timeouts),
   };
@@ -85,7 +92,7 @@ export function runPlan(request: RunRequest, outDir: string): RunPlan {
       [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: mutant?.activeMutant,
     },
     params: {
-      testIds: mutant?.testFilter,
+      testIds: mutant?.selection?.toRun,
       maxFailures: request.disableBail ? undefined : 1,
       timeout: request.budget.testTimeout,
     },

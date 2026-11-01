@@ -14,6 +14,7 @@ import {
   dryRunOptions,
   mutantRequest,
   mutantRunOptions,
+  selected,
 } from './support/doubles.ts';
 
 const activeMutantEnv = INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
@@ -36,8 +37,7 @@ test('a mutant run request widens its filter to serial groups, keeps the coverin
     kind: 'mutant',
     disableBail: false,
     activeMutant: '7',
-    testFilter: ['create', 'edit'],
-    coveringTests: ['edit'],
+    selection: { covering: ['edit'], toRun: ['create', 'edit'] },
     hitLimit: 50,
     budget: { testTimeout: 2400, deadlineMs: 5400 },
   });
@@ -71,7 +71,7 @@ test('a mutant run plan activates the mutant and runs its filter in its budget, 
     runPlan(
       mutantRequest({
         activeMutant: '7',
-        testFilter: ['a', 'b'],
+        selection: selected(['a', 'b']),
         hitLimit: 5,
         budget: { testTimeout: 900, deadlineMs: 1000 },
       }),

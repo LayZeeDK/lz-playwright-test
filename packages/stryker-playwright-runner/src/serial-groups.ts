@@ -90,12 +90,8 @@ function outermostSerialSuite(
 }
 
 export function withSerialGroups(
-  testFilter: string[] | undefined,
+  testIds: readonly string[],
   groups: SerialGroups,
-): string[] | undefined {
-  return (
-    testFilter && [
-      ...new Set(testFilter.flatMap((id) => groups.get(id) ?? [id])),
-    ]
-  );
+): string[] {
+  return [...new Set(testIds.flatMap((id) => groups.get(id) ?? [id]))];
 }

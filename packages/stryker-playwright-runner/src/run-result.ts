@@ -100,8 +100,8 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
   const tests = testCases.map((test) => toTestResult(test, isMutantRun));
   const { killed, timedOut } = attemptSummary(testCases);
   const coveringTestsPassed =
-    request.kind === 'mutant' &&
-    allPassed(request.coveringTests, reporter.testCases);
+    isMutantRun &&
+    allPassedFirstTime(request.selection?.covering, reporter.testCases);
   const reason = timeoutReason({
     mutantRun: isMutantRun,
     killed,
@@ -163,7 +163,8 @@ function survivorTests(tests: readonly TestResult[]): TestResult[] {
   return tests.filter((test) => test.status !== TestStatus.Failed);
 }
 
-function allPassed(
+// Playwright's 'expected' is a pass with no failed attempt, so a flaky test does not count. No ids, no pass.
+function allPassedFirstTime(
   ids: readonly string[] | undefined,
   testCases: ReadonlyMap<string, ReportedTest>,
 ): boolean {
@@ -294,9 +295,9 @@ function emptyRunResult(request: RunRequest): RunResult {
     return { status: DryRunStatus.Complete, tests: [], snapshots: [] };
   }
 
-  if (request.testFilter?.length) {
+  if (request.selection?.toRun.length) {
     return errorRun(
-      `None of the ${request.testFilter.length} selected tests ran; their Playwright test ids no longer match.`,
+      `None of the ${request.selection.toRun.length} selected tests ran; their Playwright test ids no longer match.`,
     );
   }
 
