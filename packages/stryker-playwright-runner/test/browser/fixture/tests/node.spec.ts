@@ -37,13 +37,15 @@ withWorkerFixture('reads what a worker fixture computed', ({ decremented }) => {
   expect(decremented).toBe('chromium'.length - 1);
 });
 
-async function waitPastTimeoutWhenSlow(): Promise<boolean> {
+// Outranks the per-test timeout the runner sets, so only the runner's deadline stops the wait.
+const raisedTimeoutMs = 60_000;
+
+async function waitPastDeadlineWhenSlow(): Promise<boolean> {
   const slow = isSlow();
 
   if (slow) {
-    await new Promise((resolve) =>
-      setTimeout(resolve, test.info().timeout + 1000),
-    );
+    test.setTimeout(raisedTimeoutMs);
+    await new Promise((resolve) => setTimeout(resolve, raisedTimeoutMs / 2));
   }
 
   return slow;
@@ -54,7 +56,7 @@ test.describe.serial('with a test that is slow under one mutant', () => {
     expect(add(1, 2)).toBe(3);
   });
 
-  test('waits past its timeout under the slow mutant', async () => {
-    expect(await waitPastTimeoutWhenSlow()).toBe(false);
+  test('waits past the deadline under the slow mutant', async () => {
+    expect(await waitPastDeadlineWhenSlow()).toBe(false);
   });
 });

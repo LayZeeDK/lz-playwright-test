@@ -248,19 +248,21 @@ function runSlowGroup(coveringTest: string): Promise<MutantRunResult> {
   );
 }
 
-test('a serial peer that runs out of time leaves a survivor when the covering test passed', async () => {
+test('a serial peer stopped at the deadline leaves a survivor when the covering test passed', async () => {
+  const loggedBefore = logged.length;
   const result = await runSlowGroup('passes under any mutant');
 
   assert.equal(result.status, MutantRunStatus.Survived, JSON.stringify(result));
   assert.equal(result.nrOfTests, 1);
+  assert.notEqual(deadlineStopTook(loggedBefore), undefined);
 });
 
-test('a covering test that runs out of time in a serial group is a Timeout', async () => {
+test('a covering test stopped at the deadline in a serial group is a Timeout', async () => {
   const result = await runSlowGroup(
-    'waits past its timeout under the slow mutant',
+    'waits past the deadline under the slow mutant',
   );
 
-  assert.equal(result.status, MutantRunStatus.Timeout, JSON.stringify(result));
+  assertTimedOut(result, /deadline/);
 });
 
 test('per-test coverage separates tests that reach different code', () => {
