@@ -18,27 +18,19 @@ function raiseWarning(level) {
 
 /** Every enabled rule reports at error, including those a preset or plugin sets to warn. */
 export function withWarningsAsErrors(configs) {
-  return [
-    ...configs.map((config) =>
-      config.rules
-        ? {
-            ...config,
-            rules: Object.fromEntries(
-              Object.entries(config.rules).map(([rule, level]) => [
-                rule,
-                raiseWarning(level),
-              ]),
-            ),
-          }
-        : config,
-    ),
-    {
-      linterOptions: {
-        reportUnusedDisableDirectives: 'error',
-        reportUnusedInlineConfigs: 'error',
-      },
-    },
-  ];
+  return configs.map((config) =>
+    config.rules
+      ? {
+          ...config,
+          rules: Object.fromEntries(
+            Object.entries(config.rules).map(([rule, level]) => [
+              rule,
+              raiseWarning(level),
+            ]),
+          ),
+        }
+      : config,
+  );
 }
 
 function dependencyChecks(ignoredDependencies) {
@@ -121,6 +113,12 @@ export default withWarningsAsErrors([
   ...nx.configs['flat/base'],
   ...nx.configs['flat/typescript'],
   ...nx.configs['flat/javascript'],
+  {
+    linterOptions: {
+      reportUnusedDisableDirectives: 'error',
+      reportUnusedInlineConfigs: 'error',
+    },
+  },
   {
     ignores: [
       '**/dist',
