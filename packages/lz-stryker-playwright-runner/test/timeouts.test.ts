@@ -128,6 +128,7 @@ const noTimeout = {
   killed: false,
   testTimedOut: false,
   stoppedAtDeadline: false,
+  coveringTestsPassed: false,
 };
 
 test('a kill outranks a per-test timeout, which counts only in a mutant run', () => {
@@ -170,6 +171,16 @@ test('a deadline stop is a Timeout in either run kind, unless a test killed the 
     timeoutReason({ ...noTimeout, stoppedAtDeadline: true, killed: true }),
     undefined,
   );
+});
+
+test('a mutant run whose covering tests all passed is no Timeout, however the extra tests ended', () => {
+  const passed = { ...noTimeout, coveringTestsPassed: true };
+
+  assert.equal(
+    timeoutReason({ ...passed, stoppedAtDeadline: true, testTimedOut: true }),
+    undefined,
+  );
+  assert.equal(timeoutReason({ ...passed, testTimedOut: true }), undefined);
 });
 
 // A deadline over a fake clock that the mocked timers move.

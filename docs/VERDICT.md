@@ -455,8 +455,10 @@ All 12 reports give every mutant the same status as the first concurrency 1 run.
   the tests and then runs global teardown, so a `globalTeardown` that needs more than what is left of
   the 2 s is cut off (inferred from the code, not run).
 - A mutant run that widens its selection to a whole `describe.serial` group keeps the timeout Stryker
-  set for the tests that cover the mutant. A long group can run past it, and the mutant counts as a
-  Timeout, which Stryker counts as detected (inferred from the code, not run).
+  set for the tests that cover the mutant. When the covering tests have passed and an added test then
+  runs out of time, the mutant counts as Survived; when a covering test has not passed by then, as a
+  Timeout, which Stryker counts as detected (unit-tested; the browser tests for both cases are written,
+  not yet run).
 - Node refuses to strip types under `node_modules`, so a published package needs a JavaScript build of
   the hook and the runner. Both packages therefore ship built JavaScript in `dist`.
 - `disableBail` cannot lift a `maxFailures` set in the user's Playwright config.

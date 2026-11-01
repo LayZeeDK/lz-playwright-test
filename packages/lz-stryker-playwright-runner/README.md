@@ -108,9 +108,11 @@ any test.
 
 The runner runs more than the tests Stryker selects: the whole `describe.serial` group that a selected
 test belongs to, and the dependency projects, such as a `setup` project, of the selected tests'
-projects. Stryker's timeout for a mutant counts only the time of the tests it selected. So add the time
-of the longest serial group and of the dependency projects to the `timeoutMS` above, or such a run ends
-as a Timeout, which Stryker counts as detected even when no test would have failed.
+projects. Stryker's timeout for a mutant counts only the time of the tests it selected. When every
+selected test has passed and an added test then hits its per-test timeout or the runner's deadline, the
+mutant counts as Survived. When a selected test has not passed by then, the run ends as a Timeout, which
+Stryker counts as detected. Dependency projects and the serial tests before a selected test run before
+it, so add their time to the `timeoutMS` above. A test that fails kills the mutant, selected or added.
 
 ## Break threshold
 

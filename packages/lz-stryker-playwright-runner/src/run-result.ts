@@ -99,11 +99,15 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
   const testCases = [...reporter.testCases.values()];
   const tests = testCases.map((test) => toTestResult(test, isMutantRun));
   const { killed, timedOut } = attemptSummary(testCases);
+  const coveringTestsPassed =
+    request.kind === 'mutant' &&
+    allPassed(request.coveringTests, reporter.testCases);
   const reason = timeoutReason({
     mutantRun: isMutantRun,
     killed,
     testTimedOut: timedOut,
     stoppedAtDeadline: status === 'deadline',
+    coveringTestsPassed,
   });
 
   if (status === 'interrupted') {
@@ -147,7 +151,27 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
     return { status: DryRunStatus.Timeout, reason };
   }
 
-  return { status: DryRunStatus.Complete, tests, snapshots };
+  return {
+    status: DryRunStatus.Complete,
+    tests: coveringTestsPassed && !killed ? survivorTests(tests) : tests,
+    snapshots,
+  };
+}
+
+// Stryker counts any Failed test in a Complete result as a kill.
+function survivorTests(tests: readonly TestResult[]): TestResult[] {
+  return tests.filter((test) => test.status !== TestStatus.Failed);
+}
+
+function allPassed(
+  ids: readonly string[] | undefined,
+  testCases: ReadonlyMap<string, ReportedTest>,
+): boolean {
+  return (
+    ids !== undefined &&
+    ids.length > 0 &&
+    ids.every((id) => testCases.get(id)?.outcome() === 'expected')
+  );
 }
 
 export function missingCoverageError(
