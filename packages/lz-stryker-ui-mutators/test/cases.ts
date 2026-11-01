@@ -1433,12 +1433,14 @@ export const cases: readonly Case[] = [
   {
     id: 'design-53',
     title:
-      'a ! value whose operand is not boolean by syntax is negated: a call, a member, or a &&/|| with an unknown side',
+      'a ! value whose operand is not boolean by syntax is negated: a call, a member, a -, or a &&/|| with an unknown side; so is a - value, which is no ! value',
     origin: `${rulesOrigin}, LzStateAttribute`,
     jsx:
       '<form><p aria-pressed={!isOn()} aria-expanded={!state.open} aria-checked={!(a === b && c)} />' +
-      '<p aria-pressed={!(a || b < c)} /></form>',
+      '<p aria-pressed={!(a || b < c)} aria-expanded={-(a === b)} aria-checked={!-a} /></form>',
     expect: [
+      ['LzStateAttribute', 'aria-expanded={!-(a === b)}'],
+      ['LzStateAttribute', 'aria-checked={!!-a}'],
       ['LzStateAttribute', 'aria-pressed={!!isOn()}'],
       ['LzStateAttribute', 'aria-expanded={!!state.open}'],
       ['LzStateAttribute', 'aria-checked={!!(a === b && c)}'],
