@@ -1,8 +1,8 @@
 # @layzee/lz-stryker-ui-mutators
 
-Mutation operators for the parts of JSX that Playwright tests look at. StrykerJS mutates expressions
+Mutators for the parts of JSX that Playwright tests look at. StrykerJS mutates expressions
 and leaves JSX text and attribute strings alone, so a suite that finds elements by role, label, and text
-gets few mutants it can kill. This plugin adds ten operators:
+gets few mutants it can kill. This plugin adds ten mutators:
 
 - `LzTextLiteral`: empties JSX text that has a letter or digit.
 - `LzLabelAttribute`: empties `aria-label`, `aria-labelledby`, `alt`, `title`, `placeholder`, and `htmlFor`.
@@ -16,34 +16,42 @@ gets few mutants it can kill. This plugin adds ten operators:
 - `LzChildExpression`: replaces a `{value}` child with `null`.
 - `LzStateAttribute`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, and `aria-selected`.
 
-The repository's `docs/design/playwright-mutators.md` says exactly what each operator changes and which
-shapes it skips. Reports show each operator's name as the mutator name.
+The repository's `docs/design/playwright-mutators.md` says exactly what each mutator changes and which
+shapes it skips. Stryker's reports show these names as the mutator of each mutant.
 
 ## Requirements
 
 - `@stryker-mutator/core` 10.1, tested on 10.1.1. The plugin patches internals of that version's
   instrumenter, and warns when it finds another version.
 - Node.js 22 or later, tested on 22.23.1 and 24.22.0 on Windows 11 arm64, and on 24.22.1 on Linux arm64.
-- Optional: `playwright-core` 1.63 or later, below 2. Any `@playwright/test` or `playwright` install
-  brings it.
+- Optional: `playwright-core` 1.63 or later, below 2. With npm, any `@playwright/test` or `playwright`
+  install brings it. With pnpm or Yarn Plug'n'Play, see "The roles come from your Playwright".
+- React JSX or TSX. The mutators match React's attribute names, such as `htmlFor` and `readOnly`, so
+  Solid, Preact or Vue JSX written with `for` or `readonly` gets no mutants on those attributes. Vue,
+  Angular and Svelte templates get no UI mutants; JSX in a Vue `<script lang="tsx">` block does. The run
+  prints nothing about the files it skips.
 
-The operators do not need a particular test runner. With `@layzee/lz-stryker-playwright-runner`, a
+The mutators do not need a particular test runner. With `@layzee/lz-stryker-playwright-runner`, a
 Playwright test can kill each of them.
 
 ## The roles come from your Playwright
 
-`LzElementRole` uses Playwright's table of implicit roles, the one `getByRole` uses, so the operator
+`LzElementRole` uses Playwright's table of implicit roles, the one `getByRole` uses, so the mutator
 treats an element the way your tests find it. The table decides which tags the span swap changes and
 which `role` attributes restate a tag's own role and are left in place.
 
-When the plugin loads, it reads the table from the `playwright-core` it resolves from its own folder.
-`playwright-core` is an optional peer dependency, so your installed version is the one it finds.
+When the plugin loads, it reads the table from the `playwright-core` that Node.js resolves from the
+plugin's own folder. `playwright-core` is an optional peer dependency. With npm, it is hoisted next to the
+plugin, so the version your tests use is the one the plugin finds. pnpm and Yarn Plug'n'Play link an
+optional peer only when your project depends on it, so the plugin can find another version or none. In
+those setups, add `playwright-core` to your `devDependencies` at the version your `@playwright/test`
+uses.
 
 - Without `playwright-core`, the plugin uses the table it bundles, and prints nothing.
 - If `playwright-core` is installed but the plugin cannot read its table, the plugin prints one warning
   and uses the bundled table. A table that lacks the entry for `a`, `area` or `button` counts as
   unreadable, because the span swap needs them. To decide which `role` attributes to leave in place, the
-  operator uses whatever entries the table holds. The warning names the version and path it found (only
+  mutator uses whatever entries the table holds. The warning names the version and path it found (only
   the path of `package.json` when that file cannot be read), the reason, and the version of the bundled
   table:
 
@@ -56,7 +64,7 @@ the table of the Playwright version it was built with. If that table cannot be r
 entries, the build fails and names what is missing. The
 package's tests parse the table of each Playwright minor version from 1.63 on.
 
-## Turn the operators on
+## Turn the mutators on
 
 Use one of two ways:
 
@@ -69,7 +77,10 @@ Use one of two ways:
   ```
 
   `appendPlugins` keeps the plugins Stryker loads by default. `plugins` replaces them, so a checker such
-  as `@stryker-mutator/typescript-checker` no longer loads unless the list names it too.
+  as `@stryker-mutator/typescript-checker` no longer loads unless the list names it too. Stryker finds
+  its default plugins by listing the `@stryker-mutator` folder next to its own install, which under pnpm
+  does not hold your checker. With pnpm, name every plugin in the list, the checker included, as in
+  `'@stryker-mutator/typescript-checker'`.
 
 - In a JavaScript or TypeScript config, import the plugin on the first line instead, and list nothing:
 
@@ -77,13 +88,13 @@ Use one of two ways:
   import '@layzee/lz-stryker-ui-mutators';
   ```
 
-Either way, the install checks that each operator makes a mutant of a sample. It stops the run with the
-names of the operators that do not, and with the instrumenter's folder and version when an internal it
+Either way, the install checks that each mutator makes a mutant of a sample. It stops the run with the
+names of the mutators that do not, and with the instrumenter's folder and version when an internal it
 patches is missing.
 
-## Turn an operator off
+## Turn a mutator off
 
-For the whole project, list the operator in `mutator.excludedMutations`. The names are case sensitive,
+For the whole project, list the mutator in `mutator.excludedMutations`. The names are case sensitive,
 and Stryker does not check them, so `lzTextLiteral` excludes nothing and logs nothing.
 
 For one mutant, use a Stryker disable comment with a reason. StrykerJS reads such a comment only where
@@ -116,12 +127,12 @@ Babel attaches it to the code that follows, so in JSX only these forms work:
 A JSX comment, `{/* Stryker disable ... */}`, is never read, and Stryker logs nothing about it. A
 `next-line` comment before a multi-line element covers only that element's first line.
 
-A comment or exclusion names an operator, not one of its mutations, so it turns off both branches of an
+A comment or exclusion names a mutator, not one of its mutations, so it turns off both branches of an
 `LzConditionalElement` ternary, and both the `role` removal and the span swap of `LzElementRole`.
 
 ## Survivors to expect
 
-The operators skip the mutants that are cheap to detect as changing nothing a test can see. These
+The mutators skip the mutants that are cheap to detect as changing nothing a test can see. These
 remain:
 
 - An `LzEventHandler` mutant can behave like StrykerJS's own `BlockStatement` mutant, which empties the
@@ -129,6 +140,11 @@ remain:
   bubbling.
 - An `LzConditionalElement` mutant on an empty list renders an empty list element, which Playwright
   reports as hidden. `toBeHidden` does not kill it; `toHaveCount(0)` on the items does.
+
+With `@stryker-mutator/typescript-checker`, an `LzEventHandler` mutant on a component prop that the
+component's type requires, such as `onClick: () => void`, fails to compile. Stryker reports it as a
+CompileError and leaves it out of the score, so no test runs against it. The mutator cannot see prop
+types. To keep such a mutant out of the report, use a disable comment on that attribute.
 
 ## Develop this package
 
