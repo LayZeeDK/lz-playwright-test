@@ -2,7 +2,7 @@
 import { expect, test } from '@playwright/test';
 
 import { add, countTo } from '../public/lib.js';
-import { decrement, increment } from '../public/node-only.js';
+import { decrement, increment, isSlow } from '../public/node-only.js';
 
 test('adds in the worker', () => {
   expect(add(1, 2)).toBe(3);
@@ -35,4 +35,26 @@ const withWorkerFixture = test.extend<object, { decremented: number }>({
 
 withWorkerFixture('reads what a worker fixture computed', ({ decremented }) => {
   expect(decremented).toBe('chromium'.length - 1);
+});
+
+async function waitPastTimeoutWhenSlow(): Promise<boolean> {
+  const slow = isSlow();
+
+  if (slow) {
+    await new Promise((resolve) =>
+      setTimeout(resolve, test.info().timeout + 1000),
+    );
+  }
+
+  return slow;
+}
+
+test.describe.serial('with a test that is slow under one mutant', () => {
+  test('passes under any mutant', () => {
+    expect(add(1, 2)).toBe(3);
+  });
+
+  test('waits past its timeout under the slow mutant', async () => {
+    expect(await waitPastTimeoutWhenSlow()).toBe(false);
+  });
 });

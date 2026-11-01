@@ -82,10 +82,11 @@ export interface TimeoutFacts {
   readonly killed: boolean;
   readonly testTimedOut: boolean;
   readonly stoppedAtDeadline: boolean;
+  readonly coveringTestsPassed: boolean;
 }
 
 export function timeoutReason(facts: TimeoutFacts): string | undefined {
-  if (facts.killed) {
+  if (facts.killed || facts.coveringTestsPassed) {
     return undefined;
   }
 

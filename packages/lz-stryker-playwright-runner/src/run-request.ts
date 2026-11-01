@@ -29,6 +29,7 @@ export interface MutantRunRequest {
   readonly activeMutant: string;
   /** The Playwright test ids to run, serial groups included; undefined runs every test. */
   readonly testFilter: readonly string[] | undefined;
+  readonly coveringTests: readonly string[] | undefined;
   readonly hitLimit: number | undefined;
   readonly budget: RunBudget;
 }
@@ -58,6 +59,7 @@ export function mutantRunRequest(
     disableBail,
     activeMutant: activeMutant.id,
     testFilter: withSerialGroups(testFilter, session.serialGroups),
+    coveringTests: testFilter,
     hitLimit,
     budget: mutantRunBudget(timeout, session.timeouts),
   };

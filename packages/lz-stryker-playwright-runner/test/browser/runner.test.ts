@@ -199,7 +199,7 @@ test('init removes the temp roots of dead runners and leaves those of the old sc
 test('dry run completes with every test passing', () => {
   const { tests } = session.dryRun;
 
-  assert.equal(tests.length, 16);
+  assert.equal(tests.length, 18);
   assert.ok(
     tests.every((t) => t.status === TestStatus.Success),
     JSON.stringify(tests),
@@ -236,6 +236,31 @@ test('a mutant run filtered to one test of a describe.serial group runs the whol
   assert.equal(alone.nrOfTests, 1);
   assert.equal(killed.status, MutantRunStatus.Killed, JSON.stringify(killed));
   assert.deepEqual(killed.killedBy, [testId('first user of the shared page')]);
+});
+
+function runSlowGroup(coveringTest: string): Promise<MutantRunResult> {
+  return session.mutantRun(
+    mutant('BooleanLiteral', 'true', 'src/node-only.ts'),
+    {
+      testFilter: [testId(coveringTest)],
+      timeout: loopRunTimeout,
+    },
+  );
+}
+
+test('a serial peer that runs out of time leaves a survivor when the covering test passed', async () => {
+  const result = await runSlowGroup('passes under any mutant');
+
+  assert.equal(result.status, MutantRunStatus.Survived, JSON.stringify(result));
+  assert.equal(result.nrOfTests, 1);
+});
+
+test('a covering test that runs out of time in a serial group is a Timeout', async () => {
+  const result = await runSlowGroup(
+    'waits past its timeout under the slow mutant',
+  );
+
+  assert.equal(result.status, MutantRunStatus.Timeout, JSON.stringify(result));
 });
 
 test('per-test coverage separates tests that reach different code', () => {

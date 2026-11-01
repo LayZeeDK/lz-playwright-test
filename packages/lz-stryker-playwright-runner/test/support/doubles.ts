@@ -150,6 +150,7 @@ export function mutantRequest(
     disableBail: true,
     activeMutant: '1',
     testFilter: undefined,
+    coveringTests: undefined,
     hitLimit: undefined,
     budget: dryRunBudget,
     ...request,

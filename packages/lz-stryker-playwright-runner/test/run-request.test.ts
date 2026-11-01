@@ -18,7 +18,7 @@ import {
 
 const activeMutantEnv = INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
 
-test('a mutant run request widens its filter to serial groups and gets its budget', () => {
+test('a mutant run request widens its filter to serial groups, keeps the covering tests, and gets its budget', () => {
   const request = mutantRunRequest(
     mutantRunOptions({
       testFilter: ['edit'],
@@ -37,6 +37,7 @@ test('a mutant run request widens its filter to serial groups and gets its budge
     disableBail: false,
     activeMutant: '7',
     testFilter: ['create', 'edit'],
+    coveringTests: ['edit'],
     hitLimit: 50,
     budget: { testTimeout: 2400, deadlineMs: 5400 },
   });

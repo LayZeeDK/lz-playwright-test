@@ -473,6 +473,104 @@ test('a deadline stop after a test killed the mutant reports the kill', () => {
   assert.deepEqual(killed(result).killedBy, ['b']);
 });
 
+const coveringA = mutantRequest({
+  testFilter: ['a', 'b'],
+  coveringTests: ['a'],
+});
+
+function mutantRunOf(
+  reporter: LzStrykerCollectingReporter,
+  status: RunStatus,
+  request = coveringA,
+): MutantRunResult {
+  return mutantRunResult(runOutput({ status, reporter }), request).result;
+}
+
+test('a deadline stop after every covering test passed leaves a survivor', () => {
+  const reporter = new LzStrykerCollectingReporter();
+  attempt(reporter, 'a', 'expected', 'passed');
+  attempt(reporter, 'b', 'skipped', 'interrupted');
+
+  assert.deepEqual(mutantRunOf(reporter, 'deadline'), {
+    status: MutantRunStatus.Survived,
+    nrOfTests: 1,
+    duration: 7,
+  });
+});
+
+test('an extra test that hit its test timeout after every covering test passed leaves a survivor', () => {
+  const reporter = new LzStrykerCollectingReporter();
+  attempt(reporter, 'a', 'expected', 'passed');
+  attempt(reporter, 'b', 'unexpected', 'timedOut');
+
+  assert.deepEqual(mutantRunOf(reporter, 'failed'), {
+    status: MutantRunStatus.Survived,
+    nrOfTests: 1,
+    duration: 7,
+  });
+});
+
+test('a covering test the deadline interrupted, that timed out, or that never ran keeps the run a Timeout', () => {
+  const interrupted = new LzStrykerCollectingReporter();
+  attempt(interrupted, 'b', 'expected', 'passed');
+  attempt(interrupted, 'a', 'skipped', 'interrupted');
+  const timedOut = new LzStrykerCollectingReporter();
+  attempt(timedOut, 'b', 'expected', 'passed');
+  attempt(timedOut, 'a', 'unexpected', 'timedOut');
+  const neverRan = new LzStrykerCollectingReporter();
+  attempt(neverRan, 'a', 'expected', 'passed');
+  attempt(neverRan, 'b', 'skipped', 'interrupted');
+
+  assert.deepEqual(
+    [
+      mutantRunOf(interrupted, 'deadline'),
+      mutantRunOf(timedOut, 'failed'),
+      mutantRunOf(
+        neverRan,
+        'deadline',
+        mutantRequest({
+          testFilter: ['a', 'b', 'c'],
+          coveringTests: ['a', 'c'],
+        }),
+      ),
+    ].map((result) => result.status),
+    [MutantRunStatus.Timeout, MutantRunStatus.Timeout, MutantRunStatus.Timeout],
+  );
+});
+
+test('an empty covering list counts as no covering test that passed', () => {
+  const reporter = new LzStrykerCollectingReporter();
+  attempt(reporter, 'a', 'unexpected', 'timedOut');
+
+  assert.equal(
+    mutantRunOf(
+      reporter,
+      'failed',
+      mutantRequest({ testFilter: ['a'], coveringTests: [] }),
+    ).status,
+    MutantRunStatus.Timeout,
+  );
+});
+
+test('a failed extra test still kills the mutant when every covering test passed', () => {
+  const reporter = new LzStrykerCollectingReporter();
+  attempt(reporter, 'a', 'expected', 'passed');
+  attempt(reporter, 'b', 'unexpected', 'failed');
+
+  assert.deepEqual(killed(mutantRunOf(reporter, 'failed')).killedBy, ['b']);
+});
+
+test('without a test filter, a timed-out test keeps the run a Timeout though the others passed', () => {
+  const reporter = new LzStrykerCollectingReporter();
+  attempt(reporter, 'a', 'expected', 'passed');
+  attempt(reporter, 'b', 'unexpected', 'timedOut');
+
+  assert.equal(
+    mutantRunOf(reporter, 'failed', mutantRequest()).status,
+    MutantRunStatus.Timeout,
+  );
+});
+
 test('a run someone else interrupted stays an error', () => {
   const reporter = new LzStrykerCollectingReporter();
   attempt(reporter, 'a', 'skipped', 'interrupted');

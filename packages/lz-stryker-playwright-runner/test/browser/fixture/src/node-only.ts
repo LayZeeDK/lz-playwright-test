@@ -11,3 +11,7 @@ export function increment(n: number): number {
 export function decrement(n: number): number {
   return n - 1;
 }
+
+export function isSlow(): boolean {
+  return false;
+}

@@ -2,3 +2,4 @@
 export declare const loadedIn: string;
 export function increment(n: number): number;
 export function decrement(n: number): number;
+export function isSlow(): boolean;
