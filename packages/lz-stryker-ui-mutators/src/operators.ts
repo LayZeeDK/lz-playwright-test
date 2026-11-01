@@ -267,12 +267,33 @@ function builtInForcesValue(site: AttributeSite, t: BabelTypes): boolean {
 }
 
 /**
- * Built-in EqualityOperator already negates a comparison. A `!x` value stays: BooleanLiteral's `x` renders
- * like `!!x` only when `x` is a boolean, which a mutator cannot see.
+ * Built-in EqualityOperator already negates a comparison, and BooleanLiteral's `x` for a `!x` value renders
+ * like `!!x` when `x` is a boolean.
  */
 function builtInNegates(site: AttributeSite, t: BabelTypes): boolean {
+  if (site.value.kind !== 'expression') {
+    return false;
+  }
+
+  const value = site.value.expression;
+
   return (
-    site.value.kind === 'expression' && isComparison(site.value.expression, t)
+    isComparison(value, t) ||
+    (t.isUnaryExpression(value, { operator: '!' }) &&
+      isBooleanBySyntax(value.argument, t))
+  );
+}
+
+// Babel keeps no node for parentheses, so `!(a === b)` reaches this as the comparison.
+function isBooleanBySyntax(node: types.Node, t: BabelTypes): boolean {
+  if (t.isLogicalExpression(node) && node.operator !== '??') {
+    return isBooleanBySyntax(node.left, t) && isBooleanBySyntax(node.right, t);
+  }
+
+  return (
+    isComparison(node, t) ||
+    t.isBooleanLiteral(node) ||
+    t.isUnaryExpression(node, { operator: '!' })
   );
 }
 
