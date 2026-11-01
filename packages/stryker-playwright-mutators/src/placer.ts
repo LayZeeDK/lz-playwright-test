@@ -77,7 +77,7 @@ function remap(
 
 function unplaceable(type: string): Error {
   return new Error(
-    `lz-stryker-ui-mutators: cannot place a UI mutant at a ${type}.`,
+    `stryker-playwright-mutators: cannot place a UI mutant at a ${type}.`,
   );
 }
 

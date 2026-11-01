@@ -4,10 +4,10 @@ import base from './stryker.base.ts';
 export default {
   ...base,
   appendPlugins: [
-    '@layzee/lz-stryker-playwright-runner',
-    '@layzee/lz-stryker-ui-mutators',
+    '@layzee/stryker-playwright-runner',
+    '@layzee/stryker-playwright-mutators',
   ],
-  ignorers: ['lz-stryker-ui-mutators'],
+  ignorers: ['stryker-playwright-mutators'],
   testRunner: 'lz-stryker-playwright',
   lzStrykerPlaywright: {
     configFile: 'apps/demo-app-e2e/playwright.config.mts',

@@ -1,5 +1,5 @@
 // How a finished Playwright run maps to a Stryker result, without a browser.
-// Run: node --test packages/lz-stryker-playwright-runner/test/run-result.test.ts
+// Run: node --test packages/stryker-playwright-runner/test/run-result.test.ts
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 

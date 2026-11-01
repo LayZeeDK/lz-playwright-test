@@ -563,7 +563,7 @@ that checks the element is visible kills both; a test that checks it is hidden k
 replace the `true` mutant with the right operand (`<p>Details</p>`), which forces the element to show
 and is the mutant `true` stands for in plain JavaScript. A smaller fix drops the `true` mutant there.
 
-**Context.** `@layzee/lz-stryker-ui-mutators` in this repo adds that force-show mutant as
+**Context.** `@layzee/stryker-playwright-mutators` in this repo adds that force-show mutant as
 `LzConditionalElement`, and skips a `&&` whose left operand is a comparison or a `&&` or `||` expression,
 because there the built-in `true` already exists. An upstream fix would make that skip need revisiting.
 
@@ -628,9 +628,9 @@ for the hooks it needed instead of working around Jest (The Deep Dive episode 6,
 
 **Versions.** `@playwright/test` and `playwright-core` 1.63 and 1.64.1, Node 22 and 24.
 
-**What a mutation testing runner needs, and what it uses today.** `@layzee/lz-stryker-playwright-runner` runs
+**What a mutation testing runner needs, and what it uses today.** `@layzee/stryker-playwright-runner` runs
 Playwright Test in-process, once per mutant, and reads only internals for it
-(`packages/lz-stryker-playwright-runner/src/playwright-internals.ts`, checked at load by `probeInternals`, so a
+(`packages/stryker-playwright-runner/src/playwright-internals.ts`, checked at load by `probeInternals`, so a
 Playwright release that moves them fails with a named error):
 
 1. A test runner object: `initialize`, `loadConfig` (projects and webServers), `listTests`, `runGlobalSetup`,

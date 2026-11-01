@@ -18,7 +18,7 @@
         "{workspaceRoot}/tools/**/*.ts",
         "{workspaceRoot}/oss/**/*.ts",
         "{workspaceRoot}/stryker.*.ts",
-        "{workspaceRoot}/packages/lz-stryker-playwright-runner/src/**/*.ts",
+        "{workspaceRoot}/packages/stryker-playwright-runner/src/**/*.ts",
         "{workspaceRoot}/tsconfig.tools.json",
         "{workspaceRoot}/tsconfig.node.json",
         "{workspaceRoot}/tsconfig.base.json"

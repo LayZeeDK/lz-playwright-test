@@ -1,5 +1,5 @@
 {
-  "name": "@layzee/lz-stryker-playwright-runner",
+  "name": "@layzee/stryker-playwright-runner",
   "version": "0.0.0",
   "private": true,
   "description": "StrykerJS test runner plugin for Playwright Test (e2e and component tests)",
@@ -9,11 +9,11 @@
     "mutation testing",
     "@stryker-mutator/test-runner-plugin"
   ],
-  "homepage": "https://github.com/LayZeeDK/lz-playwright-test/tree/main/packages/lz-stryker-playwright-runner#readme",
+  "homepage": "https://github.com/LayZeeDK/lz-playwright-test/tree/main/packages/stryker-playwright-runner#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/LayZeeDK/lz-playwright-test.git",
-    "directory": "packages/lz-stryker-playwright-runner"
+    "directory": "packages/stryker-playwright-runner"
   },
   "license": "MIT",
   "type": "module",
@@ -45,15 +45,15 @@
     "@stryker-mutator/api": "10.1.1"
   },
   "devDependencies": {
-    "@layzee/lz-stryker-ui-mutators": "*",
+    "@layzee/stryker-playwright-mutators": "*",
     "ajv": "8.20.0"
   },
   "initStrykerConfig": {
     "appendPlugins": [
-      "@layzee/lz-stryker-playwright-runner"
+      "@layzee/stryker-playwright-runner"
     ],
     "testRunner": "lz-stryker-playwright",
-    "testRunner_comment": "Take a look at https://github.com/LayZeeDK/lz-playwright-test/tree/main/packages/lz-stryker-playwright-runner#readme for information about the lz-stryker-playwright plugin.",
+    "testRunner_comment": "Take a look at https://github.com/LayZeeDK/lz-playwright-test/tree/main/packages/stryker-playwright-runner#readme for information about the lz-stryker-playwright plugin.",
     "lzStrykerPlaywright": {
       "configFile": "playwright.config.ts"
     },
@@ -68,7 +68,7 @@
     "targets": {
       "lint": {
         "dependsOn": [
-          "@layzee/lz-stryker-ui-mutators:generate-roles"
+          "@layzee/stryker-playwright-mutators:generate-roles"
         ],
         "inputs": [
           "...",
@@ -77,7 +77,7 @@
       },
       "test-browser": {
         "dependsOn": [
-          "@layzee/lz-stryker-ui-mutators:generate-roles"
+          "@layzee/stryker-playwright-mutators:generate-roles"
         ]
       }
     }

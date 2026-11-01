@@ -16,12 +16,12 @@ cp tools/packed-demo/*.json tools/packed-demo/*.mjs <scratch>/
 cp -r apps/demo-app/index.html apps/demo-app/src apps/demo-app/public <scratch>/app/
 rm <scratch>/app/src/app/price-tag.story.tsx
 cp apps/demo-app-e2e/src/*.spec.ts <scratch>/e2e/
-(cd packages/lz-stryker-playwright-runner && npm pack --pack-destination <scratch>/tarballs)
-(cd packages/lz-stryker-ui-mutators && npm pack --pack-destination <scratch>/tarballs)
+(cd packages/stryker-playwright-runner && npm pack --pack-destination <scratch>/tarballs)
+(cd packages/stryker-playwright-mutators && npm pack --pack-destination <scratch>/tarballs)
 cd <scratch>
 npm install --ignore-scripts
 npx playwright install chromium
-node --no-experimental-strip-types --input-type=module -e "await import('@layzee/lz-stryker-playwright-runner'); await import('@layzee/lz-stryker-ui-mutators')"
+node --no-experimental-strip-types --input-type=module -e "await import('@layzee/stryker-playwright-runner'); await import('@layzee/stryker-playwright-mutators')"
 npx playwright test
 npx stryker run stryker.config.mjs
 ```

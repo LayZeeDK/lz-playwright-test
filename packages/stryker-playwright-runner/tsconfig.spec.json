@@ -13,7 +13,7 @@
       "path": "./tsconfig.lib.json"
     },
     {
-      "path": "../lz-stryker-ui-mutators/tsconfig.lib.json"
+      "path": "../stryker-playwright-mutators/tsconfig.lib.json"
     }
   ]
 }

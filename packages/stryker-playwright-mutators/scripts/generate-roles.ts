@@ -9,7 +9,7 @@ try {
   );
 } catch (error) {
   process.stderr.write(
-    `lz-stryker-ui-mutators build: ${error instanceof Error ? error.message : String(error)}\n`,
+    `stryker-playwright-mutators build: ${error instanceof Error ? error.message : String(error)}\n`,
   );
   process.exitCode = 1;
 }

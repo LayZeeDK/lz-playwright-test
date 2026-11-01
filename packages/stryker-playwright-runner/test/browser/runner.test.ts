@@ -1,5 +1,5 @@
 // Drives LzStrykerPlaywrightTestRunner directly against a fixture instrumented by Stryker's own instrumenter.
-// Run: npx nx run @layzee/lz-stryker-playwright-runner:test-browser
+// Run: npx nx run @layzee/stryker-playwright-runner:test-browser
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {

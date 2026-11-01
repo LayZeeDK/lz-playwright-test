@@ -13,14 +13,14 @@ const installRan = process.env['STRYKER_MUTATOR_WORKER'] === undefined;
 if (installRan) {
   // A failure rejects this module's evaluation, and every later import of it rejects with the same error. A config
   // that imports it stops at once; under `plugins`, core only warns with the message, and the run then stops where
-  // core creates the `lz-stryker-ui-mutators` ignorer this module never got to export.
+  // core creates the `stryker-playwright-mutators` ignorer this module never got to export.
   await install(operatorsFor(consumerRoles(bundled)));
 }
 
 function uiMutatorsIgnorer(): Ignorer {
   if (!installRan) {
     throw new Error(
-      'lz-stryker-ui-mutators: the install did not run, because STRYKER_MUTATOR_WORKER is set in a process that ' +
+      'stryker-playwright-mutators: the install did not run, because STRYKER_MUTATOR_WORKER is set in a process that ' +
         'instruments. Unset it for the Stryker run.',
     );
   }
@@ -32,7 +32,7 @@ uiMutatorsIgnorer.inject = [] satisfies [];
 export const strykerPlugins = [
   declareFactoryPlugin(
     PluginKind.Ignore,
-    'lz-stryker-ui-mutators',
+    'stryker-playwright-mutators',
     uiMutatorsIgnorer,
   ),
 ];

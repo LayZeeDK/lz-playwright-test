@@ -112,7 +112,7 @@ const settings = readRunSettings(process.env);
 // `Symbol.for`, so a second copy of this package in the worker, from another install, sees the mark
 // of the first and leaves the worker's coverage to it.
 const installed: unique symbol = Symbol.for(
-  '@layzee/lz-stryker-playwright-runner/worker-hook',
+  '@layzee/stryker-playwright-runner/worker-hook',
 );
 
 if (

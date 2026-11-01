@@ -26,12 +26,12 @@ step() {
 step npm-ci npm ci --no-audit --no-fund
 # Without node_modules, npx would download whatever nx the registry serves.
 [ "$failed" -eq 0 ] || exit "$failed"
-step nx-lint npx nx run-many -t lint --projects=@layzee/lz-stryker-playwright-runner,@layzee/lz-stryker-ui-mutators
+step nx-lint npx nx run-many -t lint --projects=@layzee/stryker-playwright-runner,@layzee/stryker-playwright-mutators
 step nx-typecheck npx nx run-many -t typecheck
-step nx-build npx nx run-many -t build --projects=@layzee/lz-stryker-playwright-runner,@layzee/lz-stryker-ui-mutators
-step test-runner npx nx run @layzee/lz-stryker-playwright-runner:test
-step test-ui npx nx run @layzee/lz-stryker-ui-mutators:test
-step test-browser npx nx run @layzee/lz-stryker-playwright-runner:test-browser
+step nx-build npx nx run-many -t build --projects=@layzee/stryker-playwright-runner,@layzee/stryker-playwright-mutators
+step test-runner npx nx run @layzee/stryker-playwright-runner:test
+step test-ui npx nx run @layzee/stryker-playwright-mutators:test
+step test-browser npx nx run @layzee/stryker-playwright-runner:test-browser
 step stryker-e2e npx nx run @layzee/demo-app-e2e:mutate-e2e
 step stryker-e2e-ui npx nx run @layzee/demo-app-e2e:mutate-e2e-ui
 step stryker-ct npx nx run @layzee/demo-app:mutate-ct

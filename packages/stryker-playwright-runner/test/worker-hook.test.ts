@@ -204,7 +204,7 @@ test('a second copy of the hook in the same worker installs nothing', (t) => {
 });
 
 test('the hook installs nothing in a worker where another version of it installed first', (t) => {
-  const mark = `globalThis[Symbol.for('@layzee/lz-stryker-playwright-runner/worker-hook')]=1`;
+  const mark = `globalThis[Symbol.for('@layzee/stryker-playwright-runner/worker-hook')]=1`;
   const { child, outDir } = runWorker(t, [
     `data:text/javascript,${mark}`,
     workerHookUrl,

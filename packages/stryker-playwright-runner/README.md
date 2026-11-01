@@ -1,4 +1,4 @@
-# @layzee/lz-stryker-playwright-runner
+# @layzee/stryker-playwright-runner
 
 A StrykerJS test runner for Playwright Test. It runs Playwright e2e tests and Playwright component
 tests (`mount()`) as Stryker tests, reports per-test coverage, and starts the Playwright `webServer`
@@ -18,7 +18,7 @@ once per Stryker test runner process instead of once per mutant.
 Install the runner next to StrykerJS and Playwright:
 
 ```sh
-npm install -D @layzee/lz-stryker-playwright-runner @stryker-mutator/core @playwright/test
+npm install -D @layzee/stryker-playwright-runner @stryker-mutator/core @playwright/test
 ```
 
 Then select it in a Stryker config file, here `stryker.config.ts`:
@@ -27,7 +27,7 @@ Then select it in a Stryker config file, here `stryker.config.ts`:
 import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 
 export default {
-  appendPlugins: ['@layzee/lz-stryker-playwright-runner'],
+  appendPlugins: ['@layzee/stryker-playwright-runner'],
   testRunner: 'lz-stryker-playwright',
   lzStrykerPlaywright: { configFile: 'playwright.config.ts' },
   coverageAnalysis: 'perTest',

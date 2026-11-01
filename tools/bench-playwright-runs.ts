@@ -7,11 +7,11 @@ import path from 'node:path';
 import type { BrowserType } from '@playwright/test';
 import type { TestError } from '@playwright/test/reporter';
 
-import { fieldOf } from '../packages/lz-stryker-playwright-runner/src/is-record.ts';
+import { fieldOf } from '../packages/stryker-playwright-runner/src/is-record.ts';
 import {
   loadPlaywright,
   type RunTestsParams,
-} from '../packages/lz-stryker-playwright-runner/src/playwright-internals.ts';
+} from '../packages/stryker-playwright-runner/src/playwright-internals.ts';
 
 function isBrowserType(value: unknown): value is BrowserType {
   return typeof fieldOf(value, 'launchServer') === 'function';

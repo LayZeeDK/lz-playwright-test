@@ -128,7 +128,7 @@ export default withWarningsAsErrors([
       '**/vite.config.*.timestamp*',
       '**/test-output',
       // Instrumented bundles that runner.test.ts and ui-mutators.test.ts write before each run.
-      'packages/lz-stryker-playwright-runner/test/**/public/*.js',
+      'packages/stryker-playwright-runner/test/**/public/*.js',
     ],
   },
   {
@@ -176,7 +176,7 @@ export default withWarningsAsErrors([
   },
   {
     files: ['packages/**/*.ts', 'packages/**/*.tsx'],
-    ignores: ['packages/lz-stryker-ui-mutators/test/corpus/**'],
+    ignores: ['packages/stryker-playwright-mutators/test/corpus/**'],
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -223,7 +223,7 @@ export default withWarningsAsErrors([
     },
   },
   {
-    files: ['packages/lz-stryker-ui-mutators/package.json'],
+    files: ['packages/stryker-playwright-mutators/package.json'],
     rules: {
       // The operators import Babel for types only; playwright-core's role table is resolved at run time.
       '@nx/dependency-checks': dependencyChecks([

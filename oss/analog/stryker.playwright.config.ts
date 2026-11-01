@@ -1,7 +1,7 @@
 import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 
 export default {
-  plugins: ['@layzee/lz-stryker-playwright-runner'],
+  plugins: ['@layzee/stryker-playwright-runner'],
   testRunner: 'lz-stryker-playwright',
   lzStrykerPlaywright: {
     configFile: 'apps/analog-app-e2e/playwright.config.ts',

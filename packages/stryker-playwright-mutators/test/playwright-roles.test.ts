@@ -207,7 +207,7 @@ describe('consumerRoles', () => {
       otherBundled.roles,
     );
     assert.deepEqual(messages, [
-      'lz-stryker-ui-mutators: cannot read the implicit role table of playwright-core ' +
+      'stryker-playwright-mutators: cannot read the implicit role table of playwright-core ' +
         "(Error: Package subpath './package.json' is not exported, code ERR_PACKAGE_PATH_NOT_EXPORTED); " +
         'LzElementRole uses the table bundled from playwright-core 0.0.1.',
     ]);
@@ -226,7 +226,7 @@ describe('consumerRoles', () => {
       otherBundled.roles,
     );
     assert.deepEqual(messages, [
-      `lz-stryker-ui-mutators: cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} ` +
+      `stryker-playwright-mutators: cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} ` +
         '(Error: kImplicitRoleByTagName not found); LzElementRole uses the table bundled from playwright-core 0.0.1.',
     ]);
   });
@@ -240,7 +240,7 @@ describe('consumerRoles', () => {
       otherBundled.roles,
     );
     assert.deepEqual(messages, [
-      `lz-stryker-ui-mutators: cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} ` +
+      `stryker-playwright-mutators: cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} ` +
         '(Error: kImplicitRoleByTagName lacks the entries for a, area that LzElementRole reads); ' +
         'LzElementRole uses the table bundled from playwright-core 0.0.1.',
     ]);
@@ -267,7 +267,7 @@ describe('consumerRoles', () => {
       otherBundled.roles,
     );
     assert.deepEqual(messages, [
-      `lz-stryker-ui-mutators: cannot read the implicit role table of playwright-core in ${manifest} ` +
+      `stryker-playwright-mutators: cannot read the implicit role table of playwright-core in ${manifest} ` +
         `(${String(jsonError)}); LzElementRole uses the table bundled from playwright-core 0.0.1.`,
     ]);
   });

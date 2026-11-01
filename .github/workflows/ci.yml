@@ -31,9 +31,9 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npx nx run-many -t lint
-      - run: npx nx run-many -t build --projects=@layzee/lz-stryker-playwright-runner,@layzee/lz-stryker-ui-mutators
+      - run: npx nx run-many -t build --projects=@layzee/stryker-playwright-runner,@layzee/stryker-playwright-mutators
       - run: npx nx run-many -t typecheck
-      - run: npx nx run-many -t test --projects=@layzee/lz-stryker-playwright-runner,@layzee/lz-stryker-ui-mutators
+      - run: npx nx run-many -t test --projects=@layzee/stryker-playwright-runner,@layzee/stryker-playwright-mutators
 
   browser:
     name: ${{ matrix.target }}
@@ -47,7 +47,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: '@layzee/lz-stryker-playwright-runner:test-browser'
+          - target: '@layzee/stryker-playwright-runner:test-browser'
           - target: '@layzee/demo-app-e2e:mutate-e2e'
             report: e2e
           - target: '@layzee/demo-app-e2e:mutate-e2e-ui'

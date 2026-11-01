@@ -1,7 +1,7 @@
 # Design: UI mutation operators that Playwright tests can kill
 
 Status: chosen design, 2026-10-25, by Claude during an AFK run. Built on 2026-10-26 as
-`packages/lz-stryker-ui-mutators`. Lars approved the operator and mutation names in Names, without a
+`packages/stryker-playwright-mutators`. Lars approved the operator and mutation names in Names, without a
 namespace prefix, on 2026-10-25 ("2-3: Approve").
 
 ## Why
@@ -120,7 +120,7 @@ attribute or the tag that gives an element its implicit role.
 
 ## Rules the synthetic cases settled
 
-`packages/lz-stryker-ui-mutators/test/cases.ts` holds 144 synthetic cases: JSX versions of UI shapes in the repos
+`packages/stryker-playwright-mutators/test/cases.ts` holds 144 synthetic cases: JSX versions of UI shapes in the repos
 the runner was exercised on (RealWorld, ngx-yeti, Analog and hello-world at the commits `oss/README.md` names,
 and the demo app), each with the exact UI mutants it must give. `spikes/ui-mutator-cases/` keeps the mined rows
 they came from. The cases first ran against the prototype and now run against the package. The design was silent on
@@ -259,7 +259,7 @@ shapes cannot ship there, and the operators measure what lint cannot see.
 
 ## Integration
 
-- **Package.** `@layzee/lz-stryker-ui-mutators`. The user lists it in `plugins` and lists its ignorer in
+- **Package.** `@layzee/stryker-playwright-mutators`. The user lists it in `plugins` and lists its ignorer in
   `ignorers`, or imports it from a JavaScript or TypeScript config (see "Fail loud"). No other options in v1. Users exclude operators with
   `mutator.excludedMutations` and with `// Stryker disable` comments, both of which already match custom
   mutator names.
@@ -280,9 +280,9 @@ shapes cannot ship there, and the operators measure what lint cannot see.
   one operator that a StrykerJS change breaks cannot hide behind the others. An install or self-check
   error rejects the module's import. Core turns a plugin import error into a warning and runs on without
   the mutators (`packages/core/src/di/plugin-loader.ts:193-209`), so the module also exports an `Ignore`
-  plugin named `lz-stryker-ui-mutators`. Core creates every ignorer listed in `ignorers` right before `instrument()`
+  plugin named `stryker-playwright-mutators`. Core creates every ignorer listed in `ignorers` right before `instrument()`
   (`2-mutant-instrumenter-executor.ts:67-69`), with no catch. After a failed install the module exported
-  nothing, so core throws `Cannot find Ignore plugin "lz-stryker-ui-mutators"` there (`plugin-creator.ts:57-64`), and
+  nothing, so core throws `Cannot find Ignore plugin "stryker-playwright-mutators"` there (`plugin-creator.ts:57-64`), and
   the install error is in the warning above it. After a skipped install (see "Process placement") the
   factory throws "install did not run". Otherwise it returns an ignorer that ignores nothing.
   `spikes/ignorer-route/` measured on StrykerJS 10.1.1 that a factory that throws makes `stryker run` exit
@@ -292,14 +292,14 @@ shapes cannot ship there, and the operators measure what lint cannot see.
   below: a module that keeps its error loads without one, so a config that imports it would not stop.
 - **The `ignorers` entry is required.** `ignorers` defaults to `[]`
   (`packages/api/schema/stryker-core.json:509-516`), and core creates only the listed names. A
-  documented config that lists the plugin in `plugins` therefore always has `ignorers: ['lz-stryker-ui-mutators']`
+  documented config that lists the plugin in `plugins` therefore always has `ignorers: ['stryker-playwright-mutators']`
   next to it.
   Without it, a successful install still registers and runs every operator, because registration
   happens at import. A failed install falls back to core's warning
-  `Error during loading "@layzee/lz-stryker-ui-mutators" plugin`, and the run finishes without UI mutants. The
+  `Error during loading "@layzee/stryker-playwright-mutators" plugin`, and the run finishes without UI mutants. The
   plugin cannot detect the missing entry in that case, because its import has already failed.
 - **A config import fails loud with one entry.** A config written as a JavaScript or TypeScript module
-  can `import '@layzee/lz-stryker-ui-mutators'` on its first line instead. The module installs with a
+  can `import '@layzee/stryker-playwright-mutators'` on its first line instead. The module installs with a
   top-level `await`, so an install or self-check error rejects the config import, and the run stops
   before it starts, with no `ignorers` entry. The thermos plugin's Node operators use this route
   (`stryker.config.mjs:1`). A JSON config cannot import, so it keeps `plugins` and `ignorers`. The same
@@ -310,7 +310,7 @@ shapes cannot ship there, and the operators measure what lint cannot see.
   the name check does not count them as collisions, and the placer is wrapped once.
 - **Options, later.** A plugin module can export `strykerValidationSchema`, so options such as extra
   accessible-name props validate against the Stryker config. Mutators still cannot read them at run
-  time, because `NodeMutatorContext` carries only `isExpressionContext`. The `lz-stryker-ui-mutators` ignorer
+  time, because `NodeMutatorContext` carries only `isExpressionContext`. The `stryker-playwright-mutators` ignorer
   factory receives the full options before `instrument()` and is the hook that can pass them on.
 - **Process placement.** Exporting `strykerPlugins` puts the module into `pluginModulePaths`
   (`plugin-loader.ts:83-86`). Every test-runner and checker worker re-imports those modules
@@ -362,7 +362,7 @@ level is a new concept in the StrykerJS schema that every built-in would need a 
 
 The built package has gone through `stryker run` with a browser on the demo app and on a copy of
 epic-stack, and a Playwright test kills a mutant of every operator in
-`packages/lz-stryker-playwright-runner/test/browser/ui-mutators.test.ts`. `docs/VERDICT.md` (Evidence)
+`packages/stryker-playwright-runner/test/browser/ui-mutators.test.ts`. `docs/VERDICT.md` (Evidence)
 has the counts. Two risks remain from those runs. On a server-rendered app the runner activates the
 mutant in the browser only, so a text or element mutant breaks hydration and is killed by an
 unrelated step, and an attribute mutant never reaches the DOM (VERDICT, Limits). And three operators,
@@ -406,9 +406,9 @@ decides each operator.
    - A Playwright test written for the behaviour kills at least one of its mutants.
 
    Measured on 2026-10-26 (`docs/VERDICT.md`, Evidence): every operator meets the bar. The corpus diff
-   is the placement test in `packages/lz-stryker-ui-mutators/test/`. On the demo app, with
+   is the placement test in `packages/stryker-playwright-mutators/test/`. On the demo app, with
    `actionTimeout` set, none of the 17 UI mutants is equivalent or an error, and without it 3 kills
-   show as Timeout. In `packages/lz-stryker-playwright-runner/test/browser/ui-mutators.test.ts` a
+   show as Timeout. In `packages/stryker-playwright-runner/test/browser/ui-mutators.test.ts` a
    written test kills a mutant of each operator. A copy of epic-stack, outside the bar's scope, adds
    the first real ratios: 1 equivalent and 0 errors among 45 UI mutants, the equivalent one a
    `LzConditionalElement` (1 of 8 for that operator). Three operators have had no site in a real app yet, so the limit stays
@@ -422,7 +422,7 @@ MODE=patched node spikes/design-opus/neutral.ts
 MODE=ui node spikes/design-opus/neutral.ts
 node spikes/design-opus/directive.ts
 node spikes/design-fable/spike-jsx-placement.ts
-node --test packages/lz-stryker-ui-mutators/test/cases.test.ts
+node --test packages/stryker-playwright-mutators/test/cases.test.ts
 ```
 
 `MODE=patched` shows that the placer patch leaves built-in mutants unchanged, and `MODE=ui` prints the

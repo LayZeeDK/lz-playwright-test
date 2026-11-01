@@ -5,14 +5,14 @@ Never apply these to the upstream clone itself. `docs/VERDICT.md` (Evidence) has
 
 Every copy also needs this runner and StrykerJS installed. Link the runner as a directory junction or
 an absolute link. Node resolves the link and strips the runner's TypeScript outside `node_modules`.
-Every Stryker config here loads the runner by its package name, `@layzee/lz-stryker-playwright-runner`.
+Every Stryker config here loads the runner by its package name, `@layzee/stryker-playwright-runner`.
 
 Build both packages in this repo first. A copy loads each package from its `dist` folder, which a fresh
 clone does not have; without it the import fails with `ERR_MODULE_NOT_FOUND`.
 
 ```sh
 npx nx run-many -t build
-npm install -D @stryker-mutator/core@^10.1.1 file:<this repo>/packages/lz-stryker-playwright-runner
+npm install -D @stryker-mutator/core@^10.1.1 file:<this repo>/packages/stryker-playwright-runner
 ```
 
 The runner needs `@playwright/test` 1.63 or a later 1.x release. If the copy has an older one or none,
@@ -49,7 +49,7 @@ it uses is `oss/realworld-api`. Then run `npx stryker run stryker.playwright.con
    `pnpm add -D @stryker-mutator/core@10.1.1 @playwright/test@^1.64.1`. The copy's own
    `@playwright/test` is `^1.58.2`, below the runner's 1.63 floor; the copy's `package.json` diff
    after the run showed both versions. Then link the runner as a junction at
-   `node_modules/@layzee/lz-stryker-playwright-runner`, the name that
+   `node_modules/@layzee/stryker-playwright-runner`, the name that
    `analog/stryker.playwright.config.ts` loads.
 2. Apply `analog/copy.patch` and copy `analog/stryker.playwright.config.ts` into the copy. The patch:
    - starts the built SSR server instead of `nx serve-nitro`, whose `PORT=3000 node ...` cannot run
@@ -68,7 +68,7 @@ dev server (`npm run dev`), which compiles Stryker's sandbox on the fly.
 
 1. Copy `.env.example` to `.env`, the repo's own setup step.
 2. Install the runner, StrykerJS, and Playwright as above, plus the operators and the checker:
-   `npm install -D @stryker-mutator/typescript-checker@10.1.1 file:<this repo>/packages/lz-stryker-ui-mutators`.
+   `npm install -D @stryker-mutator/typescript-checker@10.1.1 file:<this repo>/packages/stryker-playwright-mutators`.
    The copy pins `@playwright/test` to `^1.58.1`.
 3. Apply `epic-stack/copy.patch` and copy `epic-stack/stryker.playwright.config.ts` into the copy.
    The patch:

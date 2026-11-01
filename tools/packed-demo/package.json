@@ -8,8 +8,8 @@
     "react-router-dom": "6.30.3"
   },
   "devDependencies": {
-    "@layzee/lz-stryker-playwright-runner": "file:tarballs/layzee-lz-stryker-playwright-runner-0.0.0.tgz",
-    "@layzee/lz-stryker-ui-mutators": "file:tarballs/layzee-lz-stryker-ui-mutators-0.0.0.tgz",
+    "@layzee/stryker-playwright-runner": "file:tarballs/layzee-stryker-playwright-runner-0.0.0.tgz",
+    "@layzee/stryker-playwright-mutators": "file:tarballs/layzee-stryker-playwright-mutators-0.0.0.tgz",
     "@playwright/test": "1.64.1",
     "@stryker-mutator/core": "10.1.1",
     "@vitejs/plugin-react": "6.1.2",

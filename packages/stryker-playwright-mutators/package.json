@@ -1,5 +1,5 @@
 {
-  "name": "@layzee/lz-stryker-ui-mutators",
+  "name": "@layzee/stryker-playwright-mutators",
   "version": "0.0.0",
   "private": true,
   "description": "StrykerJS mutators for JSX that Playwright tests can kill",
@@ -10,11 +10,11 @@
     "jsx",
     "accessibility"
   ],
-  "homepage": "https://github.com/LayZeeDK/lz-playwright-test/tree/main/packages/lz-stryker-ui-mutators#readme",
+  "homepage": "https://github.com/LayZeeDK/lz-playwright-test/tree/main/packages/stryker-playwright-mutators#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/LayZeeDK/lz-playwright-test.git",
-    "directory": "packages/lz-stryker-ui-mutators"
+    "directory": "packages/stryker-playwright-mutators"
   },
   "license": "MIT",
   "type": "module",

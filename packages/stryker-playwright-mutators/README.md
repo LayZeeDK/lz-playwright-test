@@ -1,4 +1,4 @@
-# @layzee/lz-stryker-ui-mutators
+# @layzee/stryker-playwright-mutators
 
 Mutators for the parts of JSX that Playwright tests look at. StrykerJS mutates expressions
 and leaves JSX text and attribute strings alone, so a suite that finds elements by role, label, and text
@@ -31,7 +31,7 @@ says exactly what each mutator changes and which shapes it skips. Stryker's repo
   Angular and Svelte templates get no UI mutants; JSX in a Vue `<script lang="tsx">` block does. The run
   prints nothing about the files it skips.
 
-The mutators do not need a particular test runner. With `@layzee/lz-stryker-playwright-runner`, a
+The mutators do not need a particular test runner. With `@layzee/stryker-playwright-runner`, a
 Playwright test can kill each of them.
 
 ## The roles come from your Playwright
@@ -56,7 +56,7 @@ uses.
   table:
 
   ```text
-  lz-stryker-ui-mutators: cannot read the implicit role table of playwright-core 1.99.0 in <path> (Error: kImplicitRoleByTagName not found); LzElementRole uses the table bundled from playwright-core 1.64.1.
+  stryker-playwright-mutators: cannot read the implicit role table of playwright-core 1.99.0 in <path> (Error: kImplicitRoleByTagName not found); LzElementRole uses the table bundled from playwright-core 1.64.1.
   ```
 
 The bundled table is generated from `playwright-core` when the package is built, so each release carries
@@ -72,8 +72,8 @@ Use one of two ways:
   prints a warning, and the run goes on without UI mutants.
 
   ```ts
-  appendPlugins: ['@layzee/lz-stryker-playwright-runner', '@layzee/lz-stryker-ui-mutators'],
-  ignorers: ['lz-stryker-ui-mutators'],
+  appendPlugins: ['@layzee/stryker-playwright-runner', '@layzee/stryker-playwright-mutators'],
+  ignorers: ['stryker-playwright-mutators'],
   ```
 
   `appendPlugins` keeps the plugins Stryker loads by default. `plugins` replaces them, so a checker such
@@ -82,7 +82,7 @@ Use one of two ways:
 - In a JavaScript or TypeScript config, import the plugin on the first line instead, and list nothing:
 
   ```ts
-  import '@layzee/lz-stryker-ui-mutators';
+  import '@layzee/stryker-playwright-mutators';
   ```
 
 Stryker finds its default plugins by listing the `@stryker-mutator` folder next to its own install, which

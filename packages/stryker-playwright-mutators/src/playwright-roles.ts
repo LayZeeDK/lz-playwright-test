@@ -84,7 +84,7 @@ export function consumerRoles(
     }
 
     warn(
-      `lz-stryker-ui-mutators: ${error.message}; ` +
+      `stryker-playwright-mutators: ${error.message}; ` +
         `LzElementRole uses the table bundled from playwright-core ${bundled.version}.`,
     );
 

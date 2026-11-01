@@ -22,8 +22,7 @@ const realworldOrigin = 'realworld@bc7158d:';
 const yetiOrigin = 'ngx-yeti@87d4377:apps/yeti-app/src/app/fixtures/';
 const analogOrigin = 'analog@a377078ec:';
 const helloWorldOrigin = 'stryker-playwright-hello-world@fa6dd64:';
-const demoOrigin =
-  'lz-stryker-playwright-runner@f00806e:apps/demo-app/src/app/';
+const demoOrigin = 'stryker-playwright-runner@f00806e:apps/demo-app/src/app/';
 const rulesOrigin = 'design:Rules the synthetic cases settled';
 const release = 'design:Operators in the first release';
 

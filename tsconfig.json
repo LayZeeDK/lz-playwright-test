@@ -10,10 +10,10 @@
       "path": "./apps/demo-app"
     },
     {
-      "path": "./packages/lz-stryker-playwright-runner"
+      "path": "./packages/stryker-playwright-runner"
     },
     {
-      "path": "./packages/lz-stryker-ui-mutators"
+      "path": "./packages/stryker-playwright-mutators"
     }
   ]
 }

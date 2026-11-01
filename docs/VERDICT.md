@@ -29,7 +29,7 @@ needed changes before its suite passed (an upstream test bug, a build switch, an
 Analog file has no server-only code, so it does not exercise server-side rendering. The Evidence section
 lists the changes, and Limits lists the general ones.
 
-A second plugin, `@layzee/lz-stryker-ui-mutators`, adds ten mutation operators for the JSX that Playwright
+A second plugin, `@layzee/stryker-playwright-mutators`, adds ten mutation operators for the JSX that Playwright
 tests look at, such as text, labels, links, and disabled or hidden state. StrykerJS 10.1.1 leaves those
 parts of a component unmutated (`docs/design/playwright-mutators.md`). On the demo app's e2e suite they
 add 17 mutants to 48 built-in ones: 11 killed, 4 survived because of gaps in the tests, and 2 in a
@@ -160,6 +160,9 @@ machine left less than 4 GB of the host's memory free for other work.
 The packages and their public names changed to `lz-` names at 7b9a022. The rows at 9a27326 ran after it;
 every other row ran before it and used the old names (`@layzee/stryker-playwright-runner`, `@layzee/stryker-ui-mutators`, `testRunner:
 'playwright'`, the `playwright` options key, and operator names without the `Lz` prefix).
+After every row, the package names changed again, to `@layzee/stryker-playwright-runner` and
+`@layzee/stryker-playwright-mutators`, because `stryker init` lists a package named `@layzee/lz-*` as `@layzee/lz`.
+The plugin name `lz-stryker-playwright`, the `lzStrykerPlaywright` options key and the `Lz` operator names stayed.
 
 | Case                                                                                                                                                                  | Runner                                                                                       | Code                             | Score                                                                                                            | Wall time                      |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------ |
@@ -219,18 +222,18 @@ literals. epic-stack needed a Prisma engine that runs on Windows arm64, a fixed 
 timeout, and one upstream test marked `fixme`; `oss/README.md` lists each change.
 
 The UI mutators have three more layers of evidence, all at or after 107505c.
-`packages/lz-stryker-ui-mutators/test/` runs without a browser: 107 synthetic cases from the open-source
+`packages/stryker-playwright-mutators/test/` runs without a browser: 107 synthetic cases from the open-source
 repos and the design, each with the exact UI mutants it must give (0 todo); install checks for the
 name refusal, a second install, the self-check, and core resolution; an in-process check that the
 JSX placement leaves the built-in mutants of five files unchanged, with a negative control; and a
 render check that every mutant of the design spike's sample renders like the same edit made by hand.
-`packages/lz-stryker-playwright-runner/test/browser/ui-mutators.test.ts` runs the runner on a page
+`packages/stryker-playwright-runner/test/browser/ui-mutators.test.ts` runs the runner on a page
 instrumented with the UI mutators: for each of the ten mutators a Playwright test kills one of its
 mutants, and a test that does not observe that mutant lets it survive. `spikes/fail-loud/` runs
 `stryker run` with the plugin listed in `plugins` and with the plugin imported from the config. Both report UI mutants,
 and with one operator's sample broken on purpose both exit 1 and name that operator.
 
-`packages/lz-stryker-playwright-runner/test/browser/runner.test.ts` checks the runner against a fixture
+`packages/stryker-playwright-runner/test/browser/runner.test.ts` checks the runner against a fixture
 instrumented by Stryker's own instrumenter. It checks that per-test coverage separates a test that
 reaches a function from one that does not, coverage across a navigation to a page without the app,
 static coverage for a shared `beforeAll` page and for a page the worker closes, per-test coverage for a
@@ -541,9 +544,9 @@ All 12 reports give every mutant the same status as the first concurrency 1 run.
 npm install
 npx playwright install chromium
 npx nx run-many -t typecheck build
-npx nx run @layzee/lz-stryker-playwright-runner:test
-npx nx run @layzee/lz-stryker-playwright-runner:test-browser
-npx nx run @layzee/lz-stryker-ui-mutators:test
+npx nx run @layzee/stryker-playwright-runner:test
+npx nx run @layzee/stryker-playwright-runner:test-browser
+npx nx run @layzee/stryker-playwright-mutators:test
 npx nx run @layzee/demo-app-e2e:mutate-e2e
 npx nx run @layzee/demo-app-e2e:mutate-e2e-ui
 npx nx run @layzee/demo-app:mutate-ct

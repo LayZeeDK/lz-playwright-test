@@ -1,7 +1,7 @@
-// Drives LzStrykerPlaywrightTestRunner against a TSX fixture instrumented with the UI operators of @layzee/lz-stryker-ui-mutators:
+// Drives LzStrykerPlaywrightTestRunner against a TSX fixture instrumented with the UI operators of @layzee/stryker-playwright-mutators:
 // for each operator, a Playwright test kills its mutant and a test that does not observe it lets it survive.
-// Run: npx nx run @layzee/lz-stryker-playwright-runner:test-browser
-import '@layzee/lz-stryker-ui-mutators';
+// Run: npx nx run @layzee/stryker-playwright-runner:test-browser
+import '@layzee/stryker-playwright-mutators';
 
 import assert from 'node:assert/strict';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';

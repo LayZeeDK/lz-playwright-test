@@ -2,7 +2,7 @@
 // import of the package beside it could start installing first; awaiting the package after it keeps the order.
 import './break.ts';
 
-await import('@layzee/lz-stryker-ui-mutators');
+await import('@layzee/stryker-playwright-mutators');
 
 export default {
   mutate: ['src.tsx'],

@@ -3,8 +3,8 @@
   "version": "0.0.1",
   "private": true,
   "devDependencies": {
-    "@layzee/lz-stryker-playwright-runner": "*",
-    "@layzee/lz-stryker-ui-mutators": "*"
+    "@layzee/stryker-playwright-runner": "*",
+    "@layzee/stryker-playwright-mutators": "*"
   },
   "nx": {
     "tags": [
