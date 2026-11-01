@@ -1409,11 +1409,15 @@ export const cases: readonly Case[] = [
   {
     id: 'design-50',
     title:
-      'no forced-off value for a comparison or logical value, and no negation for a comparison or a ! value: built-in mutants give the same',
+      'no forced-off value for a comparison or logical value, and no negation for a comparison: built-in mutants give the same; a ! value is negated, because dropping the ! renders differently when the operand is not a boolean',
     origin: `${rulesOrigin}, LzDisabledAttribute, LzHiddenAttribute and LzStateAttribute`,
     jsx:
       '<form><input readOnly={n > 0} /><p aria-disabled={a && b} aria-hidden={a ?? b} />' +
       '<p aria-selected={tab === current} aria-expanded={!open} aria-pressed={!(a && b)} /></form>',
-    expect: [['LzHiddenAttribute', 'aria-hidden={false}']],
+    expect: [
+      ['LzHiddenAttribute', 'aria-hidden={false}'],
+      ['LzStateAttribute', 'aria-expanded={!!open}'],
+      ['LzStateAttribute', 'aria-pressed={!!(a && b)}'],
+    ],
   },
 ];

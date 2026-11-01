@@ -266,12 +266,13 @@ function builtInForcesValue(site: AttributeSite, t: BabelTypes): boolean {
   );
 }
 
-/** Built-in EqualityOperator already negates a comparison, and BooleanLiteral already drops a `!`. */
+/**
+ * Built-in EqualityOperator already negates a comparison. A `!x` value stays: BooleanLiteral's `x` renders
+ * like `!!x` only when `x` is a boolean, which a mutator cannot see.
+ */
 function builtInNegates(site: AttributeSite, t: BabelTypes): boolean {
   return (
-    site.value.kind === 'expression' &&
-    (isComparison(site.value.expression, t) ||
-      t.isUnaryExpression(site.value.expression, { operator: '!' }))
+    site.value.kind === 'expression' && isComparison(site.value.expression, t)
   );
 }
 

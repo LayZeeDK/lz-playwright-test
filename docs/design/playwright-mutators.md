@@ -49,7 +49,7 @@ are in the Opus draft, section 2. Where this list differs from the draft, this l
 7. `LzHiddenAttribute`: forces `hidden` and `aria-hidden` off. It never forces an element hidden. Like `LzDisabledAttribute`, it skips a comparison or `&&`/`||` value (`hidden={a !== b}`), which the built-in `ConditionalExpression` already sets to `false`. It skips `aria-hidden` on `svg`, `img`, and `i`, as the Opus draft did (2.7): those are decorative icons, and exposing one changes nothing a role, label, or text query sees. Killed by `toBeVisible`, `getByRole` (hidden elements leave the tree).
 8. `LzElementRole`: removes `role`, or swaps a tag for `span` when Playwright's role table gives it the role `button` or `link`: `button` always, and `a` and `area` only when they have an `href`. An `<a>` without `href` has no `link` role, so swapping it would be an equivalent mutant. The `span` drops every attribute of `a`, `area`, and `button` that a `span` cannot take, such as `href`, `type`, `disabled`, and `alt` (see "Rules the synthetic cases settled"). Killed by `getByRole`.
 9. `LzChildExpression`: a `{value}` child becomes `null`. Killed by `toHaveText`.
-10. `LzStateAttribute`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, `aria-selected`. A string value flips between `"true"` and `"false"`, and an expression is negated, except where negating would give a constant: a ternary flips each branch instead, and a `String()` or `.toString()` call gets no mutant (see "Rules the synthetic cases settled"). A comparison gets no negation, because the built-in `EqualityOperator` already gives it (`tab === current` becomes `tab !== current`), and neither does a `!x` value, whose built-in `BooleanLiteral` mutant `x` renders the same state as `!!x`. A `&&`/`||` value is negated: `!(a && b)` differs from each built-in mutant there. Killed by `toHaveAttribute` and role queries with state options.
+10. `LzStateAttribute`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, `aria-selected`. A string value flips between `"true"` and `"false"`, and an expression is negated, except where negating would give a constant: a ternary flips each branch instead, and a `String()` or `.toString()` call gets no mutant (see "Rules the synthetic cases settled"). A comparison gets no negation, because the built-in `EqualityOperator` already gives it (`tab === current` becomes `tab !== current`). A `!x` value is negated to `!!x`: the built-in `BooleanLiteral` mutant `x` renders the same state only when `x` is a boolean, and `aria-checked={!count}` with `count` 3 renders `"3"`, which Playwright reads as not checked, while `!!count` renders `"true"`. A mutator sees no types, so it keeps the mutant. A `&&`/`||` value is negated: `!(a && b)` differs from each built-in mutant there. Killed by `toHaveAttribute` and role queries with state options.
 
 Later: `ListExpression` (`.map` becomes `.slice(0, 1).map`, from the Fable draft), button `type` swap, Angular
 templates, and CSS. Each waits for a reason given in the drafts' "later" sections.
@@ -176,8 +176,8 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
   stay. Case design-47 covers the list.
 - Three skips from the Opus draft (section 2) hold here too. `LzLabelAttribute` skips `htmlFor` on a
   `label` that also wraps its control, because nesting keeps the association. `LzTextLiteral` skips text
-  inside `style` and `script`, which is CSS or code, not rendered text, and inside `noscript`, which a
-  browser with scripts on never renders (case design-51). Only a test that sets Playwright's
+  inside `style` and `script`, which is CSS or code, not rendered text. This design adds `noscript`,
+  which a browser with scripts on never renders (case design-51); only a test that sets Playwright's
   `javaScriptEnabled: false` sees that text, and it loses those mutants. `LzElementRole` skips a `role` equal
   to the element's implicit role, such as `<button role="button">`, because removing it changes nothing.
   The implicit roles come from Playwright's own table, `kImplicitRoleByTagName` in
@@ -203,8 +203,9 @@ The prototype also matches `formAction`, `inert`, `aria-current`, `aria-invalid`
 design does not list; they stay out of the first release.
 
 The Opus prototype (`spikes/design-opus/ui-mutators.ts`) and both drafts use the earlier names. The
-prototype also predates nine of the rules in this design: the `LzConditionalElement` comparison and logical skip, the
-same skip for `LzDisabledAttribute` and `LzHiddenAttribute`, the `LzStateAttribute` skip of a comparison or `!` value, the
+prototype also predates ten of the rules in this design: the `LzConditionalElement` comparison and logical skip, the
+same skip for `LzDisabledAttribute` and `LzHiddenAttribute`, the `LzStateAttribute` skip of a comparison, the
+`LzTextLiteral` skip of `noscript` text, the
 `LzConditionalElement` limit to JSX children, the `LzEventHandler` single-reference skip, the `href`
 condition on the `a` swap, the skip of an empty value, the attributes that `ElementToSpan` drops, and the
 `LzHiddenAttribute` skip of `aria-hidden` on `svg`, `img`, and `i`. The package implements them, and the

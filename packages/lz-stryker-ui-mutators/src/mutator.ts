@@ -29,7 +29,6 @@ export const babelTypeMembers = [
   'isTSAsExpression',
   'isTSNonNullExpression',
   'isTSSatisfiesExpression',
-  'isUnaryExpression',
   'jsxAttribute',
   'jsxClosingElement',
   'jsxElement',
