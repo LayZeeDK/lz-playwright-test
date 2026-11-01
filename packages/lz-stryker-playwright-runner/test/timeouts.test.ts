@@ -64,14 +64,19 @@ test('the assertion warning fires below the expect timeout plus the run start an
   assert.equal(assertionTimeoutWarning(config, 10_600), undefined);
 });
 
-test('at the lowest timeoutMS the warning accepts, a test gets the whole expect timeout with no Stryker overhead', () => {
-  const config = { testTimeoutCap: Infinity, expectTimeout: 5000 };
+test('the warning fires exactly when a test would get less than the expect timeout with no Stryker overhead', () => {
+  const config = { testTimeoutCap: Infinity, expectTimeout: 7000 };
   const lowest = config.expectTimeout + runStartMs + stopHeadroomMs;
 
   assert.equal(assertionTimeoutWarning(config, lowest), undefined);
   assert.equal(
     mutantRunBudget(lowest, config).testTimeout,
     config.expectTimeout,
+  );
+  assert.notEqual(assertionTimeoutWarning(config, lowest - 1), undefined);
+  assert.ok(
+    (mutantRunBudget(lowest - 1, config).testTimeout ?? Infinity) <
+      config.expectTimeout,
   );
 });
 
