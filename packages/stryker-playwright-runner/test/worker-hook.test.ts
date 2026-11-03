@@ -5,13 +5,17 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { before, type TestContext, test } from 'node:test';
 
-import type { HookedContext } from '../src/playwright-internals.ts';
+import type {
+  HookedContext,
+  HookedRequestContext,
+} from '../src/playwright-internals.ts';
 import {
   frameReadTimeoutMs,
   readSnapshotDir,
   runSettingsEnv,
   type RunSettings,
 } from '../src/protocol.ts';
+import { testIdHeader } from '../src/server-protocol.ts';
 import type * as Hook from '../src/worker-hook.ts';
 import type { StrykerNamespace } from '../src/namespace.ts';
 import { codedError, tempTree } from './support/doubles.ts';
@@ -791,4 +795,115 @@ test('a frame that answers leaves no read timer to hold the worker open', async 
   await created.close();
 
   assert.equal(timers(), before);
+});
+
+const webServerHosts = ['localhost:4820'];
+
+/** A request context whose fetch records what it was called with. */
+function requestContext() {
+  const calls: unknown[][] = [];
+  const context: HookedRequestContext = {
+    fetch: async (...args) => {
+      calls.push(args);
+    },
+  };
+
+  return { context, calls };
+}
+
+test("a test's page requests to a webServer host carry its test id, on top of their own headers", async (t) => {
+  const hooked = installed(t, { perTest: true, testIdHosts: webServerHosts });
+  hooked.setTest('t1');
+  const created = await hooked.context();
+  const [route, ...more] = created.routes;
+  assert.ok(route && more.length === 0, 'one route');
+  const [matches, handler] = route;
+  const fallbacks: unknown[] = [];
+
+  await handler({
+    request: () => ({ headers: () => ({ accept: 'text/html' }) }),
+    fallback: async (options) => {
+      fallbacks.push(options);
+    },
+  });
+
+  assert.deepEqual(
+    [
+      'http://localhost:4820/api',
+      'http://127.0.0.1:4820/',
+      'http://[::1]:4820/x',
+      'http://localhost:4821/api',
+      'https://cdn.test/app.js',
+    ].map((url) => matches(new URL(url))),
+    [true, true, true, false, false],
+  );
+  assert.deepEqual(fallbacks, [
+    { headers: { accept: 'text/html', [testIdHeader]: 't1' } },
+  ]);
+});
+
+test('page requests carry no test id without per-test coverage, without webServer hosts, or outside a test', async (t) => {
+  const contexts = [
+    installed(t, { perTest: false, testIdHosts: webServerHosts }),
+    installed(t, { perTest: true }),
+  ].map(async (hooked) => {
+    hooked.setTest('t1');
+
+    return hooked.context();
+  });
+  const outside = installed(t, { perTest: true, testIdHosts: webServerHosts });
+  outside.setTest('t1', { type: 'beforeAll' });
+  contexts.push(outside.context());
+
+  assert.deepEqual(
+    (await Promise.all(contexts)).map((created) => created.routes.length),
+    [0, 0, 0],
+  );
+});
+
+test("a test's request fixture sends its test id with every fetch, keeping the headers it was given", async (t) => {
+  const hooked = installed(t, { perTest: true, testIdHosts: webServerHosts });
+  hooked.setTest('t1');
+  const { context, calls } = requestContext();
+
+  await hooked.hooks.runAfterCreateRequestContext?.(context);
+  await context.fetch('/api/total', { method: 'POST', headers: { a: '1' } });
+  await context.fetch('http://elsewhere.test/');
+  await context.fetch({ headers: () => ({ b: '2' }) });
+
+  assert.deepEqual(calls.slice(0, 2), [
+    [
+      '/api/total',
+      { method: 'POST', headers: { a: '1', [testIdHeader]: 't1' } },
+    ],
+    ['http://elsewhere.test/', { headers: { [testIdHeader]: 't1' } }],
+  ]);
+  assert.deepEqual(calls[2]?.[1], {
+    headers: { b: '2', [testIdHeader]: 't1' },
+  });
+});
+
+test('a request context sends no test id without per-test coverage, without webServer hosts, or in a beforeAll hook', async (t) => {
+  const settings: Omit<RunSettings, 'outDir'>[] = [
+    { perTest: false, testIdHosts: webServerHosts },
+    { perTest: true },
+    { perTest: true, testIdHosts: webServerHosts },
+  ];
+  const sent = await Promise.all(
+    settings.map(async (setting, index) => {
+      const hooked = installed(t, setting);
+      hooked.setTest('t1', index === 2 ? { type: 'beforeAll' } : undefined);
+      const { context, calls } = requestContext();
+      await hooked.hooks.runAfterCreateRequestContext?.(context);
+      await context.fetch('/api', { headers: { a: '1' } });
+
+      return calls;
+    }),
+  );
+
+  assert.deepEqual(sent, [
+    [['/api', { headers: { a: '1' } }]],
+    [['/api', { headers: { a: '1' } }]],
+    [['/api', { headers: { a: '1' } }]],
+  ]);
 });

@@ -31,8 +31,11 @@ import {
   mutantRunResult,
   type RunOutput,
   type RunStatus,
+  arrivalSlackMs,
+  testWindows,
   toRunResult,
 } from '../src/run-result.ts';
+import { untaggedKey } from '../src/server-protocol.ts';
 import {
   addAttempt,
   dryRequest,
@@ -415,6 +418,86 @@ test('a dry run merges the coverage of every snapshot exactly and reports the ga
     perTest: { a: { '1': 3 } },
   });
   assert.deepEqual(gaps, { lostFrames: 1, sharedFrames: 1 });
+});
+
+function withAttempt(id: string, startTime: Date, duration: number) {
+  return {
+    ...fakeTestCase(id),
+    results: [{ status: 'passed' as const, startTime, duration }],
+  };
+}
+
+test('a server request without a test id counts for every test that ran when it arrived, once each, and as static when none ran', () => {
+  const windows = testWindows([
+    withAttempt('a', new Date(1000), 100),
+    {
+      ...withAttempt('b', new Date(1050), 100),
+      results: [
+        { status: 'failed', startTime: new Date(1050), duration: 100 },
+        { status: 'passed', startTime: new Date(1060), duration: 100 },
+      ],
+    },
+    fakeTestCase('never-started'),
+  ]);
+
+  assert.deepEqual(windows, [
+    { testId: 'a', start: 1000, end: 1100 },
+    { testId: 'b', start: 1050, end: 1150 },
+    { testId: 'b', start: 1060, end: 1160 },
+  ]);
+
+  const merged = mergeCoverage(
+    [
+      parsed({
+        mutantCoverage: {
+          static: {},
+          perTest: {
+            a: { '1': 1 },
+            [untaggedKey(1075)]: { '2': 1 },
+            [untaggedKey(1000 - arrivalSlackMs)]: { '3': 1 },
+            [untaggedKey(1160 + arrivalSlackMs)]: { '4': 1 },
+            [untaggedKey(1000 - arrivalSlackMs - 1)]: { '5': 1 },
+            [untaggedKey(1160 + arrivalSlackMs + 1)]: { '6': 1 },
+          },
+        },
+      }),
+    ],
+    windows,
+  );
+
+  assert.deepEqual(withoutPrototypes(merged), {
+    static: { '5': 1, '6': 1 },
+    perTest: {
+      a: { '1': 1, '2': 1, '3': 1 },
+      b: { '2': 1, '4': 1 },
+    },
+  });
+});
+
+test('a dry run attributes a server request without a test id by the times its reporter saw', () => {
+  const reporter = new LzPlaywrightCollectingReporter();
+  reporter.onTestEnd(withAttempt('a', new Date(5000), 200));
+  reporter.onTestEnd(withAttempt('b', new Date(9000), 200));
+
+  const { result } = dryRunResult(
+    runOutput({
+      reporter,
+      snapshots: [
+        parsed({
+          mutantCoverage: {
+            static: {},
+            perTest: { [untaggedKey(9100)]: { '8': 2 } },
+          },
+        }),
+      ],
+    }),
+    dryRequest(),
+  );
+
+  assert.deepEqual(withoutPrototypes(completed(result).mutantCoverage), {
+    static: {},
+    perTest: { b: { '8': 2 } },
+  });
 });
 
 test('a dry run that fails before the merge reports no gaps', () => {

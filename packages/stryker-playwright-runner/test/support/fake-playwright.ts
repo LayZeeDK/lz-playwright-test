@@ -52,7 +52,7 @@ interface WebServer {
   readonly port?: number;
   readonly ignoreHTTPSErrors?: boolean;
   readonly reuseExistingServer?: boolean;
-  readonly setsNodeOptions?: boolean;
+  readonly env?: Readonly<Record<string, string>>;
 }
 
 /** What one runTests call saw: its params, the run settings and the environment the workers get. */

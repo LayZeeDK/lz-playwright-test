@@ -4,10 +4,11 @@ import { test } from 'node:test';
 import {
   parseSnapshotLine,
   readRunSettings,
+  readSnapshotDir,
   runSettingsEnv,
   serializeSnapshot,
 } from '../src/protocol.ts';
-import { withoutPrototypes } from './support/doubles.ts';
+import { tempTree, withoutPrototypes } from './support/doubles.ts';
 
 test('a snapshot with a BigInt hit count is written as a lost frame', () => {
   const line = serializeSnapshot({ hitCount: 1n, outlivedItsTest: true });
@@ -78,6 +79,33 @@ test('the run settings are read from the environment, with a hit limit only when
     }),
     { outDir: 'out', perTest: false, hitLimit: 5 },
   );
+  assert.deepEqual(
+    readRunSettings({
+      [runSettingsEnv]:
+        '{"outDir":"out","perTest":true,"testIdHosts":["localhost:1"]}',
+    }),
+    { outDir: 'out', perTest: true, testIdHosts: ['localhost:1'] },
+  );
+});
+
+test("a run folder's server snapshots merge with the workers', but only a worker file shows the worker hook installed", (t) => {
+  const line = (testId: string) =>
+    serializeSnapshot({
+      mutantCoverage: { static: {}, perTest: { [testId]: { '1': 1 } } },
+      outlivedItsTest: false,
+    });
+  const serverOnly = tempTree(t, 'protocol-dir-', {
+    'server-1-a.ndjson': line('a') + '\n',
+  });
+  const both = tempTree(t, 'protocol-dir-', {
+    'server-1-a.ndjson': line('a') + '\n',
+    'worker-2-b.ndjson': line('b') + '\n',
+  });
+
+  assert.equal(readSnapshotDir(serverOnly).hookInstalled, false);
+  assert.equal(readSnapshotDir(serverOnly).snapshots.length, 1);
+  assert.equal(readSnapshotDir(both).hookInstalled, true);
+  assert.equal(readSnapshotDir(both).snapshots.length, 2);
 });
 
 test('run settings that are not JSON, not an object or have a field of the wrong type are refused', () => {
@@ -89,6 +117,8 @@ test('run settings that are not JSON, not an object or have a field of the wrong
     '{"outDir":"out"}',
     '{"outDir":"out","perTest":"true"}',
     '{"outDir":"out","perTest":true,"hitLimit":"5"}',
+    '{"outDir":"out","perTest":true,"testIdHosts":"localhost:1"}',
+    '{"outDir":"out","perTest":true,"testIdHosts":[1]}',
   ].forEach((raw) => {
     assert.throws(() => readRunSettings({ [runSettingsEnv]: raw }), {
       message: `${runSettingsEnv} holds no valid run settings: ${raw}`,
