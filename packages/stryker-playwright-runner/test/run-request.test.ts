@@ -30,14 +30,12 @@ test('a mutant run request widens its filter to serial groups, keeps the coverin
     {
       serialGroups: new Map([['edit', ['create', 'edit']]]),
       timeouts: { testTimeoutCap: Infinity, expectTimeout: 1000 },
-      failOnFlakyTests: true,
     },
   );
 
   assert.deepEqual(request, {
     kind: 'mutant',
     disableBail: false,
-    failOnFlakyTests: true,
     activeMutant: '7',
     selection: { covering: ['edit'], toRun: ['create', 'edit'] },
     hitLimit: 50,
@@ -46,18 +44,12 @@ test('a mutant run request widens its filter to serial groups, keeps the coverin
 });
 
 test('a dry run request keeps the config timeouts', () => {
-  assert.deepEqual(
-    dryRunRequest(dryRunOptions({ coverageAnalysis: 'all' }), {
-      failOnFlakyTests: true,
-    }),
-    {
-      kind: 'dry',
-      disableBail: false,
-      failOnFlakyTests: true,
-      coverageAnalysis: 'all',
-      budget: { testTimeout: undefined, deadlineMs: undefined },
-    },
-  );
+  assert.deepEqual(dryRunRequest(dryRunOptions({ coverageAnalysis: 'all' })), {
+    kind: 'dry',
+    disableBail: false,
+    coverageAnalysis: 'all',
+    budget: { testTimeout: undefined, deadlineMs: undefined },
+  });
 });
 
 test('a dry run plan runs every test with no active mutant, and collects per-test coverage only for perTest', () => {

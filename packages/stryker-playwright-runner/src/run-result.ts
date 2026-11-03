@@ -105,7 +105,7 @@ export function flakyTestNames(output: RunOutput): string[] {
 
 export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
   const { status, reporter, snapshots, hookInstalled, installErrors } = output;
-  const { failOnFlakyTests } = request;
+  const { failOnFlakyTests } = reporter;
   const isMutantRun = request.kind === 'mutant';
   const testCases = [...reporter.testCases.values()];
   const tests = testCases.map((test) => toTestResult(test, failOnFlakyTests));

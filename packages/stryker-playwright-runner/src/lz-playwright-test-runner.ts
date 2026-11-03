@@ -66,7 +66,6 @@ interface Session {
   readonly serialGroups: SerialGroups;
   readonly timeouts: ConfigTimeouts;
   readonly retriesByProject: ReadonlyMap<string, number>;
-  readonly failOnFlakyTests: boolean;
 }
 
 const workerHookUrl = new URL(
@@ -153,7 +152,6 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         serialGroups,
         timeouts,
         retriesByProject,
-        failOnFlakyTests: config.failOnFlakyTests,
       };
     } catch (error) {
       await playwright?.runGlobalTeardown().catch(() => undefined);
@@ -186,7 +184,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
 
   async dryRun(options: DryRunOptions): Promise<DryRunResult> {
     const session = this.#ready();
-    const request = dryRunRequest(options, session);
+    const request = dryRunRequest(options);
     const output = await this.#run(session, request);
     const { result, gaps } = dryRunResult(output, request);
     const flaky = flakyTestNames(output);

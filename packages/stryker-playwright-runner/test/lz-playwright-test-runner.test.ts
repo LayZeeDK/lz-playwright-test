@@ -436,23 +436,18 @@ function oneTestPerProject(projects: readonly string[]) {
       allTests: () => [tests[index]],
     })),
   };
-  const runTests = async (run: Run) => {
-    run.reporter.onBegin({}, root);
 
-    return passAll(run);
-  };
-
-  return { tests, runTests };
+  return { tests, root };
 }
 
 test("each run raises the tests' retries to their project's retries in the Playwright config", async (t) => {
-  const { tests, runTests } = oneTestPerProject(['chromium', 'firefox']);
+  const { tests, root } = oneTestPerProject(['chromium', 'firefox']);
   const fake = fakePlaywright(t, {
     projects: [
       { default: true, project: { name: 'chromium', timeout: 1, retries: 2 } },
       { default: true, project: { name: 'firefox', timeout: 1 } },
     ],
-    runTests,
+    root,
   });
   const { shell } = fake.runner();
   await shell.init();
@@ -463,13 +458,13 @@ test("each run raises the tests' retries to their project's retries in the Playw
 });
 
 test('the retries option replaces the retries of every project', async (t) => {
-  const { tests, runTests } = oneTestPerProject(['chromium', 'firefox']);
+  const { tests, root } = oneTestPerProject(['chromium', 'firefox']);
   const fake = fakePlaywright(t, {
     projects: [
       { default: true, project: { name: 'chromium', timeout: 1, retries: 2 } },
       { default: true, project: { name: 'firefox', timeout: 1 } },
     ],
-    runTests,
+    root,
   });
   const { shell } = fake.runner({ lzPlaywright: { retries: 1 } });
   await shell.init();

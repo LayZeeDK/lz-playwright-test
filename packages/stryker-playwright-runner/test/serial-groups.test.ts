@@ -69,7 +69,7 @@ function listing({
     ) {
       calls.push(params.projects ?? []);
       errors.forEach((message) => reporter.onError({ message }));
-      reporter.onBegin(undefined, { allTests: () => tests });
+      reporter.onBegin({ failOnFlakyTests: false }, { allTests: () => tests });
 
       return result;
     },

@@ -25,6 +25,7 @@ import {
 } from '../../src/protocol.ts';
 import {
   LzPlaywrightCollectingReporter,
+  type ReportedSuite,
   type ReportedTest,
 } from '../../src/reporter.ts';
 import { finishedTest, logger, strykerOptions, tempTree } from './doubles.ts';
@@ -34,6 +35,7 @@ export type Status = FullResult['status'];
 export const activeMutantEnv =
   INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
 const fakeGlobal = '__fakePlaywright__';
+const noProjects = { allTests: () => [], suites: [] };
 
 interface Project {
   readonly default: boolean;
@@ -63,6 +65,8 @@ export interface Behaviour {
   readonly projects?: readonly Project[];
   readonly webServers?: readonly WebServer[];
   readonly failOnFlakyTests?: boolean;
+  /** The root suite each run's reporter gets at onBegin. */
+  readonly root?: ReportedSuite;
   readonly listed?: readonly ReportedTest[];
   readonly initialize?: () => Promise<void>;
   readonly globalSetup?: (reporter: Reporter) => Status;
@@ -157,8 +161,6 @@ export function fakePlaywright(
           ignoreHTTPSErrors: false,
           ...server,
         })),
-        config: { failOnFlakyTests: behaviour.failOnFlakyTests ?? false },
-        failOnFlakyTests: false,
       };
     }
 
@@ -168,7 +170,10 @@ export function fakePlaywright(
     ): Promise<{ status: Status }> {
       calls.push(['listTests', params]);
       const listed = behaviour.listed ?? [];
-      collecting(reporter).onBegin({}, { allTests: () => listed });
+      collecting(reporter).onBegin(
+        { failOnFlakyTests: false },
+        { allTests: () => listed },
+      );
 
       return { status: 'passed' };
     }
@@ -206,6 +211,10 @@ export function fakePlaywright(
       };
       calls.push(['runTests']);
       runs.push(run);
+      run.reporter.onBegin(
+        { failOnFlakyTests: behaviour.failOnFlakyTests ?? false },
+        behaviour.root ?? noProjects,
+      );
       const status = await (behaviour.runTests ?? passAll)(run);
 
       return { status };

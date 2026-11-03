@@ -17,12 +17,12 @@ test('the reporter raises retries at onBegin only when a project has some, and r
   const unreadable = { allTests: () => [] };
 
   const noRetries = new LzPlaywrightCollectingReporter(new Map([['a', 0]]));
-  noRetries.onBegin({}, unreadable);
+  noRetries.onBegin({ failOnFlakyTests: false }, unreadable);
 
   assert.equal(noRetries.retriesNotRaised, undefined);
 
   const reporter = new LzPlaywrightCollectingReporter(new Map([['a', 1]]));
-  reporter.onBegin({}, unreadable);
+  reporter.onBegin({ failOnFlakyTests: false }, unreadable);
 
   assert.match(reporter.retriesNotRaised ?? '', /TestCase\.retries/);
 });

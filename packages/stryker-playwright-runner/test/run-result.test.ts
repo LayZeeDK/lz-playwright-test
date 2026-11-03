@@ -69,6 +69,14 @@ function attempt(
   reporter.onTestEnd(addAttempt(testCase, outcome, status));
 }
 
+// Playwright hands the config's failOnFlakyTests to the reporter at onBegin.
+function begin(
+  reporter: LzPlaywrightCollectingReporter,
+  failOnFlakyTests: boolean,
+) {
+  reporter.onBegin({ failOnFlakyTests }, { allTests: () => [] });
+}
+
 function classify(
   reporter: LzPlaywrightCollectingReporter,
   {
@@ -124,13 +132,11 @@ test('a mutant run passes a test that passes only on a retry, as Playwright does
 
 test('with failOnFlakyTests, a mutant run fails a test that passes only on a retry', () => {
   const reporter = new LzPlaywrightCollectingReporter();
+  begin(reporter, true);
   attempt(reporter, 'a', 'unexpected', 'failed');
   attempt(reporter, 'a', 'flaky', 'passed');
 
-  const result = classify(reporter, {
-    status: 'passed',
-    request: mutantRequest({ failOnFlakyTests: true }),
-  });
+  const result = classify(reporter, { status: 'passed' });
 
   assert.deepEqual(
     completed(result).tests.map((t) => [
@@ -146,13 +152,13 @@ test('the dry run counts a test that passes on a retry as passing, and as failin
   const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'failed');
   attempt(reporter, 'a', 'flaky', 'passed');
-  const statuses = (failOnFlakyTests: boolean) =>
-    completed(
-      classify(reporter, {
-        status: 'passed',
-        request: dryRequest({ failOnFlakyTests }),
-      }),
+  const statuses = (failOnFlakyTests: boolean) => {
+    begin(reporter, failOnFlakyTests);
+
+    return completed(
+      classify(reporter, { status: 'passed', request: dryRequest() }),
     ).tests.map((t) => t.status);
+  };
 
   assert.deepEqual(statuses(false), [TestStatus.Success]);
   assert.deepEqual(statuses(true), [TestStatus.Failed]);
@@ -261,11 +267,11 @@ test('a test that timed out and then passed on a retry passes, and makes a mutan
   const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'timedOut');
   attempt(reporter, 'a', 'flaky', 'passed');
-  const status = (failOnFlakyTests: boolean) =>
-    classify(reporter, {
-      status: 'passed',
-      request: mutantRequest({ failOnFlakyTests }),
-    }).status;
+  const status = (failOnFlakyTests: boolean) => {
+    begin(reporter, failOnFlakyTests);
+
+    return classify(reporter, { status: 'passed' }).status;
+  };
 
   assert.equal(status(false), DryRunStatus.Complete);
   assert.equal(status(true), DryRunStatus.Timeout);
@@ -578,11 +584,8 @@ test('a covering test that timed out and passed only on a retry leaves a survivo
     mutantRunOf(reporter, 'passed').status,
     MutantRunStatus.Survived,
   );
-  assert.equal(
-    mutantRunOf(reporter, 'passed', { ...coveringA, failOnFlakyTests: true })
-      .status,
-    MutantRunStatus.Timeout,
-  );
+  begin(reporter, true);
+  assert.equal(mutantRunOf(reporter, 'passed').status, MutantRunStatus.Timeout);
 });
 
 test('a covering test that never ran keeps the run a Timeout', () => {
@@ -697,7 +700,7 @@ test('a failed test outranks the errors of its run', () => {
 
 test('a run whose retries could not be raised is an error, even when a test failed', () => {
   const reporter = new LzPlaywrightCollectingReporter(new Map([['a', 1]]));
-  reporter.onBegin({}, { allTests: () => [] });
+  reporter.onBegin({ failOnFlakyTests: false }, { allTests: () => [] });
   attempt(reporter, 'a', 'unexpected', 'failed');
 
   const result = classify(reporter);

@@ -1,4 +1,5 @@
 import type {
+  FullConfig,
   TestCase,
   TestError,
   TestResult,
@@ -29,6 +30,7 @@ export interface ReportedSuite {
 export class LzPlaywrightCollectingReporter {
   readonly errors: string[] = [];
   retriesNotRaised: string | undefined;
+  failOnFlakyTests = false;
   outputTail = '';
   // Playwright reports each attempt of a retried test with the same TestCase, which holds them all.
   readonly testCases = new Map<string, ReportedTest>();
@@ -43,7 +45,11 @@ export class LzPlaywrightCollectingReporter {
     return false;
   }
 
-  onBegin(_config: unknown, suite: ReportedSuite) {
+  onBegin(
+    { failOnFlakyTests }: Pick<FullConfig, 'failOnFlakyTests'>,
+    suite: ReportedSuite,
+  ) {
+    this.failOnFlakyTests = failOnFlakyTests;
     this.#suite = suite;
 
     if ([...this.#retriesByProject.values()].some(Boolean)) {

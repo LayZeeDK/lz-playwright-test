@@ -44,7 +44,6 @@ export interface TestRunner {
   loadConfig(): Promise<{
     readonly projects: readonly ConfigProject[];
     readonly webServers: readonly ConfigWebServer[];
-    readonly failOnFlakyTests: boolean;
   }>;
   // Resolves to undefined when Playwright throws, after printing the error to stderr.
   listTests(
@@ -282,7 +281,7 @@ function parseConfig(
     internalsChanged(
       version,
       'TestRunner.loadConfig() resolving to projects[].default, project.name, project.timeout, project.retries and ' +
-        'expect.timeout, webServers[].url, port and ignoreHTTPSErrors, and config.failOnFlakyTests',
+        'expect.timeout, and webServers[].url, port and ignoreHTTPSErrors',
     );
   const projects = fieldOf(value, 'projects');
   const webServers = fieldOf(value, 'webServers');
@@ -291,7 +290,7 @@ function parseConfig(
     throw changed();
   }
 
-  const parsed = {
+  return {
     projects: projects.map((project: unknown): ConfigProject => {
       const settings = fieldOf(project, 'project');
       const expect = fieldOf(project, 'expect');
@@ -358,16 +357,6 @@ function parseConfig(
       };
     }),
   };
-  const failOnFlakyTests = fieldOf(
-    fieldOf(value, 'config'),
-    'failOnFlakyTests',
-  );
-
-  if (typeof failOnFlakyTests !== 'boolean') {
-    throw changed();
-  }
-
-  return { ...parsed, failOnFlakyTests };
 }
 
 /**
