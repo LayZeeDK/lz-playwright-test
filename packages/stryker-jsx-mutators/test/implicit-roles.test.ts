@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 
 import { implicitRoles } from '../src/implicit-roles.ts';
 import {
@@ -22,12 +23,13 @@ const playwrightContextual = [
   'td',
   'th',
 ];
+// aria-query roles by tag alone that the table leaves out.
+const leftOut = ['td gridcell'];
 
 describe('implicitRoles', () => {
   it("holds every entry of Playwright's table that needs no context", () => {
     const missing = [...playwrightRoles()].filter(
-      ([tag, entry]) =>
-        JSON.stringify(implicitRoles.get(tag)) !== JSON.stringify(entry),
+      ([tag, entry]) => !isDeepStrictEqual(implicitRoles.get(tag), entry),
     );
 
     assert.deepEqual(missing, []);
@@ -37,36 +39,38 @@ describe('implicitRoles', () => {
     const parsed = new Set(playwrightRoles().keys());
 
     assert.deepEqual(
-      playwrightEntryTags().filter((tag) => !parsed.has(tag)),
+      playwrightEntryTags()
+        .filter((tag) => !parsed.has(tag))
+        .sort(),
       playwrightContextual,
     );
   });
 
-  it('holds every role aria-query gives by tag alone, but generic and the cell of a grid', () => {
+  it('holds every role aria-query gives by tag alone, but generic and the left-out ones', () => {
     assert.deepEqual(
       ariaQueryTagRoles(ariaQueryConcepts())
         .filter(
           ([tag, role]) =>
             role !== 'generic' &&
-            !(
-              implicitRoles.get(tag)?.role === role &&
-              implicitRoles.get(tag)?.requiredAttribute === undefined
-            ),
+            !isDeepStrictEqual(implicitRoles.get(tag), { role }),
         )
-        .map(([tag, role]) => `${tag} ${role}`),
-      ['td gridcell'],
+        .map(([tag, role]) => `${tag} ${role}`)
+        .sort(),
+      leftOut,
     );
   });
 
-  it('holds only roles some engine gives: aria-query, or Playwright for search and svg', () => {
+  it('holds only roles that aria-query or Playwright gives', () => {
     const concepts = ariaQueryConcepts();
+    const playwright = playwrightRoles();
 
     assert.deepEqual(
-      [...implicitRoles]
-        .filter(([tag, entry]) => !ariaQueryGives(concepts, tag, entry))
-        .map(([tag]) => tag)
-        .sort(),
-      ['search', 'svg'],
+      [...implicitRoles].filter(
+        ([tag, entry]) =>
+          !ariaQueryGives(concepts, tag, entry) &&
+          !isDeepStrictEqual(playwright.get(tag), entry),
+      ),
+      [],
     );
   });
 });
