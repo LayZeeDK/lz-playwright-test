@@ -12,6 +12,9 @@ export interface ReportedAttempt {
   readonly startTime?: Date | undefined;
   readonly duration: number;
   readonly error?: TestError | undefined;
+  readonly attachments?:
+    | readonly Pick<TestResult['attachments'][number], 'name' | 'path'>[]
+    | undefined;
 }
 
 export interface ReportedTest {

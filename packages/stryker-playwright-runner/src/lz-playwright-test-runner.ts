@@ -13,6 +13,7 @@ import type {
   MutantRunResult,
   TestRunner as StrykerTestRunner,
 } from '@stryker-mutator/api/test-runner';
+import { MutantRunStatus } from '@stryker-mutator/api/test-runner';
 
 import {
   readRunnerOptions,
@@ -59,6 +60,12 @@ import {
   serverSupportEnv,
   writeServerControl,
 } from './server-protocol.ts';
+import {
+  copySurvivorTraces,
+  readTracesTarget,
+  reportFileName,
+  type TracesTarget,
+} from './survivor-traces.ts';
 import { claimTempRoot, removeDir, type TempRoot } from './temp-root.ts';
 import {
   armDeadline,
@@ -89,6 +96,7 @@ interface Session {
   readonly serialGroups: SerialGroups;
   readonly timeouts: ConfigTimeouts;
   readonly retriesByProject: ReadonlyMap<string, number>;
+  readonly traces: TracesTarget | undefined;
 }
 
 const hookUrl = (name: string) =>
@@ -98,9 +106,19 @@ const workerHookUrl = hookUrl('worker-hook');
 const serverHookUrl = hookUrl('server-hook');
 const hookedWaitMs = 1000;
 
-const runOverrides = {
-  use: { screenshot: 'off', trace: 'off', video: 'off' },
-};
+const traceWithoutScreenshots = {
+  mode: 'on',
+  screenshots: false,
+  snapshots: true,
+} as const;
+
+const runOverrides = (traced: boolean) => ({
+  use: {
+    screenshot: 'off',
+    trace: traced ? traceWithoutScreenshots : 'off',
+    video: 'off',
+  },
+});
 
 export class LzPlaywrightTestRunner implements StrykerTestRunner {
   static inject = tokens(commonTokens.options, commonTokens.logger);
@@ -126,6 +144,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
 
   async init(): Promise<void> {
     const options = readRunnerOptions(this.#strykerOptions);
+    const traces = readTracesTarget(options.survivorTraces, process.env);
     const pw = loadPlaywright(options.configFile);
     const root = claimTempRoot((removed) => {
       if (removed.length) {
@@ -139,7 +158,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     try {
       playwright = await pw.createTestRunner(options.configFile, {
         outputDir: root.outputDir,
-        ...runOverrides,
+        ...runOverrides(traces !== undefined),
       });
       const config = await playwright.loadConfig();
       const timeouts = configTimeouts(config.projects);
@@ -181,6 +200,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         serialGroups,
         timeouts,
         retriesByProject,
+        traces,
       };
     } catch (error) {
       await playwright?.runGlobalTeardown().catch(() => undefined);
@@ -234,13 +254,25 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
   async mutantRun(options: MutantRunOptions): Promise<MutantRunResult> {
     const session = this.#ready();
     const request = mutantRunRequest(options, session);
-    const { result, hitCount } = mutantRunResult(
-      await this.#run(session, request),
-      request,
-    );
+    const output = await this.#run(session, request);
+    const { result, hitCount } = mutantRunResult(output, request);
     this.#log.debug(
       `Mutant ${request.activeMutant}: ${result.status}, hitCount ${hitCount}/${request.hitLimit}`,
     );
+
+    // Playwright deletes a test's output folder when that test runs again, so copy before the next run.
+    if (session.traces && result.status === MutantRunStatus.Survived) {
+      const dir = copySurvivorTraces(
+        session.traces.dir,
+        options.activeMutant,
+        reportFileName(
+          options.activeMutant.fileName,
+          session.traces.projectRoot,
+        ),
+        output.reporter.testCases.values(),
+      );
+      this.#log.debug(`Mutant ${request.activeMutant}: traces in ${dir}`);
+    }
 
     return result;
   }

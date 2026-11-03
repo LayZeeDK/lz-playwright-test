@@ -27,6 +27,7 @@ const defaults = {
   projects: undefined,
   workers: 1,
   retries: undefined,
+  survivorTraces: undefined,
   strykerTimeoutMS: 10_000,
 };
 

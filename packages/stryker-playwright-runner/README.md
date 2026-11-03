@@ -135,6 +135,8 @@ exports as `strykerValidationSchema`.
   `workers` or `dryRunTimeoutMinutes`.
 - `retries`: how many times to retry a failed test, in every project. Without it, each project keeps the
   `retries` that the Playwright config gives it. See Flaky tests.
+- `survivorTraces`: a folder, relative to the project root, for the Playwright traces of surviving
+  mutants, such as `reports/lz-playwright-traces`. See Traces of surviving mutants.
 
 ## Flaky tests
 
@@ -171,6 +173,38 @@ Playwright's `repeatEach` stays 1 under Stryker. To find flaky tests before a mu
 with `npx playwright test --repeat-each=10 --fail-on-flaky-tests`. Web-first assertions such as
 `await expect(locator).toHaveText()` retry until `expect.timeout`, so they make tests less flaky without
 any setting in the runner.
+
+## Traces of surviving mutants
+
+A surviving mutant shows that the tests miss a change, not what the page did with it. To see that, set
+`survivorTraces` and add the `lz-playwright-traces` reporter:
+
+```ts
+export default {
+  // ...
+  reporters: ['clear-text', 'html', 'lz-playwright-traces'],
+  lzPlaywright: { survivorTraces: 'reports/lz-playwright-traces' },
+} satisfies PartialStrykerOptions;
+```
+
+Every test run then records a Playwright trace with DOM snapshots and without screenshots. After each
+run of a mutant that survives, the runner copies the trace of every test that ran, one per attempt, to a
+folder for that mutant. At the end, the reporter writes `index.html` in `survivorTraces`: Stryker's
+report, where each surviving mutant lists the tests that ran, a `npx playwright show-trace` command for
+each trace, and a `npx stryker run --mutate` command that runs that mutant again after a test change. In
+incremental mode, a survivor whose result Stryker reused has no trace; run it again with that command to
+record one.
+
+The reporter empties the folder when a run starts. Without the reporter, a run with `survivorTraces`
+stops with an error, since nothing would empty the folder.
+
+Playwright calls a trace of every test "not recommended as it's performance heavy". Measured on one
+worker with a suite of 25 tests: the test durations added up to 100 to 120 s in three runs without
+traces, 114 to 131 s in three runs with Playwright's default trace, which includes screenshots, and 117 s
+in one run with the runner's trace. One short test took 1.6 times as long. The runner's traces of one
+suite run took 10 MB, against 42 MB with screenshots. No test changed status. A test that waits on timing can still change status under tracing,
+so the reporter warns, and a mutant's status in a traced run is worth comparing with an untraced run's
+report before you act on it. Leave `survivorTraces` unset in runs that gate a build.
 
 ## Faster mutation runs
 
@@ -280,7 +314,8 @@ unnoticed.
 On every run, these settings replace the ones in the Playwright config, except where a line says
 otherwise:
 
-- `screenshot`, `trace`, and `video` are off.
+- `screenshot` and `video` are off. `trace` is off, or on without screenshots when `survivorTraces` is
+  set.
 - The reporters in the Playwright config do not run.
 - `outputDir` is a folder in a private temp directory, `lz-playwright-<pid>-*` in the OS temp
   directory, which `dispose` removes. A runner that Stryker killed first leaves that directory behind.
