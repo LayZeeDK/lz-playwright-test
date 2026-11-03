@@ -9,7 +9,7 @@ import {
   type BabelTypes,
   type ElementSite,
 } from './mutator.ts';
-import type { RoleTable } from './playwright-roles.ts';
+import type { RoleTable } from './implicit-roles.ts';
 import { notOnSpan, swapsToSpan } from './span-swap.ts';
 
 const hasWord = /[\p{L}\p{N}]/u;

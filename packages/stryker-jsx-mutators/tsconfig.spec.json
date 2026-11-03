@@ -5,7 +5,7 @@
     "tsBuildInfoFile": "out-tsc/spec/tsconfig.spec.tsbuildinfo",
     "allowImportingTsExtensions": true
   },
-  "include": ["test/**/*.ts", "scripts/**/*.ts"],
+  "include": ["test/**/*.ts"],
   "references": [
     {
       "path": "./tsconfig.lib.json"

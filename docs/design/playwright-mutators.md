@@ -182,12 +182,12 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
   to the element's implicit role, such as `<button role="button">`, because removing it changes nothing.
   The implicit roles come from Playwright's own table, `kImplicitRoleByTagName` in
   `playwright-core/lib/coreBundle.js`, which `getImplicitAriaRole` reads for `getByRole`. The mutator
-  takes every tag whose role there is fixed, plus `a` and `area` with `href` (`link`). It reads the table
-  of the consumer's `playwright-core` when the plugin loads, and falls back to a table generated from
-  `playwright-core` when the package is built, as the package README describes. A table that lacks the
-  entry for `a`, `area` or `button`, or gives one of them a role other than the one the span swap reads
-  (`link` for `a` and `area`, `button` for `button`), counts as unreadable. When the plugin loads, it then uses the bundled
-  table and prints a warning. When the package is built, the generator fails. The span swap reads the
+  takes every tag whose role there is fixed, plus `a` and `area` with `href` (`link`), as a fixed table in
+  `src/implicit-roles.ts`. The table holds a tag when any test engine gives it the role, so a restating
+  `role` is kept whenever removing it would change nothing for some engine: aria-query 5.3.0, which
+  Testing Library's `getByRole` reads, agrees on every tag except `search` and `svg`, which only
+  Playwright gives a role, and they stay in. A drift test checks the table against the installed
+  `playwright-core` and `aria-query`. Lars, 2026-11-03: "Yes, keep svg and search." The span swap reads the
   same table. In 1.64.1 the tags with a fixed role are `article`, `aside`, `blockquote`, `button`, `caption`,
   `code`, `datalist`, `dd`, `del`, `details`, `dfn`, `dialog`, `dt`, `em`, `fieldset`, `figure`, `h1` to
   `h6`, `hr`, `html`, `ins`, `li`, `main`, `mark`, `math`, `menu`, `meter`, `nav`, `ol`, `optgroup`,

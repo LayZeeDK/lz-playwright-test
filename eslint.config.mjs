@@ -223,11 +223,10 @@ export default withWarningsAsErrors([
   {
     files: ['packages/stryker-jsx-mutators/package.json'],
     rules: {
-      // The mutators import Babel for types only; playwright-core's role table is resolved at run time.
+      // The mutators import Babel for types only.
       '@nx/dependency-checks': dependencyChecks([
         '@stryker-mutator/core',
         '@babel/core',
-        'playwright-core',
       ]),
     },
   },

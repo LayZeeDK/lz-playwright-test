@@ -64,17 +64,9 @@
     ],
     "targets": {
       "lint": {
-        "dependsOn": [
-          "@layzee/stryker-jsx-mutators:generate-roles"
-        ],
         "inputs": [
           "...",
           "{workspaceRoot}/tsconfig.base.json"
-        ]
-      },
-      "test-browser": {
-        "dependsOn": [
-          "@layzee/stryker-jsx-mutators:generate-roles"
         ]
       }
     }

@@ -39,19 +39,14 @@
     "node": ">=22.0.0"
   },
   "peerDependencies": {
-    "@stryker-mutator/core": "~10.1.0",
-    "playwright-core": ">=1.63.0 <2"
-  },
-  "peerDependenciesMeta": {
-    "playwright-core": {
-      "optional": true
-    }
+    "@stryker-mutator/core": "~10.1.0"
   },
   "dependencies": {
     "@stryker-mutator/api": "10.1.1"
   },
   "devDependencies": {
     "@babel/core": "8.0.9",
+    "aria-query": "5.3.0",
     "playwright-core": "1.64.1"
   },
   "nx": {
@@ -59,54 +54,21 @@
       "type:lib"
     ],
     "targets": {
-      "generate-roles": {
-        "command": "node scripts/generate-roles.ts",
-        "options": {
-          "cwd": "{projectRoot}"
-        },
-        "cache": true,
-        "inputs": [
-          "{projectRoot}/scripts/generate-roles.ts",
-          "{projectRoot}/scripts/roles-generator.ts",
-          "{projectRoot}/src/playwright-roles.ts",
-          "{projectRoot}/src/span-swap.ts",
-          "{projectRoot}/src/is-record.ts",
-          "{projectRoot}/src/package-name.ts",
-          {
-            "externalDependencies": [
-              "playwright-core"
-            ]
-          }
-        ],
-        "outputs": [
-          "{projectRoot}/src/bundled-roles.ts"
-        ]
-      },
       "build": {
         "dependsOn": [
-          "^build",
-          "generate-roles"
+          "^build"
         ]
       },
       "typecheck": {
         "dependsOn": [
           "build",
-          "^typecheck",
-          "generate-roles"
+          "^typecheck"
         ]
       },
       "lint": {
-        "dependsOn": [
-          "generate-roles"
-        ],
         "inputs": [
           "...",
           "{workspaceRoot}/tsconfig.base.json"
-        ]
-      },
-      "test": {
-        "dependsOn": [
-          "generate-roles"
         ]
       }
     }

@@ -1,10 +1,4 @@
-export const spanSwapRoleByTag: ReadonlyMap<string, string> = new Map([
-  ['a', 'link'],
-  ['area', 'link'],
-  ['button', 'button'],
-]);
-
-const spanSwapRoles: ReadonlySet<string> = new Set(spanSwapRoleByTag.values());
+const spanSwapRoles: ReadonlySet<string> = new Set(['button', 'link']);
 
 export function swapsToSpan(role: string | undefined): boolean {
   return role !== undefined && spanSwapRoles.has(role);

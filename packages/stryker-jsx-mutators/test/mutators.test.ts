@@ -5,7 +5,7 @@ import { traverse, types as t } from '@babel/core';
 
 import { elementSiteOf, toNodeMutator } from '../src/mutator.ts';
 import { mutatorsFor } from '../src/mutators.ts';
-import type { RoleTable } from '../src/playwright-roles.ts';
+import type { RoleTable } from '../src/implicit-roles.ts';
 import { parse } from './support/babel.ts';
 import { defined } from './support/defined.ts';
 

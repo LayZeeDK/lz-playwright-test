@@ -12,7 +12,7 @@ gets few mutants it can kill. This plugin adds ten mutators:
 - `LzJsxDisabledAttribute`: forces `disabled`, `readOnly`, and `aria-disabled` off.
 - `LzJsxHiddenAttribute`: forces `hidden` and `aria-hidden` off.
 - `LzJsxElementRole`: removes `role`, or swaps a `button`, or an `a` or `area` that has an `href`, for a
-  `span`. It takes these roles from Playwright (see "The roles come from your Playwright").
+  `span`. It keeps a `role` that restates the tag's implicit role (see "Implicit roles").
 - `LzJsxChildExpression`: replaces a `{value}` child with `null`.
 - `LzJsxStateAttribute`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, and `aria-selected`.
 
@@ -24,8 +24,6 @@ says exactly what each mutator changes and which shapes it skips. Stryker's repo
 - `@stryker-mutator/core` 10.1, tested on 10.1.1. The plugin patches internals of that version's
   instrumenter, and warns when it finds another version.
 - Node.js 22 or later, tested on 22.23.1 and 24.22.0 on Windows 11 arm64, and on 24.22.1 on Linux arm64.
-- Optional: `playwright-core` 1.63 or later, below 2. With npm, any `@playwright/test` or `playwright`
-  install brings it. With pnpm or Yarn Plug'n'Play, see "The roles come from your Playwright".
 - React JSX or TSX. The mutators match React's attribute names, such as `htmlFor` and `readOnly`, so
   Solid, Preact or Vue JSX written with `for` or `readonly` gets no mutants on those attributes. Vue,
   Angular and Svelte templates get no UI mutants; JSX in a Vue `<script lang="tsx">` block does. The run
@@ -34,35 +32,17 @@ says exactly what each mutator changes and which shapes it skips. Stryker's repo
 The mutators do not need a particular test runner. With `@layzee/stryker-playwright-runner`, a
 Playwright test can kill each of them.
 
-## The roles come from your Playwright
+## Implicit roles
 
-`LzJsxElementRole` uses Playwright's table of implicit roles, the one `getByRole` uses, so the mutator
-treats an element the way your tests find it. The table decides which tags the span swap changes and
-which `role` attributes restate a tag's own role and are left in place.
+`LzJsxElementRole` reads a fixed table of implicit roles: the tags that have a role by tag alone, or by
+tag and `href` for `a` and `area`. The table decides which tags the span swap changes (`button`, and `a`
+and `area` with an `href`) and which `role` attributes restate a tag's own role and are left in place.
 
-When the plugin loads, it reads the table from the `playwright-core` that Node.js resolves from the
-plugin's own folder. `playwright-core` is an optional peer dependency. With npm, it is hoisted next to the
-plugin, so the version your tests use is the one the plugin finds. pnpm and Yarn Plug'n'Play link an
-optional peer only when your project depends on it, so the plugin can find another version or none. In
-those setups, add `playwright-core` to your `devDependencies` at the version your `@playwright/test`
-uses.
-
-- Without `playwright-core`, the plugin uses the table it bundles, and prints nothing.
-- If `playwright-core` is installed but the plugin cannot read its table, the plugin prints one warning
-  and uses the bundled table. A table that lacks the entry for `a`, `area` or `button` counts as
-  unreadable, because the span swap needs them. To decide which `role` attributes to leave in place, the
-  mutator uses whatever entries the table holds. The warning names the version and path it found (only
-  the path of `package.json` when that file cannot be read), the reason, and the version of the bundled
-  table:
-
-  ```text
-  @layzee/stryker-jsx-mutators: cannot read the implicit role table of playwright-core 1.99.0 in <path> (Error: kImplicitRoleByTagName not found); LzJsxElementRole uses the table bundled from playwright-core 1.64.1.
-  ```
-
-The bundled table is generated from `playwright-core` when the package is built, so each release carries
-the table of the Playwright version it was built with. If that table cannot be read, or lacks one of those
-entries, the build fails and names what is missing. The
-package's tests parse the table of each Playwright minor version from 1.63 on.
+The table holds a tag when any test engine gives it that role, so removing a restating `role` never makes
+a mutant that some engine cannot see. It is Playwright 1.64.1's table. Testing Library 10.4.2 agrees on
+every tag except two that only Playwright gives a role: `svg` (`img`) and `search` (`search`). So with
+Testing Library, `<svg role="img">` keeps its `role`, and a test that finds it by that role does not get
+a mutant for it.
 
 ## Turn the mutators on
 
@@ -150,9 +130,9 @@ which the report still lists and the score also leaves out.
 
 ## Develop this package
 
-The build runs `node scripts/generate-roles.ts`, which writes `src/bundled-roles.ts`. When a Playwright
-minor version ships, run `node scripts/playwright-roles-matrix.ts` from the package folder. It saves that
-version's table in `test/fixture/roles/`, and the tests fail if the parser cannot read it.
+`test/implicit-roles.test.ts` checks the role table in `src/implicit-roles.ts` against the installed
+`playwright-core` and `aria-query` (the version Testing Library pins). When either is upgraded and the
+test fails, update the table to match.
 
 ## License
 
