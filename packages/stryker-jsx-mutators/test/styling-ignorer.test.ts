@@ -115,11 +115,13 @@ describe('lz-jsx-styling', () => {
     );
   });
 
-  it('finds a visibility class in an identifier key when no string holds it', async () => {
-    await assertEvery(
-      "export const a = <a className={cn('p-2', { hidden: !open })} />;",
-      'placed',
-    );
+  ['{ hidden: !open }', '{ hidden() { return open; } }'].forEach((value) => {
+    it(`finds a visibility class in the identifier key of ${value} when no string holds it`, async () => {
+      await assertEvery(
+        `export const a = <a className={cn('p-2', ${value})} />;`,
+        'placed',
+      );
+    });
   });
 
   it('ignores a class builder whose only visibility word is a computed key', async () => {

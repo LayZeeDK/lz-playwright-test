@@ -210,9 +210,7 @@ function classTexts(node: unknown): string[] {
   const own = [
     typeOf(node) === 'StringLiteral' ? node['value'] : undefined,
     fieldOf(node['value'], 'cooked'),
-    typeOf(node) === 'ObjectProperty' && node['computed'] === false
-      ? fieldOf(node['key'], 'name')
-      : undefined,
+    node['computed'] === false ? fieldOf(node['key'], 'name') : undefined,
   ].filter((text) => typeof text === 'string');
 
   return [...own, ...Object.values(node).flatMap(classTexts)];
