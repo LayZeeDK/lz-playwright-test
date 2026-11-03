@@ -319,6 +319,7 @@ describe('lz-jsx-styling', () => {
   [
     ['a spread', "{{ ...base, color: on ? 'red' : 'blue' }}"],
     ['a computed key', "{{ [prop]: on ? 'red' : 'blue' }}"],
+    ['a computed key named like a paint key', "{{ [color]: on ? 'red' : 'blue' }}"],
     ['a value that is not an object literal', "{styleOf(on ? 'red' : 'blue')}"],
   ].forEach(([title, value]) => {
     it(`keeps the mutants of a style with ${title}`, async () => {
