@@ -47,7 +47,7 @@ cases.forEach((testCase, index) => {
       )
       .sort();
     const expected = testCase.expect
-      .map(([operator, replacement]) => `${operator} ${normalize(replacement)}`)
+      .map(([mutator, replacement]) => `${mutator} ${normalize(replacement)}`)
       .sort();
 
     assert.deepEqual(actual, expected, `origin ${testCase.origin}`);

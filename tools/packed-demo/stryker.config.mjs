@@ -3,7 +3,7 @@ export default {
   reporters: ['clear-text', 'progress', 'json'],
   plugins: [
     '@layzee/stryker-playwright-runner',
-    '@layzee/stryker-playwright-mutators',
+    '@layzee/stryker-jsx-mutators',
   ],
   ignorers: ['lz-jsx'],
   testRunner: 'lz-playwright',

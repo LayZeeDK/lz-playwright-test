@@ -29,7 +29,7 @@ needed changes before its suite passed (an upstream test bug, a build switch, an
 Analog file has no server-only code, so it does not exercise server-side rendering. The Evidence section
 lists the changes, and Limits lists the general ones.
 
-A second plugin, `@layzee/stryker-playwright-mutators`, adds ten mutation operators for the JSX that Playwright
+A second plugin, `@layzee/stryker-jsx-mutators`, adds ten mutators for the JSX that Playwright
 tests look at, such as text, labels, links, and disabled or hidden state. StrykerJS 10.1.1 leaves those
 parts of a component unmutated (`docs/design/playwright-mutators.md`). On the demo app's e2e suite they
 add 17 mutants to 48 built-in ones: 11 killed, 4 survived because of gaps in the tests, and 2 in a
@@ -37,7 +37,7 @@ component no e2e page renders. On a copy of epic-stack, a server-rendered React 
 mutants to 199 built-in ones in four route files: 22 killed, 16 survived, 7 uncovered, no compile
 errors under Stryker's TypeScript checker, and 1 equivalent mutant. But 8 of those 22 kills are side
 effects of server rendering, and server rendering hides attribute mutants (Limits), so on such an app
-the kill count overstates what the tests check. Seven of the ten operators had sites in the two apps;
+the kill count overstates what the tests check. Seven of the ten mutators had sites in the two apps;
 tests cover all ten. The plugin patches StrykerJS internals, so it supports StrykerJS 10.1 only.
 
 ## How it works
@@ -153,18 +153,18 @@ failed the runner's unit suite, in a test whose server listened on `localhost`, 
 fixture servers did. The demo rows still count: their `webServer` has a `url`, which Playwright checks with its
 own code, and the bug did not touch that check. 2a53a36 makes the runner check both loopback addresses, as
 Playwright's port check does. At 9a27326 the container passed `npm ci`, lint, typecheck, build, the
-runner's 210 unit tests, the operators' 216, and the 49 browser tests. Its demo Stryker runs were stopped
+runner's 210 unit tests, the mutators' 216, and the 49 browser tests. Its demo Stryker runs were stopped
 after 25 of the first run's 32 mutants (5 survived and none timed out by then), because Docker's virtual
 machine left less than 4 GB of the host's memory free for other work.
 
 The packages and their public names changed to `lz-` names at 7b9a022. The rows at 9a27326 ran after it;
 every other row ran before it and used the old names (`@layzee/stryker-playwright-runner`, `@layzee/stryker-ui-mutators`, `testRunner:
-'playwright'`, the `playwright` options key, and operator names without the `Lz` prefix).
+'playwright'`, the `playwright` options key, and mutator names without the `Lz` prefix).
 After every row, the package names changed again, to `@layzee/stryker-playwright-runner` and
 `@layzee/stryker-playwright-mutators`, because `stryker init` lists a package named `@layzee/lz-*` as `@layzee/lz`.
-The plugin name `lz-stryker-playwright`, the `lzStrykerPlaywright` options key and the `Lz` operator names stayed.
-Later still, those became `lz-playwright`, `lzPlaywright` and `LzJsx` operator names; this page uses the current
-names throughout.
+The plugin name `lz-stryker-playwright`, the `lzStrykerPlaywright` options key and the `Lz` mutator names stayed.
+Later still, those became `lz-playwright`, `lzPlaywright` and `LzJsx` mutator names, and the mutators package
+became `@layzee/stryker-jsx-mutators`; this page uses the current names throughout.
 
 | Case                                                                                                                                                                  | Runner                                                                                       | Code                             | Score                                                                                                            | Wall time                      |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------ |
@@ -183,7 +183,7 @@ names throughout.
 | Same, after the rename to `lz-` names                                                                                                                                 | this runner, `timeoutMS` 10000                                                               | 9a27326                          | 21 killed, 6 survived                                                                                            | 2m45s                          |
 | Same, Linux                                                                                                                                                           | this runner, `timeoutMS` 10000                                                               | 74df74e                          | 21 killed, 6 survived                                                                                            | 2m16s (step)                   |
 | Same                                                                                                                                                                  | this runner, `--concurrency 2`                                                               | before fca053d                   | 21 killed, 6 survived                                                                                            | 1m26s                          |
-| Demo e2e with the UI operators (`stryker.e2e.ui.config.ts`), 65 mutants in `app.tsx` and `price-tag.tsx`, 17 of them from UI operators                                | this runner and `@layzee/stryker-ui-mutators`, `timeoutMS` 10000                             | 107505c                          | UI: 8 killed, 3 timeouts, 4 survived, 2 no coverage. Built-in: 12 killed, 8 timeouts, 1 survived, 27 no coverage | 5m15s                          |
+| Demo e2e with the UI mutators (`stryker.e2e.ui.config.ts`), 65 mutants in `app.tsx` and `price-tag.tsx`, 17 of them from UI mutators                                  | this runner and `@layzee/stryker-ui-mutators`, `timeoutMS` 10000                             | 107505c                          | UI: 8 killed, 3 timeouts, 4 survived, 2 no coverage. Built-in: 12 killed, 8 timeouts, 1 survived, 27 no coverage | 5m15s                          |
 | Same, after the rename to `lz-` names                                                                                                                                 | this runner and `@layzee/lz-stryker-ui-mutators`, `timeoutMS` 10000                          | 9a27326                          | UI: 8 killed, 3 timeouts, 4 survived, 2 no coverage. Built-in: 12 killed, 8 timeouts, 1 survived, 27 no coverage | 6m14s                          |
 | Same, with both packages installed from their packed tarballs into a project outside the workspace (`tools/packed-demo/`)                                             | same                                                                                         | 9a27326                          | The same status for each of the 65 mutants as the row above                                                      | 4m55s                          |
 | Same as the 107505c row, Linux                                                                                                                                        | this runner and `@layzee/stryker-ui-mutators`, `timeoutMS` 10000                             | 74df74e                          | UI: 8 killed, 3 timeouts, 4 survived, 2 no coverage. Built-in: 12 killed, 8 timeouts, 1 survived, 27 no coverage | 4m07s (step)                   |
@@ -208,7 +208,7 @@ label text. `spikes/live-mutant/` shows two of the four on a live page, with Str
 build and mutant ids. Mutant 23 removes the "Subtotal" label and mutant 16 removes both line names, while
 the totals the tests read stay the same. The two uncovered mutants are in `price-tag.tsx`, which no e2e page renders. No UI mutant
 was equivalent, and none was a compile or runtime error. The demo app has sites for only three of the
-ten operators (`LzJsxTextLiteral`, `LzJsxChildExpression`, `LzJsxUrlAttribute`). The other seven have evidence from
+ten mutators (`LzJsxTextLiteral`, `LzJsxChildExpression`, `LzJsxUrlAttribute`). The other seven have evidence from
 tests only, below.
 
 On epic-stack, the worker that ran it predicted each of the 45 UI mutants before the run; 36 matched.
@@ -224,7 +224,7 @@ literals. epic-stack needed a Prisma engine that runs on Windows arm64, a fixed 
 timeout, and one upstream test marked `fixme`; `oss/README.md` lists each change.
 
 The UI mutators have three more layers of evidence, all at or after 107505c.
-`packages/stryker-playwright-mutators/test/` runs without a browser: 107 synthetic cases from the open-source
+`packages/stryker-jsx-mutators/test/` runs without a browser: 107 synthetic cases from the open-source
 repos and the design, each with the exact UI mutants it must give (0 todo); install checks for the
 name refusal, a second install, the self-check, and core resolution; an in-process check that the
 JSX placement leaves the built-in mutants of five files unchanged, with a negative control; and a
@@ -233,7 +233,7 @@ render check that every mutant of the design spike's sample renders like the sam
 instrumented with the UI mutators: for each of the ten mutators a Playwright test kills one of its
 mutants, and a test that does not observe that mutant lets it survive. `spikes/fail-loud/` runs
 `stryker run` with the plugin listed in `plugins` and with the plugin imported from the config. Both report UI mutants,
-and with one operator's sample broken on purpose both exit 1 and name that operator.
+and with one mutator's sample broken on purpose both exit 1 and name that mutator.
 
 `packages/stryker-playwright-runner/test/browser/runner.test.ts` checks the runner against a fixture
 instrumented by Stryker's own instrumenter. It checks that per-test coverage separates a test that
@@ -548,7 +548,7 @@ npx playwright install chromium
 npx nx run-many -t typecheck build
 npx nx run @layzee/stryker-playwright-runner:test
 npx nx run @layzee/stryker-playwright-runner:test-browser
-npx nx run @layzee/stryker-playwright-mutators:test
+npx nx run @layzee/stryker-jsx-mutators:test
 npx nx run @layzee/demo-app-e2e:mutate-e2e
 npx nx run @layzee/demo-app-e2e:mutate-e2e-ui
 npx nx run @layzee/demo-app:mutate-ct
@@ -577,7 +577,7 @@ the copy's `apps/conduit-e2e/playwright.config.ts` after `prepare.ts` has run. `
 add it. `oss/README.md` gives the steps for the hello-world forced-timeout row, ngx-yeti, Analog, and epic-stack.
 
 Versions: StrykerJS 10.1.1, Playwright 1.64.1, Nx 24.0.1, Vite 8.3.5, Node 24.22.0 (24.22.1 in the Linux
-container). The runner's and the operators' test suites also pass on Node 22.23.1, on Windows.
+container). The runner's and the mutators' test suites also pass on Node 22.23.1, on Windows.
 
 `tools/linux-run.sh` runs these steps in the container at the commit you archive: `npm ci`, lint,
 typecheck, build, the three test targets, and the three demo targets. It writes each step's log and exit code

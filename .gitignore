@@ -3,7 +3,7 @@
 # compiled output
 dist
 # Written by the generate-roles target from the installed playwright-core.
-packages/stryker-playwright-mutators/src/bundled-roles.ts
+packages/stryker-jsx-mutators/src/bundled-roles.ts
 tmp
 out-tsc
 

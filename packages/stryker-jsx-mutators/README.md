@@ -1,4 +1,4 @@
-# @layzee/stryker-playwright-mutators
+# @layzee/stryker-jsx-mutators
 
 Mutators for the parts of JSX that Playwright tests look at. StrykerJS mutates expressions
 and leaves JSX text and attribute strings alone, so a suite that finds elements by role, label, and text
@@ -56,7 +56,7 @@ uses.
   table:
 
   ```text
-  @layzee/stryker-playwright-mutators: cannot read the implicit role table of playwright-core 1.99.0 in <path> (Error: kImplicitRoleByTagName not found); LzJsxElementRole uses the table bundled from playwright-core 1.64.1.
+  @layzee/stryker-jsx-mutators: cannot read the implicit role table of playwright-core 1.99.0 in <path> (Error: kImplicitRoleByTagName not found); LzJsxElementRole uses the table bundled from playwright-core 1.64.1.
   ```
 
 The bundled table is generated from `playwright-core` when the package is built, so each release carries
@@ -72,7 +72,7 @@ Use one of two ways:
   prints a warning, and the run goes on without UI mutants.
 
   ```ts
-  appendPlugins: ['@layzee/stryker-playwright-runner', '@layzee/stryker-playwright-mutators'],
+  appendPlugins: ['@layzee/stryker-playwright-runner', '@layzee/stryker-jsx-mutators'],
   ignorers: ['lz-jsx'],
   ```
 
@@ -82,7 +82,7 @@ Use one of two ways:
 - In a JavaScript or TypeScript config, import the plugin on the first line instead, and list nothing:
 
   ```ts
-  import '@layzee/stryker-playwright-mutators';
+  import '@layzee/stryker-jsx-mutators';
   ```
 
 Stryker finds its default plugins by listing the `@stryker-mutator` folder next to its own install, which

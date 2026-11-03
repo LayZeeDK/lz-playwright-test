@@ -5,7 +5,7 @@ export default {
   ...base,
   appendPlugins: [
     '@layzee/stryker-playwright-runner',
-    '@layzee/stryker-playwright-mutators',
+    '@layzee/stryker-jsx-mutators',
   ],
   ignorers: ['lz-jsx'],
   testRunner: 'lz-playwright',

@@ -1,7 +1,7 @@
 // Synthetic UI shapes from the open-source repos the runner was exercised on, as JSX, with the UI mutants the
 // design (docs/design/playwright-mutators.md) says each gives. An empty expect is a must-not-generate case. The
 // mined rows and their transcription notes are in spikes/ui-mutator-cases/.
-import type { OperatorName } from '../src/operators.ts';
+import type { MutatorName } from '../src/mutators.ts';
 
 export interface Case {
   readonly id: string;
@@ -12,8 +12,8 @@ export interface Case {
   readonly setup?: string;
   // One JSX expression; free identifiers stand for props.
   readonly jsx: string;
-  // Each mutant as [operator, replacement source]; mutation names are in the mined-*.md files.
-  readonly expect: readonly (readonly [OperatorName, string])[];
+  // Each mutant as [mutator, replacement source]; mutation names are in the mined-*.md files.
+  readonly expect: readonly (readonly [MutatorName, string])[];
   // Text the instrumented file must contain, for a rule about placement rather than about the mutants.
   readonly instrumented?: string;
 }
@@ -24,7 +24,7 @@ const analogOrigin = 'analog@a377078ec:';
 const helloWorldOrigin = 'stryker-playwright-hello-world@fa6dd64:';
 const demoOrigin = 'stryker-playwright-runner@f00806e:apps/demo-app/src/app/';
 const rulesOrigin = 'design:Rules the synthetic cases settled';
-const release = 'design:Operators in the first release';
+const release = 'design:Mutators in the first release';
 
 export const cases: readonly Case[] = [
   {

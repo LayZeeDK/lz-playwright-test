@@ -4,7 +4,7 @@ import {
   attributeName,
   elementSiteOf,
   isJsxChild,
-  operatorTable,
+  mutatorTable,
   type AttributeSite,
   type BabelTypes,
   type ElementSite,
@@ -37,8 +37,8 @@ const labelableElements: ReadonlySet<string> = new Set([
   'textarea',
 ]);
 
-export function operatorsFor(roles: RoleTable) {
-  return operatorTable([
+export function mutatorsFor(roles: RoleTable) {
+  return mutatorTable([
     {
       name: 'LzJsxTextLiteral',
       sample: 'export const a = <p>Hello</p>;\n',
@@ -238,7 +238,7 @@ export function operatorsFor(roles: RoleTable) {
   ]);
 }
 
-export type OperatorName = ReturnType<typeof operatorsFor>[number]['name'];
+export type MutatorName = ReturnType<typeof mutatorsFor>[number]['name'];
 
 function isNamed(
   names: ReadonlySet<string>,

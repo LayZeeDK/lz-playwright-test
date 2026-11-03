@@ -1,7 +1,7 @@
-# Design: UI mutation operators that Playwright tests can kill
+# Design: UI mutators that Playwright tests can kill
 
-Status: chosen design, 2026-10-25, by Claude during an AFK run. Built on 2026-10-26 as
-`packages/stryker-playwright-mutators`. Lars approved the operator and mutation names in Names, without a
+Status: chosen design, 2026-10-25, by Claude during an AFK run. Built on 2026-10-26, now in
+`packages/stryker-jsx-mutators`. Lars approved the mutator and mutation names in Names, without a
 namespace prefix, on 2026-10-25 ("2-3: Approve").
 
 ## Why
@@ -11,7 +11,7 @@ untouched: JSX text, plain attribute strings such as `aria-label`, `role`, and `
 and `disabled`, and event props that point at a named handler
 (`docs/research/playwright-mutation-operators.md`, section 2). A suite that finds elements by role,
 label, and text can be strong and still look weak, or weak and look strong, because Stryker never makes
-those changes. These operators make them. They never change `className`, `style`, `data-testid`, or
+those changes. These mutators make them. They never change `className`, `style`, `data-testid`, or
 `key`. A changed `data-testid` tests the test's own hook, not the app (the research's "Candidate
 operator inventory", row 22).
 
@@ -19,7 +19,7 @@ operator inventory", row 22).
 
 Two designers worked independently from the same research and brief, on different models:
 `docs/design/playwright-mutators-opus.md` and `docs/design/playwright-mutators-fable.md`. Both spikes
-rerun clean from `spikes/` (commands below). They agree on the top operators and on the integration
+rerun clean from `spikes/` (commands below). They agree on the top mutators and on the integration
 route. Two independent designs that agree count for more than either draft alone. This design takes the
 Opus draft as the base. From the Fable draft it takes the three rows marked Fable below and its upstream
 fix, and it keeps the Fable `ListExpression` for Later.
@@ -35,17 +35,17 @@ fix, and it keeps the Fable `ListExpression` for Later.
 | Upstream fixes found                          | JSX comment directives are ignored for every mutator                | built-in `ConditionalExpression` makes a duplicate `true` mutant for JSX `&&`           | both                                                                                       |
 | Names                                         | framework-neutral (`TextContent`)                                   | `Jsx` prefix                                                                            | neither: renamed to the StrykerJS convention, still framework-neutral (see Names)          |
 
-## Operators in the first release
+## Mutators in the first release
 
 Ranked by how often realistic Playwright suites would kill them. Full patterns, examples and skip rules
 are in the Opus draft, section 2. Where this list differs from the draft, this list wins.
 
 1. `LzJsxTextLiteral`: empties JSX text that has a letter or digit. Killed by `getByText`, `getByRole({ name })`, `toHaveText`.
 2. `LzJsxLabelAttribute`: empties `aria-label`, `aria-labelledby`, `alt`, `title`, `placeholder`, and `htmlFor`, whether the value is a string or a bound expression (`alt={username}`). A template literal is left to the built-in `StringLiteral`, which already empties it. Killed by `getByLabel`, `getByRole({ name })`, `getByPlaceholder`, `getByAltText`.
-3. `LzJsxEventHandler`: `onX={handler}` becomes `onX={undefined}` when the handler is not inline, so the operator never repeats the built-in `ArrowFunction` mutant. It also skips a handler that is a function declared in the same file (a function declaration, or a `const` whose initializer is a function or an arrow) when this attribute is the handler's only reference. Babel's scope binding gives that reference count. Killed by the assertion after a `click` or `fill`.
-4. `LzJsxConditionalElement`: forces `x && <A/>` to render, and forces each branch of a JSX ternary. It skips a shape when the `&&` left operand, or the ternary test, is a `BinaryExpression` with `==`, `!=`, `===`, `!==`, `<`, `<=`, `>`, or `>=`, or a `LogicalExpression` with `&&` or `||`. For those shapes the built-in `ConditionalExpression` already makes the same mutants: `true` for the left operand of `&&`, which renders the element, and `true` and `false` for a ternary test, which force each branch. So `{open && <p/>}` and `{busy ? <A/> : <B/>}` get operator mutants, and `{off > 0 && <s/>}` and `{n > 1 ? <A/> : <B/>}` get none. Killed by `toBeVisible`, `toHaveCount(0)`.
+3. `LzJsxEventHandler`: `onX={handler}` becomes `onX={undefined}` when the handler is not inline, so the mutator never repeats the built-in `ArrowFunction` mutant. It also skips a handler that is a function declared in the same file (a function declaration, or a `const` whose initializer is a function or an arrow) when this attribute is the handler's only reference. Babel's scope binding gives that reference count. Killed by the assertion after a `click` or `fill`.
+4. `LzJsxConditionalElement`: forces `x && <A/>` to render, and forces each branch of a JSX ternary. It skips a shape when the `&&` left operand, or the ternary test, is a `BinaryExpression` with `==`, `!=`, `===`, `!==`, `<`, `<=`, `>`, or `>=`, or a `LogicalExpression` with `&&` or `||`. For those shapes the built-in `ConditionalExpression` already makes the same mutants: `true` for the left operand of `&&`, which renders the element, and `true` and `false` for a ternary test, which force each branch. So `{open && <p/>}` and `{busy ? <A/> : <B/>}` get its mutants, and `{off > 0 && <s/>}` and `{n > 1 ? <A/> : <B/>}` get none. Killed by `toBeVisible`, `toHaveCount(0)`.
 5. `LzJsxUrlAttribute`: `href`, `to`, and `action` become `""`, from a string or a bound expression; a template literal is left to `StringLiteral`, as for `LzJsxLabelAttribute`. Killed by `toHaveURL`.
-6. `LzJsxDisabledAttribute`: forces `disabled`, `readOnly`, and `aria-disabled` off, and skips boolean-literal values (`disabled={true}`), which `BooleanLiteral` already flips. It also skips a value that is a comparison or a `&&`/`||` expression, the shapes `LzJsxConditionalElement` skips, because the built-in `ConditionalExpression` already sets it to `false`: `disabled={form.invalid || form.pending}` and `readOnly={n > 0}` get no operator mutant. Killed by `toBeDisabled`, `toBeEditable`.
+6. `LzJsxDisabledAttribute`: forces `disabled`, `readOnly`, and `aria-disabled` off, and skips boolean-literal values (`disabled={true}`), which `BooleanLiteral` already flips. It also skips a value that is a comparison or a `&&`/`||` expression, the shapes `LzJsxConditionalElement` skips, because the built-in `ConditionalExpression` already sets it to `false`: `disabled={form.invalid || form.pending}` and `readOnly={n > 0}` get no mutant from it. Killed by `toBeDisabled`, `toBeEditable`.
 7. `LzJsxHiddenAttribute`: forces `hidden` and `aria-hidden` off. It never forces an element hidden. Like `LzJsxDisabledAttribute`, it skips a comparison or `&&`/`||` value (`hidden={a !== b}`), which the built-in `ConditionalExpression` already sets to `false`. It skips `aria-hidden` on `svg`, `img`, and `i`, as the Opus draft did (2.7): those are decorative icons, and exposing one changes nothing a role, label, or text query sees. Killed by `toBeVisible`, `getByRole` (hidden elements leave the tree).
 8. `LzJsxElementRole`: removes `role`, or swaps a tag for `span` when Playwright's role table gives it the role `button` or `link`: `button` always, and `a` and `area` only when they have an `href`. An `<a>` without `href` has no `link` role, so swapping it would be an equivalent mutant. The `span` drops every attribute of `a`, `area`, and `button` that a `span` cannot take, such as `href`, `type`, `disabled`, and `alt` (see "Rules the synthetic cases settled"). Killed by `getByRole`.
 9. `LzJsxChildExpression`: a `{value}` child becomes `null`. Killed by `toHaveText`.
@@ -61,7 +61,7 @@ role query would kill them. A tag swap copies the element's whole subtree once p
 lists, and landmarks wrap far larger subtrees than buttons and links. The first release measures that
 cost on `button` and `a` first.
 
-Deleting an element has no operator. It is the first of the four JSX operators proposed in StrykerJS
+Deleting an element has no mutator. It is the first of the four JSX mutators proposed in StrykerJS
 issue #4375 (`docs/research/jsx-prior-art.md`, section 1.1), and `LzJsxConditionalElement` covers it only
 where a condition already guards the element.
 
@@ -73,22 +73,22 @@ StrykerJS `v10.1.1` (`packages/instrumenter/src/mutators/`), weapon-regex `v2.0.
 (`core/src/main/scala/weaponregex/internal/mutator/`), Stryker.NET (`src/Stryker.Abstractions/Mutator.cs`)
 and stryker4s (`modules/core/src/main/scala/stryker4s/mutation/`), both at their current heads.
 
-- **Operator names follow StrykerJS.** A StrykerJS mutator name is the kind of syntax it changes, then
+- **Mutator names follow StrykerJS.** A StrykerJS mutator name is the kind of syntax it changes, then
   the syntax category: `ArithmeticOperator`, `EqualityOperator`, `BooleanLiteral`, `StringLiteral`,
   `ConditionalExpression`, `BlockStatement`, `ArrowFunction`. stryker4s uses the same names, and
-  Stryker.NET uses the short forms (`Equality`, `String`, `Statement`). The operator name is what users
+  Stryker.NET uses the short forms (`Equality`, `String`, `Statement`). The mutator name is what users
   write in `mutator.excludedMutations` and `// Stryker disable`, and what reports show as `mutatorName`.
-  The UI operators keep that shape, behind an `Lz` prefix, with markup categories that fit JSX and Angular templates alike:
+  The UI mutators keep that shape, behind an `Lz` prefix, with markup categories that fit JSX and Angular templates alike:
   `Literal` for static text, `Attribute`, `Element`, `Expression`, and `Handler`. StrykerJS groups one
   syntax by meaning (equality, logical and arithmetic operators are all binary expressions), so the
-  attribute operators are grouped by what the attribute does.
+  attribute mutators are grouped by what the attribute does.
 - **Mutation names follow weapon-regex.** A weapon-regex mutation name is the construct, then the change:
   `QuantifierRemoval`, `CharClassNegation`, and `GroupToNCGroup` for "X to Y". StrykerJS reports only the
-  operator name (the built-in `Regex` mutator reports weapon-regex's mutations as `Regex`), so these names
-  appear in docs, tests and the operator table that upstreaming would add (see Upstream path), not in
+  mutator name (the built-in `Regex` mutator reports weapon-regex's mutations as `Regex`), so these names
+  appear in docs, tests and the mutator table that upstreaming would add (see Upstream path), not in
   `mutatorName`.
 
-| Operator                  | Mutations                                                                                              | Earlier name (drafts, spike) |
+| Mutator                   | Mutations                                                                                              | Earlier name (drafts, spike) |
 | ------------------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------- |
 | `LzJsxTextLiteral`        | `TextRemoval`                                                                                          | `TextContent`                |
 | `LzJsxLabelAttribute`     | `LabelRemoval`                                                                                         | `AccessibleName`             |
@@ -108,7 +108,7 @@ and StrykerJS matches those names against every registered mutator ignoring case
 2026-10-26 that this repository's public names use an `Lz`, `lz` or `lz-` prefix; the "Earlier name" column
 and the dated drafts use the names from before that rule. The upstream route would drop the prefix to sit with
 the built-ins. Because StrykerJS matches the names ignoring case, the install checks every name before it
-changes `allMutators`. It refuses a name that equals, ignoring case, another of its own operators or a
+changes `allMutators`. It refuses a name that equals, ignoring case, another of its own mutators or a
 mutator that other code registered, and then registers nothing. A future built-in with the same name thus
 fails the run loudly instead of sharing a filter key. `mutator.excludedMutations` does not ignore case:
 StrykerJS matches it with `includes` (`babel-transformer.ts:278`), so users write those names exactly as
@@ -120,7 +120,7 @@ attribute or the tag that gives an element its implicit role.
 
 ## Rules the synthetic cases settled
 
-`packages/stryker-playwright-mutators/test/cases.ts` holds 144 synthetic cases: JSX versions of UI shapes in the repos
+`packages/stryker-jsx-mutators/test/cases.ts` holds 144 synthetic cases: JSX versions of UI shapes in the repos
 the runner was exercised on (RealWorld, ngx-yeti, Analog and hello-world at the commits `oss/README.md` names,
 and the demo app), each with the exact UI mutants it must give. `spikes/ui-mutator-cases/` keeps the mined rows
 they came from. The cases first ran against the prototype and now run against the package. The design was silent on
@@ -148,7 +148,7 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
 - A negated or other non-literal expression is still forced off: `disabled={!live}` and
   `hidden={!canModify}` become `{false}`. The built-in `BooleanLiteral` mutant `disabled={live}` also
   disables an enabled button, so any test that clicks it kills that mutant. `{false}` changes the element
-  only while it is disabled, so only a test that checks the disabled state kills it. The operator
+  only while it is disabled, so only a test that checks the disabled state kills it. The mutator
   mutant is the stronger one, and the Fable draft's skip of `!` is not taken. A comparison or a `&&`/`||`
   expression is not forced off: the built-in `ConditionalExpression` already replaces it with `false`, so
   `{false}` would repeat that mutant (cases realworld-12+13, realworld-14, design-50).
@@ -160,7 +160,7 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
   any other expression to `!(expr)`, and an `undefined` or other literal branch stays. So
   `isSelected === undefined ? undefined : isSelected ? 'true' : 'false'` keeps its `undefined` branch and
   swaps the strings. A `String()` or `.toString()` call, optional (`s?.toString()`) or not, gets no
-  mutant; a template literal never reaches the operator. These rules look through an `as`, `satisfies` or
+  mutant; a template literal never reaches the mutator. These rules look through an `as`, `satisfies` or
   `!` wrapper, and a flipped value drops it: `(s ? 'true' : 'false') as 'true' | 'false'` becomes
   `s ? "false" : "true"`, while a negated one keeps it (`!(flag as boolean)`). Cases tldraw-1, tldraw-2,
   design-15, design-16 and design-43 to design-45 cover this.
@@ -181,7 +181,7 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
   `javaScriptEnabled: false` sees that text, and it loses those mutants. `LzJsxElementRole` skips a `role` equal
   to the element's implicit role, such as `<button role="button">`, because removing it changes nothing.
   The implicit roles come from Playwright's own table, `kImplicitRoleByTagName` in
-  `playwright-core/lib/coreBundle.js`, which `getImplicitAriaRole` reads for `getByRole`. The operator
+  `playwright-core/lib/coreBundle.js`, which `getImplicitAriaRole` reads for `getByRole`. The mutator
   takes every tag whose role there is fixed, plus `a` and `area` with `href` (`link`). It reads the table
   of the consumer's `playwright-core` when the plugin loads, and falls back to a table generated from
   `playwright-core` when the package is built, as the package README describes. A table that lacks the
@@ -209,8 +209,8 @@ same skip for `LzJsxDisabledAttribute` and `LzJsxHiddenAttribute`, the `LzJsxSta
 `LzJsxConditionalElement` limit to JSX children, the `LzJsxEventHandler` single-reference skip, the `href`
 condition on the `a` swap, the skip of an empty value, the attributes that `ElementToSpan` drops, and the
 `LzJsxHiddenAttribute` skip of `aria-hidden` on `svg`, `img`, and `i`. The package implements them, and the
-synthetic cases that test them pass. Two more prototype behaviours differ from this design. The prototype skips, without a word, an operator whose name is already registered
-(a case-sensitive `Set.has`), and wraps the placer only when it added every operator, where the design
+synthetic cases that test them pass. Two more prototype behaviours differ from this design. The prototype skips, without a word, a mutator whose name is already registered
+(a case-sensitive `Set.has`), and wraps the placer only when it added every mutator, where the design
 refuses the name. It also removes a string state value, so `aria-pressed="true"` becomes
 `aria-pressed={undefined}`, where `LzJsxStateAttribute` flips it. Its counts in `neutral-output.txt`
 therefore include one `ConditionalRendering` (now `LzJsxConditionalElement`) mutant on
@@ -221,8 +221,8 @@ handler referenced once, and `<a>x</a>` without `href`.
 
 ## Equivalent mutants
 
-Some operator mutants behave the same as a mutant StrykerJS or the source already gives. The skips above
-remove the cases that are cheap to detect. Each operator's match rule holds its skips. StrykerJS's
+Some mutants of these mutators behave the same as a mutant StrykerJS or the source already gives. The skips above
+remove the cases that are cheap to detect. Each mutator's match rule holds its skips. StrykerJS's
 `NodeMutator.filter` hook (`node-mutator.ts:14`) cannot hold them: it sees only the mutants of the node
 and its subtree, without the ones that carry an ignore reason (`babel-transformer.ts:122-153`). A skip
 written as a filter would then change with the user's `excludedMutations`, and the `LzJsxEventHandler`
@@ -245,7 +245,7 @@ text (`LzJsxTextLiteral`, `LzJsxLabelAttribute`), an empty `href` (`LzJsxUrlAttr
 handler (`ElementToSpan`). Claude measured this at 63d0209 by applying each UI mutant's replacement at
 its location and linting the original and the mutant. They are kept because:
 
-- an operator cannot know a project's lint config, and a skip keyed to jsx-a11y would drop 39 percent of
+- a mutator cannot know a project's lint config, and a skip keyed to jsx-a11y would drop 39 percent of
   the UI mutants, including the ones a role, label or text locator kills most often. A surviving one says
   that no test looks at the element by name, which lint cannot tell;
 - StrykerJS cannot label them. Its checker API has two outcomes, `Passed` and `CompileError`
@@ -255,12 +255,12 @@ its location and linting the original and the mutant. They are kept because:
 
 The cost is a small score lift in projects whose lint already blocks these shapes, as they are easy to
 kill. The demo app takes the other side of this: it runs jsx-a11y's `strict` set at `error`, so these
-shapes cannot ship there, and the operators measure what lint cannot see.
+shapes cannot ship there, and the mutators measure what lint cannot see.
 
 ## Integration
 
-- **Package.** `@layzee/stryker-playwright-mutators`. The user lists it in `plugins` and lists its ignorer in
-  `ignorers`, or imports it from a JavaScript or TypeScript config (see "Fail loud"). No other options in v1. Users exclude operators with
+- **Package.** `@layzee/stryker-jsx-mutators`. The user lists it in `plugins` and lists its ignorer in
+  `ignorers`, or imports it from a JavaScript or TypeScript config (see "Fail loud"). No other options in v1. Users exclude mutators with
   `mutator.excludedMutations` and with `// Stryker disable` comments, both of which already match custom
   mutator names.
 - **Version range.** Peer dependency `@stryker-mutator/core` `~10.1.0`. At run time the plugin reads the
@@ -270,14 +270,14 @@ shapes cannot ship there, and the operators measure what lint cannot see.
 - **Registration without an upstream change.** On import, the plugin finds the instrumenter that the
   running `@stryker-mutator/core` uses. When `process.argv[1]`, after `realpath`, is core's
   `bin/stryker.js`, the plugin resolves the instrumenter from that core's folder, so a global or
-  differently hoisted `stryker` gets the operators too. Otherwise, as when a program calls Stryker's API,
-  it resolves core from its own folder. The thermos plugin's Node operators resolve core the same way
+  differently hoisted `stryker` gets the mutators too. Otherwise, as when a program calls Stryker's API,
+  it resolves core from its own folder. The thermos plugin's Node mutators resolve core the same way
   (`LayZeeDK/thermos-claude-plugin`, `tools/stryker-node-mutators/install.ts`). The plugin then pushes its
   mutators into the live `allMutators` array, and wraps `expressionMutantPlacer.canPlace` and `place` so that `JSXAttribute` and
   `JSXText` become placement sites. Details: Opus draft, sections 3.2 and 3.3.
-- **Fail loud.** Still at import, the plugin instruments one JSX sample per operator and checks that
-  each sample gives a mutant of its operator. The error names every operator whose sample gave none, so
-  one operator that a StrykerJS change breaks cannot hide behind the others. An install or self-check
+- **Fail loud.** Still at import, the plugin instruments one JSX sample per mutator and checks that
+  each sample gives a mutant of its mutator. The error names every mutator whose sample gave none, so
+  one mutator that a StrykerJS change breaks cannot hide behind the others. An install or self-check
   error rejects the module's import. Core turns a plugin import error into a warning and runs on without
   the mutators (`packages/core/src/di/plugin-loader.ts:193-209`), so the module also exports an `Ignore`
   plugin named `lz-jsx`. Core creates every ignorer listed in `ignorers` right before `instrument()`
@@ -287,26 +287,26 @@ shapes cannot ship there, and the operators measure what lint cannot see.
   factory throws "install did not run". Otherwise it returns an ignorer that ignores nothing.
   `spikes/ignorer-route/` measured on StrykerJS 10.1.1 that a factory that throws makes `stryker run` exit
   1 with the error's message, and `spikes/fail-loud/` measured that a failed install exits 1 on both
-  routes with the failing operator's name. An earlier version of this
+  routes with the failing mutator's name. An earlier version of this
   design kept the error and threw it from the factory. That cannot hold together with the config import
   below: a module that keeps its error loads without one, so a config that imports it would not stop.
 - **The `ignorers` entry is required.** `ignorers` defaults to `[]`
   (`packages/api/schema/stryker-core.json:509-516`), and core creates only the listed names. A
   documented config that lists the plugin in `plugins` therefore always has `ignorers: ['lz-jsx']`
   next to it.
-  Without it, a successful install still registers and runs every operator, because registration
+  Without it, a successful install still registers and runs every mutator, because registration
   happens at import. A failed install falls back to core's warning
-  `Error during loading "@layzee/stryker-playwright-mutators" plugin`, and the run finishes without UI mutants. The
+  `Error during loading "@layzee/stryker-jsx-mutators" plugin`, and the run finishes without UI mutants. The
   plugin cannot detect the missing entry in that case, because its import has already failed.
 - **A config import fails loud with one entry.** A config written as a JavaScript or TypeScript module
-  can `import '@layzee/stryker-playwright-mutators'` on its first line instead. The module installs with a
+  can `import '@layzee/stryker-jsx-mutators'` on its first line instead. The module installs with a
   top-level `await`, so an install or self-check error rejects the config import, and the run stops
-  before it starts, with no `ignorers` entry. The thermos plugin's Node operators use this route
+  before it starts, with no `ignorers` entry. The thermos plugin's Node mutators use this route
   (`stryker.config.mjs:1`). A JSON config cannot import, so it keeps `plugins` and `ignorers`. The same
   spike measured this route: a config that imports a module whose top-level `await` rejects makes
   `stryker run` exit 1 with `Invalid config file` and the error's message.
 - **A second install adds nothing.** A config that both imports the module and lists it in `plugins`
-  installs twice in one process. The second install skips the operators that the first one registered,
+  installs twice in one process. The second install skips the mutators that the first one registered,
   the name check does not count them as collisions, and the placer is wrapped once.
 - **Options, later.** A plugin module can export `strykerValidationSchema`, so options such as extra
   accessible-name props validate against the Stryker config. Mutators still cannot read them at run
@@ -323,7 +323,7 @@ shapes cannot ship there, and the operators measure what lint cannot see.
   worker, for example a mutation run of a test that starts Stryker, the inner main process inherits the
   variable. The ignorer then throws the "install did not run" error, so the run stops instead of
   silently losing UI mutants.
-- **Reports.** Each operator keeps its own `mutatorName`, so reports and filters show `LzJsxTextLiteral` next
+- **Reports.** Each mutator keeps its own `mutatorName`, so reports and filters show `LzJsxTextLiteral` next
   to `StringLiteral`.
 
 Claude read the call sites cited in this section in the StrykerJS `v10.1.1` tag
@@ -332,18 +332,18 @@ Claude read the call sites cited in this section in the StrykerJS `v10.1.1` tag
 ## Upstream path
 
 Three PRs to `@stryker-mutator/instrumenter`, smallest first, in the shape weapon-regex already set: the
-instrumenter owns Babel, placement, ids and reports, and the operator rules live in a table.
+instrumenter owns Babel, placement, ids and reports, and the mutator rules live in a table.
 
 1. Neutral fixes: a JSX placer for attributes and text, the JSX child wrap, `{/* Stryker disable */}`
    support inside JSX, and no `true` mutant for a JSX `&&`.
-2. The operators, off by default, enabled by a new `mutator.includedMutations` option.
-3. The operator table as its own package, when Angular template support starts.
+2. The mutators, off by default, enabled by a new `mutator.includedMutations` option.
+3. The mutator table as its own package, when Angular template support starts.
 
 The upstream record shapes this order (`docs/research/jsx-prior-art.md`, section 1.1). StrykerJS issue
 #4375 asked for JSX text mutation in 2023, and a maintainer declined it on scope ("Stryker for
-Javascript and not Stryker for HTML"), not on mechanism. PR 2 therefore ships the operators off, and its
+Javascript and not Stryker for HTML"), not on mechanism. PR 2 therefore ships the mutators off, and its
 text cites #4375 as the user demand. Issue #701 (2018) added the `JSXAttribute` skip to `StringLiteral`
-after `class="row"` became `class=""`. These operators change attributes by what they mean to a user, so
+after `class="row"` became `class=""`. These mutators change attributes by what they mean to a user, so
 PR 2 says why they do not bring that mutant back. Issue #4141 complained about too many JSX mutants, and
 the answer was Ignore plugins, the plugin kind that "Fail loud" uses. For Angular templates, the nearest
 precedent is `azat-io/mootant`, which mutates Svelte and Vue template expressions but not static markup
@@ -355,17 +355,17 @@ pins weapon-regex to `mutationLevels: [1]` (`regex-mutator.ts:31`). Stryker.NET 
 `MutationLevel` (`MutatorBase.cs:23-27`), and weapon-regex groups its mutations by level
 (`BuiltinMutators.scala:46-70`). PR 2 could ask for a level option instead of `includedMutations`. A
 level is a new concept in the StrykerJS schema that every built-in would need a value for, while
-`includedMutations` names operators the way `excludedMutations` already does. The design asks for
+`includedMutations` names mutators the way `excludedMutations` already does. The design asks for
 `includedMutations` and leaves levels to the maintainers. The names in Names stay either way.
 
 ## Risks that remain
 
 The built package has gone through `stryker run` with a browser on the demo app and on a copy of
-epic-stack, and a Playwright test kills a mutant of every operator in
+epic-stack, and a Playwright test kills a mutant of every mutator in
 `packages/stryker-playwright-runner/test/browser/ui-mutators.test.ts`. `docs/VERDICT.md` (Evidence)
 has the counts. Two risks remain from those runs. On a server-rendered app the runner activates the
 mutant in the browser only, so a text or element mutant breaks hydration and is killed by an
-unrelated step, and an attribute mutant never reaches the DOM (VERDICT, Limits). And three operators,
+unrelated step, and an attribute mutant never reaches the DOM (VERDICT, Limits). And three mutators,
 `LzJsxEventHandler`, `LzJsxHiddenAttribute`, and `LzJsxStateAttribute`, have had no site in a real app yet, only in
 the test fixture.
 
@@ -373,10 +373,10 @@ The self-check instruments through the instrumenter the plugin resolved and impo
 plugin's own module instance, so the check cannot see a mismatch with the instance that core imports.
 It catches a broken install of the resolved copy, and it names a second copy only through the version
 and path in its message. The gate is a real `stryker run` through core with `testRunner: 'command'` and
-no browser, asserting that `mutation.json` lists the operator names (Opus draft, section 5, risk 3). Run
+no browser, asserting that `mutation.json` lists the mutator names (Opus draft, section 5, risk 3). Run
 it before calling the self-check enough, and on every StrykerJS bump. `spikes/fail-loud/` is that gate and
-the negative control below: on StrykerJS 10.1.1 both routes report 12 UI mutants from seven operators, and
-with one broken sample both exit 1 with that operator's name.
+the negative control below: on StrykerJS 10.1.1 both routes report 12 UI mutants from seven mutators, and
+with one broken sample both exit 1 with that mutator's name.
 
 The `ElementToSpan` rule rests on `tsc` output for three hand-written elements and on one Stryker run:
 on epic-stack, with `@stryker-mutator/typescript-checker`, its one mutant (`<a href>` to a `<span>`
@@ -386,32 +386,32 @@ the `button` swap, which no real app run has produced yet.
 ## What the verification plan adds
 
 The Opus draft's section 6 says what to run. These steps add the checks that can fail and the bar that
-decides each operator.
+decides each mutator.
 
-1. **Corpus diff.** Instrument the demo app with the operators off and on, and diff the two sorted lists
+1. **Corpus diff.** Instrument the demo app with the mutators off and on, and diff the two sorted lists
    of `line:col mutator replacement`. A built-in mutant that is in one list and not in the other means
-   that an operator suppressed or moved it. `spikes/design-opus/neutral.ts` prints counts only today, so
+   that a mutator suppressed or moved it. `spikes/design-opus/neutral.ts` prints counts only today, so
    this diff runs on the built package, not the prototype.
-2. **Negative control for fail loud.** Break the install on purpose: give one operator a sample that it
-   cannot mutate. Then assert that `stryker run` exits non-zero with that operator's name in the error,
+2. **Negative control for fail loud.** Break the install on purpose: give one mutator a sample that it
+   cannot mutate. Then assert that `stryker run` exits non-zero with that mutator's name in the error,
    once through the `ignorers` entry and once through the config import. Without this control, a green
    gate cannot tell a working fail-loud route from an install that never failed.
-3. **The bar per operator.** An operator stays in the first release only when all of these hold on the
-   demo app and the fixtures. An operator that misses one moves to Later, with its counts recorded.
+3. **The bar per mutator.** A mutator stays in the first release only when all of these hold on the
+   demo app and the fixtures. A mutator that misses one moves to Later, with its counts recorded.
    - The corpus diff shows that its mutants differ from every built-in mutant at the same site.
    - Each of its mutants is classified by hand as killed, survived with a test gap, equivalent, or error
      (CompileError, Timeout). Equivalent and error mutants together are at most one in ten. This limit
-     is a starting value, not a measured one. Tune it against the real ratios once the first operators
+     is a starting value, not a measured one. Tune it against the real ratios once the first mutators
      have been classified by hand.
    - A Playwright test written for the behaviour kills at least one of its mutants.
 
-   Measured on 2026-10-26 (`docs/VERDICT.md`, Evidence): every operator meets the bar. The corpus diff
-   is the placement test in `packages/stryker-playwright-mutators/test/`. On the demo app, with
+   Measured on 2026-10-26 (`docs/VERDICT.md`, Evidence): every mutator meets the bar. The corpus diff
+   is the placement test in `packages/stryker-jsx-mutators/test/`. On the demo app, with
    `actionTimeout` set, none of the 17 UI mutants is equivalent or an error, and without it 3 kills
    show as Timeout. In `packages/stryker-playwright-runner/test/browser/ui-mutators.test.ts` a
-   written test kills a mutant of each operator. A copy of epic-stack, outside the bar's scope, adds
+   written test kills a mutant of each mutator. A copy of epic-stack, outside the bar's scope, adds
    the first real ratios: 1 equivalent and 0 errors among 45 UI mutants, the equivalent one a
-   `LzJsxConditionalElement` (1 of 8 for that operator). Three operators have had no site in a real app yet, so the limit stays
+   `LzJsxConditionalElement` (1 of 8 for that mutator). Three mutators have had no site in a real app yet, so the limit stays
    a starting value.
 
 ## Rerun the evidence
@@ -422,9 +422,9 @@ MODE=patched node spikes/design-opus/neutral.ts
 MODE=ui node spikes/design-opus/neutral.ts
 node spikes/design-opus/directive.ts
 node spikes/design-fable/spike-jsx-placement.ts
-node --test packages/stryker-playwright-mutators/test/cases.test.ts
+node --test packages/stryker-jsx-mutators/test/cases.test.ts
 ```
 
 `MODE=patched` shows that the placer patch leaves built-in mutants unchanged, and `MODE=ui` prints the
-per-operator counts. Compare both with the committed `neutral-output.txt`. Without `MODE`, `neutral.ts`
+per-mutator counts. Compare both with the committed `neutral-output.txt`. Without `MODE`, `neutral.ts`
 runs the stock instrumenter only and proves nothing about the patch.

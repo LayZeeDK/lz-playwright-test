@@ -4,7 +4,7 @@ import { describe, it } from 'node:test';
 import { traverse, types as t } from '@babel/core';
 
 import { elementSiteOf, toNodeMutator } from '../src/mutator.ts';
-import { operatorsFor } from '../src/operators.ts';
+import { mutatorsFor } from '../src/mutators.ts';
 import type { RoleTable } from '../src/playwright-roles.ts';
 import { parse } from './support/babel.ts';
 import { defined } from './support/defined.ts';
@@ -12,9 +12,7 @@ import { defined } from './support/defined.ts';
 function elementRoleMutants(code: string, roles: RoleTable): string[] {
   const file = parse(code);
   const mutator = toNodeMutator(
-    defined(
-      operatorsFor(roles).find(({ name }) => name === 'LzJsxElementRole'),
-    ),
+    defined(mutatorsFor(roles).find(({ name }) => name === 'LzJsxElementRole')),
     t,
   );
   const show = (node: t.Node): string => {

@@ -25,7 +25,7 @@
   ],
   "references": [
     {
-      "path": "../../packages/stryker-playwright-mutators"
+      "path": "../../packages/stryker-jsx-mutators"
     },
     {
       "path": "../../packages/stryker-playwright-runner"

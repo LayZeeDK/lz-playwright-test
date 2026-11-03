@@ -9,7 +9,7 @@ import {
   babelTypeMembers,
   toNodeMutator,
   type BabelTypes,
-  type Operator,
+  type Mutator,
 } from './mutator.ts';
 import { withJsxPlacement, type PlacerMethods } from './placer.ts';
 import { packageName } from './package-name.ts';
@@ -68,15 +68,15 @@ export interface Instrumenter {
 }
 
 export async function install(
-  operators: readonly Operator[],
+  mutators: readonly Mutator[],
   resolve: () => Promise<Instrumenter> = resolveFromCore,
   warn: (message: string) => void = console.warn,
 ): Promise<void> {
   const instrumenter = await resolve();
 
-  checkNames(operators, instrumenter.allMutators);
-  register(instrumenter, operators);
-  await selfCheck(instrumenter, operators);
+  checkNames(mutators, instrumenter.allMutators);
+  register(instrumenter, mutators);
+  await selfCheck(instrumenter, mutators);
 
   if (instrumenter.version !== testedVersion) {
     warn(
@@ -87,10 +87,10 @@ export async function install(
 }
 
 function checkNames(
-  operators: readonly Operator[],
+  mutators: readonly Mutator[],
   present: readonly ListedMutator[],
 ): void {
-  const names = operators.map(({ name }) => name);
+  const names = mutators.map(({ name }) => name);
   const invalid = names.filter((name) => !namePattern.test(name));
 
   if (invalid.length > 0) {
@@ -123,16 +123,16 @@ function checkNames(
 
 function register(
   instrumenter: Instrumenter,
-  operators: readonly Operator[],
+  mutators: readonly Mutator[],
 ): void {
   const { allMutators, expressionPlacer, types } = instrumenter;
   const registered = new Set(allMutators.map(({ name }) => name));
 
   allMutators.push(
-    ...operators
+    ...mutators
       .filter(({ name }) => !registered.has(name))
-      .map((operator) => ({
-        ...toNodeMutator(operator, types),
+      .map((mutator) => ({
+        ...toNodeMutator(mutator, types),
         [ownMark]: ownMark,
       })),
   );
@@ -148,16 +148,16 @@ function register(
 
 async function selfCheck(
   instrumenter: Instrumenter,
-  operators: readonly Operator[],
+  mutators: readonly Mutator[],
 ): Promise<void> {
   const fileOf = (name: string): string => `${name}.self-check.tsx`;
   const mutants = await instrumenter.instrument(
-    operators.map(({ name, sample }) => ({
+    mutators.map(({ name, sample }) => ({
       name: fileOf(name),
       content: sample,
     })),
   );
-  const silent = operators
+  const silent = mutators
     .map(({ name }) => name)
     .filter(
       (name) =>

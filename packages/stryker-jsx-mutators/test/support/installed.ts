@@ -2,18 +2,18 @@
 // where STRYKER_MUTATOR_WORKER makes index.ts skip the install (a mutation run of this package).
 import { bundled } from '../../src/bundled-roles.ts';
 import { install, type Instrumenter } from '../../src/install.ts';
-import { operatorsFor, type OperatorName } from '../../src/operators.ts';
+import { mutatorsFor, type MutatorName } from '../../src/mutators.ts';
 
-export const operatorNames: readonly OperatorName[] = operatorsFor(
+export const mutatorNames: readonly MutatorName[] = mutatorsFor(
   bundled.roles,
 ).map(({ name }) => name);
 
-export const ours: ReadonlySet<string> = new Set(operatorNames);
+export const ours: ReadonlySet<string> = new Set(mutatorNames);
 
 export async function installInto<T extends Instrumenter>(
   instrumenter: T,
 ): Promise<T> {
-  await install(operatorsFor(bundled.roles), async () => instrumenter);
+  await install(mutatorsFor(bundled.roles), async () => instrumenter);
 
   return instrumenter;
 }

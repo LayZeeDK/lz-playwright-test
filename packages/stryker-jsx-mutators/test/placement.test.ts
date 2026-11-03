@@ -1,6 +1,6 @@
 // The placer wrap is neutral for built-in mutants, and places UI mutants as valid TSX. One process, ordered: the
 // corpus is instrumented stock first, then the install runs (support/installed.ts), then the corpus is instrumented
-// with every UI operator excluded. node --test runs each test file in its own process, so no other file has wrapped
+// with every UI mutator excluded. node --test runs each test file in its own process, so no other file has wrapped
 // the placer before. That sequence runs in a before hook, so that an error in it fails every test instead of the file.
 // Corpus: the design spike's sample, the demo app's components, and StrykerJS v10.1.1's
 // packages/instrumenter/testResources/parser/App.tsx and testResources/instrumenter/vue-tsx-sample.vue (copied).
@@ -23,7 +23,7 @@ import {
   type InstrumentedMutant,
   type InstrumentResult,
 } from './support/instrument-result.ts';
-import { installInto, operatorNames, ours } from './support/installed.ts';
+import { installInto, mutatorNames, ours } from './support/installed.ts';
 
 const root = join(import.meta.dirname, '..', '..', '..');
 const corpus: readonly SourceFile[] = [
@@ -82,14 +82,14 @@ before(async () => {
     ]);
   stock = await instrumentEach([]);
   await installInto(instrumenter);
-  excluded = await instrumentEach(operatorNames);
+  excluded = await instrumentEach(mutatorNames);
   oneLeftOn = await instrumentEach(
-    operatorNames.filter((name) => name !== 'LzJsxTextLiteral'),
+    mutatorNames.filter((name) => name !== 'LzJsxTextLiteral'),
   );
   on = await instrumentEach([]);
 });
 
-describe('the JSX placement, with every UI operator excluded', () => {
+describe('the JSX placement, with every UI mutator excluded', () => {
   corpus.forEach(({ name }, index) => {
     const file = basename(name);
 
@@ -120,7 +120,7 @@ describe('the JSX placement, with every UI operator excluded', () => {
     );
   });
 
-  it('shows a difference when one UI operator is left unexcluded (the negative control)', () => {
+  it('shows a difference when one UI mutator is left unexcluded (the negative control)', () => {
     const differing = corpus.filter(
       (_file, index) =>
         masked(firstContent(oneLeftOn[index])) !==
@@ -131,7 +131,7 @@ describe('the JSX placement, with every UI operator excluded', () => {
   });
 });
 
-describe('the JSX placement, with the UI operators on', () => {
+describe('the JSX placement, with the UI mutators on', () => {
   corpus.forEach(({ name }, index) => {
     if (name.endsWith('.tsx')) {
       it(`instruments ${basename(name)} to TSX that Babel parses again`, () => {
@@ -140,7 +140,7 @@ describe('the JSX placement, with the UI operators on', () => {
     }
   });
 
-  it('gives the stock built-in mutants with the UI operators on, for each corpus file', () => {
+  it('gives the stock built-in mutants with the UI mutators on, for each corpus file', () => {
     assert.deepEqual(
       on.map(({ mutants }) => builtIns(mutants)),
       stock.map(({ mutants }) => builtIns(mutants)),

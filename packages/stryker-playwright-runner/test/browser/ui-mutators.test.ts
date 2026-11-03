@@ -1,7 +1,7 @@
-// Drives LzPlaywrightTestRunner against a TSX fixture instrumented with the UI operators of @layzee/stryker-playwright-mutators:
-// for each operator, a Playwright test kills its mutant and a test that does not observe it lets it survive.
+// Drives LzPlaywrightTestRunner against a TSX fixture instrumented with the UI mutators of @layzee/stryker-jsx-mutators:
+// for each mutator, a Playwright test kills its mutant and a test that does not observe it lets it survive.
 // Run: npx nx run @layzee/stryker-playwright-runner:test-browser
-import '@layzee/stryker-playwright-mutators';
+import '@layzee/stryker-jsx-mutators';
 
 import assert from 'node:assert/strict';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -120,77 +120,77 @@ test('per-test coverage credits a text mutant only to the tests that render its 
 });
 
 const rows: readonly {
-  operator: string;
+  mutator: string;
   original: string;
   replacement: string;
   killer: string;
   bystander: string;
 }[] = [
   {
-    operator: 'LzJsxTextLiteral',
+    mutator: 'LzJsxTextLiteral',
     original: 'Orders',
     replacement: '',
     killer: 'shows the heading',
     bystander: 'shows the total',
   },
   {
-    operator: 'LzJsxLabelAttribute',
+    mutator: 'LzJsxLabelAttribute',
     original: 'aria-label="Close"',
     replacement: 'aria-label=""',
     killer: 'closes the dialog',
     bystander: 'toggle reports expanded',
   },
   {
-    operator: 'LzJsxEventHandler',
+    mutator: 'LzJsxEventHandler',
     original: 'onClick={actions.reveal}',
     replacement: 'onClick={undefined}',
     killer: 'reveals the status',
     bystander: 'shows the heading',
   },
   {
-    operator: 'LzJsxConditionalElement',
+    mutator: 'LzJsxConditionalElement',
     original: 'open && <p>Details panel</p>',
     replacement: '<p>Details panel</p>',
     killer: 'panel starts hidden',
     bystander: 'shows the heading',
   },
   {
-    operator: 'LzJsxUrlAttribute',
+    mutator: 'LzJsxUrlAttribute',
     original: 'href="#/done"',
     replacement: 'href=""',
     killer: 'navigates to done',
     bystander: 'shows the heading',
   },
   {
-    operator: 'LzJsxDisabledAttribute',
+    mutator: 'LzJsxDisabledAttribute',
     original: 'disabled={busy}',
     replacement: 'disabled={false}',
     killer: 'submit is disabled while busy',
     bystander: 'shows the heading',
   },
   {
-    operator: 'LzJsxHiddenAttribute',
+    mutator: 'LzJsxHiddenAttribute',
     original: 'hidden={!open}',
     replacement: 'hidden={false}',
     killer: 'region hidden until opened',
     bystander: 'shows the heading',
   },
   {
-    operator: 'LzJsxElementRole',
+    mutator: 'LzJsxElementRole',
     original: 'role="dialog"',
     replacement: 'role={undefined}',
     killer: 'opens the dialog',
     bystander: 'toggle reports expanded',
   },
   {
-    operator: 'LzJsxChildExpression',
+    mutator: 'LzJsxChildExpression',
     original: 'total',
     replacement: 'null',
     killer: 'shows the total',
     bystander: 'shows the heading',
   },
   {
-    operator: 'LzJsxStateAttribute',
+    mutator: 'LzJsxStateAttribute',
     original: 'aria-expanded={open}',
     replacement: 'aria-expanded={!open}',
     killer: 'toggle reports expanded',
@@ -198,12 +198,12 @@ const rows: readonly {
   },
 ];
 
-rows.forEach(({ operator, original, replacement, killer, bystander }) => {
+rows.forEach(({ mutator, original, replacement, killer, bystander }) => {
   const change = `${original} -> ${replacement || 'empty text'}`;
 
-  test(`${operator}: "${bystander}" does not observe ${change}, so it survives`, async () => {
+  test(`${mutator}: "${bystander}" does not observe ${change}, so it survives`, async () => {
     const result = await mutantRun(
-      mutant(operator, original, replacement),
+      mutant(mutator, original, replacement),
       bystander,
     );
 
@@ -214,9 +214,9 @@ rows.forEach(({ operator, original, replacement, killer, bystander }) => {
     );
   });
 
-  test(`${operator}: "${killer}" kills ${change}`, async () => {
+  test(`${mutator}: "${killer}" kills ${change}`, async () => {
     const result = await mutantRun(
-      mutant(operator, original, replacement),
+      mutant(mutator, original, replacement),
       killer,
     );
 

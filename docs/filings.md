@@ -594,7 +594,7 @@ that checks the element is visible kills both; a test that checks it is hidden k
 replace the `true` mutant with the right operand (`<p>Details</p>`), which forces the element to show
 and is the mutant `true` stands for in plain JavaScript. A smaller fix drops the `true` mutant there.
 
-**Context.** `@layzee/stryker-playwright-mutators` in this repo adds that force-show mutant as
+**Context.** `@layzee/stryker-jsx-mutators` in this repo adds that force-show mutant as
 `LzConditionalElement`, and skips a `&&` whose left operand is a comparison or a `&&` or `||` expression,
 because there the built-in `true` already exists. An upstream fix would make that skip need revisiting.
 
@@ -608,7 +608,7 @@ Status: no draft needed (2026-10-26). Reported upstream as
 **What it cost here.** `@stryker-mutator/instrumenter` 10.1.1 lists `TSAsExpression` among its type nodes
 (`dist/src/util/syntax-helpers.js:140`), so it makes no mutant anywhere inside `expr as Type`. Measured on
 2026-10-26: `export const a = [1 + 1] as const;` gives none, while the same line with `satisfies number[]`
-or with no suffix gives ArrayDeclaration and ArithmeticOperator. The UI operators' table was written as
+or with no suffix gives ArrayDeclaration and ArithmeticOperator. The UI mutators' table was written as
 `[...] as const satisfies ...`, so a mutation run scored 100% with no mutant in any rule body; the
 package now builds the table through a helper with a `const` type parameter, and the run then found 15
 survivors. Worth a comment on #6208 if Lars wants one: a `const` assertion is the common case, and it

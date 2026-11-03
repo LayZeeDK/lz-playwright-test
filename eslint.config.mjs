@@ -174,7 +174,7 @@ export default withWarningsAsErrors([
   },
   {
     files: ['packages/**/*.ts', 'packages/**/*.tsx'],
-    ignores: ['packages/stryker-playwright-mutators/test/corpus/**'],
+    ignores: ['packages/stryker-jsx-mutators/test/corpus/**'],
     languageOptions: {
       parserOptions: {
         projectService: true,
@@ -221,9 +221,9 @@ export default withWarningsAsErrors([
     },
   },
   {
-    files: ['packages/stryker-playwright-mutators/package.json'],
+    files: ['packages/stryker-jsx-mutators/package.json'],
     rules: {
-      // The operators import Babel for types only; playwright-core's role table is resolved at run time.
+      // The mutators import Babel for types only; playwright-core's role table is resolved at run time.
       '@nx/dependency-checks': dependencyChecks([
         '@stryker-mutator/core',
         '@babel/core',

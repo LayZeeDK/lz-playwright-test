@@ -3,7 +3,7 @@ import './break.ts';
 
 export default {
   mutate: ['src.tsx'],
-  plugins: ['@layzee/stryker-playwright-mutators'],
+  plugins: ['@layzee/stryker-jsx-mutators'],
   ignorers: ['lz-jsx'],
   testRunner: 'command',
   commandRunner: { command: 'node -e "process.exit(0)"' },

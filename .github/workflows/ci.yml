@@ -31,9 +31,9 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npx nx run-many -t lint
-      - run: npx nx run-many -t build --projects=@layzee/stryker-playwright-runner,@layzee/stryker-playwright-mutators
+      - run: npx nx run-many -t build --projects=@layzee/stryker-playwright-runner,@layzee/stryker-jsx-mutators
       - run: npx nx run-many -t typecheck
-      - run: npx nx run-many -t test --projects=@layzee/stryker-playwright-runner,@layzee/stryker-playwright-mutators
+      - run: npx nx run-many -t test --projects=@layzee/stryker-playwright-runner,@layzee/stryker-jsx-mutators
 
   browser:
     name: ${{ matrix.target }}

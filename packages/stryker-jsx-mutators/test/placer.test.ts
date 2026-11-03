@@ -1,4 +1,4 @@
-// withJsxPlacement against a fake original placer, on Babel trees and mutants the UI operators never give: a bare
+// withJsxPlacement against a fake original placer, on Babel trees and mutants the UI mutators never give: a bare
 // attribute whose value is missing rather than null, and values the placer cannot hold.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -97,7 +97,7 @@ describe('withJsxPlacement', () => {
   ).forEach(([title, code, type, mutant]) => {
     it(`throws on ${title}`, () => {
       assert.throws(() => placeOn(code, type).place(mutant), {
-        message: `@layzee/stryker-playwright-mutators: cannot place a UI mutant at a ${type}.`,
+        message: `@layzee/stryker-jsx-mutators: cannot place a UI mutant at a ${type}.`,
       });
     });
   });

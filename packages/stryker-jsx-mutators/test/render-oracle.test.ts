@@ -247,7 +247,7 @@ describe('render oracle on spikes/design-opus/sample.tsx', () => {
     );
   });
 
-  it('gives at least one mutant of every operator in the table', () => {
+  it('gives at least one mutant of every mutator in the table', () => {
     assert.deepEqual(
       new Set(
         result.mutants

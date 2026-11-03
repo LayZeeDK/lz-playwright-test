@@ -9,7 +9,7 @@ import {
   isJsxChild,
   toNodeMutator,
   type AttributeSite,
-  type Operator,
+  type Mutator,
 } from '../src/mutator.ts';
 import { parse } from './support/babel.ts';
 
@@ -22,10 +22,10 @@ function firstElement(file: t.File): t.JSXElement {
   return statement.expression;
 }
 
-/** Runs an operator with one rule on `attribute` over every path of `file`; returns the sites its skip saw. */
+/** Runs a mutator with one rule on `attribute` over every path of `file`; returns the sites its skip saw. */
 function sitesOf(file: t.File, attribute: string): AttributeSite[] {
   const sites: AttributeSite[] = [];
-  const operator: Operator = {
+  const probe: Mutator = {
     name: 'Probe',
     sample: '',
     rules: [
@@ -41,7 +41,7 @@ function sitesOf(file: t.File, attribute: string): AttributeSite[] {
       },
     ],
   };
-  const mutator = toNodeMutator(operator, t);
+  const mutator = toNodeMutator(probe, t);
 
   traverse(file, {
     enter(path) {

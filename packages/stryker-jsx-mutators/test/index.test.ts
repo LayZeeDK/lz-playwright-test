@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
-import { operatorNames } from './support/installed.ts';
+import { mutatorNames } from './support/installed.ts';
 
 const entryPath = join(import.meta.dirname, 'fixture', 'entry.ts');
 
@@ -24,12 +24,12 @@ function runEntry(
 }
 
 describe('index.ts', () => {
-  it('registers every operator of the table, wraps the placer, and exports an ignorer that ignores nothing', () => {
+  it('registers every mutator of the table, wraps the placer, and exports an ignorer that ignores nothing', () => {
     const { status, stdout, stderr } = runEntry({});
 
     assert.equal(status, 0, stderr);
     assert.deepEqual(JSON.parse(stdout), {
-      registered: operatorNames,
+      registered: mutatorNames,
       placerWrapped: true,
       ignorer: 'Ignore lz-jsx undefined',
     });
@@ -45,19 +45,19 @@ describe('index.ts', () => {
       registered: [],
       placerWrapped: false,
       ignorer:
-        'throws @layzee/stryker-playwright-mutators: the install did not run, because STRYKER_MUTATOR_WORKER is set in a process ' +
+        'throws @layzee/stryker-jsx-mutators: the install did not run, because STRYKER_MUTATOR_WORKER is set in a process ' +
         'that instruments. Unset it for the Stryker run.',
     });
   });
 
-  it("rejects its import with install's error when another mutator has an operator's name", () => {
+  it("rejects its import with install's error when another mutator already has one of this package's mutator names", () => {
     const { status, stdout, stderr } = runEntry({}, 'taken');
 
     assert.notEqual(status, 0);
     assert.equal(stdout, '');
     assert.match(
       stderr,
-      /@layzee\/stryker-playwright-mutators: another mutator already has the name LzJsxTextLiteral\./,
+      /@layzee\/stryker-jsx-mutators: another mutator already has the name LzJsxTextLiteral\./,
     );
   });
 });

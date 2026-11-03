@@ -3,7 +3,7 @@ import { declareFactoryPlugin, PluginKind } from '@stryker-mutator/api/plugin';
 
 import { bundled } from './bundled-roles.ts';
 import { install } from './install.ts';
-import { operatorsFor } from './operators.ts';
+import { mutatorsFor } from './mutators.ts';
 import { packageName } from './package-name.ts';
 import { consumerRoles } from './playwright-roles.ts';
 
@@ -15,7 +15,7 @@ if (installRan) {
   // A failure rejects this module's evaluation, and every later import of it rejects with the same error. A config
   // that imports it stops at once; under `plugins`, core only warns with the message, and the run then stops where
   // core creates the ignorer this module never got to export.
-  await install(operatorsFor(consumerRoles(bundled)));
+  await install(mutatorsFor(consumerRoles(bundled)));
 }
 
 function uiMutatorsIgnorer(): Ignorer {

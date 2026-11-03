@@ -49,7 +49,7 @@ export type BabelTypes = Pick<
   readonly react: Pick<typeof types.react, 'buildChildren'>;
 };
 
-export interface Operator {
+export interface Mutator {
   readonly name: string;
   readonly sample: string;
   readonly rules: readonly Rule[];
@@ -57,9 +57,7 @@ export interface Operator {
 
 // In place of `as const`: Stryker mutates nothing inside an `as` expression, which would leave every rule of the
 // table out of a mutation run.
-export function operatorTable<const T extends readonly Operator[]>(
-  table: T,
-): T {
+export function mutatorTable<const T extends readonly Mutator[]>(table: T): T {
   return table;
 }
 
@@ -110,15 +108,15 @@ export interface NodeMutatorLike {
 }
 
 export function toNodeMutator(
-  operator: Operator,
+  mutator: Mutator,
   t: BabelTypes,
 ): NodeMutatorLike {
   return {
-    name: operator.name,
+    name: mutator.name,
     *mutate(path) {
       const site = attributeSite(path, t);
 
-      for (const rule of operator.rules) {
+      for (const rule of mutator.rules) {
         yield* rule.kind === 'node'
           ? rule.mutate(path, t)
           : attributeMutants(rule, site, t);

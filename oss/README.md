@@ -67,8 +67,8 @@ The run uses the UI mutators and the TypeScript checker, against the repo's own 
 dev server (`npm run dev`), which compiles Stryker's sandbox on the fly.
 
 1. Copy `.env.example` to `.env`, the repo's own setup step.
-2. Install the runner, StrykerJS, and Playwright as above, plus the operators and the checker:
-   `npm install -D @stryker-mutator/typescript-checker@10.1.1 file:<this repo>/packages/stryker-playwright-mutators`.
+2. Install the runner, StrykerJS, and Playwright as above, plus the mutators and the checker:
+   `npm install -D @stryker-mutator/typescript-checker@10.1.1 file:<this repo>/packages/stryker-jsx-mutators`.
    The copy pins `@playwright/test` to `^1.58.1`.
 3. Apply `epic-stack/copy.patch` and copy `epic-stack/stryker.playwright.config.ts` into the copy.
    The patch:

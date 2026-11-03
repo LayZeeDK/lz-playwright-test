@@ -45,7 +45,7 @@
     "@stryker-mutator/api": "10.1.1"
   },
   "devDependencies": {
-    "@layzee/stryker-playwright-mutators": "*",
+    "@layzee/stryker-jsx-mutators": "*",
     "ajv": "8.20.0"
   },
   "initStrykerConfig": {
@@ -65,7 +65,7 @@
     "targets": {
       "lint": {
         "dependsOn": [
-          "@layzee/stryker-playwright-mutators:generate-roles"
+          "@layzee/stryker-jsx-mutators:generate-roles"
         ],
         "inputs": [
           "...",
@@ -74,7 +74,7 @@
       },
       "test-browser": {
         "dependsOn": [
-          "@layzee/stryker-playwright-mutators:generate-roles"
+          "@layzee/stryker-jsx-mutators:generate-roles"
         ]
       }
     }

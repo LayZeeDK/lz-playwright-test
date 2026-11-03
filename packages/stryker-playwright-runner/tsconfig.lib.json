@@ -12,7 +12,7 @@
   "include": ["src/**/*.ts"],
   "references": [
     {
-      "path": "../stryker-playwright-mutators/tsconfig.lib.json"
+      "path": "../stryker-jsx-mutators/tsconfig.lib.json"
     }
   ]
 }

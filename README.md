@@ -2,7 +2,7 @@
 
 A StrykerJS test runner for Playwright Test. One plugin runs Playwright e2e tests and
 Playwright component tests (`mount()`) as Stryker tests, with per-test coverage, and starts the
-`webServer` once instead of once per mutant. A second plugin adds mutation operators for the parts of
+`webServer` once instead of once per mutant. A second plugin adds mutators for the parts of
 JSX that Playwright tests look at: text, labels, handlers, conditional elements, links, and disabled,
 hidden, role, and ARIA state attributes.
 
@@ -12,7 +12,7 @@ The answer to whether this works, the evidence, and the limits are in `docs/VERD
 
 - `packages/stryker-playwright-runner/README.md`: the runner's requirements, Stryker config, options,
   and the Playwright settings it replaces on every run.
-- `packages/stryker-playwright-mutators/README.md`: the ten UI mutation operators and how to turn them on.
+- `packages/stryker-jsx-mutators/README.md`: the ten UI mutators and how to turn them on.
 
 Both packages ship built JavaScript in `dist`. The workspace's own Stryker runs load them from there, so
 build first (the Nx targets below do).
@@ -20,12 +20,12 @@ build first (the Nx targets below do).
 ## Layout
 
 - `packages/stryker-playwright-runner`: the runner, package `@layzee/stryker-playwright-runner`.
-- `packages/stryker-playwright-mutators`: the UI mutation operators, package `@layzee/stryker-playwright-mutators`.
+- `packages/stryker-jsx-mutators`: the UI mutators, package `@layzee/stryker-jsx-mutators`.
 - `apps/demo-app` (Nx project `@layzee/demo-app`): the demo app and its Playwright component tests
   (`playwright.components.config.mts`).
 - `apps/demo-app-e2e`: the demo app's Playwright e2e tests.
 - `stryker.e2e.config.ts`, `stryker.ct.config.ts`: Stryker configs for the demo.
-  `stryker.e2e.ui.config.ts` adds the UI mutation operators to the e2e run.
+  `stryker.e2e.ui.config.ts` adds the UI mutators to the e2e run.
 - `stryker.base.ts`: the settings that all four Stryker configs share.
 - `stryker.e2e.command.config.ts`: the demo baselines on Stryker's `command` runner, selected with
   `STRYKER_BASELINE=define` or `STRYKER_BASELINE=off`.
@@ -35,7 +35,7 @@ build first (the Nx targets below do).
   container run (`linux-run.sh`), and the demo on the packed tarballs (`packed-demo/`).
 - `docs/research/`: the research behind the design.
 - `docs/filings.md`: drafts of upstream issues found while validating the runner, none filed.
-- `docs/design/`: the design for the UI mutation operators.
+- `docs/design/`: the design for the UI mutators.
 - `spikes/`: throwaway experiments behind that design.
 
 ## Type-check and test the runner
@@ -52,12 +52,12 @@ npx nx run @layzee/stryker-playwright-runner:test-browser
 ```
 
 `test/browser/ui-mutators.test.ts` runs the runner against a page instrumented with the UI mutators
-and checks that a Playwright test kills each operator's mutant.
+and checks that a Playwright test kills each mutator's mutant.
 
-The UI operators' tests need no browser:
+The UI mutators' tests need no browser:
 
 ```sh
-npx nx run @layzee/stryker-playwright-mutators:test
+npx nx run @layzee/stryker-jsx-mutators:test
 ```
 
 To run Stryker on the demo app, use `npx nx run @layzee/demo-app-e2e:mutate-e2e`,

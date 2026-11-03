@@ -13,7 +13,7 @@
       "path": "./packages/stryker-playwright-runner"
     },
     {
-      "path": "./packages/stryker-playwright-mutators"
+      "path": "./packages/stryker-jsx-mutators"
     }
   ]
 }

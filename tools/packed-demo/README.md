@@ -1,7 +1,7 @@
 # Packed demo: the demo app on the packed tarballs
 
 This folder holds what a scratch project outside the workspace needs to run the demo's e2e Stryker run with
-the UI operators on the two packed packages, with no workspace links. `docs/VERDICT.md` (Evidence) has the
+the UI mutators on the two packed packages, with no workspace links. `docs/VERDICT.md` (Evidence) has the
 result. The configs are plain JavaScript versions of the demo's Vite, Playwright and `stryker.e2e.ui.config.ts`
 settings, without Nx.
 
@@ -17,11 +17,11 @@ cp -r apps/demo-app/index.html apps/demo-app/src apps/demo-app/public <scratch>/
 rm <scratch>/app/src/app/price-tag.story.tsx
 cp apps/demo-app-e2e/src/*.spec.ts <scratch>/e2e/
 (cd packages/stryker-playwright-runner && npm pack --pack-destination <scratch>/tarballs)
-(cd packages/stryker-playwright-mutators && npm pack --pack-destination <scratch>/tarballs)
+(cd packages/stryker-jsx-mutators && npm pack --pack-destination <scratch>/tarballs)
 cd <scratch>
 npm install --ignore-scripts
 npx playwright install chromium
-node --no-experimental-strip-types --input-type=module -e "await import('@layzee/stryker-playwright-runner'); await import('@layzee/stryker-playwright-mutators')"
+node --no-experimental-strip-types --input-type=module -e "await import('@layzee/stryker-playwright-runner'); await import('@layzee/stryker-jsx-mutators')"
 npx playwright test
 npx stryker run stryker.config.mjs
 ```

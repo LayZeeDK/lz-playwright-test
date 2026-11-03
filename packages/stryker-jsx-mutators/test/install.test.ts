@@ -20,7 +20,7 @@ import {
 import {
   babelTypeMembers,
   type NodeMutatorLike,
-  type Operator,
+  type Mutator,
 } from '../src/mutator.ts';
 import type { MutantPlacerLike } from '../src/placer.ts';
 import { firstPath, parse } from './support/babel.ts';
@@ -28,10 +28,10 @@ import { exported, exportedFunction } from './support/exports.ts';
 import { instrumentFully } from './support/instrument-result.ts';
 import { tempRoot, writeTree } from './support/temp-tree.ts';
 
-const ownMark = Symbol.for('@layzee/stryker-playwright-mutators');
+const ownMark = Symbol.for('@layzee/stryker-jsx-mutators');
 const strykerMutators = ['StringLiteral', 'BooleanLiteral'] as const;
 
-function operator(name: string): Operator {
+function mutator(name: string): Mutator {
   return {
     name,
     sample: `export const ${name.toLowerCase()} = 1;\n`,
@@ -77,9 +77,9 @@ function setup({
         }));
     },
   };
-  const run = (operators: Operator[], target: Instrumenter = instrumenter) =>
+  const run = (mutators: Mutator[], target: Instrumenter = instrumenter) =>
     install(
-      operators,
+      mutators,
       async () => target,
       (message) => warnings.push(message),
     );
@@ -89,10 +89,10 @@ function setup({
 }
 
 describe('install', () => {
-  it("adds the operators after Stryker's mutators, and instruments each one's sample as <name>.self-check.tsx", async () => {
+  it("adds the mutators after Stryker's mutators, and instruments each one's sample as <name>.self-check.tsx", async () => {
     const { run, names, instrumented, warnings } = setup();
 
-    await run([operator('Alpha'), operator('Beta')]);
+    await run([mutator('Alpha'), mutator('Beta')]);
 
     assert.deepEqual(names(), [...strykerMutators, 'Alpha', 'Beta']);
     assert.deepEqual(instrumented, [
@@ -108,30 +108,30 @@ describe('install', () => {
     const { run, expressionPlacer } = setup();
     const { canPlace, place } = expressionPlacer;
 
-    await run([operator('Alpha')]);
+    await run([mutator('Alpha')]);
 
     assert.notEqual(expressionPlacer.canPlace, canPlace);
     assert.notEqual(expressionPlacer.place, place);
     assert.equal(ownMark in expressionPlacer, true);
   });
 
-  it('adds nothing and wraps the placer once when it installs the same operators again', async () => {
+  it('adds nothing and wraps the placer once when it installs the same mutators again', async () => {
     const { run, names, expressionPlacer } = setup();
 
-    await run([operator('Alpha'), operator('Beta')]);
+    await run([mutator('Alpha'), mutator('Beta')]);
     const { canPlace, place } = expressionPlacer;
-    await run([operator('Alpha'), operator('Beta')]);
+    await run([mutator('Alpha'), mutator('Beta')]);
 
     assert.deepEqual(names(), [...strykerMutators, 'Alpha', 'Beta']);
     assert.equal(expressionPlacer.canPlace, canPlace);
     assert.equal(expressionPlacer.place, place);
   });
 
-  it('adds only the missing operator when a second install brings one more', async () => {
+  it('adds only the missing mutator when a second install brings one more', async () => {
     const { run, names } = setup();
 
-    await run([operator('Alpha')]);
-    await run([operator('Alpha'), operator('Beta')]);
+    await run([mutator('Alpha')]);
+    await run([mutator('Alpha'), mutator('Beta')]);
 
     assert.deepEqual(names(), [...strykerMutators, 'Alpha', 'Beta']);
   });
@@ -142,10 +142,10 @@ describe('install', () => {
     const specifier = '../src/install.ts?copy';
     const copyInstall = exportedFunction(await import(specifier), 'install');
 
-    await run([operator('Alpha')]);
+    await run([mutator('Alpha')]);
     const { canPlace } = expressionPlacer;
     await Reflect.apply(copyInstall, undefined, [
-      [operator('Alpha')],
+      [mutator('Alpha')],
       async () => instrumenter,
       (message: string) => warnings.push(message),
     ]);
@@ -156,39 +156,35 @@ describe('install', () => {
 
   (
     [
-      ["a name of Stryker's", [operator('StringLiteral')], 'StringLiteral'],
+      ["a name of Stryker's", [mutator('StringLiteral')], 'StringLiteral'],
       [
         "a name of Stryker's in another case",
-        [operator('stringliteral')],
+        [mutator('stringliteral')],
         'stringliteral',
       ],
       [
         "two names of Stryker's",
-        [
-          operator('BooleanLiteral'),
-          operator('Alpha'),
-          operator('StringLiteral'),
-        ],
+        [mutator('BooleanLiteral'), mutator('Alpha'), mutator('StringLiteral')],
         'BooleanLiteral, StringLiteral',
       ],
       [
-        'a name twice among its operators',
-        [operator('Alpha'), operator('Beta'), operator('Alpha')],
+        'a name twice among its mutators',
+        [mutator('Alpha'), mutator('Beta'), mutator('Alpha')],
         'Alpha',
       ],
       [
-        'a name twice among its operators in another case',
-        [operator('Alpha'), operator('ALPHA')],
+        'a name twice among its mutators in another case',
+        [mutator('Alpha'), mutator('ALPHA')],
         'ALPHA',
       ],
     ] as const
-  ).forEach(([title, operators, taken]) => {
+  ).forEach(([title, mutators, taken]) => {
     it(`refuses ${title}, before it changes the list or the placer`, async () => {
       const { run, names, instrumented, expressionPlacer } = setup();
       const { canPlace } = expressionPlacer;
 
-      await assert.rejects(run([...operators]), {
-        message: `@layzee/stryker-playwright-mutators: another mutator already has the name ${taken}.`,
+      await assert.rejects(run([...mutators]), {
+        message: `@layzee/stryker-jsx-mutators: another mutator already has the name ${taken}.`,
       });
 
       assert.deepEqual(names(), strykerMutators);
@@ -198,22 +194,22 @@ describe('install', () => {
     });
   });
 
-  it("treats a Stryker mutator whose name lowercases to an operator's name as a collision", async () => {
+  it("treats a Stryker mutator whose name lowercases to one of this package's mutator names as a collision", async () => {
     const { run, instrumenter } = setup();
     const kelvinSign = '\u212A';
     instrumenter.allMutators.push({ name: kelvinSign, mutate: () => [] });
 
-    await assert.rejects(run([operator('k')]), {
+    await assert.rejects(run([mutator('k')]), {
       message:
-        '@layzee/stryker-playwright-mutators: another mutator already has the name k.',
+        '@layzee/stryker-jsx-mutators: another mutator already has the name k.',
     });
   });
 
-  it('does not count its own registered operators as collisions on a second install', async () => {
+  it('does not count its own registered mutators as collisions on a second install', async () => {
     const { run, names } = setup();
 
-    await run([operator('Alpha')]);
-    await run([operator('Alpha')]);
+    await run([mutator('Alpha')]);
+    await run([mutator('Alpha')]);
 
     assert.deepEqual(names(), [...strykerMutators, 'Alpha']);
   });
@@ -223,28 +219,28 @@ describe('install', () => {
 
     await assert.rejects(
       run([
-        operator('Text1'),
-        operator('Alpha'),
-        operator('Text-Literal'),
-        operator(''),
+        mutator('Text1'),
+        mutator('Alpha'),
+        mutator('Text-Literal'),
+        mutator(''),
       ]),
       {
         message:
-          "@layzee/stryker-playwright-mutators: a mutator name has letters only, as Stryker's directives match no other character: " +
+          "@layzee/stryker-jsx-mutators: a mutator name has letters only, as Stryker's directives match no other character: " +
           '"Text1", "Text-Literal", ""',
       },
     );
     assert.deepEqual(names(), strykerMutators);
   });
 
-  it('throws, naming the instrumenter version and dir and every operator whose sample gave no mutant', async () => {
+  it('throws, naming the instrumenter version and dir and every mutator whose sample gave no mutant', async () => {
     const { run } = setup({ silent: ['Alpha', 'Gamma'] });
 
     await assert.rejects(
-      run([operator('Alpha'), operator('Beta'), operator('Gamma')]),
+      run([mutator('Alpha'), mutator('Beta'), mutator('Gamma')]),
       {
         message:
-          `@layzee/stryker-playwright-mutators: the instrumenter ${testedVersion} in /stryker/instrumenter made no mutants of Alpha, Gamma from ` +
+          `@layzee/stryker-jsx-mutators: the instrumenter ${testedVersion} in /stryker/instrumenter made no mutants of Alpha, Gamma from ` +
           'their samples, so it does not run the mutators this module added. A bundled or second copy of the ' +
           'instrumenter does that.',
       },
@@ -254,11 +250,11 @@ describe('install', () => {
   (
     [
       [
-        'a mutant of an operator only from its own sample file',
+        'a mutant of a mutator only from its own sample file',
         { fileName: 'Other.self-check.tsx' },
       ],
       [
-        'a mutant in the sample file of an operator only when that operator made it',
+        'a mutant in the sample file of a mutator only when that mutator made it',
         { mutatorName: 'StringLiteral' },
       ],
     ] satisfies [string, Partial<MutantOrigin>][]
@@ -275,7 +271,7 @@ describe('install', () => {
       };
 
       await assert.rejects(
-        run([operator('Alpha')], changed),
+        run([mutator('Alpha')], changed),
         /made no mutants of Alpha from their samples/,
       );
     });
@@ -285,11 +281,11 @@ describe('install', () => {
     it(`warns about the instrumenter version ${version} after the self-check passed`, async () => {
       const { run, names, warnings } = setup({ version });
 
-      await run([operator('Alpha')]);
+      await run([mutator('Alpha')]);
 
       assert.deepEqual(names(), [...strykerMutators, 'Alpha']);
       assert.deepEqual(warnings, [
-        `@layzee/stryker-playwright-mutators was tested with @stryker-mutator/instrumenter ${testedVersion}, not ${version} in ` +
+        `@layzee/stryker-jsx-mutators was tested with @stryker-mutator/instrumenter ${testedVersion}, not ${version} in ` +
           '/stryker/instrumenter; its self-check passed.',
       ]);
     });
@@ -299,7 +295,7 @@ describe('install', () => {
     const { run, warnings } = setup({ version: '10.2.0', silent: ['Alpha'] });
 
     await assert.rejects(
-      run([operator('Alpha')]),
+      run([mutator('Alpha')]),
       /the instrumenter 10\.2\.0 in \/stryker\/instrumenter made no mutants of Alpha/,
     );
     assert.deepEqual(warnings, []);
@@ -511,7 +507,7 @@ describe('resolveFromCore against a fake instrumenter', () => {
     const { corePackage, dir } = fakeCore(t, ['otherPlacer']);
 
     await assert.rejects(resolveFromCore(corePackage), {
-      message: `@layzee/stryker-playwright-mutators: the instrumenter 9.9.8 in ${dir} has no expressionMutantPlacer.`,
+      message: `@layzee/stryker-jsx-mutators: the instrumenter 9.9.8 in ${dir} has no expressionMutantPlacer.`,
     });
   });
 
@@ -567,7 +563,7 @@ describe('resolveFromCore against a fake instrumenter', () => {
       });
 
       await assert.rejects(resolveFromCore(corePackage), {
-        message: `@layzee/stryker-playwright-mutators: the instrumenter 9.9.8 in ${dir} has no ${missing}.`,
+        message: `@layzee/stryker-jsx-mutators: the instrumenter 9.9.8 in ${dir} has no ${missing}.`,
       });
     });
   });
@@ -651,7 +647,7 @@ describe('resolveFromCore against a fake instrumenter', () => {
     const path = firstPath(parse('x;'), 'Program');
 
     assert.throws(() => original.canPlace(path), {
-      message: `@layzee/stryker-playwright-mutators: the instrumenter 9.9.8 in ${dir} has an expressionMutantPlacer whose canPlace returned a number, not a boolean.`,
+      message: `@layzee/stryker-jsx-mutators: the instrumenter 9.9.8 in ${dir} has an expressionMutantPlacer whose canPlace returned a number, not a boolean.`,
     });
   });
 
@@ -693,7 +689,7 @@ describe('resolveFromCore against a fake instrumenter', () => {
       await assert.rejects(
         instrumenter.instrument([{ name: 'a.tsx', content: 'x' }]),
         {
-          message: `@layzee/stryker-playwright-mutators: the instrumenter 9.9.8 in ${dir} resolved Instrumenter.instrument() to a value whose mutants are missing or have no string fileName and mutatorName.`,
+          message: `@layzee/stryker-jsx-mutators: the instrumenter 9.9.8 in ${dir} resolved Instrumenter.instrument() to a value whose mutants are missing or have no string fileName and mutatorName.`,
         },
       );
     });

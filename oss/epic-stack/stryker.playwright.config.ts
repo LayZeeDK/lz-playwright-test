@@ -3,7 +3,7 @@ import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 export default {
   plugins: [
     '@layzee/stryker-playwright-runner',
-    '@layzee/stryker-playwright-mutators',
+    '@layzee/stryker-jsx-mutators',
     '@stryker-mutator/typescript-checker',
   ],
   ignorers: ['lz-jsx'],

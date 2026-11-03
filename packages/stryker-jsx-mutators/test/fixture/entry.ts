@@ -9,7 +9,7 @@ if (process.argv[2] === 'taken') {
 }
 
 const { strykerPlugins } = await import('../../src/index.ts');
-const own = Symbol.for('@layzee/stryker-playwright-mutators');
+const own = Symbol.for('@layzee/stryker-jsx-mutators');
 let ignorer: string;
 
 try {

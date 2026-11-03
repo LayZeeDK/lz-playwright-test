@@ -207,7 +207,7 @@ describe('consumerRoles', () => {
       otherBundled.roles,
     );
     assert.deepEqual(messages, [
-      '@layzee/stryker-playwright-mutators: cannot read the implicit role table of playwright-core ' +
+      '@layzee/stryker-jsx-mutators: cannot read the implicit role table of playwright-core ' +
         "(Error: Package subpath './package.json' is not exported, code ERR_PACKAGE_PATH_NOT_EXPORTED); " +
         'LzJsxElementRole uses the table bundled from playwright-core 0.0.1.',
     ]);
@@ -226,7 +226,7 @@ describe('consumerRoles', () => {
       otherBundled.roles,
     );
     assert.deepEqual(messages, [
-      `@layzee/stryker-playwright-mutators: cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} ` +
+      `@layzee/stryker-jsx-mutators: cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} ` +
         '(Error: kImplicitRoleByTagName not found); LzJsxElementRole uses the table bundled from playwright-core 0.0.1.',
     ]);
   });
@@ -240,7 +240,7 @@ describe('consumerRoles', () => {
       otherBundled.roles,
     );
     assert.deepEqual(messages, [
-      `@layzee/stryker-playwright-mutators: cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} ` +
+      `@layzee/stryker-jsx-mutators: cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} ` +
         '(Error: kImplicitRoleByTagName lacks the entries for a, area that LzJsxElementRole reads); ' +
         'LzJsxElementRole uses the table bundled from playwright-core 0.0.1.',
     ]);
@@ -267,7 +267,7 @@ describe('consumerRoles', () => {
       otherBundled.roles,
     );
     assert.deepEqual(messages, [
-      `@layzee/stryker-playwright-mutators: cannot read the implicit role table of playwright-core in ${manifest} ` +
+      `@layzee/stryker-jsx-mutators: cannot read the implicit role table of playwright-core in ${manifest} ` +
         `(${String(jsonError)}); LzJsxElementRole uses the table bundled from playwright-core 0.0.1.`,
     ]);
   });
