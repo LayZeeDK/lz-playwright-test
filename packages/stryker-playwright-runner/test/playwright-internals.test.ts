@@ -190,8 +190,12 @@ test('the test runner resolves loadConfig to the project and web server fields t
           project: { name: 'a', timeout: 1, retries: 2 },
           deps: [],
         },
-        { default: false, expect: {}, project: { name: 'b', timeout: 0 } },
-        { default: true, project: { name: 'c', timeout: 2 } },
+        {
+          default: false,
+          expect: {},
+          project: { name: 'b', timeout: 0, retries: 0 },
+        },
+        { default: true, project: { name: 'c', timeout: 2, retries: 0 } },
       ],
       webServers: [
         {
@@ -237,8 +241,8 @@ test('the test runner reads loaded config values the way Playwright does: a nume
   const runner = await testRunnerAnswering({
     loadConfig: {
       projects: [
-        { default: 'yes', project: { name: 'a', timeout: 1 } },
-        { default: 0, project: { name: 'b', timeout: 1 } },
+        { default: 'yes', project: { name: 'a', timeout: 1, retries: 0 } },
+        { default: 0, project: { name: 'b', timeout: 1, retries: 0 } },
       ],
       webServers: [
         { port: '3000', ignoreHTTPSErrors: 1 },
@@ -276,7 +280,7 @@ test('the test runner reads what Playwright runs though its types refuse it: a f
         {
           default: true,
           expect: { timeout: null },
-          project: { name: 'a', timeout: 1 },
+          project: { name: 'a', timeout: 1, retries: 0 },
         },
       ],
       webServers: [
@@ -326,7 +330,7 @@ test('the test runner reads what Playwright runs though its types refuse it: a f
 const validProject = {
   default: true,
   expect: { timeout: 5 },
-  project: { name: 'a', timeout: 1 },
+  project: { name: 'a', timeout: 1, retries: 0 },
 };
 const validServer = {
   url: 'http://localhost',
@@ -346,14 +350,25 @@ const refusedConfigs = [
   [
     'has a project with no string project.name',
     {
-      projects: [{ ...validProject, project: { name: 1, timeout: 1 } }],
+      projects: [
+        { ...validProject, project: { name: 1, timeout: 1, retries: 0 } },
+      ],
       webServers: [],
     },
   ],
   [
     'has a project with no number project.timeout',
     {
-      projects: [{ ...validProject, project: { name: 'a', timeout: '1' } }],
+      projects: [
+        { ...validProject, project: { name: 'a', timeout: '1', retries: 0 } },
+      ],
+      webServers: [],
+    },
+  ],
+  [
+    'has a project with no project.retries',
+    {
+      projects: [{ ...validProject, project: { name: 'a', timeout: 1 } }],
       webServers: [],
     },
   ],
@@ -588,7 +603,6 @@ test('the instrumentation is the one playwright-core exports, and its absence fa
   });
 });
 
-// A root suite as onBegin receives it: one suite per project, titled with its name.
 function rootSuite(projects: Readonly<Record<string, readonly unknown[]>>) {
   return {
     suites: Object.entries(projects).map(([title, tests]) => ({

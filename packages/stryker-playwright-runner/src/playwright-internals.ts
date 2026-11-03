@@ -296,8 +296,7 @@ function parseConfig(
       const settings = fieldOf(project, 'project');
       const expect = fieldOf(project, 'expect');
       const expectTimeout = fieldOf(expect, 'timeout') ?? undefined;
-      // Playwright's default when nothing sets retries.
-      const retries = fieldOf(settings, 'retries') ?? 0;
+      const retries = fieldOf(settings, 'retries');
 
       if (
         !isRecord(project) ||
@@ -372,9 +371,10 @@ function parseConfig(
 }
 
 /**
- * Playwright's runTests sets retries to 0 for every project. Its dispatcher reads each test's retries from
- * the TestCase objects that onBegin receives, so the runner raises them there. A test whose
- * describe.configure({ retries }) set a number keeps it, unless that number is 0.
+ * Playwright's runTests sets retries to 0 for every project (playwright 1.64.1 lib/runner/index.js:7010). Its
+ * dispatcher reads each test's retries from the TestCase objects that onBegin receives (lib/runner/index.js:6128,
+ * set at lib/common/index.js:2060), so the runner raises them there. A test whose describe.configure({ retries })
+ * set a number keeps it, unless that number is 0.
  */
 export function raiseRetries(
   suite: unknown,
