@@ -49,6 +49,21 @@ test("init counts the largest project's retries, or the retries option, in the t
   assert.deepEqual(enough.lines, []);
 });
 
+test('init refuses projects that share a name but not their retries', async (t) => {
+  const fake = fakePlaywright(t, {
+    projects: [
+      { default: true, project: { name: 'e2e', timeout: 1, retries: 2 } },
+      { default: true, project: { name: 'e2e', timeout: 1, retries: 0 } },
+    ],
+  });
+  const { shell } = fake.runner();
+
+  await assert.rejects(
+    shell.init(),
+    /projects named "e2e" set different retries/,
+  );
+});
+
 function oneTestPerProject(projects: readonly string[]) {
   const tests = projects.map(() => ({ retries: 0 }));
   const root = {
