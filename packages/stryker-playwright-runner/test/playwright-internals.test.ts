@@ -15,6 +15,13 @@ import {
 } from '../src/playwright-internals.ts';
 
 const src = new URL('../src/', import.meta.url);
+const noServer = {
+  url: undefined,
+  port: undefined,
+  ignoreHTTPSErrors: false,
+  reuseExistingServer: false,
+  setsNodeOptions: false,
+};
 
 function fakeModules(
   methods: readonly string[] = testRunnerMethods,
@@ -202,6 +209,8 @@ test('the test runner resolves loadConfig to the project and web server fields t
           url: 'http://localhost:3000',
           port: 3000,
           ignoreHTTPSErrors: true,
+          reuseExistingServer: true,
+          env: { NODE_OPTIONS: '--inspect' },
           command: 'serve',
         },
         {},
@@ -229,8 +238,14 @@ test('the test runner resolves loadConfig to the project and web server fields t
       },
     ],
     webServers: [
-      { url: 'http://localhost:3000', port: 3000, ignoreHTTPSErrors: true },
-      { url: undefined, port: undefined, ignoreHTTPSErrors: false },
+      {
+        url: 'http://localhost:3000',
+        port: 3000,
+        ignoreHTTPSErrors: true,
+        reuseExistingServer: true,
+        setsNodeOptions: true,
+      },
+      { ...noServer, url: undefined, port: undefined },
     ],
   });
 });
@@ -243,8 +258,13 @@ test('the test runner reads loaded config values the way Playwright does: a nume
         { default: 0, project: { name: 'b', timeout: 1, retries: 0 } },
       ],
       webServers: [
-        { port: '3000', ignoreHTTPSErrors: 1 },
-        { port: 4000, ignoreHTTPSErrors: '' },
+        {
+          port: '3000',
+          ignoreHTTPSErrors: 1,
+          reuseExistingServer: 'yes',
+          env: { PORT: '3000', NODE_OPTIONS: undefined },
+        },
+        { port: 4000, ignoreHTTPSErrors: '', reuseExistingServer: 0, env: 1 },
       ],
     },
   });
@@ -263,8 +283,13 @@ test('the test runner reads loaded config values the way Playwright does: a nume
       },
     ],
     webServers: [
-      { url: undefined, port: 3000, ignoreHTTPSErrors: true },
-      { url: undefined, port: 4000, ignoreHTTPSErrors: false },
+      {
+        ...noServer,
+        port: 3000,
+        ignoreHTTPSErrors: true,
+        reuseExistingServer: true,
+      },
+      { ...noServer, port: 4000 },
     ],
   });
 });
@@ -301,22 +326,14 @@ test('the test runner reads what Playwright runs though its types refuse it: a f
       },
     ],
     webServers: [
-      { url: undefined, port: undefined, ignoreHTTPSErrors: false },
-      { url: undefined, port: undefined, ignoreHTTPSErrors: false },
-      { url: undefined, port: undefined, ignoreHTTPSErrors: false },
-      { url: undefined, port: undefined, ignoreHTTPSErrors: false },
-      { url: undefined, port: undefined, ignoreHTTPSErrors: false },
-      {
-        url: 'http://127.0.0.1:41234/',
-        port: undefined,
-        ignoreHTTPSErrors: false,
-      },
-      {
-        url: 'http://localhost:3000/health',
-        port: 3000,
-        ignoreHTTPSErrors: false,
-      },
-      { url: 'http://localhost/health', port: 0, ignoreHTTPSErrors: false },
+      noServer,
+      noServer,
+      noServer,
+      noServer,
+      noServer,
+      { ...noServer, url: 'http://127.0.0.1:41234/' },
+      { ...noServer, url: 'http://localhost:3000/health', port: 3000 },
+      { ...noServer, url: 'http://localhost/health', port: 0 },
     ],
   });
 });

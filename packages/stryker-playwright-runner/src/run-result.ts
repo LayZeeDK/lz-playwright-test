@@ -23,6 +23,7 @@ import type {
   MutantRunRequest,
   RunRequest,
 } from './run-request.ts';
+import { untaggedArrival } from './server-protocol.ts';
 import { timeoutReason } from './timeouts.ts';
 
 export type RunResult =
@@ -226,8 +227,40 @@ export function missingCoverageError(
   return 'No page loaded instrumented code. Is the webServer serving the Stryker sandbox? A server that was already running (reuseExistingServer) serves the original sources.';
 }
 
-// The output maps have no prototype, so a test id such as __proto__ from a page stays an own key.
-export function mergeCoverage(snapshots: readonly Snapshot[]): MutantCoverage {
+/** When one attempt of a test ran, in ms since the epoch. */
+export interface TestWindow {
+  readonly testId: string;
+  readonly start: number;
+  readonly end: number;
+}
+
+export const arrivalSlackMs = 50;
+
+export function testWindows(testCases: Iterable<ReportedTest>): TestWindow[] {
+  return [...testCases].flatMap((test) =>
+    test.results.flatMap(({ startTime, duration }) =>
+      startTime === undefined
+        ? []
+        : [
+            {
+              testId: test.id,
+              start: startTime.getTime(),
+              end: startTime.getTime() + duration,
+            },
+          ],
+    ),
+  );
+}
+
+/**
+ * A server request that came without a test id counts for every test that ran when it arrived, and as
+ * static when none did. The output maps have no prototype, so a test id such as __proto__ from a page
+ * stays an own key.
+ */
+export function mergeCoverage(
+  snapshots: readonly Snapshot[],
+  windows: readonly TestWindow[] = [],
+): MutantCoverage {
   const merged: MutantCoverage = {
     static: nullPrototypeRecord(),
     perTest: nullPrototypeRecord(),
@@ -240,6 +273,25 @@ export function mergeCoverage(snapshots: readonly Snapshot[]): MutantCoverage {
       target[mutantId] = (target[mutantId] ?? 0) + count;
     });
   };
+  const testsFor = (testId: string, outlivedItsTest: boolean): string[] => {
+    const arrivedAt = untaggedArrival(testId);
+
+    if (arrivedAt === undefined) {
+      return outlivedItsTest ? [] : [testId];
+    }
+
+    return [
+      ...new Set(
+        windows
+          .filter(
+            ({ start, end }) =>
+              start - arrivalSlackMs <= arrivedAt &&
+              arrivedAt <= end + arrivalSlackMs,
+          )
+          .map((window) => window.testId),
+      ),
+    ];
+  };
 
   snapshots.forEach(({ coverage, outlivedItsTest }) => {
     if (!coverage) {
@@ -248,12 +300,15 @@ export function mergeCoverage(snapshots: readonly Snapshot[]): MutantCoverage {
 
     add(merged.static, coverage.static);
     Object.entries(coverage.perTest).forEach(([testId, hits]) => {
-      add(
-        outlivedItsTest
-          ? merged.static
-          : (merged.perTest[testId] ??= nullPrototypeRecord()),
-        hits,
-      );
+      const tests = testsFor(testId, outlivedItsTest);
+
+      if (tests.length === 0) {
+        add(merged.static, hits);
+      }
+
+      tests.forEach((id) => {
+        add((merged.perTest[id] ??= nullPrototypeRecord()), hits);
+      });
     });
   });
 
@@ -295,7 +350,14 @@ export function dryRunResult(
   }
 
   return {
-    result: { status, tests, mutantCoverage: mergeCoverage(snapshots) },
+    result: {
+      status,
+      tests,
+      mutantCoverage: mergeCoverage(
+        snapshots,
+        testWindows(output.reporter.testCases.values()),
+      ),
+    },
     gaps: coverageGaps(snapshots),
   };
 }

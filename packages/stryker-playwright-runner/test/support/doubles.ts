@@ -153,6 +153,7 @@ export function mutantRequest(
     kind: 'mutant',
     disableBail: true,
     activeMutant: '1',
+    mutantActivation: 'runtime',
     selection: undefined,
     hitLimit: undefined,
     budget: dryRunBudget,

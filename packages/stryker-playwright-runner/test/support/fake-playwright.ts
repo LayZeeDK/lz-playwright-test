@@ -51,6 +51,8 @@ interface WebServer {
   readonly url?: string;
   readonly port?: number;
   readonly ignoreHTTPSErrors?: boolean;
+  readonly reuseExistingServer?: boolean;
+  readonly setsNodeOptions?: boolean;
 }
 
 /** What one runTests call saw: its params, the run settings and the environment the workers get. */
@@ -159,6 +161,8 @@ export function fakePlaywright(
         })),
         webServers: (behaviour.webServers ?? []).map((server) => ({
           ignoreHTTPSErrors: false,
+          reuseExistingServer: false,
+          setsNodeOptions: false,
           ...server,
         })),
       };

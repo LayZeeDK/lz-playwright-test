@@ -9,6 +9,8 @@ export const runSettingsEnv = 'LZ_STRYKER_PLAYWRIGHT_RUN';
 
 export const snapshotSuffix = '.ndjson';
 
+export const workerFilePrefix = 'worker-';
+
 export const installErrorSuffix = '.install-error';
 
 export const frameReadTimeoutMs = 2000;
@@ -17,6 +19,8 @@ export interface RunSettings {
   readonly outDir: string;
   readonly perTest: boolean;
   readonly hitLimit?: number | undefined;
+  /** The webServer hosts (see hostKey) whose requests from a test's page carry the test id header. */
+  readonly testIdHosts?: readonly string[] | undefined;
 }
 
 export interface PageSettings extends Pick<RunSettings, 'hitLimit'> {
@@ -142,7 +146,11 @@ export function readSnapshotDir(dir: string): SnapshotDir {
     .filter((file) => file.endsWith(installErrorSuffix))
     .map(read);
 
-  return { snapshots, hookInstalled: files.length > 0, installErrors };
+  return {
+    snapshots,
+    hookInstalled: files.some((file) => file.startsWith(workerFilePrefix)),
+    installErrors,
+  };
 }
 
 export function readRunSettings(
@@ -164,18 +172,28 @@ export function readRunSettings(
   }
 
   if (isRecord(settings)) {
-    const { outDir, perTest, hitLimit } = settings;
+    const { outDir, perTest, hitLimit, testIdHosts } = settings;
 
     if (
       typeof outDir === 'string' &&
       typeof perTest === 'boolean' &&
-      (hitLimit === undefined || typeof hitLimit === 'number')
+      (hitLimit === undefined || typeof hitLimit === 'number') &&
+      (testIdHosts === undefined || isStringArray(testIdHosts))
     ) {
-      return hitLimit === undefined
-        ? { outDir, perTest }
-        : { outDir, perTest, hitLimit };
+      return {
+        outDir,
+        perTest,
+        ...(hitLimit === undefined ? {} : { hitLimit }),
+        ...(testIdHosts === undefined ? {} : { testIdHosts }),
+      };
     }
   }
 
   throw new Error(refused);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === 'string')
+  );
 }

@@ -166,6 +166,7 @@ export function fakeInstall(
     const onPage: ((page: HookedPage) => void)[] = [];
     const scripts: [unknown, PageSettings][] = [];
     const events: string[] = [];
+    const routes: Parameters<HookedContext['route']>[] = [];
     const created: HookedContext = {
       pages: () => pages,
       browser: () => owner?.browser ?? null,
@@ -176,6 +177,9 @@ export function fakeInstall(
       addInitScript: async (script, settings) => {
         scripts.push([script, settings]);
       },
+      route: async (url, handler) => {
+        routes.push([url, handler]);
+      },
     };
     owner?.contexts.push(created);
     await hooks.runAfterCreateBrowserContext?.(created);
@@ -184,6 +188,7 @@ export function fakeInstall(
       context: created,
       scripts,
       events,
+      routes,
       open: (opened: HookedPage) => {
         pages.push(opened);
         onPage.forEach((handler) => handler(opened));

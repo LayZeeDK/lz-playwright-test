@@ -13,6 +13,7 @@ import {
   type HookedContext,
   type HookedFrame,
   type HookedPage,
+  type HookedRequestContext,
   instrumentationOf,
   internalsChanged,
   playwrightVersion,
@@ -30,7 +31,9 @@ import {
   serializeSnapshot,
   snapshotSuffix,
   type SnapshotLine,
+  workerFilePrefix,
 } from './protocol.ts';
+import { hostKey, testIdHeader } from './server-protocol.ts';
 
 type FrameRead = Omit<SnapshotLine, 'outlivedItsTest'>;
 
@@ -130,7 +133,7 @@ if (
       fs.writeFileSync(
         path.join(
           settings.outDir,
-          `worker-${process.pid}${installErrorSuffix}`,
+          `${workerFilePrefix}${process.pid}${installErrorSuffix}`,
         ),
         String(error),
       );
@@ -144,9 +147,10 @@ if (
 
 export function install(
   playwrightRequire: (id: string) => unknown,
-  { outDir, perTest, hitLimit }: RunSettings,
+  { outDir, perTest, hitLimit, testIdHosts }: RunSettings,
   ns: string = INSTRUMENTER_CONSTANTS.NAMESPACE,
 ): void {
+  const tagHosts = perTest ? testIdHosts : undefined;
   const version = playwrightVersion(playwrightRequire);
   const test = currentTestOf(playwrightRequire('playwright/test'), version);
   const instrumentation = instrumentationOf(
@@ -157,7 +161,7 @@ export function install(
     process.env[INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE];
   const outFile = path.join(
     outDir,
-    `worker-${process.pid}-${randomUUID()}${snapshotSuffix}`,
+    `${workerFilePrefix}${process.pid}-${randomUUID()}${snapshotSuffix}`,
   );
   const contexts = new WeakMap<HookedContext, ContextState>();
   const alreadyRead = new WeakSet<HookedPage>();
@@ -240,8 +244,61 @@ export function install(
         testId: state.testId,
         hitLimit,
       } satisfies PageSettings);
+
+      if (tagHosts !== undefined && state.testId !== undefined) {
+        await tagPageRequests(context, state.testId, tagHosts);
+      }
     },
     runBeforeCloseBrowserContext: collect,
+    async runAfterCreateRequestContext(context) {
+      const testId = contextTestId(test);
+
+      if (tagHosts !== undefined && testId !== undefined) {
+        tagFetches(context, testId);
+      }
+    },
+  });
+}
+
+/**
+ * Adds the header after the browser decided on CORS, and only to the webServer's hosts, so a cross-origin
+ * request gets no preflight it would not get without the runner. `fallback` leaves the request to the
+ * routes the test adds, which Playwright runs first.
+ */
+function tagPageRequests(
+  context: HookedContext,
+  testId: string,
+  hosts: readonly string[],
+) {
+  return context.route(
+    (url) => hosts.includes(hostKey(url)),
+    (route) =>
+      route.fallback({
+        headers: { ...route.request().headers(), [testIdHeader]: testId },
+      }),
+  );
+}
+
+/**
+ * Wraps fetch, which get, post and the other methods call. Playwright Test's listener fills a request
+ * context's options only where they are unset, after this hook's listener (playwright 1.64.1
+ * lib/index.js:128), so setting extraHTTPHeaders at creation would drop the test's own.
+ */
+function tagFetches(context: HookedRequestContext, testId: string) {
+  const fetch = context.fetch.bind(context);
+  const tagged: HookedRequestContext['fetch'] = (target, options = {}) =>
+    fetch(target, {
+      ...options,
+      headers: {
+        ...(options.headers ??
+          (typeof target === 'string' ? {} : target.headers())),
+        [testIdHeader]: testId,
+      },
+    });
+  Object.defineProperty(context, 'fetch', {
+    configurable: true,
+    writable: true,
+    value: tagged,
   });
 }
 

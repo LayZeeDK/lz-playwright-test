@@ -1,6 +1,9 @@
+import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
+import { setTimeout } from 'node:timers/promises';
 
+import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 import type { Logger } from '@stryker-mutator/api/logging';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 import type {
@@ -31,6 +34,7 @@ import {
   mutantRunRequest,
   runPlan,
   type RunRequest,
+  serverMutantFor,
 } from './run-request.ts';
 import {
   type CoverageGaps,
@@ -45,6 +49,16 @@ import {
   projectsThatRun,
   type SerialGroups,
 } from './serial-groups.ts';
+import {
+  anyHooked,
+  forgetHooked,
+  hostKey,
+  readServerSupport,
+  serverDirEnv,
+  type ServerSupport,
+  serverSupportEnv,
+  writeServerControl,
+} from './server-protocol.ts';
 import { claimTempRoot, removeDir, type TempRoot } from './temp-root.ts';
 import {
   armDeadline,
@@ -59,20 +73,30 @@ interface ServerCheck {
   isUp(): Promise<boolean>;
 }
 
+/** The webServer side of a session, when server support is on. */
+interface ServerSide {
+  /** Holds the control file and the hooked marks of the processes global setup starts. */
+  readonly dir: string;
+  readonly testIdHosts: readonly string[] | undefined;
+}
+
 interface Session {
   readonly options: RunnerOptions;
   readonly playwright: TestRunner;
   readonly root: TempRoot;
   readonly servers: readonly ServerCheck[];
+  readonly server: ServerSide | undefined;
   readonly serialGroups: SerialGroups;
   readonly timeouts: ConfigTimeouts;
   readonly retriesByProject: ReadonlyMap<string, number>;
 }
 
-const workerHookUrl = new URL(
-  `./worker-hook${path.extname(import.meta.filename)}`,
-  import.meta.url,
-).href;
+const hookUrl = (name: string) =>
+  new URL(`./${name}${path.extname(import.meta.filename)}`, import.meta.url)
+    .href;
+const workerHookUrl = hookUrl('worker-hook');
+const serverHookUrl = hookUrl('server-hook');
+const hookedWaitMs = 1000;
 
 const runOverrides = {
   use: { screenshot: 'off', trace: 'off', video: 'off' },
@@ -85,6 +109,8 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
   readonly #log: Logger;
   readonly #baseNodeOptions = process.env['NODE_OPTIONS'];
   #session: Session | undefined;
+  /** The static mutant the webServer last started with. */
+  #serverMutant: string | undefined;
 
   constructor(
     options: LzPlaywrightRunnerOptionsWithStrykerOptions,
@@ -131,7 +157,13 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       const servers = config.webServers.flatMap((server) =>
         serverCheck(server, pw.isURLAvailable),
       );
-      await runGlobalSetup(playwright);
+      const server = await serverSide(
+        readServerSupport(process.env),
+        root,
+        config.webServers,
+        pw.isURLAvailable,
+      );
+      await this.#globalSetup(playwright, server, undefined);
       // Every Stryker test runner process needs the groups, and only one of them runs the dry run.
       // Listed after global setup, like Playwright's own CLI, because test files may read what it
       // creates.
@@ -145,6 +177,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         playwright,
         root,
         servers,
+        server,
         serialGroups,
         timeouts,
         retriesByProject,
@@ -223,6 +256,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
   }
 
   async #run(session: Session, request: RunRequest): Promise<RunOutput> {
+    await this.#serveMutant(session, serverMutantFor(request));
     const deadlineAt =
       request.budget.deadlineMs === undefined
         ? undefined
@@ -254,7 +288,16 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     );
 
     try {
-      const { env, params } = runPlan(request, outDir);
+      const { env, params, control } = runPlan(
+        request,
+        outDir,
+        session.server?.testIdHosts,
+      );
+
+      if (session.server) {
+        writeServerControl(session.server.dir, control);
+      }
+
       // Only the workers this run forks see these; the webServer started earlier never does.
       const { status } = await withEnv(
         {
@@ -310,10 +353,132 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     this.#log.warn(
       `webServer at ${names} stopped answering; rerunning Playwright global setup (global teardown runs first).`,
     );
-    await runGlobalSetup(session.playwright);
+    await this.#globalSetup(
+      session.playwright,
+      session.server,
+      this.#serverMutant,
+    );
 
     return true;
   }
+
+  async #serveMutant(session: Session, mutant: string | undefined) {
+    if (!session.server || mutant === this.#serverMutant) {
+      return;
+    }
+
+    this.#log.debug(
+      `Restarting the webServer ${mutant === undefined ? 'without a mutant' : `with static mutant ${mutant}`}.`,
+    );
+    await this.#globalSetup(session.playwright, session.server, mutant);
+  }
+
+  /** Global teardown runs first, so this also restarts the webServer that global setup started. */
+  async #globalSetup(
+    playwright: TestRunner,
+    server: ServerSide | undefined,
+    mutant: string | undefined,
+  ) {
+    if (!server) {
+      await runGlobalSetup(playwright);
+
+      return;
+    }
+
+    forgetHooked(server.dir);
+    await withEnv(
+      {
+        NODE_OPTIONS:
+          `--import "${serverHookUrl}" ${this.#baseNodeOptions ?? ''}`.trim(),
+        [serverDirEnv]: server.dir,
+        [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: mutant,
+      },
+      () => runGlobalSetup(playwright),
+    );
+    this.#serverMutant = mutant;
+
+    if (!(await hookedWithin(server.dir, hookedWaitMs))) {
+      throw new Error(
+        `${serverSupportEnv} is on, but no process that Playwright global setup started loaded the server hook. ` +
+          'A webServer that is not Node.js, a command that sets NODE_OPTIONS itself, or a server that was already ' +
+          'running cannot get the active mutant.',
+      );
+    }
+  }
+}
+
+/**
+ * Fails on what server support cannot handle: a NODE_OPTIONS in webServer.env replaces the runner's, and
+ * a server that answers before global setup with reuseExistingServer belongs to another process, which
+ * this runner cannot switch to its mutant.
+ */
+export async function serverSide(
+  support: ServerSupport | undefined,
+  root: Pick<TempRoot, 'dir'>,
+  webServers: readonly ConfigWebServer[],
+  isURLAvailable: Playwright['isURLAvailable'],
+): Promise<ServerSide | undefined> {
+  if (!support) {
+    return undefined;
+  }
+
+  if (webServers.some((server) => server.setsNodeOptions)) {
+    throw new Error(
+      `${serverSupportEnv} is on, but a webServer's env sets NODE_OPTIONS, which replaces the one that loads ` +
+        'the server hook. Set NODE_OPTIONS in the environment that runs Stryker instead.',
+    );
+  }
+
+  const reused = webServers
+    .filter((server) => server.reuseExistingServer)
+    .flatMap((server) => serverCheck(server, isURLAvailable));
+  const up = await Promise.all(reused.map((server) => server.isUp()));
+  const shared = reused.filter((_, index) => up[index]);
+
+  if (shared.length > 0) {
+    throw new Error(
+      `${serverSupportEnv} is on, but the webServer at ${shared.map((server) => server.name).join(', ')} ` +
+        'already answers and reuseExistingServer is true. Only the Stryker process that started a server can ' +
+        'switch its mutant: give each process its own port from STRYKER_MUTATOR_WORKER, and stop your own server.',
+    );
+  }
+
+  const dir = path.join(root.dir, 'server');
+  fs.mkdirSync(dir, { recursive: true });
+
+  return {
+    dir,
+    testIdHosts:
+      support.mode === 'header' ? webServers.flatMap(serverHosts) : undefined,
+  };
+}
+
+function serverHosts(server: ConfigWebServer): string[] {
+  const target = serverTarget(server);
+
+  if (target === undefined) {
+    return [];
+  }
+
+  return [
+    'port' in target
+      ? `localhost:${target.port}`
+      : hostKey(new URL(target.url)),
+  ];
+}
+
+async function hookedWithin(dir: string, waitMs: number): Promise<boolean> {
+  const until = performance.now() + waitMs;
+
+  while (!anyHooked(dir)) {
+    if (performance.now() >= until) {
+      return false;
+    }
+
+    await setTimeout(50);
+  }
+
+  return true;
 }
 
 export async function withEnv<T>(

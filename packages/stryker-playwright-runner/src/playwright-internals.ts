@@ -37,6 +37,9 @@ export interface ConfigWebServer {
    */
   readonly port?: number | undefined;
   readonly ignoreHTTPSErrors: boolean;
+  readonly reuseExistingServer: boolean;
+  /** Whether its `env` sets NODE_OPTIONS, which Playwright puts over the runner's process.env. */
+  readonly setsNodeOptions: boolean;
 }
 
 export interface TestRunner {
@@ -120,12 +123,36 @@ export interface HookedContext {
     script: (settings: PageSettings) => void,
     settings: PageSettings,
   ): Promise<unknown>;
+  route(
+    url: (url: URL) => boolean,
+    handler: (route: HookedRoute) => Promise<void>,
+  ): Promise<unknown>;
+}
+
+export interface HookedRoute {
+  request(): { headers(): Record<string, string> };
+  fallback(options: {
+    readonly headers: Readonly<Record<string, string>>;
+  }): Promise<void>;
+}
+
+export interface FetchOptions {
+  readonly headers?: Readonly<Record<string, string>> | undefined;
+  readonly [option: string]: unknown;
+}
+
+export interface HookedRequestContext {
+  readonly fetch: (
+    target: string | { headers(): Record<string, string> },
+    options?: FetchOptions,
+  ) => Promise<unknown>;
 }
 
 export interface Instrumentation {
   addListener(listener: {
     runAfterCreateBrowserContext?(context: HookedContext): Promise<void>;
     runBeforeCloseBrowserContext?(context: HookedContext): Promise<void>;
+    runAfterCreateRequestContext?(context: HookedRequestContext): Promise<void>;
   }): void;
 }
 
@@ -349,11 +376,14 @@ function parseConfig(
         url !== undefined && configPort !== undefined
           ? new URL(url).port
           : port;
+      const env = server['env'];
 
       return {
         url,
         port: checkedPort === undefined ? undefined : Number(checkedPort),
         ignoreHTTPSErrors: !!server['ignoreHTTPSErrors'],
+        reuseExistingServer: !!server['reuseExistingServer'],
+        setsNodeOptions: isRecord(env) && env['NODE_OPTIONS'] !== undefined,
       };
     }),
   };

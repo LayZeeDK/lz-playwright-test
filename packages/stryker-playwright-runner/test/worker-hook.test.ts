@@ -583,6 +583,7 @@ test('a context the hook never saw created writes nothing', async (t) => {
     browser: () => null,
     on: () => undefined,
     addInitScript: async () => undefined,
+    route: async () => undefined,
   };
 
   await hooked.hooks.runBeforeCloseBrowserContext?.(unseen);

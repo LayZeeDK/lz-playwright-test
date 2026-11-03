@@ -7,6 +7,7 @@ import type {
 import type { RunTestsParams } from './playwright-internals.ts';
 import { runSettingsEnv, type RunSettings } from './protocol.ts';
 import { type SerialGroups, withSerialGroups } from './serial-groups.ts';
+import type { ServerControl } from './server-protocol.ts';
 import {
   type ConfigTimeouts,
   dryRunBudget,
@@ -27,6 +28,7 @@ export interface MutantRunRequest {
   readonly kind: 'mutant';
   readonly disableBail: boolean;
   readonly activeMutant: string;
+  readonly mutantActivation: MutantRunOptions['mutantActivation'];
   /** Undefined runs every test. */
   readonly selection: TestSelection | undefined;
   readonly hitLimit: number | undefined;
@@ -50,6 +52,7 @@ export function dryRunRequest({
 export function mutantRunRequest(
   {
     activeMutant,
+    mutantActivation,
     testFilter,
     hitLimit,
     disableBail,
@@ -64,6 +67,7 @@ export function mutantRunRequest(
     kind: 'mutant',
     disableBail,
     activeMutant: activeMutant.id,
+    mutantActivation,
     selection: testFilter && {
       covering: testFilter,
       toRun: withSerialGroups(testFilter, session.serialGroups),
@@ -76,14 +80,23 @@ export function mutantRunRequest(
 export interface RunPlan {
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly params: Pick<RunTestsParams, 'testIds' | 'maxFailures' | 'timeout'>;
+  readonly control: ServerControl;
 }
 
-export function runPlan(request: RunRequest, outDir: string): RunPlan {
+/** `testIdHosts` are the webServer hosts whose requests carry the test id header in a per-test run. */
+export function runPlan(
+  request: RunRequest,
+  outDir: string,
+  testIdHosts?: readonly string[],
+): RunPlan {
   const mutant = request.kind === 'mutant' ? request : undefined;
+  const perTest =
+    request.kind === 'dry' && request.coverageAnalysis === 'perTest';
   const settings: RunSettings = {
     outDir,
-    perTest: request.kind === 'dry' && request.coverageAnalysis === 'perTest',
+    perTest,
     hitLimit: mutant?.hitLimit,
+    testIdHosts: perTest ? testIdHosts : undefined,
   };
 
   return {
@@ -96,5 +109,22 @@ export function runPlan(request: RunRequest, outDir: string): RunPlan {
       maxFailures: request.disableBail ? undefined : 1,
       timeout: request.budget.testTimeout,
     },
+    control: {
+      outDir,
+      perTest,
+      activeMutant: mutant?.activeMutant,
+      hitLimit: mutant?.hitLimit,
+    },
   };
+}
+
+/**
+ * The mutant the webServer must start with: code it runs once at start, such as module scope, never
+ * sees a mutant switched per request. Stryker asks for static activation of every run without a test
+ * filter (@stryker-mutator/core 10.1.1 mutant-test-planner.js:148).
+ */
+export function serverMutantFor(request: RunRequest): string | undefined {
+  return request.kind === 'mutant' && request.mutantActivation === 'static'
+    ? request.activeMutant
+    : undefined;
 }

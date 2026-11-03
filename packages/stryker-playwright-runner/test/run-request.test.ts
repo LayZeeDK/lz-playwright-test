@@ -8,6 +8,7 @@ import {
   dryRunRequest,
   mutantRunRequest,
   runPlan,
+  serverMutantFor,
 } from '../src/run-request.ts';
 import {
   dryRequest,
@@ -37,6 +38,7 @@ test('a mutant run request widens its filter to serial groups, keeps the coverin
     kind: 'mutant',
     disableBail: false,
     activeMutant: '7',
+    mutantActivation: 'static',
     selection: { covering: ['edit'], toRun: ['create', 'edit'] },
     hitLimit: 50,
     budget: { testTimeout: 2400, deadlineMs: 5400 },
@@ -59,6 +61,12 @@ test('a dry run plan runs every test with no active mutant, and collects per-tes
       [activeMutantEnv]: undefined,
     },
     params: { testIds: undefined, maxFailures: undefined, timeout: undefined },
+    control: {
+      outDir: 'out',
+      perTest: true,
+      activeMutant: undefined,
+      hitLimit: undefined,
+    },
   });
   assert.equal(
     runPlan(dryRequest({ coverageAnalysis: 'all' }), 'out').env[runSettingsEnv],
@@ -83,8 +91,49 @@ test('a mutant run plan activates the mutant and runs its filter in its budget, 
         [activeMutantEnv]: '7',
       },
       params: { testIds: ['a', 'b'], maxFailures: undefined, timeout: 900 },
+      control: {
+        outDir: 'out',
+        perTest: false,
+        activeMutant: '7',
+        hitLimit: 5,
+      },
     },
   );
+});
+
+test('a run plan names the webServer hosts for the test id header only when it collects per-test coverage', () => {
+  const hosts = ['localhost:4820'];
+
+  assert.equal(
+    runPlan(dryRequest(), 'out', hosts).env[runSettingsEnv],
+    '{"outDir":"out","perTest":true,"testIdHosts":["localhost:4820"]}',
+  );
+  assert.equal(
+    runPlan(dryRequest({ coverageAnalysis: 'all' }), 'out', hosts).env[
+      runSettingsEnv
+    ],
+    '{"outDir":"out","perTest":false}',
+  );
+  assert.equal(
+    runPlan(mutantRequest(), 'out', hosts).env[runSettingsEnv],
+    '{"outDir":"out","perTest":false}',
+  );
+});
+
+test('the webServer starts with the mutant of a statically activated mutant run, and with none otherwise', () => {
+  assert.equal(
+    serverMutantFor(
+      mutantRequest({ activeMutant: '7', mutantActivation: 'static' }),
+    ),
+    '7',
+  );
+  assert.equal(
+    serverMutantFor(
+      mutantRequest({ activeMutant: '7', mutantActivation: 'runtime' }),
+    ),
+    undefined,
+  );
+  assert.equal(serverMutantFor(dryRequest()), undefined);
 });
 
 test('a run plan stops at the first failure unless bail is disabled', () => {

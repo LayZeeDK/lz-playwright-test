@@ -9,6 +9,7 @@ import { raiseRetries } from './playwright-internals.ts';
 
 export interface ReportedAttempt {
   readonly status: TestResult['status'];
+  readonly startTime?: Date | undefined;
   readonly duration: number;
   readonly error?: TestError | undefined;
 }
