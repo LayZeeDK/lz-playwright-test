@@ -1,6 +1,8 @@
-// Prints one JSON line: the names this package registered, whether the placer is wrapped, and the ignorer outcome.
+// Prints one JSON line: the names this package registered, whether the placer is wrapped, each ignorer's outcome,
+// and whether the entry exports the options schema.
 import { resolveFromCore } from '../../src/install.ts';
-import { defined } from '../support/defined.ts';
+import { strykerValidationSchema } from '../../src/styling-ignorer.ts';
+import { exportedFunction } from '../support/exports.ts';
 
 const instrumenter = await resolveFromCore();
 
@@ -8,16 +10,23 @@ if (process.argv[2] === 'taken') {
   instrumenter.allMutators.push({ name: 'LzJsxTextLiteral', mutate: () => [] });
 }
 
-const { strykerPlugins } = await import('../../src/index.ts');
+const entry = await import('../../src/index.ts');
 const own = Symbol.for('@layzee/stryker-jsx-mutators');
-let ignorer: string;
 
-try {
-  const plugin = defined(strykerPlugins[0]);
-  ignorer = `${plugin.kind} ${plugin.name} ${String(plugin.factory().shouldIgnore({}))}`;
-} catch (error) {
-  ignorer = `throws ${error instanceof Error ? error.message : String(error)}`;
-}
+const ignorers = entry.strykerPlugins.map((plugin) => {
+  try {
+    const ignorer: unknown = Reflect.apply(plugin.factory, undefined, [{}]);
+    const outcome: unknown = Reflect.apply(
+      exportedFunction(ignorer, 'shouldIgnore'),
+      ignorer,
+      [{}],
+    );
+
+    return `${plugin.kind} ${plugin.name} ${String(outcome)}`;
+  } catch (error) {
+    return `${plugin.name} throws ${error instanceof Error ? error.message : String(error)}`;
+  }
+});
 
 console.log(
   JSON.stringify({
@@ -25,6 +34,7 @@ console.log(
       .filter((mutator) => own in mutator)
       .map(({ name }) => name),
     placerWrapped: own in instrumenter.expressionPlacer.target,
-    ignorer,
+    ignorers,
+    schema: entry.strykerValidationSchema === strykerValidationSchema,
   }),
 );

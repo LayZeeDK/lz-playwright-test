@@ -4,6 +4,8 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import type { Ignorer } from '@stryker-mutator/api/ignore';
+
 import { fieldOf, isRecord } from './is-record.ts';
 import {
   babelTypeMembers,
@@ -302,6 +304,7 @@ export async function coreInstrument(
   (
     files: readonly SourceFile[],
     excludedMutations?: readonly string[],
+    ignorers?: readonly Ignorer[],
   ) => Promise<unknown>
 > {
   const Instrumenter = fieldOf(
@@ -317,13 +320,13 @@ export async function coreInstrument(
     throw hasNo(instrumenter)('Instrumenter');
   }
 
-  return async (files, excludedMutations = []) => {
+  return async (files, excludedMutations = [], ignorers = []) => {
     const result: unknown = await Reflect.apply(
       instrument,
       Reflect.construct(Instrumenter, [silentLogger]),
       [
         files.map((file) => ({ ...file, mutate: true })),
-        { plugins: null, excludedMutations, ignorers: [] },
+        { plugins: null, excludedMutations, ignorers },
       ],
     );
 

@@ -1,10 +1,19 @@
+import type { StrykerOptions } from '@stryker-mutator/api/core';
 import type { Ignorer } from '@stryker-mutator/api/ignore';
-import { declareFactoryPlugin, PluginKind } from '@stryker-mutator/api/plugin';
+import {
+  commonTokens,
+  declareFactoryPlugin,
+  PluginKind,
+  tokens,
+} from '@stryker-mutator/api/plugin';
 
 import { implicitRoles } from './implicit-roles.ts';
 import { install } from './install.ts';
 import { mutatorsFor } from './mutators.ts';
 import { packageName } from './package-name.ts';
+import { stylingIgnorer } from './styling-ignorer.ts';
+
+export { strykerValidationSchema } from './styling-ignorer.ts';
 
 // Core sets this in every test-runner and checker child process (child-process-proxy.js:32), which re-import plugin
 // modules but never instrument.
@@ -17,18 +26,30 @@ if (installRan) {
   await install(mutatorsFor(implicitRoles));
 }
 
-function uiMutatorsIgnorer(): Ignorer {
+function assertInstalled(): void {
   if (!installRan) {
     throw new Error(
       `${packageName}: the install did not run, because STRYKER_MUTATOR_WORKER is set in a process that ` +
         'instruments. Unset it for the Stryker run.',
     );
   }
+}
+
+function uiMutatorsIgnorer(): Ignorer {
+  assertInstalled();
 
   return { shouldIgnore: () => undefined };
 }
 uiMutatorsIgnorer.inject = [] satisfies [];
 
+function uiStylingIgnorer(options: StrykerOptions): Ignorer {
+  assertInstalled();
+
+  return stylingIgnorer(options);
+}
+uiStylingIgnorer.inject = tokens(commonTokens.options);
+
 export const strykerPlugins = [
   declareFactoryPlugin(PluginKind.Ignore, 'lz-jsx', uiMutatorsIgnorer),
+  declareFactoryPlugin(PluginKind.Ignore, 'lz-jsx-styling', uiStylingIgnorer),
 ];

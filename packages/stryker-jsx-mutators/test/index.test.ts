@@ -24,29 +24,32 @@ function runEntry(
 }
 
 describe('index.ts', () => {
-  it('registers every mutator of the table, wraps the placer, and exports an ignorer that ignores nothing', () => {
+  it('registers every mutator of the table, wraps the placer, and exports lz-jsx, lz-jsx-styling and the options schema', () => {
     const { status, stdout, stderr } = runEntry({});
 
     assert.equal(status, 0, stderr);
     assert.deepEqual(JSON.parse(stdout), {
       registered: mutatorNames,
       placerWrapped: true,
-      ignorer: 'Ignore lz-jsx undefined',
+      ignorers: ['Ignore lz-jsx undefined', 'Ignore lz-jsx-styling undefined'],
+      schema: true,
     });
   });
 
-  it("installs nothing in a worker, and the ignorer factory throws 'install did not run'", () => {
+  it("installs nothing in a worker, and each ignorer factory throws 'install did not run'", () => {
     const { status, stdout, stderr } = runEntry({
       STRYKER_MUTATOR_WORKER: '1',
     });
+    const notRun =
+      'throws @layzee/stryker-jsx-mutators: the install did not run, because STRYKER_MUTATOR_WORKER is set in a process ' +
+      'that instruments. Unset it for the Stryker run.';
 
     assert.equal(status, 0, stderr);
     assert.deepEqual(JSON.parse(stdout), {
       registered: [],
       placerWrapped: false,
-      ignorer:
-        'throws @layzee/stryker-jsx-mutators: the install did not run, because STRYKER_MUTATOR_WORKER is set in a process ' +
-        'that instruments. Unset it for the Stryker run.',
+      ignorers: [`lz-jsx ${notRun}`, `lz-jsx-styling ${notRun}`],
+      schema: true,
     });
   });
 

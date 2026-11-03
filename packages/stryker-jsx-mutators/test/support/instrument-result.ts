@@ -1,4 +1,5 @@
 import type { MutantStatus, Position } from '@stryker-mutator/api/core';
+import type { Ignorer } from '@stryker-mutator/api/ignore';
 
 import {
   coreInstrument,
@@ -17,6 +18,7 @@ export interface InstrumentedMutant {
     readonly end: Readonly<Position>;
   };
   readonly status?: MutantStatus | undefined;
+  readonly statusReason?: string | undefined;
 }
 
 export interface InstrumentResult {
@@ -39,9 +41,10 @@ export async function instrumentFully(
   instrumenter: Instrumenter,
   files: readonly SourceFile[],
   excludedMutations: readonly string[] = [],
+  ignorers: readonly Ignorer[] = [],
 ): Promise<InstrumentResult> {
   const instrument = await coreInstrument(instrumenter);
-  const result = await instrument(files, excludedMutations);
+  const result = await instrument(files, excludedMutations, ignorers);
   const fileList = fieldOf(result, 'files');
   const mutants = fieldOf(result, 'mutants');
 
@@ -57,6 +60,7 @@ export async function instrumentFully(
     mutants: mutants.map((mutant: unknown) => {
       const location = fieldOf(mutant, 'location');
       const status = fieldOf(mutant, 'status');
+      const statusReason = fieldOf(mutant, 'statusReason');
 
       return {
         id: stringOf(mutant, 'id'),
@@ -68,6 +72,10 @@ export async function instrumentFully(
           end: positionOf(fieldOf(location, 'end')),
         },
         status: status === undefined ? undefined : statusOf(status),
+        statusReason:
+          statusReason === undefined
+            ? undefined
+            : stringOf(mutant, 'statusReason'),
       };
     }),
   };

@@ -73,6 +73,84 @@ Either way, the install checks that each mutator makes a mutant of a sample. It 
 names of the mutators that do not, and with the instrumenter's folder and version when an internal it
 patches is missing.
 
+## Hide styling mutants with lz-jsx-styling
+
+StrykerJS mutates class name and inline style expressions. A DOM test rarely sees those changes, so
+their mutants survive and lower the score. The opt-in `lz-jsx-styling` ignorer reports them as Ignored,
+with a reason. Ignored mutants stay in the report and are left out of the score.
+
+It hides every mutant inside:
+
+- A `className`, `class`, or `*ClassName` attribute with a `{...}` value, such as
+  `className={cn('p-2', active && 'bg-accent')}` or a `NavLink` callback. Reason: "lz-jsx-styling: class
+  names only style the element; DOM tests do not observe them".
+- A call to `cn`, `clsx`, `classnames`, `classNames`, `cx`, `twMerge`, `cva`, or `tv` outside such an
+  attribute. Reason: "lz-jsx-styling: class-name builder call; DOM tests do not observe class names".
+- A variable whose name ends in `ClassName` or `Classes` and whose value is a string, a template or an
+  object literal, such as `const sizeClasses = { sm: 'h-4', lg: 'h-8' }`. Reason: the class one above.
+- A `style` attribute with an object literal value, such as `style={{ color: on ? 'red' : 'blue' }}`.
+  Reason: "lz-jsx-styling: inline styles only style the element; DOM tests do not observe them".
+
+Static strings, such as `className="p-2"`, have no mutants to hide: StrykerJS skips them.
+
+### Classes that hide an element
+
+A class can hide an element, and Playwright's `toBeVisible` sees that. So the ignorer keeps the mutants of
+a class attribute, call or variable when one of its strings, template parts or object keys holds one of
+these classes:
+
+`hidden`, `invisible`, `collapse`, `sr-only`, `not-sr-only`, `d-none`, `visually-hidden`, `is-hidden`.
+
+It matches whole class names, split on whitespace. A class with variants matches by its last part, so
+`md:hidden` and `peer-invalid:hidden` match. `overflow-hidden` and `hiddenish` do not.
+
+Add your project's own hiding classes with `lzJsxStyling.visibilityClasses`. They add to the list above;
+they do not replace it.
+
+### Style keys that change the box
+
+The ignorer keeps the mutants of a `style` value when any of these is true:
+
+- It is not an object literal, such as `style={styles.card}`.
+- It has a spread (`...base`) or a computed key (`[name]: value`).
+- It has one of these keys, in camelCase or kebab-case, quoted or not: `display`, `visibility`,
+  `contentVisibility`, `pointerEvents`, `width`, `height`, `minWidth`, `minHeight`, `maxWidth`,
+  `maxHeight`, `transform`, `scale`, `position`, `top`, `right`, `bottom`, `left`, `inset`, `overflow`,
+  `opacity`, `clip`, `clipPath`.
+
+Playwright treats an element as hidden when its box is empty, or by `visibility` or `display: none`.
+Transforms, sizes and position change the box and what `toBeInViewport` sees. `opacity` and `clip-path`
+are on the list to be safe.
+
+### Turn it on
+
+List the plugin, then the ignorer. Load the plugin through `plugins` or `appendPlugins`: an `import` in
+the config does not give Stryker the ignorer or the option's schema.
+
+```ts
+appendPlugins: ['@layzee/stryker-playwright-runner', '@layzee/stryker-jsx-mutators'],
+ignorers: ['lz-jsx', 'lz-jsx-styling'],
+lzJsxStyling: {
+  visibilityClasses: ['closed', 'is-collapsed'],
+},
+```
+
+Both ignorers come from the same module, and loading that module installs the mutators. So
+`ignorers: ['lz-jsx-styling']` alone also turns the mutators on, and also stops the run when the install
+fails. Listing `lz-jsx` too costs nothing and keeps it clear that the UI mutators are on.
+
+`visibilityClasses` must be an array of class names without whitespace. Stryker checks it against the
+schema the plugin exports, and the ignorer throws when it is created with any other value.
+
+### When to leave it out
+
+Leave `lz-jsx-styling` out when your tests assert classes or styles, with `toHaveClass`, `toHaveCSS` or
+`toHaveStyle`. Those tests can kill the mutants it hides. A `// Stryker restore` comment does not bring
+them back; only leaving the ignorer out does.
+
+Leave it out, or add the class to `visibilityClasses`, when your own CSS hides an element through a class
+the list above does not name.
+
 ## Turn a mutator off
 
 For the whole project, list the mutator in `mutator.excludedMutations`. The names are case sensitive,

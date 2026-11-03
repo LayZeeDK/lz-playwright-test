@@ -1,0 +1,408 @@
+// The lz-jsx-styling ignorer, through StrykerJS's own instrumenter with only its built-in mutators.
+import assert from 'node:assert/strict';
+import { dirname, join } from 'node:path';
+import { describe, it } from 'node:test';
+import { pathToFileURL } from 'node:url';
+
+import { strykerCoreSchema } from '@stryker-mutator/api/core';
+
+import { corePackageJson, resolveFromCore } from '../src/install.ts';
+import {
+  strykerValidationSchema,
+  stylingIgnorer,
+} from '../src/styling-ignorer.ts';
+import { exportedFunction } from './support/exports.ts';
+import { instrumentFully } from './support/instrument-result.ts';
+
+const classReason =
+  'lz-jsx-styling: class names only style the element; DOM tests do not observe them';
+const styleReason =
+  'lz-jsx-styling: inline styles only style the element; DOM tests do not observe them';
+const builderReason =
+  'lz-jsx-styling: class-name builder call; DOM tests do not observe class names';
+
+const instrumenter = resolveFromCore();
+
+/** One entry per mutant: its ignore reason, or `placed`. */
+async function outcomes(code: string, options: object = {}): Promise<string[]> {
+  const { mutants } = await instrumentFully(
+    await instrumenter,
+    [{ name: 'a.tsx', content: code }],
+    [],
+    [stylingIgnorer(options)],
+  );
+
+  return mutants.map(({ status, statusReason }) =>
+    status === 'Ignored' ? (statusReason ?? 'Ignored') : 'placed',
+  );
+}
+
+async function assertEvery(
+  code: string,
+  outcome: string,
+  options: object = {},
+): Promise<void> {
+  const found = await outcomes(code, options);
+
+  assert.ok(found.length > 0, `no mutants in ${code}`);
+  assert.deepEqual(new Set(found), new Set([outcome]), code);
+}
+
+describe('lz-jsx-styling', () => {
+  it('ignores every mutant in a className expression, with the class reason', async () => {
+    await assertEvery(
+      "export const a = <a className={cn('a', on && 'b')} />;",
+      classReason,
+    );
+  });
+
+  ['class', 'containerClassName'].forEach((name) => {
+    it(`ignores every mutant in a ${name} expression`, async () => {
+      await assertEvery(
+        `export const a = <a ${name}={on ? 'a' : 'b'} />;`,
+        classReason,
+      );
+    });
+  });
+
+  it('ignores a NavLink className callback, the arrow and the classes it picks', async () => {
+    await assertEvery(
+      "export const a = <NavLink className={({ isActive }) => cn('p-2', isActive && 'bg-accent')} />;",
+      classReason,
+    );
+  });
+
+  it('keeps the mutants of a handler beside the className', async () => {
+    assert.deepEqual(
+      await outcomes(
+        "export const a = <a className={on ? 'a' : 'b'} onClick={() => go(true)} />;",
+      ),
+      [classReason, classReason, 'placed', 'placed'],
+    );
+  });
+
+  [
+    'hidden',
+    'invisible',
+    'collapse',
+    'sr-only',
+    'not-sr-only',
+    'd-none',
+    'visually-hidden',
+    'is-hidden',
+    'md:hidden',
+    'peer-invalid:hidden',
+  ].forEach((token) => {
+    it(`keeps the mutants of a className that can add the visibility class ${token}`, async () => {
+      await assertEvery(
+        `export const a = <a className={on ? 'p-2 block' : 'p-2 ${token}'} />;`,
+        'placed',
+      );
+    });
+  });
+
+  it('finds a visibility class in a template literal', async () => {
+    await assertEvery(
+      "export const a = <a className={`p-2 ${on ? 'x' : 'y'} hidden`} />;",
+      'placed',
+    );
+  });
+
+  it('finds a visibility class in an object key of a class builder', async () => {
+    await assertEvery(
+      "export const a = <a className={cn('p-2', { hidden: !open, 'sr-only': on })} />;",
+      'placed',
+    );
+  });
+
+  ['overflow-hidden', 'hiddenish', 'hidden-x', 'md:overflow-hidden'].forEach(
+    (token) => {
+      it(`ignores a className whose only near match is ${token}`, async () => {
+        await assertEvery(
+          `export const a = <a className={on ? 'p-2' : '${token}'} />;`,
+          classReason,
+        );
+      });
+    },
+  );
+
+  it('keeps the mutants of a className with a visibility class from visibilityClasses, also as a variant', async () => {
+    const options = { lzJsxStyling: { visibilityClasses: ['closed'] } };
+
+    await assertEvery(
+      "export const a = <a className={on ? 'p-2' : 'closed'} />;",
+      'placed',
+      options,
+    );
+    await assertEvery(
+      "export const a = <a className={on ? 'p-2' : 'max-md:closed'} />;",
+      'placed',
+      options,
+    );
+    await assertEvery(
+      "export const a = <a className={on ? 'p-2' : 'hidden'} />;",
+      'placed',
+      options,
+    );
+  });
+
+  it('ignores a class the default list lacks when visibilityClasses does not name it', async () => {
+    await assertEvery(
+      "export const a = <a className={on ? 'p-2' : 'closed'} />;",
+      classReason,
+    );
+  });
+
+  [
+    'cn',
+    'clsx',
+    'classnames',
+    'classNames',
+    'cx',
+    'twMerge',
+    'cva',
+    'tv',
+  ].forEach((callee) => {
+    it(`ignores every mutant in a ${callee} call outside an attribute, with the builder reason`, async () => {
+      await assertEvery(
+        `export const c = ${callee}('p-2', on && 'bg-accent');`,
+        builderReason,
+      );
+    });
+  });
+
+  it('keeps the mutants of a class builder call that can add a visibility class', async () => {
+    await assertEvery(
+      "export const c = cn('p-2', on && 'max-md:hidden');",
+      'placed',
+    );
+  });
+
+  ['format', 'lib.cn', 'cn.call'].forEach((callee) => {
+    it(`keeps the mutants of a ${callee} call`, async () => {
+      await assertEvery(
+        `export const c = ${callee}('p-2', on && 'bg-accent');`,
+        'placed',
+      );
+    });
+  });
+
+  it('keeps the mutants of a class builder call inside a className that can add a visibility class', async () => {
+    await assertEvery(
+      "export const a = <a className={on ? 'hidden' : cn('p-2', b && 'm-2')} />;",
+      'placed',
+    );
+  });
+
+  [
+    "export const buttonClassName = 'p-2 m-2';",
+    'export const sizeClasses = `p-${size} m-2`;',
+    "export const variantClasses = { primary: 'bg-blue', ghost: 'bg-none' };",
+  ].forEach((code) => {
+    it(`ignores every mutant of a class variable: ${code}`, async () => {
+      await assertEvery(code, classReason);
+    });
+  });
+
+  [
+    "export const label = 'p-2 m-2';",
+    "export const buttonClassName = pick('p-2', 'm-2');",
+    "export const toggleClasses = { open: 'block', closed: 'hidden' };",
+  ].forEach((code) => {
+    it(`keeps the mutants of ${code}`, async () => {
+      await assertEvery(code, 'placed');
+    });
+  });
+
+  it('ignores every mutant in a style object of keys that do not change visibility or the box', async () => {
+    await assertEvery(
+      "export const a = <a style={{ color: on ? 'red' : 'blue', 'animation-delay': `${n}s` }} />;",
+      styleReason,
+    );
+  });
+
+  it('ignores a style object whose only hidden word is in a value', async () => {
+    await assertEvery(
+      "export const a = <a style={{ color: on ? 'hidden' : 'blue' }} />;",
+      styleReason,
+    );
+  });
+
+  [
+    'display',
+    'visibility',
+    'contentVisibility',
+    'pointerEvents',
+    'width',
+    'height',
+    'minWidth',
+    'minHeight',
+    'maxWidth',
+    'maxHeight',
+    'transform',
+    'scale',
+    'position',
+    'top',
+    'right',
+    'bottom',
+    'left',
+    'inset',
+    'overflow',
+    'opacity',
+    'clip',
+    'clipPath',
+    "'pointer-events'",
+    "'content-visibility'",
+    "'maxHeight'",
+    "'clip-path'",
+  ].forEach((key) => {
+    it(`keeps the mutants of a style object with the key ${key}`, async () => {
+      await assertEvery(
+        `export const a = <a style={{ color: on ? 'red' : 'blue', ${key}: on ? 'a' : 'b' }} />;`,
+        'placed',
+      );
+    });
+  });
+
+  [
+    ['a spread', "{{ ...base, color: on ? 'red' : 'blue' }}"],
+    ['a computed key', "{{ [prop]: on ? 'red' : 'blue' }}"],
+    ['a value that is not an object literal', "{styleOf(on ? 'red' : 'blue')}"],
+  ].forEach(([title, value]) => {
+    it(`keeps the mutants of a style with ${title}`, async () => {
+      await assertEvery(`export const a = <a style=${value} />;`, 'placed');
+    });
+  });
+
+  [
+    'closed',
+    null,
+    {},
+    [1],
+    [''],
+    ['is closed'],
+    [' closed'],
+    ['closed\t'],
+    ['closed', null],
+  ].forEach((visibilityClasses) => {
+    it(`refuses visibilityClasses ${JSON.stringify(visibilityClasses)} when it is created`, () => {
+      assert.throws(
+        () => stylingIgnorer({ lzJsxStyling: { visibilityClasses } }),
+        {
+          message: `@layzee/stryker-jsx-mutators: lzJsxStyling.visibilityClasses must be an array of class names, each without whitespace, not ${JSON.stringify(visibilityClasses)}.`,
+        },
+      );
+    });
+  });
+
+  [
+    {},
+    { lzJsxStyling: {} },
+    { lzJsxStyling: { visibilityClasses: [] } },
+  ].forEach((options) => {
+    it(`accepts the options ${JSON.stringify(options)}`, () => {
+      assert.doesNotThrow(() => stylingIgnorer(options));
+    });
+  });
+
+  it('ignores a className after a Stryker restore comment', async () => {
+    await assertEvery(
+      "// Stryker disable StringLiteral\n// Stryker restore StringLiteral\nexport const a = <a className={on ? 'a' : 'b'} />;",
+      classReason,
+    );
+  });
+
+  ['data-state', 'classNames', 'classNameFor'].forEach((name) => {
+    it(`keeps the mutants of a ${name} attribute`, async () => {
+      await assertEvery(
+        `export const a = <a ${name}={on ? 'a' : 'b'} />;`,
+        'placed',
+      );
+    });
+  });
+});
+
+describe('strykerValidationSchema', () => {
+  /** Stryker's own option check: the core schema merged with `contributions`, as core does after loading plugins. */
+  async function validate(options: object, contributions: readonly object[]) {
+    const config: unknown = await import(
+      pathToFileURL(
+        join(dirname(corePackageJson()), 'dist', 'src', 'config', 'index.js'),
+      ).href
+    );
+    const log: string[] = [];
+    const record = (level: string) => (message: unknown) => {
+      log.push(`${level} ${String(message)}`);
+    };
+    const logger = {
+      debug: () => undefined,
+      info: () => undefined,
+      warn: record('warn'),
+      error: record('error'),
+      trace: () => undefined,
+      fatal: () => undefined,
+      isDebugEnabled: () => false,
+      isTraceEnabled: () => false,
+    };
+    const builder: unknown = Reflect.construct(
+      exportedFunction(config, 'MetaSchemaBuilder'),
+      [strykerCoreSchema, logger],
+    );
+    const schema: unknown = Reflect.apply(
+      exportedFunction(builder, 'buildMetaSchema'),
+      builder,
+      [contributions],
+    );
+    const validator: unknown = Reflect.construct(
+      exportedFunction(config, 'OptionsValidator'),
+      [schema, logger],
+    );
+
+    try {
+      Reflect.apply(exportedFunction(validator, 'validate'), validator, [
+        structuredClone(options),
+        true,
+      ]);
+
+      return { valid: true, log };
+    } catch {
+      return { valid: false, log };
+    }
+  }
+
+  const unknownOption = /^warn Unknown stryker config option "lzJsxStyling"/;
+
+  it('lets core accept lzJsxStyling without the unknown-option warning it gives when the schema is missing', async () => {
+    const options = { lzJsxStyling: { visibilityClasses: ['closed'] } };
+    const without = await validate(options, []);
+    const withSchema = await validate(options, [strykerValidationSchema]);
+
+    assert.equal(without.valid, true);
+    assert.ok(without.log.some((line) => unknownOption.test(line)));
+    assert.deepEqual(withSchema, { valid: true, log: [] });
+  });
+
+  [
+    { visibilityClasses: 'closed' },
+    { visibilityClasses: [1] },
+    { visibilityClasses: [''] },
+    { visibilityClasses: ['is closed'] },
+    { classes: ['closed'] },
+    [],
+    'closed',
+  ].forEach((lzJsxStyling) => {
+    it(`lets core refuse lzJsxStyling ${JSON.stringify(lzJsxStyling)}`, async () => {
+      const { valid, log } = await validate({ lzJsxStyling }, [
+        strykerValidationSchema,
+      ]);
+
+      assert.equal(valid, false);
+      assert.ok(
+        log.some(
+          (line) => line.startsWith('error') && line.includes('lzJsxStyling'),
+        ),
+        log.join('\n'),
+      );
+    });
+  });
+});
