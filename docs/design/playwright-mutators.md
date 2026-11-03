@@ -183,19 +183,17 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
   The implicit roles come from Playwright's own table, `kImplicitRoleByTagName` in
   `playwright-core/lib/coreBundle.js`, which `getImplicitAriaRole` reads for `getByRole`. The mutator
   takes every tag whose role there is fixed, plus `a` and `area` with `href` (`link`), as a fixed table in
-  `src/implicit-roles.ts`. The table holds a tag when any test engine gives it the role, so a restating
-  `role` is kept whenever removing it would change nothing for some engine: aria-query 5.3.0, which
-  Testing Library's `getByRole` reads, agrees on every tag except `search` and `svg`, which only
-  Playwright gives a role, and they stay in. A drift test checks the table against the installed
-  `playwright-core` and `aria-query`. Lars, 2026-11-03: "Yes, keep svg and search." The span swap reads the
-  same table. In 1.64.1 the tags with a fixed role are `article`, `aside`, `blockquote`, `button`, `caption`,
-  `code`, `datalist`, `dd`, `del`, `details`, `dfn`, `dialog`, `dt`, `em`, `fieldset`, `figure`, `h1` to
-  `h6`, `hr`, `html`, `ins`, `li`, `main`, `mark`, `math`, `menu`, `meter`, `nav`, `ol`, `optgroup`,
-  `option`, `output`, `p`, `progress`, `search`, `strong`, `sub`, `sup`, `svg`, `table`, `tbody`,
-  `textarea`, `tfoot`, `thead`, `time`, `tr`, and `ul`. So `LzJsxElementRole` makes no removal mutant for
-  `<output role="status">` or `<svg role="img">`, and both keep their `role`. `area` without `href`,
-  `footer`, `form`, `header`, `img`, `input`, `section`, `select`, `td`, and `th` get their role from
-  attributes or context, so removing an explicit one can change what `getByRole` finds, and the skip leaves them out. `dd`, `dt`, `li`, `tbody`, `tfoot`,
+  `src/implicit-roles.ts`. The table holds a tag when any test engine gives it the role by tag alone, so a
+  restating `role` is kept whenever removing it would change nothing for some engine. Lars, 2026-11-03:
+  "Yes, keep svg and search.", and later "Role table: Approve recommendation." (a real union). So the table
+  joins Playwright's (which alone gives `search` and `svg` a role) and aria-query 5.3.0's tag-only roles,
+  which Testing Library's `getByRole` reads with aria-query's context rules ignored (`address`, `footer`,
+  `header`, `td`, `th`; checked with Testing Library 10.4.0 under jsdom). `generic` is left out. A drift test
+  checks the table against the installed `playwright-core` and `aria-query` in both directions. The span
+  swap reads the same table. So `LzJsxElementRole` makes no removal mutant for `<output role="status">`,
+  `<svg role="img">` or `<header role="banner">`. `area` without `href`, `form`, `img`, `input`, `section`,
+  and `select` get their role from attributes or an accessible name, so removing an explicit one can change
+  what `getByRole` finds, and the skip leaves them out. `dd`, `dt`, `li`, `tbody`, `tfoot`,
   `thead`, and `tr` lose their implicit role under a parent with `role="none"` or `role="presentation"`;
   that shape is rare, and the skip keeps them. Cases design-7 and design-14 cover the role skip.
 

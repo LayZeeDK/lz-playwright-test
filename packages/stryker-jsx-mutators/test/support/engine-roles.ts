@@ -23,7 +23,9 @@ function captured(value: string | undefined): string {
   return value;
 }
 
-export function playwrightRoles(): RoleTable {
+const entry = /\\n {2}"(\w+)": /g;
+
+function playwrightTable(): string {
   const manifest = require.resolve('playwright-core/package.json');
   const bundle = readFileSync(
     join(dirname(manifest), 'lib', 'coreBundle.js'),
@@ -36,7 +38,17 @@ export function playwrightRoles(): RoleTable {
     throw new Error(`kImplicitRoleByTagName not found in ${manifest}`);
   }
 
-  const table = bundle.slice(from, to + end.length);
+  return bundle.slice(from, to + end.length);
+}
+
+export function playwrightEntryTags(): readonly string[] {
+  return [...playwrightTable().matchAll(entry)].map(([, tag]) =>
+    captured(tag).toLowerCase(),
+  );
+}
+
+export function playwrightRoles(): RoleTable {
+  const table = playwrightTable();
 
   return new Map([
     ...[...table.matchAll(always)].map(
@@ -102,6 +114,16 @@ export function ariaQueryConcepts(): readonly Concept[] {
   }
 
   return list.map(conceptOf);
+}
+
+export function ariaQueryTagRoles(
+  concepts: readonly Concept[],
+): readonly (readonly [tag: string, role: string])[] {
+  return concepts
+    .filter((concept) => concept.attributes.length === 0)
+    .flatMap((concept) =>
+      concept.roles.map((role) => [concept.name, role] as const),
+    );
 }
 
 export function ariaQueryGives(

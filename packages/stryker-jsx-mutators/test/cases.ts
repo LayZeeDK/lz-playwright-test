@@ -958,7 +958,7 @@ export const cases: readonly Case[] = [
     title:
       'implicit roles of landmarks, lists and headings are skipped; a context-dependent one is removed',
     origin: rulesOrigin,
-    jsx: '<div><nav role="navigation" /><aside role="complementary" /><ol role="list"><li role="listitem" /></ol><h2 role="heading" /><header role="banner" /></div>',
+    jsx: '<div><nav role="navigation" /><aside role="complementary" /><ol role="list"><li role="listitem" /></ol><h2 role="heading" /><header role="banner" /><section role="region" /></div>',
     expect: [['LzJsxElementRole', 'role={undefined}']],
   },
   {
