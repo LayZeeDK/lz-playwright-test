@@ -45,7 +45,7 @@ already todo for a rule above, and their `gap` names both rules.
 
 ## Design clarifications for Claude to settle
 
-Settled on 2026-10-25 in `docs/design/playwright-mutators.md`, "Rules the synthetic cases settled". One
+Settled on 2026-10-25 in `docs/design/jsx-mutators.md`, "Rules the synthetic cases settled". One
 change from the table above: `LabelAttribute` takes bound values, so realworld-21 and analog-3 are no
 longer gaps and expect `alt=""` and `title=""`.
 

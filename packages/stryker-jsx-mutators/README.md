@@ -16,7 +16,7 @@ gets few mutants it can kill. This plugin adds ten mutators:
 - `LzJsxChildExpression`: replaces a `{value}` child with `null`.
 - `LzJsxStateAttribute`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, and `aria-selected`.
 
-The [design document](https://github.com/LayZeeDK/lz-playwright-test/blob/main/docs/design/playwright-mutators.md)
+The [design document](https://github.com/LayZeeDK/lz-playwright-test/blob/main/docs/design/jsx-mutators.md)
 says exactly what each mutator changes and which shapes it skips. Stryker's reports show these names as the mutator of each mutant.
 
 ## Requirements
@@ -26,7 +26,7 @@ says exactly what each mutator changes and which shapes it skips. Stryker's repo
 - Node.js 22 or later, tested on 22.23.1 and 24.22.0 on Windows 11 arm64, and on 24.22.1 on Linux arm64.
 - React JSX or TSX. The mutators match React's attribute names, such as `htmlFor` and `readOnly`, so
   Solid, Preact or Vue JSX written with `for` or `readonly` gets no mutants on those attributes. Vue,
-  Angular and Svelte templates get no UI mutants; JSX in a Vue `<script lang="tsx">` block does. The run
+  Angular and Svelte templates get no JSX mutants; JSX in a Vue `<script lang="tsx">` block does. The run
   prints nothing about the files it skips.
 
 The mutators do not need a particular test runner. With `@layzee/stryker-playwright-runner`, a
@@ -38,8 +38,8 @@ Playwright test can kill each of them.
 tag and `href` for `a` and `area`. The table decides which tags the span swap changes (`button`, and `a`
 and `area` with an `href`) and which `role` attributes restate a tag's own role and are left in place.
 
-The table holds a tag when any test engine gives it that role by tag alone, so removing a restating
-`role` never makes a mutant that some engine cannot see. It joins two tables:
+The table holds a tag when any test engine gives it that role by tag alone. So the mutator makes no
+removal mutant that the tests of one engine could not kill. It joins two tables:
 
 - Playwright 1.64.1's, which alone gives `svg` (`img`) and `search` (`search`) a role.
 - Testing Library 10.4's, from aria-query 5.3.0, which ignores aria-query's context rules and so gives
@@ -55,7 +55,7 @@ The `generic` role is left out: Playwright gives it to no tag, and a `role="gene
 Use one of two ways:
 
 - List the plugin and its ignorer. Both lines are required: without `ignorers`, a failed install only
-  prints a warning, and the run goes on without UI mutants.
+  prints a warning, and the run goes on without JSX mutants.
 
   ```ts
   appendPlugins: ['@layzee/stryker-playwright-runner', '@layzee/stryker-jsx-mutators'],
@@ -93,7 +93,7 @@ It hides every mutant inside:
 - A call to `cn`, `clsx`, `classnames`, `classNames`, `cx`, `twMerge`, `cva`, or `tv` outside such an
   attribute. Reason: "lz-jsx-styling: class-name builder call; DOM tests do not observe class names".
 - A variable whose name ends in `ClassName` or `Classes` and whose value is a string, a template or an
-  object literal, such as `const sizeClasses = { sm: 'h-4', lg: 'h-8' }`. Reason: the class one above.
+  object literal, such as `const sizeClasses = { sm: 'h-4', lg: 'h-8' }`. Reason: the same as for a class attribute.
 - A `style` attribute with an object literal value, such as `style={{ color: on ? 'red' : 'blue' }}`.
   Reason: "lz-jsx-styling: inline styles only style the element; DOM tests do not observe them".
 
@@ -143,7 +143,7 @@ lzJsxStyling: {
 
 Both ignorers come from the same module, and loading that module installs the mutators. So
 `ignorers: ['lz-jsx-styling']` alone also turns the mutators on, and also stops the run when the install
-fails. Listing `lz-jsx` too costs nothing and keeps it clear that the UI mutators are on.
+fails. Listing `lz-jsx` too costs nothing and keeps it clear that the JSX mutators are on.
 
 `visibilityClasses` must be an array of class names without whitespace. Stryker checks it against the
 schema the plugin exports, and the ignorer throws when it is created with any other value.

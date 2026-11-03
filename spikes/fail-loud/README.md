@@ -1,6 +1,6 @@
 # Negative control: a broken install stops `stryker run` on both routes
 
-The design (`docs/design/playwright-mutators.md`, "What the verification plan adds", step 2) asks for a run
+The design (`docs/design/jsx-mutators.md`, "What the verification plan adds", step 2) asks for a run
 that breaks one operator's sample on purpose and shows that `stryker run` stops with that operator's name,
 once per route. `break.ts` gives `LzJsxTextLiteral` a sample it cannot mutate when `SPIKE_BROKEN=1`. A config's own
 imports run before core loads `plugins`, so the real `@layzee/stryker-jsx-mutators` specifier installs the

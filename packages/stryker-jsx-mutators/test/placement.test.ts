@@ -84,7 +84,7 @@ before(async () => {
   on = await instrumentEach([]);
 });
 
-describe('the JSX placement, with every UI mutator excluded', () => {
+describe('the JSX placement, with every JSX mutator excluded', () => {
   corpus.forEach(({ name }, index) => {
     const file = basename(name);
 
@@ -115,7 +115,7 @@ describe('the JSX placement, with every UI mutator excluded', () => {
     );
   });
 
-  it('shows a difference when one UI mutator is left unexcluded (the negative control)', () => {
+  it('shows a difference when one JSX mutator is left unexcluded (the negative control)', () => {
     const differing = corpus.filter(
       (_file, index) =>
         masked(firstContent(oneLeftOn[index])) !==
@@ -126,7 +126,7 @@ describe('the JSX placement, with every UI mutator excluded', () => {
   });
 });
 
-describe('the JSX placement, with the UI mutators on', () => {
+describe('the JSX placement, with the JSX mutators on', () => {
   corpus.forEach(({ name }, index) => {
     if (name.endsWith('.tsx')) {
       it(`instruments ${basename(name)} to TSX that Babel parses again`, () => {
@@ -135,7 +135,7 @@ describe('the JSX placement, with the UI mutators on', () => {
     }
   });
 
-  it('gives the stock built-in mutants with the UI mutators on, for each corpus file', () => {
+  it('gives the stock built-in mutants with the JSX mutators on, for each corpus file', () => {
     assert.deepEqual(
       on.map(({ mutants }) => builtIns(mutants)),
       stock.map(({ mutants }) => builtIns(mutants)),

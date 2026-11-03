@@ -1,5 +1,5 @@
 // Synthetic UI shapes from the open-source repos the runner was exercised on, as JSX, with the UI mutants the
-// design (docs/design/playwright-mutators.md) says each gives. An empty expect is a must-not-generate case. The
+// design (docs/design/jsx-mutators.md) says each gives. An empty expect is a must-not-generate case. The
 // mined rows and their transcription notes are in spikes/ui-mutator-cases/.
 import type { MutatorName } from '../src/mutators.ts';
 
@@ -995,7 +995,7 @@ export const cases: readonly Case[] = [
     title:
       'a guard and a ternary inside an attribute value: the guard is removed, the ternary is left alone',
     origin:
-      'docs/design/playwright-mutators-opus.md:64 and docs/design/playwright-mutators.md:139, LzJsxConditionalElement',
+      'docs/design/playwright-mutators-opus.md:64 and docs/design/jsx-mutators.md:139, LzJsxConditionalElement',
     jsx: '<Card icon={busy && <Spinner />} badge={busy ? <Dot /> : null} />',
     expect: [['LzJsxConditionalElement', '<Spinner />']],
   },
@@ -1400,7 +1400,7 @@ export const cases: readonly Case[] = [
     title:
       'aria-hidden="false" is not removed, since Playwright reads only "true"; aria-disabled="false" is, since it overrides a disabled ancestor',
     origin:
-      'docs/design/playwright-mutators.md:133, LzJsxDisabledAttribute and LzJsxHiddenAttribute',
+      'docs/design/jsx-mutators.md:133, LzJsxDisabledAttribute and LzJsxHiddenAttribute',
     jsx: '<form><button aria-disabled="false">One</button><p aria-hidden="false">Two</p><p aria-hidden="true">Three</p></form>',
     expect: [
       ['LzJsxDisabledAttribute', 'aria-disabled={undefined}'],

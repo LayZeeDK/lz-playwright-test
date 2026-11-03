@@ -1,6 +1,6 @@
 # Spike: the two fail-loud routes stop `stryker run`
 
-The UI operators design (`docs/design/playwright-mutators.md`, Integration, "Fail loud") relies on two routes
+The UI operators design (`docs/design/jsx-mutators.md`, Integration, "Fail loud") relies on two routes
 that it marked as not spiked:
 
 - an `Ignore` plugin named `ui-mutators` whose factory throws a kept install error (`plugin.mjs`), listed in

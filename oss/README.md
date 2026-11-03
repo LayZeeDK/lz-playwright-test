@@ -63,7 +63,7 @@ it uses is `oss/realworld-api`. Then run `npx stryker run stryker.playwright.con
 
 ## epic-stack: epicweb-dev/epic-stack at 893610d
 
-The run uses the UI mutators and the TypeScript checker, against the repo's own e2e tests on its Vite
+The run uses the JSX mutators and the TypeScript checker, against the repo's own e2e tests on its Vite
 dev server (`npm run dev`), which compiles Stryker's sandbox on the fly.
 
 1. Copy `.env.example` to `.env`, the repo's own setup step.
@@ -91,3 +91,38 @@ dev server (`npm run dev`), which compiles Stryker's sandbox on the fly.
    server and one SQLite database, even at `concurrency: 1`. A test that one runner's data breaks can
    fail without a mutant at fault, which turns a survivor into a kill; that may be why two mutants
    killed on 2026-10-29 survived on 2026-10-31.
+
+## react-virtuoso: petyosi/react-virtuoso at 31aef22
+
+The run mutates three library files and five Ladle example files that the e2e specs open, against the
+repo's own e2e tests on its Ladle dev server, which compiles Stryker's sandbox on the fly. Every step
+below runs in `packages/react-virtuoso` unless it says otherwise.
+
+1. Install with pnpm from the copy's root: `pnpm install --frozen-lockfile --filter react-virtuoso...`.
+2. Install StrykerJS and Playwright:
+   `pnpm add -D @stryker-mutator/core@10.1.1 @playwright/test@^1.64.1 playwright@^1.64.1`. The copy
+   has `@playwright/test` `^1.60.0`, below the runner's 1.63 floor, and a separate `playwright`
+   dependency; with only `@playwright/test` raised, `npx playwright` still runs the 1.60 CLI. Then link
+   the runner and the mutators as junctions at `node_modules/@layzee/stryker-playwright-runner` and
+   `node_modules/@layzee/stryker-jsx-mutators` in the copy's root. Stryker loads plugins from its own
+   install in pnpm's store, which sees the root `node_modules` but not the package's.
+3. Apply `react-virtuoso/copy.patch` from the copy's root and copy
+   `react-virtuoso/stryker.playwright.config.ts` into `packages/react-virtuoso`. The patch:
+   - starts Ladle with `node <ladle cli> serve` and sets `LADLE=true` through `webServer.env`, instead
+     of `npm run ladle`, whose `LADLE=true ladle serve` cannot run in cmd.exe. `vite.config.ts` loads
+     its library-build config unless `LADLE` is set;
+   - looks for the Ladle CLI in `node_modules` of the config's folder or two levels up. Stryker's
+     sandbox has no `node_modules` (see step 5), and Node resolves from the package's
+     `node_modules` above it;
+   - sets `BROWSER: 'none'`, which stops Ladle from opening a browser window each time it starts;
+   - gives each Stryker test runner process its own port, 61000 plus `STRYKER_MUTATOR_WORKER`;
+   - turns off `reuseExistingServer`;
+   - adds `.stryker-tmp` to `.gitignore`.
+4. Run `npx playwright install chromium`. Plain `npx playwright test --workers=1` then passes 45 tests
+   and skips 1 (the repo's own `test.skip`).
+5. Run `npx stryker run stryker.playwright.config.ts`. The config sets `symlinkNodeModules: false`:
+   pnpm links packages with relative symlinks, and Node does not resolve them through the junction
+   Stryker makes from the sandbox's `node_modules`, so Ladle failed with "Cannot find module
+   ...\sandbox-...\node_modules\@ladle\react\lib\cli\cli.js". Keep `tempDirName: '.stryker-tmp'`
+   inside the package: Stryker rewrites the sandbox's `tsconfig.json` `extends` for that depth, and a
+   temp folder elsewhere leaves Vite unable to load `../../tsconfig.base.json`.

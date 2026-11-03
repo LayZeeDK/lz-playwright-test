@@ -3,7 +3,7 @@
 Lars, 2026-10-25: "Create synthetic tests for our Playwright mutators/operators." Then: "I mean synthetic test
 cases. Consider basing them on the OSS repos we have used to exercise them."
 
-The operators are designed, not built: `D:/projects/sandbox/stryker-playwright-runner/docs/design/playwright-mutators.md`
+The operators are designed, not built: `D:/projects/sandbox/stryker-playwright-runner/docs/design/jsx-mutators.md`
 (read "Operators in the first release", "Names" and "Equivalent mutants" in full; the names in its Names table
 are the approved ones). Each operator has generate rules and skip rules. Your job is to find the real UI shapes
 in one open-source repo that each operator would meet, and turn each into a synthetic JSX test case.

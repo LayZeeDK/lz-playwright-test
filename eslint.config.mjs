@@ -125,7 +125,7 @@ export default withWarningsAsErrors([
       '**/out-tsc',
       '**/vite.config.*.timestamp*',
       '**/test-output',
-      // Instrumented bundles that runner.test.ts and ui-mutators.test.ts write before each run.
+      // Instrumented bundles that runner.test.ts and jsx-mutators.test.ts write before each run.
       'packages/stryker-playwright-runner/test/**/public/*.js',
     ],
   },

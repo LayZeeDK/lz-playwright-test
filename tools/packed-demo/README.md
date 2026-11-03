@@ -1,7 +1,7 @@
 # Packed demo: the demo app on the packed tarballs
 
 This folder holds what a scratch project outside the workspace needs to run the demo's e2e Stryker run with
-the UI mutators on the two packed packages, with no workspace links. `docs/VERDICT.md` (Evidence) has the
+the JSX mutators on the two packed packages, with no workspace links. `docs/VERDICT.md` (Evidence) has the
 result. The configs are plain JavaScript versions of the demo's Vite, Playwright and `stryker.e2e.ui.config.ts`
 settings, without Nx.
 

@@ -1,7 +1,7 @@
 # Mined cases: realworld (Angular + NgRx + Nx)
 
 Clone `D:/projects/github/stefanoslig/angular-ngrx-nx-realworld-example-app`, pinned commit `bc7158d`. Design:
-`docs/design/playwright-mutators.md`. The repo has no `.tsx`; every case is the JSX equivalent of an Angular
+`docs/design/jsx-mutators.md`. The repo has no `.tsx`; every case is the JSX equivalent of an Angular
 template shape, with the original kept in origin. Paths are relative to the repo root. The e2e suite is
 `apps/conduit-e2e/src/` (locators are mostly `getByTestId`, `locator("[placeholder=...]")`, `getByText`).
 

@@ -1,4 +1,4 @@
-# Design: UI mutators that Playwright tests can kill
+# Design: JSX mutators that Playwright tests can kill
 
 Status: chosen design, 2026-10-25, by Claude during an AFK run. Built on 2026-10-26, now in
 `packages/stryker-jsx-mutators`. Lars approved the mutator and mutation names in Names, without a
@@ -47,7 +47,7 @@ are in the Opus draft, section 2. Where this list differs from the draft, this l
 5. `LzJsxUrlAttribute`: `href`, `to`, and `action` become `""`, from a string or a bound expression; a template literal is left to `StringLiteral`, as for `LzJsxLabelAttribute`. Killed by `toHaveURL`.
 6. `LzJsxDisabledAttribute`: forces `disabled`, `readOnly`, and `aria-disabled` off, and skips boolean-literal values (`disabled={true}`), which `BooleanLiteral` already flips. It also skips a value that is a comparison or a `&&`/`||` expression, the shapes `LzJsxConditionalElement` skips, because the built-in `ConditionalExpression` already sets it to `false`: `disabled={form.invalid || form.pending}` and `readOnly={n > 0}` get no mutant from it. Killed by `toBeDisabled`, `toBeEditable`.
 7. `LzJsxHiddenAttribute`: forces `hidden` and `aria-hidden` off. It never forces an element hidden. Like `LzJsxDisabledAttribute`, it skips a comparison or `&&`/`||` value (`hidden={a !== b}`), which the built-in `ConditionalExpression` already sets to `false`. It skips `aria-hidden` on `svg`, `img`, and `i`, as the Opus draft did (2.7): those are decorative icons, and exposing one changes nothing a role, label, or text query sees. Killed by `toBeVisible`, `getByRole` (hidden elements leave the tree).
-8. `LzJsxElementRole`: removes `role`, or swaps a tag for `span` when Playwright's role table gives it the role `button` or `link`: `button` always, and `a` and `area` only when they have an `href`. An `<a>` without `href` has no `link` role, so swapping it would be an equivalent mutant. The `span` drops every attribute of `a`, `area`, and `button` that a `span` cannot take, such as `href`, `type`, `disabled`, and `alt` (see "Rules the synthetic cases settled"). Killed by `getByRole`.
+8. `LzJsxElementRole`: removes `role`, or swaps a tag for `span` when the implicit-role table (`src/implicit-roles.ts`) gives it the role `button` or `link`: `button` always, and `a` and `area` only when they have an `href`. An `<a>` without `href` has no `link` role, so swapping it would be an equivalent mutant. The `span` drops every attribute of `a`, `area`, and `button` that a `span` cannot take, such as `href`, `type`, `disabled`, and `alt` (see "Rules the synthetic cases settled"). Killed by `getByRole`.
 9. `LzJsxChildExpression`: a `{value}` child becomes `null`. Killed by `toHaveText`.
 10. `LzJsxStateAttribute`: flips `aria-expanded`, `aria-pressed`, `aria-checked`, `aria-selected`. A string value flips between `"true"` and `"false"`, and an expression is negated, except where negating would give a constant: a ternary flips each branch instead, and a `String()` or `.toString()` call gets no mutant (see "Rules the synthetic cases settled"). A comparison gets no negation, because the built-in `EqualityOperator` already gives it (`tab === current` becomes `tab !== current`). A `!x` value is negated to `!!x`: the built-in `BooleanLiteral` mutant `x` renders the same state only when `x` is a boolean. With `count` 3, `aria-checked={!count}` renders `"false"`; the built-in mutant `aria-checked={count}` renders `"3"`, which Playwright also reads as not checked, while `!!count` renders `"true"`. A mutator sees no types, so it skips `!x` only when `x` is a boolean by its syntax alone: a comparison, a `!` expression, a boolean literal, or a `&&`/`||` whose two sides are each one of these. `aria-pressed={!(a === b)}` and `aria-checked={!true}` get no mutant; `aria-expanded={!open}` and `aria-pressed={!(a && b)}` do. A `&&`/`||` value is negated: `!(a && b)` differs from each built-in mutant there. Killed by `toHaveAttribute` and role queries with state options.
 
@@ -78,7 +78,7 @@ and stryker4s (`modules/core/src/main/scala/stryker4s/mutation/`), both at their
   `ConditionalExpression`, `BlockStatement`, `ArrowFunction`. stryker4s uses the same names, and
   Stryker.NET uses the short forms (`Equality`, `String`, `Statement`). The mutator name is what users
   write in `mutator.excludedMutations` and `// Stryker disable`, and what reports show as `mutatorName`.
-  The UI mutators keep that shape, behind an `Lz` prefix, with markup categories that fit JSX and Angular templates alike:
+  The JSX mutators keep that shape, behind an `Lz` prefix, with markup categories that fit JSX and Angular templates alike:
   `Literal` for static text, `Attribute`, `Element`, `Expression`, and `Handler`. StrykerJS groups one
   syntax by meaning (equality, logical and arithmetic operators are all binary expressions), so the
   attribute mutators are grouped by what the attribute does.
@@ -122,7 +122,7 @@ attribute or the tag that gives an element its implicit role.
 
 `packages/stryker-jsx-mutators/test/cases.ts` holds 144 synthetic cases: JSX versions of UI shapes in the repos
 the runner was exercised on (RealWorld, ngx-yeti, Analog and hello-world at the commits `oss/README.md` names,
-and the demo app), each with the exact UI mutants it must give. `spikes/ui-mutator-cases/` keeps the mined rows
+and the demo app), each with the exact JSX mutants it must give. `spikes/ui-mutator-cases/` keeps the mined rows
 they came from. The cases first ran against the prototype and now run against the package. The design was silent on
 these points; Claude settled them on 2026-10-25 from the prototype's behaviour and the Opus draft:
 
@@ -213,7 +213,7 @@ refuses the name. It also removes a string state value, so `aria-pressed="true"`
 `aria-pressed={undefined}`, where `LzJsxStateAttribute` flips it. Its counts in `neutral-output.txt`
 therefore include one `ConditionalRendering` (now `LzJsxConditionalElement`) mutant on
 `price-tag.tsx` line 22 (`off > 0 && (...)`) that the skip removes. With the skip, the demo's
-`price-tag.tsx` gets 2 UI mutants instead of 3, and `app.tsx` stays at 15. The verification plan's
+`price-tag.tsx` gets 2 JSX mutants instead of 3, and `app.tsx` stays at 15. The verification plan's
 must-not-generate rows (Opus draft, section 6.1) gain `n > 0 && <A/>`, `a === b ? <A/> : <B/>`, a
 handler referenced once, and `<a>x</a>` without `href`.
 
@@ -237,14 +237,14 @@ remain:
   does.
 
 Mutants that a lint rule would reject stay, unlabelled. Claude decided this on 2026-10-26. With all 36
-`eslint-plugin-jsx-a11y` rules at `error`, 88 of the 224 UI mutants of the synthetic cases, the demo app,
+`eslint-plugin-jsx-a11y` rules at `error`, 88 of the 224 JSX mutants of the synthetic cases, the demo app,
 the UI fixture and the corpus add a finding the original did not have: an emptied heading, label or link
 text (`LzJsxTextLiteral`, `LzJsxLabelAttribute`), an empty `href` (`LzJsxUrlAttribute`), or a `span` that keeps a click
 handler (`ElementToSpan`). Claude measured this at 63d0209 by applying each UI mutant's replacement at
 its location and linting the original and the mutant. They are kept because:
 
 - a mutator cannot know a project's lint config, and a skip keyed to jsx-a11y would drop 39 percent of
-  the UI mutants, including the ones a role, label or text locator kills most often. A surviving one says
+  the JSX mutants, including the ones a role, label or text locator kills most often. A surviving one says
   that no test looks at the element by name, which lint cannot tell;
 - StrykerJS cannot label them. Its checker API has two outcomes, `Passed` and `CompileError`
   (`@stryker-mutator/api/dist/src/check/check-status.d.ts`), so an ESLint checker would report them as
@@ -294,7 +294,7 @@ shapes cannot ship there, and the mutators measure what lint cannot see.
   next to it.
   Without it, a successful install still registers and runs every mutator, because registration
   happens at import. A failed install falls back to core's warning
-  `Error during loading "@layzee/stryker-jsx-mutators" plugin`, and the run finishes without UI mutants. The
+  `Error during loading "@layzee/stryker-jsx-mutators" plugin`, and the run finishes without JSX mutants. The
   plugin cannot detect the missing entry in that case, because its import has already failed.
 - **A config import fails loud with one entry.** A config written as a JavaScript or TypeScript module
   can `import '@layzee/stryker-jsx-mutators'` on its first line instead. The module installs with a
@@ -320,7 +320,7 @@ shapes cannot ship there, and the mutators measure what lint cannot see.
   module would add a `plugins` entry users can also forget. If Stryker itself runs inside a Stryker
   worker, for example a mutation run of a test that starts Stryker, the inner main process inherits the
   variable. The ignorer then throws the "install did not run" error, so the run stops instead of
-  silently losing UI mutants.
+  silently losing JSX mutants.
 - **Reports.** Each mutator keeps its own `mutatorName`, so reports and filters show `LzJsxTextLiteral` next
   to `StringLiteral`.
 
@@ -360,7 +360,7 @@ level is a new concept in the StrykerJS schema that every built-in would need a 
 
 The built package has gone through `stryker run` with a browser on the demo app and on a copy of
 epic-stack, and a Playwright test kills a mutant of every mutator in
-`packages/stryker-playwright-runner/test/browser/ui-mutators.test.ts`. `docs/VERDICT.md` (Evidence)
+`packages/stryker-playwright-runner/test/browser/jsx-mutators.test.ts`. `docs/VERDICT.md` (Evidence)
 has the counts. Two risks remain from those runs. On a server-rendered app the runner activates the
 mutant in the browser only, so a text or element mutant breaks hydration and is killed by an
 unrelated step, and an attribute mutant never reaches the DOM (VERDICT, Limits). And three mutators,
@@ -373,7 +373,7 @@ It catches a broken install of the resolved copy, and it names a second copy onl
 and path in its message. The gate is a real `stryker run` through core with `testRunner: 'command'` and
 no browser, asserting that `mutation.json` lists the mutator names (Opus draft, section 5, risk 3). Run
 it before calling the self-check enough, and on every StrykerJS bump. `spikes/fail-loud/` is that gate and
-the negative control below: on StrykerJS 10.1.1 both routes report 12 UI mutants from seven mutators, and
+the negative control below: on StrykerJS 10.1.1 both routes report 12 JSX mutants from seven mutators, and
 with one broken sample both exit 1 with that mutator's name.
 
 The `ElementToSpan` rule rests on `tsc` output for three hand-written elements and on one Stryker run:
@@ -405,10 +405,10 @@ decides each mutator.
 
    Measured on 2026-10-26 (`docs/VERDICT.md`, Evidence): every mutator meets the bar. The corpus diff
    is the placement test in `packages/stryker-jsx-mutators/test/`. On the demo app, with
-   `actionTimeout` set, none of the 17 UI mutants is equivalent or an error, and without it 3 kills
-   show as Timeout. In `packages/stryker-playwright-runner/test/browser/ui-mutators.test.ts` a
+   `actionTimeout` set, none of the 17 JSX mutants is equivalent or an error, and without it 3 kills
+   show as Timeout. In `packages/stryker-playwright-runner/test/browser/jsx-mutators.test.ts` a
    written test kills a mutant of each mutator. A copy of epic-stack, outside the bar's scope, adds
-   the first real ratios: 1 equivalent and 0 errors among 45 UI mutants, the equivalent one a
+   the first real ratios: 1 equivalent and 0 errors among 45 JSX mutants, the equivalent one a
    `LzJsxConditionalElement` (1 of 8 for that mutator). Three mutators have had no site in a real app yet, so the limit stays
    a starting value.
 

@@ -1,6 +1,6 @@
 # Prior art for mutating JSX, and React apps with Playwright tests
 
-Researched 2026-10-25 for `docs/design/playwright-mutators.md` (sections "Operators in the first release" and "Names"). Lars's request, verbatim: "Search for prior art that supports JSX".
+Researched 2026-10-25 for `docs/design/jsx-mutators.md` (sections "Operators in the first release" and "Names"). Lars's request, verbatim: "Search for prior art that supports JSX".
 
 This file extends `docs/research/playwright-mutation-operators.md` section 1 and `docs/research/prior-art-mutation-e2e.md`. It does not repeat Mutandis, webMuJava, MaewU, Ma11y, AjaxMutator, MDroid+ or the Angular ENASE 2025 paper.
 

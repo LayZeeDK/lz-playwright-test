@@ -236,7 +236,7 @@ change:
   changes the title.
 - Fixtures, page objects and other modules that the specs import.
 - The Playwright config, its `webServer` included.
-- This runner, Playwright, Stryker, and the Stryker options. The UI mutators too, unless the change alters
+- This runner, Playwright, Stryker, and the Stryker options. The JSX mutators too, unless the change alters
   a mutant's replacement text.
 - The Node.js version and environment variables.
 

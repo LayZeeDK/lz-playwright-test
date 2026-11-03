@@ -2,7 +2,7 @@
 
 Repo: `D:/projects/github/LayZeeDK/ngx-yeti` (Angular library, Playwright suites in `apps/yeti-app-e2e`,
 `apps/yeti-analog-e2e`). Read through `git --git-dir ... show 87d4377:<path>` only. Design:
-`docs/design/playwright-mutators.md`.
+`docs/design/jsx-mutators.md`.
 
 Conventions used in the table:
 

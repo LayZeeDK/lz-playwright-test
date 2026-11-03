@@ -5,7 +5,7 @@ Sources:
 - `hello-`: `Huluvu424242/stryker-playwright-hello-world` at `fa6dd64` (clone `D:/projects/github/Huluvu424242/stryker-playwright-hello-world`). UI is `index.html` only. `src/price.js` is plain logic with no markup, so it gives no UI shape. `docs/index.html` is not mined.
 - `demo-`: this repo at HEAD `f00806e`: `apps/demo-app/src/app/app.tsx`, `price-tag.tsx`, `price-tag.story.tsx`, with the tests in `apps/demo-app-e2e/src/*.spec.ts` and `apps/demo-app/component-tests/price-tag.spec.ts`. The jsx column is the original reduced to its shape.
 
-Design read: `docs/design/playwright-mutators.md` (operator list, Names, Equivalent mutants). `expect` is marked [checked] when a written design rule was applied to the snippet, [inferred] when the design is silent. A mutant's replacement text is shown after `->`. Emptied text uses `{null}` per the design's "Emptied text: `null`" [the exact printed form is inferred].
+Design read: `docs/design/jsx-mutators.md` (operator list, Names, Equivalent mutants). `expect` is marked [checked] when a written design rule was applied to the snippet, [inferred] when the design is silent. A mutant's replacement text is shown after `->`. Emptied text uses `{null}` per the design's "Emptied text: `null`" [the exact printed form is inferred].
 
 ## hello-world (HTML to JSX)
 

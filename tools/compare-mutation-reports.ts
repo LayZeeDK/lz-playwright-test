@@ -1,7 +1,7 @@
 // Compares the mutants of two Stryker mutation.json reports: id, file name, start position, mutator and
 // replacement, and with --status their statuses too. File names drop the folders, so a project that keeps the
 // same files elsewhere (tools/packed-demo) compares with the workspace. Mutator names match with or without
-// the Lz prefix of the UI mutators, so a report from before the lz- rename compares with one after it.
+// the Lz prefix of the JSX mutators, so a report from before the lz- rename compares with one after it.
 // The report schema makes replacement optional; a missing one compares as empty.
 // Exits 0 when both list the same mutants, 1 when they differ, and 2 on a usage error, a report it cannot
 // read, or a report that lists a mutant twice.
