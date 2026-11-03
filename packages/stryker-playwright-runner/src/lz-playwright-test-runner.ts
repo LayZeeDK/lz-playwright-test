@@ -35,6 +35,7 @@ import {
 import {
   type CoverageGaps,
   dryRunResult,
+  flakyTestNames,
   mayHaveLostItsServer,
   mutantRunResult,
   type RunOutput,
@@ -64,6 +65,8 @@ interface Session {
   readonly servers: readonly ServerCheck[];
   readonly serialGroups: SerialGroups;
   readonly timeouts: ConfigTimeouts;
+  readonly retriesByProject: ReadonlyMap<string, number>;
+  readonly failOnFlakyTests: boolean;
 }
 
 const workerHookUrl = new URL(
@@ -142,6 +145,13 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         servers,
         serialGroups,
         timeouts,
+        retriesByProject: new Map(
+          config.projects.map(({ project }) => [
+            project.name,
+            options.retries ?? project.retries,
+          ]),
+        ),
+        failOnFlakyTests: config.failOnFlakyTests,
       };
     } catch (error) {
       await playwright?.runGlobalTeardown().catch(() => undefined);
@@ -173,11 +183,17 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
   }
 
   async dryRun(options: DryRunOptions): Promise<DryRunResult> {
-    const request = dryRunRequest(options);
-    const { result, gaps } = dryRunResult(
-      await this.#run(this.#ready(), request),
-      request,
-    );
+    const session = this.#ready();
+    const request = dryRunRequest(options, session);
+    const output = await this.#run(session, request);
+    const { result, gaps } = dryRunResult(output, request);
+    const flaky = flakyTestNames(output);
+
+    if (flaky.length > 0) {
+      this.#log.warn(
+        `${flaky.length} test(s) passed only on a retry in the dry run: ${flaky.join(', ')}`,
+      );
+    }
 
     if (gaps) {
       logCoverageGaps(this.#log, gaps);
@@ -234,7 +250,9 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     deadlineAt: number | undefined,
   ): Promise<RunOutput> {
     const outDir = session.root.nextRunDir();
-    const reporter = new LzPlaywrightCollectingReporter();
+    const reporter = new LzPlaywrightCollectingReporter(
+      session.retriesByProject,
+    );
     const deadline = armDeadline(deadlineAt, () =>
       session.playwright.stopTests(),
     );

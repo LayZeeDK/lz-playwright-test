@@ -21,7 +21,11 @@ export interface RunTestsParams {
 export interface ConfigProject {
   readonly default: boolean;
   readonly expect?: { readonly timeout?: number | undefined } | undefined;
-  readonly project: { readonly name: string; readonly timeout: number };
+  readonly project: {
+    readonly name: string;
+    readonly timeout: number;
+    readonly retries: number;
+  };
 }
 
 export interface ConfigWebServer {
@@ -40,6 +44,7 @@ export interface TestRunner {
   loadConfig(): Promise<{
     readonly projects: readonly ConfigProject[];
     readonly webServers: readonly ConfigWebServer[];
+    readonly failOnFlakyTests: boolean;
   }>;
   // Resolves to undefined when Playwright throws, after printing the error to stderr.
   listTests(
@@ -291,12 +296,15 @@ function parseConfig(
       const settings = fieldOf(project, 'project');
       const expect = fieldOf(project, 'expect');
       const expectTimeout = fieldOf(expect, 'timeout') ?? undefined;
+      // Playwright's default when nothing sets retries.
+      const retries = fieldOf(settings, 'retries') ?? 0;
 
       if (
         !isRecord(project) ||
         !isRecord(settings) ||
         typeof settings['name'] !== 'string' ||
         typeof settings['timeout'] !== 'number' ||
+        typeof retries !== 'number' ||
         (expect !== undefined && !isRecord(expect)) ||
         (expectTimeout !== undefined && typeof expectTimeout !== 'number')
       ) {
@@ -306,7 +314,11 @@ function parseConfig(
       return {
         default: !!project['default'],
         expect: expect === undefined ? undefined : { timeout: expectTimeout },
-        project: { name: settings['name'], timeout: settings['timeout'] },
+        project: {
+          name: settings['name'],
+          timeout: settings['timeout'],
+          retries,
+        },
       };
     }),
     webServers: webServers.map((server: unknown): ConfigWebServer => {
@@ -346,7 +358,57 @@ function parseConfig(
         ignoreHTTPSErrors: !!server['ignoreHTTPSErrors'],
       };
     }),
+    failOnFlakyTests: !!fieldOf(fieldOf(value, 'config'), 'failOnFlakyTests'),
   };
+}
+
+/**
+ * Playwright's runTests sets retries to 0 for every project. Its dispatcher reads each test's retries from
+ * the TestCase objects that onBegin receives, so the runner raises them there. A test whose
+ * describe.configure({ retries }) set a number keeps it, unless that number is 0.
+ */
+export function raiseRetries(
+  suite: unknown,
+  retriesByProject: ReadonlyMap<string, number>,
+): void {
+  const projects = fieldOf(suite, 'suites');
+
+  if (!Array.isArray(projects)) {
+    throw retriesChanged();
+  }
+
+  projects.forEach((project: unknown) => {
+    const title = fieldOf(project, 'title');
+    const allTests = fieldOf(project, 'allTests');
+
+    if (typeof title !== 'string' || typeof allTests !== 'function') {
+      throw retriesChanged();
+    }
+
+    const retries = retriesByProject.get(title) ?? 0;
+    const tests: unknown = Reflect.apply(allTests, project, []);
+
+    if (!Array.isArray(tests)) {
+      throw retriesChanged();
+    }
+
+    tests.forEach((test: unknown) => {
+      if (!isRecord(test) || typeof test['retries'] !== 'number') {
+        throw retriesChanged();
+      }
+
+      if (test['retries'] === 0) {
+        test['retries'] = retries;
+      }
+    });
+  });
+}
+
+function retriesChanged(): Error {
+  return internalsChanged(
+    undefined,
+    'the root suite onBegin receives, with project suites and TestCase.retries',
+  );
 }
 
 export function playwrightVersion(

@@ -66,13 +66,17 @@ export interface AttemptSummary {
 
 export function attemptSummary(
   testCases: Iterable<ReportedTest>,
+  failOnFlakyTests: boolean,
 ): AttemptSummary {
-  const attempts = [...testCases].flatMap((test) =>
-    test.results.map(({ status }) => ({
-      status,
-      unexpected: status !== test.expectedStatus,
-    })),
-  );
+  const attempts = [...testCases]
+    // Playwright passes a run whose tests pass on a retry, unless failOnFlakyTests is set.
+    .filter((test) => failOnFlakyTests || test.outcome() !== 'flaky')
+    .flatMap((test) =>
+      test.results.map(({ status }) => ({
+        status,
+        unexpected: status !== test.expectedStatus,
+      })),
+    );
 
   return {
     anyFailed: attempts.some(
@@ -89,19 +93,31 @@ export function attemptSummary(
 export function mayHaveLostItsServer(output: RunOutput): boolean {
   return (
     output.status !== 'deadline' &&
-    attemptSummary(output.reporter.testCases.values()).anyFailed
+    attemptSummary(output.reporter.testCases.values(), true).anyFailed
   );
+}
+
+/** The tests that passed only on a retry. */
+export function flakyTestNames(output: RunOutput): string[] {
+  return [...output.reporter.testCases.values()]
+    .filter((test) => test.outcome() === 'flaky')
+    .map(testName);
 }
 
 export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
   const { status, reporter, snapshots, hookInstalled, installErrors } = output;
+  const { failOnFlakyTests } = request;
   const isMutantRun = request.kind === 'mutant';
   const testCases = [...reporter.testCases.values()];
-  const tests = testCases.map((test) => toTestResult(test, isMutantRun));
-  const { killed, timedOut } = attemptSummary(testCases);
+  const tests = testCases.map((test) => toTestResult(test, failOnFlakyTests));
+  const { killed, timedOut } = attemptSummary(testCases, failOnFlakyTests);
   const coveringTestsPassed =
     isMutantRun &&
-    allPassedFirstTime(request.selection?.covering, reporter.testCases);
+    allPassed(
+      request.selection?.covering,
+      reporter.testCases,
+      failOnFlakyTests,
+    );
   const reason = timeoutReason({
     mutantRun: isMutantRun,
     killed,
@@ -163,15 +179,23 @@ function survivorTests(tests: readonly TestResult[]): TestResult[] {
   return tests.filter((test) => test.status !== TestStatus.Failed);
 }
 
-// Playwright's 'expected' is a pass with no failed attempt, so a flaky test does not count. No ids, no pass.
-function allPassedFirstTime(
+// No ids, no pass.
+function allPassed(
   ids: readonly string[] | undefined,
   testCases: ReadonlyMap<string, ReportedTest>,
+  failOnFlakyTests: boolean,
 ): boolean {
   return (
     ids !== undefined &&
     ids.length > 0 &&
-    ids.every((id) => testCases.get(id)?.outcome() === 'expected')
+    ids.every((id) => {
+      const test = testCases.get(id);
+
+      return (
+        test !== undefined &&
+        testStatus(test.outcome(), failOnFlakyTests) === TestStatus.Success
+      );
+    })
   );
 }
 
@@ -316,21 +340,31 @@ function anyTestFailed(tests: readonly TestResult[]): boolean {
   return tests.some((test) => test.status === TestStatus.Failed);
 }
 
-function toTestResult(test: ReportedTest, isMutantRun: boolean): TestResult {
+function testStatus(
+  outcome: ReturnType<TestCase['outcome']>,
+  failOnFlakyTests: boolean,
+): TestStatus {
+  return outcome === 'flaky' && failOnFlakyTests
+    ? TestStatus.Failed
+    : statusByOutcome[outcome];
+}
+
+function testName(test: ReportedTest): string {
   // The root suite's title is the empty first one.
   const titles = test.titlePath().filter(Boolean);
+
+  return `[${titles[0]}] › ${titles.slice(1).join(' › ')}`;
+}
+
+function toTestResult(
+  test: ReportedTest,
+  failOnFlakyTests: boolean,
+): TestResult {
   const last = test.results.at(-1);
-  const outcome = test.outcome();
-  // A test that passes only on a retry still failed against the mutant. Retries reach mutant runs
-  // through describe.configure({ retries }), which outranks the retries: 0 that Playwright's
-  // runTests sets.
-  const status =
-    outcome === 'flaky' && isMutantRun
-      ? TestStatus.Failed
-      : statusByOutcome[outcome];
+  const status = testStatus(test.outcome(), failOnFlakyTests);
   const base = {
     id: test.id,
-    name: `[${titles[0]}] › ${titles.slice(1).join(' › ')}`,
+    name: testName(test),
     timeSpentMs: last?.duration ?? 0,
     fileName: test.location.file,
     startPosition: {

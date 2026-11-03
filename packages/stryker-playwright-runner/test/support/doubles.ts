@@ -140,6 +140,7 @@ export function dryRequest(
   return {
     kind: 'dry',
     disableBail: true,
+    failOnFlakyTests: false,
     coverageAnalysis: 'perTest',
     budget: dryRunBudget,
     ...request,
@@ -152,6 +153,7 @@ export function mutantRequest(
   return {
     kind: 'mutant',
     disableBail: true,
+    failOnFlakyTests: false,
     activeMutant: '1',
     selection: undefined,
     hitLimit: undefined,

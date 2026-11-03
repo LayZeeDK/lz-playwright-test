@@ -133,6 +133,30 @@ exports as `strykerValidationSchema`.
   Stryker fails the run when the dry run takes longer than `dryRunTimeoutMinutes`, 5 by default. A suite
   that takes a few minutes on Playwright's default workers can take longer than that on one, so raise
   `workers` or `dryRunTimeoutMinutes`.
+- `retries`: how often to retry a failed test, in every project. Without it, each project keeps the
+  `retries` that the Playwright config gives it. See Flaky tests.
+
+## Flaky tests
+
+A test that fails without a mutant at fault kills that mutant, and the report then counts a mutant as
+detected that the tests may never detect. The runner hands flakiness to Playwright's own settings:
+
+- Each failed test is retried as often as the Playwright config's `retries` says, or the `retries` option.
+  Retries set with `describe.configure({ retries })` apply too.
+- A test that passes on a retry passes, as in `npx playwright test`: the mutant survives that test. With
+  `failOnFlakyTests: true` in the Playwright config, it fails, and the mutant is killed. The same holds in
+  the dry run, where a failed test stops Stryker.
+- The dry run warns with the names of the tests that passed only on a retry.
+
+A retry costs time only for a test that failed, so mostly for killed mutants: each one runs its failing
+test once more per retry, and each attempt waits out the `expect.timeout` of its failing assertion. Raise
+`timeoutMS` by the expect timeout per retry. A retry that runs past the runner's deadline is stopped, and
+the mutant counts as Killed, as it would without the retry.
+
+Playwright's `repeatEach` stays 1 under Stryker. To find flaky tests before a mutation run, run the suite
+with `npx playwright test --repeat-each=10 --fail-on-flaky-tests`. Web-first assertions such as
+`await expect(locator).toHaveText()` retry until `expect.timeout`, so they make tests less flaky without
+any setting in the runner.
 
 ## Faster mutation runs
 
@@ -261,7 +285,7 @@ otherwise:
   This catches a looping test that raised its own timeout. When
   Stryker's timeout is under 7.6 s, there is no such stop, and Stryker's own timer ends the run. The dry
   run has no such stop either.
-- `retries` is 0 and `repeatEach` is 1. Retries set with `describe.configure({ retries })` still apply.
+- `repeatEach` is 1. `retries` is the Playwright config's or the `retries` option, as Flaky tests says.
 
 ## Limits
 

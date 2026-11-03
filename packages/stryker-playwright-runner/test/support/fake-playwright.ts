@@ -38,7 +38,11 @@ const fakeGlobal = '__fakePlaywright__';
 interface Project {
   readonly default: boolean;
   readonly expect?: { readonly timeout?: number };
-  readonly project: { readonly name: string; readonly timeout: number };
+  readonly project: {
+    readonly name: string;
+    readonly timeout: number;
+    readonly retries?: number;
+  };
 }
 
 interface WebServer {
@@ -58,6 +62,7 @@ export interface Run {
 export interface Behaviour {
   readonly projects?: readonly Project[];
   readonly webServers?: readonly WebServer[];
+  readonly failOnFlakyTests?: boolean;
   readonly listed?: readonly ReportedTest[];
   readonly initialize?: () => Promise<void>;
   readonly globalSetup?: (reporter: Reporter) => Status;
@@ -140,13 +145,21 @@ export function fakePlaywright(
       calls.push(['loadConfig']);
 
       return {
-        projects: behaviour.projects ?? [
-          { default: true, project: { name: 'chromium', timeout: 30_000 } },
-        ],
+        projects: (
+          behaviour.projects ?? [
+            { default: true, project: { name: 'chromium', timeout: 30_000 } },
+          ]
+        ).map((project) => ({
+          ...project,
+          project: { retries: 0, ...project.project },
+        })),
         webServers: (behaviour.webServers ?? []).map((server) => ({
           ignoreHTTPSErrors: false,
           ...server,
         })),
+        // Playwright keeps it in config; the runner reads it from there.
+        config: { failOnFlakyTests: behaviour.failOnFlakyTests ?? false },
+        failOnFlakyTests: false,
       };
     }
 

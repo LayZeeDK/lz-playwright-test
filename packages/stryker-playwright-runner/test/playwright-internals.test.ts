@@ -7,6 +7,7 @@ import {
   isSerialSuite,
   playwrightVersion,
   probeInternals,
+  raiseRetries,
   runningSlotOf,
   supportsPlaywright,
   testRunnerMethods,
@@ -186,7 +187,7 @@ test('the test runner resolves loadConfig to the project and web server fields t
         {
           default: true,
           expect: { timeout: 5, toPass: {} },
-          project: { name: 'a', timeout: 1, retries: 0 },
+          project: { name: 'a', timeout: 1, retries: 2 },
           deps: [],
         },
         { default: false, expect: {}, project: { name: 'b', timeout: 0 } },
@@ -202,6 +203,7 @@ test('the test runner resolves loadConfig to the project and web server fields t
         {},
       ],
       workers: 1,
+      config: { failOnFlakyTests: true, forbidOnly: false },
     },
   });
 
@@ -210,23 +212,24 @@ test('the test runner resolves loadConfig to the project and web server fields t
       {
         default: true,
         expect: { timeout: 5 },
-        project: { name: 'a', timeout: 1 },
+        project: { name: 'a', timeout: 1, retries: 2 },
       },
       {
         default: false,
         expect: { timeout: undefined },
-        project: { name: 'b', timeout: 0 },
+        project: { name: 'b', timeout: 0, retries: 0 },
       },
       {
         default: true,
         expect: undefined,
-        project: { name: 'c', timeout: 2 },
+        project: { name: 'c', timeout: 2, retries: 0 },
       },
     ],
     webServers: [
       { url: 'http://localhost:3000', port: 3000, ignoreHTTPSErrors: true },
       { url: undefined, port: undefined, ignoreHTTPSErrors: false },
     ],
+    failOnFlakyTests: true,
   });
 });
 
@@ -246,13 +249,22 @@ test('the test runner reads loaded config values the way Playwright does: a nume
 
   assert.deepEqual(await runner.loadConfig(), {
     projects: [
-      { default: true, expect: undefined, project: { name: 'a', timeout: 1 } },
-      { default: false, expect: undefined, project: { name: 'b', timeout: 1 } },
+      {
+        default: true,
+        expect: undefined,
+        project: { name: 'a', timeout: 1, retries: 0 },
+      },
+      {
+        default: false,
+        expect: undefined,
+        project: { name: 'b', timeout: 1, retries: 0 },
+      },
     ],
     webServers: [
       { url: undefined, port: 3000, ignoreHTTPSErrors: true },
       { url: undefined, port: 4000, ignoreHTTPSErrors: false },
     ],
+    failOnFlakyTests: false,
   });
 });
 
@@ -284,9 +296,10 @@ test('the test runner reads what Playwright runs though its types refuse it: a f
       {
         default: true,
         expect: { timeout: undefined },
-        project: { name: 'a', timeout: 1 },
+        project: { name: 'a', timeout: 1, retries: 0 },
       },
     ],
+    failOnFlakyTests: false,
     webServers: [
       { url: undefined, port: undefined, ignoreHTTPSErrors: false },
       { url: undefined, port: undefined, ignoreHTTPSErrors: false },
@@ -339,6 +352,15 @@ const refusedConfigs = [
     'has a project with no number project.timeout',
     {
       projects: [{ ...validProject, project: { name: 'a', timeout: '1' } }],
+      webServers: [],
+    },
+  ],
+  [
+    'has a project with a project.retries that is no number',
+    {
+      projects: [
+        { ...validProject, project: { name: 'a', timeout: 1, retries: '1' } },
+      ],
       webServers: [],
     },
   ],
@@ -551,6 +573,48 @@ test('the instrumentation is the one playwright-core exports, and its absence fa
     assert.throws(() => instrumentationOf(core, '1.99.0'), {
       message:
         /^Playwright 1\.99\.0 changed the internals this runner calls \(playwright-core _instrumentation\.addListener\)\.$/,
+    });
+  });
+});
+
+// A root suite as onBegin receives it: one suite per project, titled with its name.
+function rootSuite(projects: Readonly<Record<string, readonly unknown[]>>) {
+  return {
+    suites: Object.entries(projects).map(([title, tests]) => ({
+      title,
+      allTests: () => tests,
+    })),
+  };
+}
+
+test("the retries of each test that has none are raised to its project's", () => {
+  const plain = { retries: 0 };
+  const configured = { retries: 3 };
+  const other = { retries: 0 };
+
+  raiseRetries(
+    rootSuite({ chromium: [plain, configured], firefox: [other] }),
+    new Map([
+      ['chromium', 2],
+      ['firefox', 0],
+    ]),
+  );
+
+  assert.deepEqual(
+    [plain, configured, other],
+    [{ retries: 2 }, { retries: 3 }, { retries: 0 }],
+  );
+});
+
+test('a root suite without project suites or numeric retries fails loudly', () => {
+  [
+    {},
+    { suites: [{ title: 'a' }] },
+    rootSuite({ a: [{}] }),
+    { suites: [{ title: 'a', allTests: () => 'tests' }] },
+  ].forEach((suite) => {
+    assert.throws(() => raiseRetries(suite, new Map([['a', 1]])), {
+      message: /TestCase\.retries/,
     });
   });
 });

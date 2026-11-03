@@ -19,6 +19,8 @@ export type RunRequest = DryRunRequest | MutantRunRequest;
 export interface DryRunRequest {
   readonly kind: 'dry';
   readonly disableBail: boolean;
+  /** The Playwright config's failOnFlakyTests: a test that passes only on a retry fails the run. */
+  readonly failOnFlakyTests: boolean;
   readonly coverageAnalysis: DryRunOptions['coverageAnalysis'];
   readonly budget: RunBudget;
 }
@@ -26,6 +28,7 @@ export interface DryRunRequest {
 export interface MutantRunRequest {
   readonly kind: 'mutant';
   readonly disableBail: boolean;
+  readonly failOnFlakyTests: boolean;
   readonly activeMutant: string;
   /** Undefined runs every test. */
   readonly selection: TestSelection | undefined;
@@ -40,11 +43,17 @@ export interface TestSelection {
   readonly toRun: readonly string[];
 }
 
-export function dryRunRequest({
-  disableBail,
-  coverageAnalysis,
-}: DryRunOptions): DryRunRequest {
-  return { kind: 'dry', disableBail, coverageAnalysis, budget: dryRunBudget };
+export function dryRunRequest(
+  { disableBail, coverageAnalysis }: DryRunOptions,
+  { failOnFlakyTests }: { readonly failOnFlakyTests: boolean },
+): DryRunRequest {
+  return {
+    kind: 'dry',
+    disableBail,
+    failOnFlakyTests,
+    coverageAnalysis,
+    budget: dryRunBudget,
+  };
 }
 
 export function mutantRunRequest(
@@ -58,11 +67,13 @@ export function mutantRunRequest(
   session: {
     readonly serialGroups: SerialGroups;
     readonly timeouts: ConfigTimeouts;
+    readonly failOnFlakyTests: boolean;
   },
 ): MutantRunRequest {
   return {
     kind: 'mutant',
     disableBail,
+    failOnFlakyTests: session.failOnFlakyTests,
     activeMutant: activeMutant.id,
     selection: testFilter && {
       covering: testFilter,

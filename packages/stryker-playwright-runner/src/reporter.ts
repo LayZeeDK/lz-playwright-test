@@ -4,6 +4,8 @@ import type {
   TestResult,
 } from '@playwright/test/reporter';
 
+import { raiseRetries } from './playwright-internals.ts';
+
 export interface ReportedAttempt {
   readonly status: TestResult['status'];
   readonly duration: number;
@@ -29,7 +31,12 @@ export class LzPlaywrightCollectingReporter {
   outputTail = '';
   // Playwright reports each attempt of a retried test with the same TestCase, which holds them all.
   readonly testCases = new Map<string, ReportedTest>();
+  readonly #retriesByProject: ReadonlyMap<string, number>;
   #suite: ReportedSuite | undefined;
+
+  constructor(retriesByProject: ReadonlyMap<string, number> = new Map()) {
+    this.#retriesByProject = retriesByProject;
+  }
 
   printsToStdio() {
     return false;
@@ -37,6 +44,14 @@ export class LzPlaywrightCollectingReporter {
 
   onBegin(_config: unknown, suite: ReportedSuite) {
     this.#suite = suite;
+
+    if ([...this.#retriesByProject.values()].some(Boolean)) {
+      try {
+        raiseRetries(suite, this.#retriesByProject);
+      } catch (error) {
+        this.errors.push(String(error));
+      }
+    }
   }
 
   get listedTests(): readonly ReportedTest[] {

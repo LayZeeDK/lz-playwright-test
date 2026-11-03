@@ -26,6 +26,7 @@ const defaults = {
   configFile: undefined,
   projects: undefined,
   workers: 1,
+  retries: undefined,
   strykerTimeoutMS: 10_000,
 };
 
@@ -43,13 +44,14 @@ test('the runner options resolve the config file and take the schema default for
 test('the runner options keep the projects and workers the user set', () => {
   const options = readRunnerOptions(
     strykerOptions({
-      lzPlaywright: { projects: ['chromium'], workers: 2 },
+      lzPlaywright: { projects: ['chromium'], workers: 2, retries: 0 },
     }),
   );
 
   assert.equal(options.configFile, undefined);
   assert.deepEqual(options.projects, ['chromium']);
   assert.equal(options.workers, 2);
+  assert.equal(options.retries, 0);
 });
 
 test('the runner options refuse --testFiles', () => {
@@ -70,6 +72,9 @@ test('the runner options refuse lzPlaywright options that are not an object or h
     { workers: '2' },
     { workers: 1.5 },
     { workers: 0 },
+    { retries: '1' },
+    { retries: 0.5 },
+    { retries: -1 },
   ].forEach((lzPlaywright) => {
     assert.throws(() => readRunnerOptions(strykerOptions({ lzPlaywright })), {
       message: `The lzPlaywright options do not match their schema: ${JSON.stringify(lzPlaywright)}`,
@@ -113,6 +118,7 @@ test("Stryker's check of the options fills in the defaults", () => {
         configFile: 'a.ts',
         projects: ['chromium'],
         workers: 2,
+        retries: 1,
       },
     }).valid,
     true,
@@ -126,6 +132,7 @@ test("Stryker's check of the options refuses wrong types, workers below 1 and un
     { projects: [1] },
     { workers: 1.5 },
     { workers: 0 },
+    { retries: -1 },
     { browser: 'chromium' },
   ].forEach((lzPlaywright) => {
     assert.equal(

@@ -6,6 +6,7 @@ export interface LzPlaywrightOptions {
   readonly configFile?: string;
   readonly projects?: readonly string[];
   readonly workers?: number;
+  readonly retries?: number;
 }
 
 type JsonType<T> = T extends string
@@ -44,6 +45,12 @@ export const optionProperties = {
     default: 1,
     description: 'Playwright workers per Stryker test runner process.',
   },
+  retries: {
+    type: 'integer',
+    minimum: 0,
+    description:
+      'Retries of a failed test in every project. Defaults to the retries in the Playwright config.',
+  },
 } satisfies OptionSchemas;
 
 export const strykerValidationSchema = {
@@ -63,6 +70,7 @@ export interface RunnerOptions {
   readonly configFile: string | undefined;
   readonly projects: readonly string[] | undefined;
   readonly workers: number;
+  readonly retries: number | undefined;
   readonly strykerTimeoutMS: number;
 }
 
@@ -76,6 +84,7 @@ const optionGuards = {
   configFile: (value) => value === undefined || typeof value === 'string',
   projects: (value) => value === undefined || isStringArray(value),
   workers: (value) => value === undefined || typeof value === 'number',
+  retries: (value) => value === undefined || typeof value === 'number',
 } satisfies {
   readonly [K in keyof LzPlaywrightOptions]-?: (
     value: unknown,
@@ -94,23 +103,28 @@ export function readRunnerOptions(
   const own = options.lzPlaywright ?? {};
 
   if (isRecord(own) && !Array.isArray(own)) {
-    const { configFile, projects, workers } = own;
+    const { configFile, projects, workers, retries } = own;
 
     if (
       optionGuards.configFile(configFile) &&
       optionGuards.projects(projects) &&
-      optionGuards.workers(workers)
+      optionGuards.workers(workers) &&
+      optionGuards.retries(retries)
     ) {
       const workerCount = workers ?? optionProperties.workers.default;
 
       if (
         Number.isInteger(workerCount) &&
-        workerCount >= optionProperties.workers.minimum
+        workerCount >= optionProperties.workers.minimum &&
+        (retries === undefined ||
+          (Number.isInteger(retries) &&
+            retries >= optionProperties.retries.minimum))
       ) {
         return {
           configFile: configFile ? path.resolve(configFile) : undefined,
           projects,
           workers: workerCount,
+          retries,
           strykerTimeoutMS: options.timeoutMS,
         };
       }
