@@ -7,6 +7,7 @@ import { isMainThread } from 'node:worker_threads';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
 import { isRecord } from './is-record.ts';
+import { globalNamespace, type StrykerNamespace } from './namespace.ts';
 import {
   type HookedBrowser,
   type HookedContext,
@@ -56,8 +57,6 @@ class ContextState {
     return this.#closedPageSnapshots;
   }
 }
-
-type Writable<T> = { -readonly [K in keyof T]: T[K] };
 
 interface RunningTest {
   readonly testId: string;
@@ -166,7 +165,7 @@ export function install(
 
   fs.writeFileSync(outFile, '');
   recordNodeCoverage(
-    workerNamespace(ns),
+    globalNamespace(ns),
     { perTest, hitLimit },
     () => nodeTestId(test),
     (line) => fs.appendFileSync(outFile, line + '\n'),
@@ -244,34 +243,6 @@ export function install(
     },
     runBeforeCloseBrowserContext: collect,
   });
-}
-
-/**
- * The global that Stryker's instrumented code and this hook share, in the worker and in every page.
- * Instrumented code may create it first, so each field claims nothing.
- */
-export type StrykerNamespace = Writable<StrykerNamespaceFields>;
-
-interface StrykerNamespaceFields {
-  readonly activeMutant?: unknown;
-  readonly currentTestId?: unknown;
-  readonly mutantCoverage?: unknown;
-  readonly hitCount?: unknown;
-  readonly hitLimit?: unknown;
-}
-
-function workerNamespace(name: string): StrykerNamespace {
-  const scope: Record<string, unknown> = globalThis;
-  const found = scope[name];
-
-  if (isRecord(found)) {
-    return found;
-  }
-
-  const created: StrykerNamespace = {};
-  scope[name] = created;
-
-  return created;
 }
 
 export function recordNodeCoverage(

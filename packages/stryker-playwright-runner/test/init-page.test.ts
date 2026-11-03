@@ -4,7 +4,7 @@ import { before, type TestContext, test } from 'node:test';
 
 import type { PageSettings } from '../src/protocol.ts';
 import type * as Hook from '../src/worker-hook.ts';
-import type { StrykerNamespace } from '../src/worker-hook.ts';
+import type { StrykerNamespace } from '../src/namespace.ts';
 
 let hook: typeof Hook;
 

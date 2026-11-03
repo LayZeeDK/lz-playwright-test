@@ -17,7 +17,8 @@ import {
 } from '../../src/playwright-internals.ts';
 import { setEnv } from '../../src/lz-playwright-test-runner.ts';
 import type { PageSettings, RunSettings } from '../../src/protocol.ts';
-import type { install, StrykerNamespace } from '../../src/worker-hook.ts';
+import type { StrykerNamespace } from '../../src/namespace.ts';
+import type { install } from '../../src/worker-hook.ts';
 import { tempTree } from './doubles.ts';
 
 const activeMutantEnv = INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;

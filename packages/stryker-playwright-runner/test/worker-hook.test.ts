@@ -13,7 +13,7 @@ import {
   type RunSettings,
 } from '../src/protocol.ts';
 import type * as Hook from '../src/worker-hook.ts';
-import type { StrykerNamespace } from '../src/worker-hook.ts';
+import type { StrykerNamespace } from '../src/namespace.ts';
 import { codedError, tempTree } from './support/doubles.ts';
 import { fakeInstall, type Runnable } from './support/fake-worker.ts';
 
