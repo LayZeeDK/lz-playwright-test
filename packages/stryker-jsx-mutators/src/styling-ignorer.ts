@@ -86,13 +86,10 @@ const boxKeys: readonly string[] = [
 ];
 
 export function stylingIgnorer(options: object): Ignorer {
-  const hiding = new Set([
-    ...visibilityClasses,
-    ...userVisibilityClasses(options),
-  ]);
+  const hiding = new Set(hidingClasses(options));
   const hides = (node: unknown): boolean =>
     classTexts(node)
-      .flatMap((text) => text.split(/\s+/))
+      .flatMap((text) => text.split(/\s/))
       .some((token) => hiding.has(token.slice(token.lastIndexOf(':') + 1)));
 
   return {
@@ -103,23 +100,24 @@ export function stylingIgnorer(options: object): Ignorer {
         return styleReason;
       }
 
-      const reason =
-        isClassAttribute(node) || isClassVariable(node)
-          ? classReason
-          : isClassBuilderCall(node) && !insideClassAttribute(path)
-            ? builderReason
-            : undefined;
+      if (isClassAttribute(node) || isClassVariable(node)) {
+        return hides(node) ? undefined : classReason;
+      }
 
-      return reason === undefined || hides(node) ? undefined : reason;
+      if (isClassBuilderCall(node) && !insideClassAttribute(path)) {
+        return hides(node) ? undefined : builderReason;
+      }
+
+      return undefined;
     },
   };
 }
 
-function userVisibilityClasses(options: object): readonly string[] {
+function hidingClasses(options: object): readonly string[] {
   const own = fieldOf(fieldOf(options, 'lzJsxStyling'), 'visibilityClasses');
 
   if (own === undefined) {
-    return [];
+    return visibilityClasses;
   }
 
   if (!isClassList(own)) {
@@ -129,7 +127,7 @@ function userVisibilityClasses(options: object): readonly string[] {
     );
   }
 
-  return own;
+  return [...visibilityClasses, ...own];
 }
 
 function isClassList(value: unknown): value is readonly string[] {
@@ -146,7 +144,6 @@ function isClassAttribute(node: unknown): boolean {
   const name = fieldOf(fieldOf(node, 'name'), 'name');
 
   return (
-    typeOf(node) === 'JSXAttribute' &&
     (name === 'className' ||
       name === 'class' ||
       (typeof name === 'string' && name.endsWith('ClassName'))) &&
@@ -159,9 +156,7 @@ function isPlainStyleAttribute(node: unknown): boolean {
   const properties = fieldOf(value, 'properties');
 
   return (
-    typeOf(node) === 'JSXAttribute' &&
     fieldOf(fieldOf(node, 'name'), 'name') === 'style' &&
-    typeOf(value) === 'ObjectExpression' &&
     Array.isArray(properties) &&
     properties.every(isPlainStyleProperty)
   );
@@ -169,15 +164,9 @@ function isPlainStyleAttribute(node: unknown): boolean {
 
 function isPlainStyleProperty(property: unknown): boolean {
   const key = fieldOf(property, 'key');
-  const name =
-    typeOf(key) === 'Identifier'
-      ? fieldOf(key, 'name')
-      : typeOf(key) === 'StringLiteral'
-        ? fieldOf(key, 'value')
-        : undefined;
+  const name = fieldOf(key, 'name') ?? fieldOf(key, 'value');
 
   return (
-    typeOf(property) !== 'SpreadElement' &&
     fieldOf(property, 'computed') === false &&
     typeof name === 'string' &&
     !boxKeys.includes(
@@ -187,12 +176,9 @@ function isPlainStyleProperty(property: unknown): boolean {
 }
 
 function isClassVariable(node: unknown): boolean {
-  const id = fieldOf(node, 'id');
-  const name = fieldOf(id, 'name');
+  const name = fieldOf(fieldOf(node, 'id'), 'name');
 
   return (
-    typeOf(node) === 'VariableDeclarator' &&
-    typeOf(id) === 'Identifier' &&
     typeof name === 'string' &&
     (name.endsWith('ClassName') || name.endsWith('Classes')) &&
     classValueTypes.includes(typeOf(fieldOf(node, 'init')))
@@ -200,12 +186,9 @@ function isClassVariable(node: unknown): boolean {
 }
 
 function isClassBuilderCall(node: unknown): boolean {
-  const callee = fieldOf(node, 'callee');
-
   return (
     typeOf(node) === 'CallExpression' &&
-    typeOf(callee) === 'Identifier' &&
-    classBuilders.includes(fieldOf(callee, 'name'))
+    classBuilders.includes(fieldOf(fieldOf(node, 'callee'), 'name'))
   );
 }
 
@@ -220,22 +203,14 @@ function insideClassAttribute(path: unknown): boolean {
 
 /** The strings in a subtree that can hold class names: string literals, template parts, and object keys. */
 function classTexts(node: unknown): string[] {
-  if (Array.isArray(node)) {
-    return node.flatMap(classTexts);
-  }
-
   if (!isRecord(node)) {
     return [];
   }
 
   const own = [
     typeOf(node) === 'StringLiteral' ? node['value'] : undefined,
-    typeOf(node) === 'TemplateElement'
-      ? fieldOf(node['value'], 'cooked')
-      : undefined,
-    typeOf(node) === 'ObjectProperty' &&
-    node['computed'] === false &&
-    typeOf(node['key']) === 'Identifier'
+    fieldOf(node['value'], 'cooked'),
+    typeOf(node) === 'ObjectProperty' && node['computed'] === false
       ? fieldOf(node['key'], 'name')
       : undefined,
   ].filter((text) => typeof text === 'string');
