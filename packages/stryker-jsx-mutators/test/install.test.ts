@@ -465,7 +465,7 @@ describe('resolveFromCore against a fake instrumenter', () => {
     placers: readonly string[],
     replace: Readonly<Record<string, string>> = {},
   ) {
-    const modules = join(tempRoot(t, 'ui-mutators-core-'), 'node_modules');
+    const modules = join(tempRoot(t, 'jsx-mutators-core-'), 'node_modules');
     const dir = join(modules, '@stryker-mutator', 'instrumenter');
     const files: Record<string, string> = {
       '@stryker-mutator/core/package.json':
