@@ -38,6 +38,29 @@ export function configTimeouts(
   };
 }
 
+// A project's suite is titled with its name, which Playwright lets projects share.
+export function configRetries(
+  projects: readonly { project: { name: string; retries: number } }[],
+  optionRetries: number | undefined,
+): ReadonlyMap<string, number> {
+  const retriesByProject = new Map<string, number>();
+
+  projects.forEach(({ project: { name, retries } }) => {
+    const resolved = optionRetries ?? retries;
+    const named = retriesByProject.get(name);
+
+    if (named !== undefined && named !== resolved) {
+      throw new Error(
+        `The Playwright projects named ${JSON.stringify(name)} set different retries (${named} and ${resolved}), and the runner tells projects apart by name. Give them distinct names, or set lzPlaywright.retries.`,
+      );
+    }
+
+    retriesByProject.set(name, resolved);
+  });
+
+  return retriesByProject;
+}
+
 export function assertionTimeoutWarning(
   config: ConfigTimeouts,
   strykerTimeoutMS: number,

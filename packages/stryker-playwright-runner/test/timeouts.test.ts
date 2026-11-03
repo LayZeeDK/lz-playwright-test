@@ -4,6 +4,7 @@ import { type TestContext, test } from 'node:test';
 import {
   armDeadline,
   assertionTimeoutWarning,
+  configRetries,
   configTimeouts,
   defaultExpectTimeoutMs,
   minTestTimeoutMs,
@@ -51,6 +52,52 @@ test('the expect timeout is the largest over the projects, with Playwright defau
       { project: { timeout: 1 } },
     ]).expectTimeout,
     defaultExpectTimeoutMs,
+  );
+});
+
+test("each project gets its own retries, or the retries option's", () => {
+  const projects = [
+    { project: { name: 'chromium', retries: 2 } },
+    { project: { name: 'firefox', retries: 0 } },
+  ];
+
+  assert.deepEqual(
+    configRetries(projects, undefined),
+    new Map([
+      ['chromium', 2],
+      ['firefox', 0],
+    ]),
+  );
+  assert.deepEqual(
+    configRetries(projects, 1),
+    new Map([
+      ['chromium', 1],
+      ['firefox', 1],
+    ]),
+  );
+});
+
+test('projects that share a name must share their retries, unless the retries option sets them all', () => {
+  const unnamed = [
+    { project: { name: '', retries: 2 } },
+    { project: { name: '', retries: 0 } },
+  ];
+
+  assert.throws(() => configRetries(unnamed, undefined), {
+    message:
+      'The Playwright projects named "" set different retries (2 and 0), and the runner tells projects apart by name. ' +
+      'Give them distinct names, or set lzPlaywright.retries.',
+  });
+  assert.deepEqual(configRetries(unnamed, 1), new Map([['', 1]]));
+  assert.deepEqual(
+    configRetries(
+      [
+        { project: { name: '', retries: 1 } },
+        { project: { name: '', retries: 1 } },
+      ],
+      undefined,
+    ),
+    new Map([['', 1]]),
   );
 });
 

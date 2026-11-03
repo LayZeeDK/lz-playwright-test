@@ -49,6 +49,7 @@ import { claimTempRoot, removeDir, type TempRoot } from './temp-root.ts';
 import {
   armDeadline,
   assertionTimeoutWarning,
+  configRetries,
   type ConfigTimeouts,
   configTimeouts,
 } from './timeouts.ts';
@@ -116,12 +117,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       });
       const config = await playwright.loadConfig();
       const timeouts = configTimeouts(config.projects);
-      const retriesByProject = new Map(
-        config.projects.map(({ project }) => [
-          project.name,
-          options.retries ?? project.retries,
-        ]),
-      );
+      const retriesByProject = configRetries(config.projects, options.retries);
       const warning = assertionTimeoutWarning(
         timeouts,
         options.strykerTimeoutMS,
