@@ -386,7 +386,7 @@ export function raiseRetries(
       throw retriesChanged();
     }
 
-    const tests: unknown = Reflect.apply(allTests, project, []);
+    const tests: unknown = allTests.call(project);
 
     if (!Array.isArray(tests)) {
       throw retriesChanged();
