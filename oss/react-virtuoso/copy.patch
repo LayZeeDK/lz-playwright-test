@@ -1,0 +1,37 @@
+diff --git a/.gitignore b/.gitignore
+index 1da80d6..dc6f805 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -25,3 +25,4 @@ apps/virtuoso.dev/docs/virtuoso-masonry-api/*
+ plans
+ prompts
+ reports
++.stryker-tmp
+diff --git a/packages/react-virtuoso/playwright.config.ts b/packages/react-virtuoso/playwright.config.ts
+index 6084e26..21e299f 100644
+--- a/packages/react-virtuoso/playwright.config.ts
++++ b/packages/react-virtuoso/playwright.config.ts
+@@ -1,12 +1,20 @@
+ import type { PlaywrightTestConfig } from '@playwright/test'
++import { existsSync } from 'node:fs'
++import { join } from 'node:path'
++
++const port = 61000 + Number(process.env.STRYKER_MUTATOR_WORKER ?? 0)
++const ladleCli = ['.', '../..']
++  .map((dir) => join(__dirname, dir, 'node_modules/@ladle/react/lib/cli/cli.js'))
++  .find((file) => existsSync(file))
+ 
+ const config: PlaywrightTestConfig = {
+   testDir: './e2e',
+   webServer: {
+-    command: 'npm run ladle',
+-    port: 61000,
++    command: `node "${ladleCli}" serve --port ${port}`,
++    env: { LADLE: 'true', BROWSER: 'none' },
++    port,
+     timeout: 120 * 1000,
+-    reuseExistingServer: process.env.CI === undefined || process.env.CI === '',
++    reuseExistingServer: false,
+   },
+ }
+ export default config
