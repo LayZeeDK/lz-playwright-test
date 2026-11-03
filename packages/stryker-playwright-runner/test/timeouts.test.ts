@@ -59,19 +59,19 @@ test('the assertion warning fires below the expect timeout plus the run start an
 
   assert.equal(
     assertionTimeoutWarning(config, 10_599, 0),
-    "timeoutMS (10599) is below the Playwright expect timeout (5000) plus the runner's 5600 ms to start and stop a run; killed mutants may be reported as timeouts. Set timeoutMS to at least 10600.",
+    'timeoutMS (10599) is below 1 attempt(s) at the Playwright expect timeout (5000) plus 3000 ms to start a worker for each, and 2600 ms to stop the run; killed mutants may be reported as timeouts. Set timeoutMS to at least 10600.',
   );
   assert.equal(assertionTimeoutWarning(config, 10_600, 0), undefined);
 });
 
-test('with retries, the warning asks for every attempt at the expect timeout', () => {
+test('with retries, the warning asks for every attempt at the expect timeout and a worker start for each', () => {
   const config = { testTimeoutCap: Infinity, expectTimeout: 5000 };
 
   assert.equal(
-    assertionTimeoutWarning(config, 15_599, 2),
-    "timeoutMS (15599) is below 3 attempts at the Playwright expect timeout (5000) plus the runner's 5600 ms to start and stop a run; a failed test's retries may not finish, and a flaky test can then kill a mutant. Set timeoutMS to at least 20600.",
+    assertionTimeoutWarning(config, 26_599, 2),
+    "timeoutMS (26599) is below 3 attempt(s) at the Playwright expect timeout (5000) plus 3000 ms to start a worker for each, and 2600 ms to stop the run; killed mutants may be reported as timeouts, and a failed test's retries may not finish, so a flaky test can kill a mutant. Set timeoutMS to at least 26600.",
   );
-  assert.equal(assertionTimeoutWarning(config, 20_600, 2), undefined);
+  assert.equal(assertionTimeoutWarning(config, 26_600, 2), undefined);
   assert.equal(assertionTimeoutWarning(config, 10_600, 0), undefined);
 });
 

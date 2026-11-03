@@ -32,7 +32,7 @@ async function startRunner(
   configFile = fixture('playwright.config.ts'),
 ) {
   const started = new LzPlaywrightTestRunner(
-    { lzPlaywright: { configFile, ...lzPlaywright }, timeoutMS: 11_000 },
+    { lzPlaywright: { configFile, ...lzPlaywright }, timeoutMS: 18_600 },
     log,
   );
   live.push(started);

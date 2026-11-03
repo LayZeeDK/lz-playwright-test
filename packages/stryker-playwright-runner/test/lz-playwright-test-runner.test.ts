@@ -178,7 +178,7 @@ test('init warns when timeoutMS is below the expect timeout plus the start and s
     [
       [
         'warn',
-        "timeoutMS (10599) is below the Playwright expect timeout (5000) plus the runner's 5600 ms to start and stop a run; killed mutants may be reported as timeouts. Set timeoutMS to at least 10600.",
+        'timeoutMS (10599) is below 1 attempt(s) at the Playwright expect timeout (5000) plus 3000 ms to start a worker for each, and 2600 ms to stop the run; killed mutants may be reported as timeouts. Set timeoutMS to at least 10600.',
       ],
     ],
   );
@@ -192,12 +192,12 @@ test("init counts the largest project's retries, or the retries option, in the t
       { default: true, project: { name: 'firefox', timeout: 1, retries: 1 } },
     ],
   });
-  const fromConfig = fake.runner({ timeoutMS: 20_599 });
+  const fromConfig = fake.runner({ timeoutMS: 26_599 });
   const fromOption = fake.runner({
-    timeoutMS: 15_599,
+    timeoutMS: 18_599,
     lzPlaywright: { retries: 1 },
   });
-  const enough = fake.runner({ timeoutMS: 20_600 });
+  const enough = fake.runner({ timeoutMS: 26_600 });
 
   await fromConfig.shell.init();
   await fromOption.shell.init();
@@ -205,11 +205,11 @@ test("init counts the largest project's retries, or the retries option, in the t
 
   assert.match(
     fromConfig.lines.find(([level]) => level === 'warn')?.[1] ?? '',
-    /below 3 attempts .* at least 20600\.$/,
+    /below 3 attempt\(s\) .* at least 26600\.$/,
   );
   assert.match(
     fromOption.lines.find(([level]) => level === 'warn')?.[1] ?? '',
-    /below 2 attempts .* at least 15600\.$/,
+    /below 2 attempt\(s\) .* at least 18600\.$/,
   );
   assert.deepEqual(enough.lines, []);
 });

@@ -43,17 +43,22 @@ export function assertionTimeoutWarning(
   strykerTimeoutMS: number,
   retries: number,
 ): string | undefined {
+  const attempts = retries + 1;
   // Stryker's measured overhead (dry run time less test time) shrinks to 0 when Playwright workers overlap tests.
-  const runHeadroomMs = runStartMs + stopHeadroomMs;
-  const lowerBoundMs = (retries + 1) * config.expectTimeout + runHeadroomMs;
+  // Playwright 1.64.1's dispatcher stops the worker after a failed test, so each retry starts a new one.
+  const lowerBoundMs =
+    attempts * (config.expectTimeout + runStartMs) + stopHeadroomMs;
 
   if (strykerTimeoutMS >= lowerBoundMs) {
     return undefined;
   }
 
-  return retries === 0
-    ? `timeoutMS (${strykerTimeoutMS}) is below the Playwright expect timeout (${config.expectTimeout}) plus the runner's ${runHeadroomMs} ms to start and stop a run; killed mutants may be reported as timeouts. Set timeoutMS to at least ${lowerBoundMs}.`
-    : `timeoutMS (${strykerTimeoutMS}) is below ${retries + 1} attempts at the Playwright expect timeout (${config.expectTimeout}) plus the runner's ${runHeadroomMs} ms to start and stop a run; a failed test's retries may not finish, and a flaky test can then kill a mutant. Set timeoutMS to at least ${lowerBoundMs}.`;
+  const retriesMayNotFinish =
+    retries === 0
+      ? ''
+      : ", and a failed test's retries may not finish, so a flaky test can kill a mutant";
+
+  return `timeoutMS (${strykerTimeoutMS}) is below ${attempts} attempt(s) at the Playwright expect timeout (${config.expectTimeout}) plus ${runStartMs} ms to start a worker for each, and ${stopHeadroomMs} ms to stop the run; killed mutants may be reported as timeouts${retriesMayNotFinish}. Set timeoutMS to at least ${lowerBoundMs}.`;
 }
 
 export interface RunBudget {
