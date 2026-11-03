@@ -1,7 +1,7 @@
 import type { NodePath, types } from '@babel/core';
 
 import { decodeValue, isJsxChild, type BabelTypes } from './mutator.ts';
-import { pluginName } from './plugin-name.ts';
+import { packageName } from './package-name.ts';
 
 export interface MutantPlacerLike {
   readonly name: string;
@@ -77,7 +77,7 @@ function remap(
 }
 
 function unplaceable(type: string): Error {
-  return new Error(`${pluginName}: cannot place a UI mutant at a ${type}.`);
+  return new Error(`${packageName}: cannot place a UI mutant at a ${type}.`);
 }
 
 function valueExpression(

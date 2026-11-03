@@ -4,8 +4,8 @@ import base from './stryker.base.ts';
 export default {
   ...base,
   appendPlugins: ['@layzee/stryker-playwright-runner'],
-  testRunner: 'lz-stryker-playwright',
-  lzStrykerPlaywright: {
+  testRunner: 'lz-playwright',
+  lzPlaywright: {
     configFile: 'apps/demo-app/playwright.components.config.mts',
   },
   mutate: ['apps/demo-app/src/app/price-tag.tsx'],

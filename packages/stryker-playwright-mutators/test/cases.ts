@@ -34,11 +34,11 @@ export const cases: readonly Case[] = [
     jsx: '<button className="btn btn-outline-danger" onClick={logout}>Or click here to logout.</button>',
     expect: [
       [
-        'LzElementRole',
+        'LzJsxElementRole',
         '<span className="btn btn-outline-danger" onClick={logout}>Or click here to logout.</span>',
       ],
-      ['LzEventHandler', 'onClick={undefined}'],
-      ['LzTextLiteral', ''],
+      ['LzJsxEventHandler', 'onClick={undefined}'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -46,14 +46,14 @@ export const cases: readonly Case[] = [
     title: 'a plain-string placeholder is emptied',
     origin: `${realworldOrigin}libs/auth/feature-auth/src/login/login.component.html:18`,
     jsx: '<input type="email" id="email" placeholder="Email" />',
-    expect: [['LzLabelAttribute', 'placeholder=""']],
+    expect: [['LzJsxLabelAttribute', 'placeholder=""']],
   },
   {
     id: 'realworld-3',
     title: 'a form submit handler from props is removed',
     origin: `${realworldOrigin}libs/auth/feature-auth/src/login/login.component.html:12`,
     jsx: '<form onSubmit={onSubmit}></form>',
-    expect: [['LzEventHandler', 'onSubmit={undefined}']],
+    expect: [['LzJsxEventHandler', 'onSubmit={undefined}']],
   },
   {
     id: 'realworld-4',
@@ -62,11 +62,11 @@ export const cases: readonly Case[] = [
     jsx: '<button className="btn btn-sm btn-outline-danger" onClick={deleteArticle}>Delete Article</button>',
     expect: [
       [
-        'LzElementRole',
+        'LzJsxElementRole',
         '<span className="btn btn-sm btn-outline-danger" onClick={deleteArticle}>Delete Article</span>',
       ],
-      ['LzEventHandler', 'onClick={undefined}'],
-      ['LzTextLiteral', ''],
+      ['LzJsxEventHandler', 'onClick={undefined}'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -83,8 +83,8 @@ export const cases: readonly Case[] = [
     setup: 'function logout() {\n  store.logout();\n}',
     jsx: '<button onClick={logout}>Logout</button>',
     expect: [
-      ['LzElementRole', '<span onClick={logout}>Logout</span>'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span onClick={logout}>Logout</span>'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -93,8 +93,8 @@ export const cases: readonly Case[] = [
     origin: `${realworldOrigin}apps/conduit/src/app/layout/navbar/navbar.component.html:5`,
     jsx: '<nav>{!isLoggedIn ? <GuestNav /> : <MemberNav />}</nav>',
     expect: [
-      ['LzConditionalElement', '<GuestNav />'],
-      ['LzConditionalElement', '<MemberNav />'],
+      ['LzJsxConditionalElement', '<GuestNav />'],
+      ['LzJsxConditionalElement', '<MemberNav />'],
     ],
   },
   {
@@ -102,7 +102,7 @@ export const cases: readonly Case[] = [
     title: 'an identifier guard is removed',
     origin: `${realworldOrigin}libs/articles/feature-article/src/article.component.html:1`,
     jsx: '<main>{article && <ArticlePage article={article} />}</main>',
-    expect: [['LzConditionalElement', '<ArticlePage article={article} />']],
+    expect: [['LzJsxConditionalElement', '<ArticlePage article={article} />']],
   },
   {
     id: 'realworld-9',
@@ -117,8 +117,8 @@ export const cases: readonly Case[] = [
     origin: `${realworldOrigin}libs/articles/feature-article/src/article-meta/article-meta.component.html:2`,
     jsx: '<a data-testid="article-author" href={\'/profile/\' + username}></a>',
     expect: [
-      ['LzElementRole', '<span data-testid="article-author"></span>'],
-      ['LzUrlAttribute', 'href=""'],
+      ['LzJsxElementRole', '<span data-testid="article-author"></span>'],
+      ['LzJsxUrlAttribute', 'href=""'],
     ],
   },
   {
@@ -127,9 +127,9 @@ export const cases: readonly Case[] = [
     origin: `${realworldOrigin}apps/conduit/src/app/layout/navbar/navbar.component.html:11`,
     jsx: '<a className="nav-link" href="/login">Sign in</a>',
     expect: [
-      ['LzElementRole', '<span className="nav-link">Sign in</span>'],
-      ['LzUrlAttribute', 'href=""'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span className="nav-link">Sign in</span>'],
+      ['LzJsxUrlAttribute', 'href=""'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -139,8 +139,8 @@ export const cases: readonly Case[] = [
     origin: `${realworldOrigin}libs/auth/feature-auth/src/login/login.component.html:33,36`,
     jsx: '<button data-testid="sign-in" disabled={form.invalid || form.pending} type="submit">Sign in</button>',
     expect: [
-      ['LzElementRole', '<span data-testid="sign-in">Sign in</span>'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span data-testid="sign-in">Sign in</span>'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -156,28 +156,28 @@ export const cases: readonly Case[] = [
     title: 'a negated hidden expression is forced off',
     origin: `${realworldOrigin}libs/articles/feature-article/src/article-meta/article-meta.component.html:12`,
     jsx: '<span hidden={!canModify}></span>',
-    expect: [['LzHiddenAttribute', 'hidden={false}']],
+    expect: [['LzJsxHiddenAttribute', 'hidden={false}']],
   },
   {
     id: 'realworld-16',
     title: 'aria-hidden with a boolean literal is left to BooleanLiteral',
     origin: `${realworldOrigin}libs/ui/components/src/avatar/avatar.component.html:4`,
     jsx: '<span className="avatar fallback" aria-hidden={true}>{initials}</span>',
-    expect: [['LzChildExpression', 'null']],
+    expect: [['LzJsxChildExpression', 'null']],
   },
   {
     id: 'realworld-17',
     title: 'a member expression child is emptied',
     origin: `${realworldOrigin}libs/articles/feature-article/src/article.component.html:5`,
     jsx: '<h1 data-testid="article-title">{article.title}</h1>',
-    expect: [['LzChildExpression', 'null']],
+    expect: [['LzJsxChildExpression', 'null']],
   },
   {
     id: 'realworld-18',
     title: 'parentheses around a child are not text',
     origin: `${realworldOrigin}libs/articles/feature-article/src/article-meta/article-meta.component.html:46`,
     jsx: '<span className="counter">({article.favoritesCount})</span>',
-    expect: [['LzChildExpression', 'null']],
+    expect: [['LzJsxChildExpression', 'null']],
   },
   {
     id: 'realworld-19',
@@ -192,14 +192,14 @@ export const cases: readonly Case[] = [
     origin: `${realworldOrigin}libs/articles/feature-article/src/article.component.html:43`,
     jsx: '<><a href="/login">Sign in</a> or <a href="/register">sign up</a> to add comments on this article.</>',
     expect: [
-      ['LzElementRole', '<span>Sign in</span>'],
-      ['LzUrlAttribute', 'href=""'],
-      ['LzTextLiteral', ''],
-      ['LzTextLiteral', ''],
-      ['LzElementRole', '<span>sign up</span>'],
-      ['LzUrlAttribute', 'href=""'],
-      ['LzTextLiteral', ''],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span>Sign in</span>'],
+      ['LzJsxUrlAttribute', 'href=""'],
+      ['LzJsxTextLiteral', ''],
+      ['LzJsxTextLiteral', ''],
+      ['LzJsxElementRole', '<span>sign up</span>'],
+      ['LzJsxUrlAttribute', 'href=""'],
+      ['LzJsxTextLiteral', ''],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -207,14 +207,14 @@ export const cases: readonly Case[] = [
     title: 'a bound alt is emptied',
     origin: `${realworldOrigin}libs/ui/components/src/avatar/avatar.component.html:2`,
     jsx: '<img src={src} alt={username} />',
-    expect: [['LzLabelAttribute', 'alt=""']],
+    expect: [['LzJsxLabelAttribute', 'alt=""']],
   },
   {
     id: 'realworld-22',
     title: 'an a without href keeps its tag',
     origin: `${realworldOrigin}libs/ui/components/src/pager/pager.component.html:9`,
     jsx: '<a data-testid="pagination-link" className="page-link">{pageNumber}</a>',
-    expect: [['LzChildExpression', 'null']],
+    expect: [['LzJsxChildExpression', 'null']],
   },
   {
     id: 'ngx-yeti-1',
@@ -224,11 +224,11 @@ export const cases: readonly Case[] = [
     jsx: '<button type="button" disabled={!live} onClick={() => setLive(false)}>Remove the live buttons</button>',
     expect: [
       [
-        'LzElementRole',
+        'LzJsxElementRole',
         '<span onClick={() => setLive(false)}>Remove the live buttons</span>',
       ],
-      ['LzDisabledAttribute', 'disabled={false}'],
-      ['LzTextLiteral', ''],
+      ['LzJsxDisabledAttribute', 'disabled={false}'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -236,7 +236,7 @@ export const cases: readonly Case[] = [
     title: 'an identifier guard around a form is removed',
     origin: `${yetiOrigin}button-fixture.ts:26`,
     jsx: '<div>{live && <form id="button-form"></form>}</div>',
-    expect: [['LzConditionalElement', '<form id="button-form"></form>']],
+    expect: [['LzJsxConditionalElement', '<form id="button-form"></form>']],
   },
   {
     id: 'ngx-yeti-3',
@@ -245,9 +245,9 @@ export const cases: readonly Case[] = [
     origin: `${yetiOrigin}fragment-links-fixture.ts:38`,
     jsx: '<div>{page !== null && <a href="../two">Open page two</a>}</div>',
     expect: [
-      ['LzElementRole', '<span>Open page two</span>'],
-      ['LzUrlAttribute', 'href=""'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span>Open page two</span>'],
+      ['LzJsxUrlAttribute', 'href=""'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -256,8 +256,8 @@ export const cases: readonly Case[] = [
     origin: `${yetiOrigin}button-fixture.ts:68`,
     jsx: '<a id="previous" disabled>Previous</a>',
     expect: [
-      ['LzDisabledAttribute', 'disabled={undefined}'],
-      ['LzTextLiteral', ''],
+      ['LzJsxDisabledAttribute', 'disabled={undefined}'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -266,10 +266,10 @@ export const cases: readonly Case[] = [
     origin: `${yetiOrigin}button-fixture.ts:61`,
     jsx: '<a id="next" disabled={last} href={last ? null : \'/replay\'}>Next</a>',
     expect: [
-      ['LzElementRole', '<span id="next">Next</span>'],
-      ['LzDisabledAttribute', 'disabled={false}'],
-      ['LzUrlAttribute', 'href=""'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span id="next">Next</span>'],
+      ['LzJsxDisabledAttribute', 'disabled={false}'],
+      ['LzJsxUrlAttribute', 'href=""'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -278,9 +278,9 @@ export const cases: readonly Case[] = [
     origin: `${yetiOrigin}button-fixture.ts:24`,
     jsx: '<a href="/replay">Leave for a page without buttons</a>',
     expect: [
-      ['LzElementRole', '<span>Leave for a page without buttons</span>'],
-      ['LzUrlAttribute', 'href=""'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span>Leave for a page without buttons</span>'],
+      ['LzJsxUrlAttribute', 'href=""'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -289,9 +289,9 @@ export const cases: readonly Case[] = [
     origin: `${yetiOrigin}button-fixture.ts:92`,
     jsx: '<a id="contact-link" href="#contact">Contact us</a>',
     expect: [
-      ['LzElementRole', '<span id="contact-link">Contact us</span>'],
-      ['LzUrlAttribute', 'href=""'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span id="contact-link">Contact us</span>'],
+      ['LzJsxUrlAttribute', 'href=""'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -299,7 +299,7 @@ export const cases: readonly Case[] = [
     title: 'a group aria-label is emptied',
     origin: `${yetiOrigin}buttons-fixture.ts:50`,
     jsx: '<div aria-label="Text style"></div>',
-    expect: [['LzLabelAttribute', 'aria-label=""']],
+    expect: [['LzJsxLabelAttribute', 'aria-label=""']],
   },
   {
     id: 'ngx-yeti-9',
@@ -307,7 +307,7 @@ export const cases: readonly Case[] = [
       'an svg keeps its img role, as Playwright gives svg that role, and loses its aria-label',
     origin: `${yetiOrigin}icon-fixture.ts:36`,
     jsx: '<svg role="img" aria-label="Warning" viewBox="0 0 24 24"></svg>',
-    expect: [['LzLabelAttribute', 'aria-label=""']],
+    expect: [['LzJsxLabelAttribute', 'aria-label=""']],
   },
   {
     id: 'ngx-yeti-10',
@@ -315,8 +315,8 @@ export const cases: readonly Case[] = [
     origin: `${yetiOrigin}spinner-fixture.ts:23`,
     jsx: '<span id="loading-spinner" role="status" aria-label="Loading"></span>',
     expect: [
-      ['LzElementRole', 'role={undefined}'],
-      ['LzLabelAttribute', 'aria-label=""'],
+      ['LzJsxElementRole', 'role={undefined}'],
+      ['LzJsxLabelAttribute', 'aria-label=""'],
     ],
   },
   {
@@ -324,21 +324,21 @@ export const cases: readonly Case[] = [
     title: 'a plain-string alt is emptied',
     origin: `${yetiOrigin}card-fixture.ts:36`,
     jsx: '<img src="trail.svg" width="1600" height="900" alt="A mountain trail at dawn" />',
-    expect: [['LzLabelAttribute', 'alt=""']],
+    expect: [['LzJsxLabelAttribute', 'alt=""']],
   },
   {
     id: 'ngx-yeti-12',
     title: 'an iframe title is emptied',
     origin: `${yetiOrigin}frame-fixture.ts:44`,
     jsx: '<iframe title="Trail notes" srcDoc="<p>Six miles and one summit.</p>"></iframe>',
-    expect: [['LzLabelAttribute', 'title=""']],
+    expect: [['LzJsxLabelAttribute', 'title=""']],
   },
   {
     id: 'ngx-yeti-13',
     title: 'aria-labelledby is emptied',
     origin: `${yetiOrigin}fragment-links-fixture.ts:48`,
     jsx: '<svg aria-labelledby="svg-link-text" height="24" width="160"></svg>',
-    expect: [['LzLabelAttribute', 'aria-labelledby=""']],
+    expect: [['LzJsxLabelAttribute', 'aria-labelledby=""']],
   },
   {
     id: 'ngx-yeti-14',
@@ -355,11 +355,11 @@ export const cases: readonly Case[] = [
     jsx: '<button id="bold" type="button" aria-pressed={bold} onClick={pressBold}>Bold</button>',
     expect: [
       [
-        'LzElementRole',
+        'LzJsxElementRole',
         '<span id="bold" aria-pressed={bold} onClick={pressBold}>Bold</span>',
       ],
-      ['LzStateAttribute', 'aria-pressed={!bold}'],
-      ['LzTextLiteral', ''],
+      ['LzJsxStateAttribute', 'aria-pressed={!bold}'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -369,12 +369,15 @@ export const cases: readonly Case[] = [
     setup: 'const pressBold = () => {\n  setBold((b) => !b);\n};',
     jsx: '<div><button id="bold" type="button" onClick={pressBold}>Bold</button><button id="bold-key" type="button" onClick={pressBold}>Bold</button></div>',
     expect: [
-      ['LzElementRole', '<span id="bold" onClick={pressBold}>Bold</span>'],
-      ['LzEventHandler', 'onClick={undefined}'],
-      ['LzTextLiteral', ''],
-      ['LzElementRole', '<span id="bold-key" onClick={pressBold}>Bold</span>'],
-      ['LzEventHandler', 'onClick={undefined}'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span id="bold" onClick={pressBold}>Bold</span>'],
+      ['LzJsxEventHandler', 'onClick={undefined}'],
+      ['LzJsxTextLiteral', ''],
+      [
+        'LzJsxElementRole',
+        '<span id="bold-key" onClick={pressBold}>Bold</span>',
+      ],
+      ['LzJsxEventHandler', 'onClick={undefined}'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -382,7 +385,7 @@ export const cases: readonly Case[] = [
     title: 'an output child is emptied',
     origin: `${yetiOrigin}button-fixture.ts:39`,
     jsx: '<output id="bold-presses">{presses}</output>',
-    expect: [['LzChildExpression', 'null']],
+    expect: [['LzJsxChildExpression', 'null']],
   },
   {
     id: 'ngx-yeti-18',
@@ -391,11 +394,11 @@ export const cases: readonly Case[] = [
     jsx: '<button id="busy" type="button" aria-busy={waiting} aria-disabled={waiting}>Saving</button>',
     expect: [
       [
-        'LzElementRole',
+        'LzJsxElementRole',
         '<span id="busy" aria-busy={waiting} aria-disabled={waiting}>Saving</span>',
       ],
-      ['LzDisabledAttribute', 'aria-disabled={false}'],
-      ['LzTextLiteral', ''],
+      ['LzJsxDisabledAttribute', 'aria-disabled={false}'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -405,8 +408,8 @@ export const cases: readonly Case[] = [
     origin: `${yetiOrigin}cluster-fixture.ts:24`,
     jsx: '<ul id="tags-cluster" role="list"><li>layout</li><li>intrinsic</li></ul>',
     expect: [
-      ['LzTextLiteral', ''],
-      ['LzTextLiteral', ''],
+      ['LzJsxTextLiteral', ''],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -415,8 +418,8 @@ export const cases: readonly Case[] = [
     origin: `${yetiOrigin}button-fixture.ts:28`,
     jsx: '<button id="save" type="button">Save</button>',
     expect: [
-      ['LzElementRole', '<span id="save">Save</span>'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span id="save">Save</span>'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -432,9 +435,9 @@ export const cases: readonly Case[] = [
     origin: `${analogOrigin}libs/top-bar/src/lib/top-bar/template.html:16`,
     jsx: '<a href="/"><h1>My Store</h1></a>',
     expect: [
-      ['LzElementRole', '<span><h1>My Store</h1></span>'],
-      ['LzUrlAttribute', 'href=""'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span><h1>My Store</h1></span>'],
+      ['LzJsxUrlAttribute', 'href=""'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -444,12 +447,12 @@ export const cases: readonly Case[] = [
     jsx: '<a href="/cart" className="button fancy-button"><i className="material-icons">shopping_cart</i>Checkout</a>',
     expect: [
       [
-        'LzElementRole',
+        'LzJsxElementRole',
         '<span className="button fancy-button"><i className="material-icons">shopping_cart</i>Checkout</span>',
       ],
-      ['LzUrlAttribute', 'href=""'],
-      ['LzTextLiteral', ''],
-      ['LzTextLiteral', ''],
+      ['LzJsxUrlAttribute', 'href=""'],
+      ['LzJsxTextLiteral', ''],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -460,11 +463,11 @@ export const cases: readonly Case[] = [
     jsx: "<a title={product.name + ' details'} href={`/products/${product.id}`}>{product.name}</a>",
     expect: [
       [
-        'LzElementRole',
+        'LzJsxElementRole',
         "<span title={product.name + ' details'}>{product.name}</span>",
       ],
-      ['LzChildExpression', 'null'],
-      ['LzLabelAttribute', 'title=""'],
+      ['LzJsxChildExpression', 'null'],
+      ['LzJsxLabelAttribute', 'title=""'],
     ],
   },
   {
@@ -473,9 +476,9 @@ export const cases: readonly Case[] = [
     origin: `${analogOrigin}apps/analog-app/src/app/pages/(home).page.ts:32`,
     jsx: '<div>{product.description && <p>Description: {product.description}</p>}</div>',
     expect: [
-      ['LzConditionalElement', '<p>Description: {product.description}</p>'],
-      ['LzTextLiteral', ''],
-      ['LzChildExpression', 'null'],
+      ['LzJsxConditionalElement', '<p>Description: {product.description}</p>'],
+      ['LzJsxTextLiteral', ''],
+      ['LzJsxChildExpression', 'null'],
     ],
   },
   {
@@ -486,8 +489,8 @@ export const cases: readonly Case[] = [
       "const share = () => {\n  window.alert('The product has been shared!');\n};",
     jsx: '<button type="button" onClick={share}>Share</button>',
     expect: [
-      ['LzElementRole', '<span onClick={share}>Share</span>'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span onClick={share}>Share</span>'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -497,9 +500,9 @@ export const cases: readonly Case[] = [
     setup: "import { share } from './share';",
     jsx: '<button type="button" onClick={share}>Share</button>',
     expect: [
-      ['LzElementRole', '<span onClick={share}>Share</span>'],
-      ['LzEventHandler', 'onClick={undefined}'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span onClick={share}>Share</span>'],
+      ['LzJsxEventHandler', 'onClick={undefined}'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -517,8 +520,11 @@ export const cases: readonly Case[] = [
     origin: `${analogOrigin}apps/analog-app/src/app/product-alerts/product-alerts.component.ts:7`,
     jsx: '<div>{product() && product()!.price > 700 && (<p><button type="button" onClick={() => notify.emit()}>Notify Me</button></p>)}</div>',
     expect: [
-      ['LzElementRole', '<span onClick={() => notify.emit()}>Notify Me</span>'],
-      ['LzTextLiteral', ''],
+      [
+        'LzJsxElementRole',
+        '<span onClick={() => notify.emit()}>Notify Me</span>',
+      ],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -528,17 +534,17 @@ export const cases: readonly Case[] = [
     jsx: '<div>{signedUpEmail() ? <div id="signup-message">Thanks for signing up, {signedUpEmail()}!</div> : <form method="post"><button type="submit">Submit</button></form>}</div>',
     expect: [
       [
-        'LzConditionalElement',
+        'LzJsxConditionalElement',
         '<div id="signup-message">Thanks for signing up, {signedUpEmail()}!</div>',
       ],
       [
-        'LzConditionalElement',
+        'LzJsxConditionalElement',
         '<form method="post"><button type="submit">Submit</button></form>',
       ],
-      ['LzTextLiteral', ''],
-      ['LzChildExpression', 'null'],
-      ['LzElementRole', '<span>Submit</span>'],
-      ['LzTextLiteral', ''],
+      ['LzJsxTextLiteral', ''],
+      ['LzJsxChildExpression', 'null'],
+      ['LzJsxElementRole', '<span>Submit</span>'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -547,8 +553,8 @@ export const cases: readonly Case[] = [
     origin: `${analogOrigin}apps/analog-app/src/app/pages/newsletter.page.ts:40`,
     jsx: '<div>{errors()?.email && <p>{errors()?.email}</p>}</div>',
     expect: [
-      ['LzConditionalElement', '<p>{errors()?.email}</p>'],
-      ['LzChildExpression', 'null'],
+      ['LzJsxConditionalElement', '<p>{errors()?.email}</p>'],
+      ['LzJsxChildExpression', 'null'],
     ],
   },
   {
@@ -564,7 +570,7 @@ export const cases: readonly Case[] = [
     title: 'a member-expression submit handler is removed',
     origin: `${analogOrigin}apps/analog-app/src/app/pages/cart.page.ts:25`,
     jsx: '<form onSubmit={props.onSubmit}></form>',
-    expect: [['LzEventHandler', 'onSubmit={undefined}']],
+    expect: [['LzJsxEventHandler', 'onSubmit={undefined}']],
   },
   {
     id: 'analog-13',
@@ -572,8 +578,8 @@ export const cases: readonly Case[] = [
     origin: `${analogOrigin}apps/analog-app/src/app/pages/cart.page.ts:27`,
     jsx: '<div><label htmlFor="name"> Name </label><input id="name" type="text" /></div>',
     expect: [
-      ['LzLabelAttribute', 'htmlFor=""'],
-      ['LzTextLiteral', ''],
+      ['LzJsxLabelAttribute', 'htmlFor=""'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -582,8 +588,8 @@ export const cases: readonly Case[] = [
     origin: `${analogOrigin}apps/analog-app/src/app/pages/newsletter.page.ts:33`,
     jsx: '<div><label htmlFor="email"> Email </label><input type="email" name="email" /></div>',
     expect: [
-      ['LzLabelAttribute', 'htmlFor=""'],
-      ['LzTextLiteral', ''],
+      ['LzJsxLabelAttribute', 'htmlFor=""'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -592,8 +598,8 @@ export const cases: readonly Case[] = [
     origin: `${analogOrigin}apps/analog-app/src/app/pages/cart.page.ts:36`,
     jsx: '<button className="button" type="submit">Purchase</button>',
     expect: [
-      ['LzElementRole', '<span className="button">Purchase</span>'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span className="button">Purchase</span>'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -601,7 +607,7 @@ export const cases: readonly Case[] = [
     title: 'trailing whitespace text is not text',
     origin: `${analogOrigin}apps/analog-app/src/app/pages/cart.page.ts:19`,
     jsx: '<div className="cart-item"><span>{item.name} </span></div>',
-    expect: [['LzChildExpression', 'null']],
+    expect: [['LzJsxChildExpression', 'null']],
   },
   {
     id: 'analog-17',
@@ -609,8 +615,8 @@ export const cases: readonly Case[] = [
     origin: `${analogOrigin}apps/analog-app/src/app/pages/server-functions.page.ts:24`,
     jsx: '<li>{p.name} — {p.price}</li>',
     expect: [
-      ['LzChildExpression', 'null'],
-      ['LzChildExpression', 'null'],
+      ['LzJsxChildExpression', 'null'],
+      ['LzJsxChildExpression', 'null'],
     ],
   },
   {
@@ -618,7 +624,7 @@ export const cases: readonly Case[] = [
     title: 'a heading text is emptied',
     origin: `${analogOrigin}apps/analog-app/src/app/pages/products.[productId].page.ts:15`,
     jsx: '<h2>Product Details</h2>',
-    expect: [['LzTextLiteral', '']],
+    expect: [['LzJsxTextLiteral', '']],
   },
   {
     id: 'analog-19',
@@ -627,13 +633,16 @@ export const cases: readonly Case[] = [
     jsx: '<section>{product && (<div><h3>{product.name}</h3><p>{product.description}</p><button type="button" onClick={() => addToCart(product)}>Buy</button></div>)}</section>',
     expect: [
       [
-        'LzConditionalElement',
+        'LzJsxConditionalElement',
         '<div><h3>{product.name}</h3><p>{product.description}</p><button type="button" onClick={() => addToCart(product)}>Buy</button></div>',
       ],
-      ['LzChildExpression', 'null'],
-      ['LzChildExpression', 'null'],
-      ['LzElementRole', '<span onClick={() => addToCart(product)}>Buy</span>'],
-      ['LzTextLiteral', ''],
+      ['LzJsxChildExpression', 'null'],
+      ['LzJsxChildExpression', 'null'],
+      [
+        'LzJsxElementRole',
+        '<span onClick={() => addToCart(product)}>Buy</span>',
+      ],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -650,11 +659,11 @@ export const cases: readonly Case[] = [
     jsx: '<header>{user ? <div><Button size="small" onClicked={() => logout.emit(event)} label="Log out" /></div> : <div><Button size="small" label="Log in" /></div>}</header>',
     expect: [
       [
-        'LzConditionalElement',
+        'LzJsxConditionalElement',
         '<div><Button size="small" onClicked={() => logout.emit(event)} label="Log out" /></div>',
       ],
       [
-        'LzConditionalElement',
+        'LzJsxConditionalElement',
         '<div><Button size="small" label="Log in" /></div>',
       ],
     ],
@@ -665,9 +674,9 @@ export const cases: readonly Case[] = [
     origin: `${analogOrigin}apps/analog-app/src/app/pages/cart.page.ts:15`,
     jsx: '<a href="/shipping">Shipping Prices</a>',
     expect: [
-      ['LzElementRole', '<span>Shipping Prices</span>'],
-      ['LzUrlAttribute', 'href=""'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span>Shipping Prices</span>'],
+      ['LzJsxUrlAttribute', 'href=""'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -675,7 +684,7 @@ export const cases: readonly Case[] = [
     title: 'a heading text is emptied',
     origin: `${helloWorldOrigin}index.html:8`,
     jsx: '<h1>Stryker + Playwright Hello World</h1>',
-    expect: [['LzTextLiteral', '']],
+    expect: [['LzJsxTextLiteral', '']],
   },
   {
     id: 'hello-2+3',
@@ -683,8 +692,8 @@ export const cases: readonly Case[] = [
     origin: `${helloWorldOrigin}index.html:10`,
     jsx: '<label htmlFor="amount">Betrag</label>',
     expect: [
-      ['LzLabelAttribute', 'htmlFor=""'],
-      ['LzTextLiteral', ''],
+      ['LzJsxLabelAttribute', 'htmlFor=""'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -693,8 +702,8 @@ export const cases: readonly Case[] = [
     origin: `${helloWorldOrigin}index.html:13`,
     jsx: '<button id="btn">Berechnen</button>',
     expect: [
-      ['LzElementRole', '<span id="btn">Berechnen</span>'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span id="btn">Berechnen</span>'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -702,7 +711,7 @@ export const cases: readonly Case[] = [
     title: 'text before an element keeps its separating space',
     origin: `${helloWorldOrigin}index.html:15`,
     jsx: '<p>Ergebnis: <span id="result"></span></p>',
-    expect: [['LzTextLiteral', '']],
+    expect: [['LzJsxTextLiteral', '']],
   },
   {
     id: 'hello-7',
@@ -725,10 +734,10 @@ export const cases: readonly Case[] = [
     jsx: '<button id="btn" onClick={() => { setResult(calculatePrice(value)); }}>Berechnen</button>',
     expect: [
       [
-        'LzElementRole',
+        'LzJsxElementRole',
         '<span id="btn" onClick={() => { setResult(calculatePrice(value)); }}>Berechnen</span>',
       ],
-      ['LzTextLiteral', ''],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -736,14 +745,14 @@ export const cases: readonly Case[] = [
     title: 'a Cart heading text is emptied',
     origin: `${demoOrigin}app.tsx:28`,
     jsx: '<h1>Cart</h1>',
-    expect: [['LzTextLiteral', '']],
+    expect: [['LzJsxTextLiteral', '']],
   },
   {
     id: 'demo-2',
     title: 'an About heading text is emptied',
     origin: `${demoOrigin}app.tsx:69`,
     jsx: '<h1>About</h1>',
-    expect: [['LzTextLiteral', '']],
+    expect: [['LzJsxTextLiteral', '']],
   },
   {
     id: 'demo-3',
@@ -751,8 +760,8 @@ export const cases: readonly Case[] = [
     origin: `${demoOrigin}app.tsx:61`,
     jsx: '<Link to="/about">About</Link>',
     expect: [
-      ['LzUrlAttribute', 'to=""'],
-      ['LzTextLiteral', ''],
+      ['LzJsxUrlAttribute', 'to=""'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -761,8 +770,8 @@ export const cases: readonly Case[] = [
     origin: `${demoOrigin}app.tsx:70`,
     jsx: '<Link to="/">Back to cart</Link>',
     expect: [
-      ['LzUrlAttribute', 'to=""'],
-      ['LzTextLiteral', ''],
+      ['LzJsxUrlAttribute', 'to=""'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -770,14 +779,14 @@ export const cases: readonly Case[] = [
     title: 'a wrapping label text is emptied',
     origin: `${demoOrigin}app.tsx:49`,
     jsx: '<label>Discount code<input value={code} /></label>',
-    expect: [['LzTextLiteral', '']],
+    expect: [['LzJsxTextLiteral', '']],
   },
   {
     id: 'demo-6',
     title: 'a term text is emptied',
     origin: `${demoOrigin}app.tsx:54`,
     jsx: '<dt>Subtotal</dt>',
-    expect: [['LzTextLiteral', '']],
+    expect: [['LzJsxTextLiteral', '']],
   },
   {
     id: 'demo-7',
@@ -805,14 +814,14 @@ export const cases: readonly Case[] = [
     title: 'a formatted call child is emptied',
     origin: `${demoOrigin}app.tsx:44`,
     jsx: '<output>{formatPrice(lineTotal(line))}</output>',
-    expect: [['LzChildExpression', 'null']],
+    expect: [['LzJsxChildExpression', 'null']],
   },
   {
     id: 'demo-11',
     title: 'a test-id element child is emptied',
     origin: `${demoOrigin}app.tsx:55`,
     jsx: '<dd data-testid="subtotal">{formatPrice(subtotal(lines))}</dd>',
-    expect: [['LzChildExpression', 'null']],
+    expect: [['LzJsxChildExpression', 'null']],
   },
   {
     id: 'demo-12',
@@ -820,8 +829,8 @@ export const cases: readonly Case[] = [
     origin: `${demoOrigin}app.tsx:33`,
     jsx: '<label>{line.name}<input aria-label="x" /></label>',
     expect: [
-      ['LzChildExpression', 'null'],
-      ['LzLabelAttribute', 'aria-label=""'],
+      ['LzJsxChildExpression', 'null'],
+      ['LzJsxLabelAttribute', 'aria-label=""'],
     ],
   },
   {
@@ -829,14 +838,14 @@ export const cases: readonly Case[] = [
     title: 'a map child is left to the later ListExpression',
     origin: `${demoOrigin}app.tsx:30`,
     jsx: '<ul>{lines.map((line) => (<li key={line.name}>x</li>))}</ul>',
-    expect: [['LzTextLiteral', '']],
+    expect: [['LzJsxTextLiteral', '']],
   },
   {
     id: 'demo-14',
     title: 'a comparison guard is left to ConditionalExpression',
     origin: `${demoOrigin}price-tag.tsx:22`,
     jsx: '<p>{off > 0 && (<s>x</s>)}</p>',
-    expect: [['LzTextLiteral', '']],
+    expect: [['LzJsxTextLiteral', '']],
   },
   {
     id: 'demo-15',
@@ -858,14 +867,14 @@ export const cases: readonly Case[] = [
     title: 'string-literal space children give nothing',
     origin: `${demoOrigin}price-tag.tsx:24`,
     jsx: "<p>{' '}<s>x</s>{' '}</p>",
-    expect: [['LzTextLiteral', '']],
+    expect: [['LzJsxTextLiteral', '']],
   },
   {
     id: 'demo-18',
     title: 'a price child is emptied',
     origin: `${demoOrigin}price-tag.tsx:21`,
     jsx: '<span data-testid="price">{formatPrice(cents)}</span>',
-    expect: [['LzChildExpression', 'null']],
+    expect: [['LzJsxChildExpression', 'null']],
   },
   {
     id: 'demo-19',
@@ -886,7 +895,7 @@ export const cases: readonly Case[] = [
     title: 'htmlFor on a label that wraps its control is skipped',
     origin: rulesOrigin,
     jsx: '<label htmlFor="q">Query <input id="q" /></label>',
-    expect: [['LzTextLiteral', '']],
+    expect: [['LzJsxTextLiteral', '']],
   },
   {
     id: 'design-2',
@@ -917,8 +926,8 @@ export const cases: readonly Case[] = [
     origin: rulesOrigin,
     jsx: '<button role="button">Save</button>',
     expect: [
-      ['LzElementRole', '<span role="button">Save</span>'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span role="button">Save</span>'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -927,9 +936,9 @@ export const cases: readonly Case[] = [
     origin: rulesOrigin,
     jsx: '<a href="/x" role="link">X</a>',
     expect: [
-      ['LzElementRole', '<span role="link">X</span>'],
-      ['LzTextLiteral', ''],
-      ['LzUrlAttribute', 'href=""'],
+      ['LzJsxElementRole', '<span role="link">X</span>'],
+      ['LzJsxTextLiteral', ''],
+      ['LzJsxUrlAttribute', 'href=""'],
     ],
   },
   {
@@ -938,8 +947,8 @@ export const cases: readonly Case[] = [
     origin: rulesOrigin,
     jsx: '<a role="link" tabIndex={0}>X</a>',
     expect: [
-      ['LzElementRole', 'role={undefined}'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', 'role={undefined}'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
@@ -948,27 +957,27 @@ export const cases: readonly Case[] = [
       'implicit roles of landmarks, lists and headings are skipped; a context-dependent one is removed',
     origin: rulesOrigin,
     jsx: '<div><nav role="navigation" /><aside role="complementary" /><ol role="list"><li role="listitem" /></ol><h2 role="heading" /><header role="banner" /></div>',
-    expect: [['LzElementRole', 'role={undefined}']],
+    expect: [['LzJsxElementRole', 'role={undefined}']],
   },
   {
     id: 'design-8',
     title: 'a string state value is flipped',
-    origin: `${release}, LzStateAttribute`,
+    origin: `${release}, LzJsxStateAttribute`,
     jsx: '<div role="tab" aria-selected="true" aria-expanded="false">Tab</div>',
     expect: [
-      ['LzElementRole', 'role={undefined}'],
-      ['LzStateAttribute', 'aria-selected="false"'],
-      ['LzStateAttribute', 'aria-expanded="true"'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', 'role={undefined}'],
+      ['LzJsxStateAttribute', 'aria-selected="false"'],
+      ['LzJsxStateAttribute', 'aria-expanded="true"'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
     id: 'design-9',
     title:
       'aria-hidden on an i or img icon is skipped; hidden on an svg is not',
-    origin: `${release}, LzHiddenAttribute`,
+    origin: `${release}, LzJsxHiddenAttribute`,
     jsx: '<p><i className="icon" aria-hidden="true" /><img src="x.png" aria-hidden={hide} /><svg hidden /></p>',
-    expect: [['LzHiddenAttribute', 'hidden={undefined}']],
+    expect: [['LzJsxHiddenAttribute', 'hidden={undefined}']],
   },
   {
     id: 'design-10',
@@ -976,7 +985,7 @@ export const cases: readonly Case[] = [
       'a JSX entity in an emptied attribute is decoded in the instrumented original',
     origin: 'docs/design/playwright-mutators-opus.md:189',
     jsx: '<img alt="Fish &amp; Chips" />',
-    expect: [['LzLabelAttribute', 'alt=""']],
+    expect: [['LzJsxLabelAttribute', 'alt=""']],
     instrumented: '"Fish & Chips"',
   },
   {
@@ -984,27 +993,27 @@ export const cases: readonly Case[] = [
     title:
       'a guard and a ternary inside an attribute value: the guard is removed, the ternary is left alone',
     origin:
-      'docs/design/playwright-mutators-opus.md:64 and docs/design/playwright-mutators.md:139, LzConditionalElement',
+      'docs/design/playwright-mutators-opus.md:64 and docs/design/playwright-mutators.md:139, LzJsxConditionalElement',
     jsx: '<Card icon={busy && <Spinner />} badge={busy ? <Dot /> : null} />',
-    expect: [['LzConditionalElement', '<Spinner />']],
+    expect: [['LzJsxConditionalElement', '<Spinner />']],
   },
   {
     id: 'design-12',
     title:
       'a function declared in the file but referenced twice keeps its handler mutants',
-    origin: `${release}, LzEventHandler`,
+    origin: `${release}, LzJsxEventHandler`,
     setup: 'function save() {}\nexport const again = save;',
     jsx: '<form onSubmit={save}></form>',
-    expect: [['LzEventHandler', 'onSubmit={undefined}']],
+    expect: [['LzJsxEventHandler', 'onSubmit={undefined}']],
   },
   {
     id: 'design-13',
     title:
       'a let handler referenced once keeps its handler mutant, as only a const or a declaration is skipped',
-    origin: `${release}, LzEventHandler`,
+    origin: `${release}, LzJsxEventHandler`,
     setup: 'let save = () => {};',
     jsx: '<form onSubmit={save}></form>',
-    expect: [['LzEventHandler', 'onSubmit={undefined}']],
+    expect: [['LzJsxEventHandler', 'onSubmit={undefined}']],
   },
   {
     id: 'design-14',
@@ -1022,7 +1031,7 @@ export const cases: readonly Case[] = [
       'tldraw@12921f6d3:packages/tldraw/src/lib/ui/components/primitives/menus/TldrawUiMenuItem.tsx:233',
     jsx: "<div aria-pressed={isSelected ? 'true' : 'false'} />",
     expect: [
-      ['LzStateAttribute', 'aria-pressed={isSelected ? "false" : "true"}'],
+      ['LzJsxStateAttribute', 'aria-pressed={isSelected ? "false" : "true"}'],
     ],
   },
   {
@@ -1034,7 +1043,7 @@ export const cases: readonly Case[] = [
     jsx: "<div aria-pressed={isSelected === undefined ? undefined : isSelected ? 'true' : 'false'} />",
     expect: [
       [
-        'LzStateAttribute',
+        'LzJsxStateAttribute',
         'aria-pressed={isSelected === undefined ? undefined : isSelected ? "false" : "true"}',
       ],
     ],
@@ -1043,75 +1052,77 @@ export const cases: readonly Case[] = [
     id: 'design-15',
     title:
       'a String() or template-literal state gets no negation, which would be a constant false',
-    origin: `${release}, LzStateAttribute`,
+    origin: `${release}, LzJsxStateAttribute`,
     jsx: '<div><div aria-expanded={String(open)} /><div aria-checked={`${checked}`} /></div>',
     expect: [],
   },
   {
     id: 'design-16',
     title: 'a boolean or logical state expression is negated',
-    origin: `${release}, LzStateAttribute`,
+    origin: `${release}, LzJsxStateAttribute`,
     jsx: '<div aria-expanded={open} aria-selected={tab.active && !tab.locked} />',
     expect: [
-      ['LzStateAttribute', 'aria-expanded={!open}'],
-      ['LzStateAttribute', 'aria-selected={!(tab.active && !tab.locked)}'],
+      ['LzJsxStateAttribute', 'aria-expanded={!open}'],
+      ['LzJsxStateAttribute', 'aria-selected={!(tab.active && !tab.locked)}'],
     ],
   },
   {
     id: 'design-17',
     title: 'a boolean-literal ternary state flips each branch',
-    origin: `${release}, LzStateAttribute`,
+    origin: `${release}, LzJsxStateAttribute`,
     jsx: '<div aria-pressed={on ? true : false} />',
-    expect: [['LzStateAttribute', 'aria-pressed={on ? false : true}']],
+    expect: [['LzJsxStateAttribute', 'aria-pressed={on ? false : true}']],
   },
   {
     id: 'design-18',
     title:
       'a .toString() state gets no negation; another method call is negated',
-    origin: `${release}, LzStateAttribute`,
+    origin: `${release}, LzJsxStateAttribute`,
     jsx: '<div aria-expanded={open.toString()} aria-checked={state.get()} aria-selected={isOpen()} />',
     expect: [
-      ['LzStateAttribute', 'aria-checked={!state.get()}'],
-      ['LzStateAttribute', 'aria-selected={!isOpen()}'],
+      ['LzJsxStateAttribute', 'aria-checked={!state.get()}'],
+      ['LzJsxStateAttribute', 'aria-selected={!isOpen()}'],
     ],
   },
   {
     id: 'design-19',
     title:
       'a ternary state with no negatable branch gets no mutant; one with a single negatable branch flips only that one',
-    origin: `${release}, LzStateAttribute`,
+    origin: `${release}, LzJsxStateAttribute`,
     jsx: "<div><div aria-pressed={c ? undefined : String(x)} /><div aria-expanded={c ? 'true' : undefined} /></div>",
-    expect: [['LzStateAttribute', 'aria-expanded={c ? "false" : undefined}']],
+    expect: [
+      ['LzJsxStateAttribute', 'aria-expanded={c ? "false" : undefined}'],
+    ],
   },
   {
     id: 'design-43',
     title:
       'a string ternary state inside as, satisfies or ! flips each branch and drops the type wrapper',
-    origin: `${release}, LzStateAttribute`,
+    origin: `${release}, LzJsxStateAttribute`,
     jsx:
       "<div><div aria-pressed={(s ? 'true' : 'false') as 'true' | 'false'} />" +
       "<div aria-expanded={(s ? 'true' : 'false') satisfies string} />" +
       "<div aria-checked={(s ? 'true' : 'false')!} />" +
       "<div aria-selected={((s ? 'true' : 'false') as string)!} /></div>",
     expect: [
-      ['LzStateAttribute', 'aria-pressed={s ? "false" : "true"}'],
-      ['LzStateAttribute', 'aria-expanded={s ? "false" : "true"}'],
-      ['LzStateAttribute', 'aria-checked={s ? "false" : "true"}'],
-      ['LzStateAttribute', 'aria-selected={s ? "false" : "true"}'],
+      ['LzJsxStateAttribute', 'aria-pressed={s ? "false" : "true"}'],
+      ['LzJsxStateAttribute', 'aria-expanded={s ? "false" : "true"}'],
+      ['LzJsxStateAttribute', 'aria-checked={s ? "false" : "true"}'],
+      ['LzJsxStateAttribute', 'aria-selected={s ? "false" : "true"}'],
     ],
   },
   {
     id: 'design-44',
     title: 'a boolean state inside as is negated with its type wrapper',
-    origin: `${release}, LzStateAttribute`,
+    origin: `${release}, LzJsxStateAttribute`,
     jsx: '<div aria-pressed={flag as boolean} />',
-    expect: [['LzStateAttribute', 'aria-pressed={!(flag as boolean)}']],
+    expect: [['LzJsxStateAttribute', 'aria-pressed={!(flag as boolean)}']],
   },
   {
     id: 'design-45',
     title:
       'an optional .toString() state gets no negation, which would be a constant false',
-    origin: `${release}, LzStateAttribute`,
+    origin: `${release}, LzJsxStateAttribute`,
     jsx: '<div><div aria-expanded={s?.toString()} /><div aria-checked={s.toString?.()} /></div>',
     expect: [],
   },
@@ -1119,7 +1130,7 @@ export const cases: readonly Case[] = [
     id: 'design-46',
     title:
       'a literal or undefined state inside as or ! gets no negation, as it gets none unwrapped',
-    origin: `${release}, LzStateAttribute`,
+    origin: `${release}, LzJsxStateAttribute`,
     jsx:
       '<div><div aria-expanded={0 as any} /><div aria-checked={null!} />' +
       '<div aria-pressed={undefined as any} /><div aria-selected={0} /></div>',
@@ -1128,64 +1139,64 @@ export const cases: readonly Case[] = [
   {
     id: 'design-20',
     title: 'a rendered value among the children of a fragment is removed',
-    origin: `${release}, LzChildExpression`,
+    origin: `${release}, LzJsxChildExpression`,
     jsx: '<>{user.name}</>',
-    expect: [['LzChildExpression', 'null']],
+    expect: [['LzJsxChildExpression', 'null']],
   },
   {
     id: 'design-21',
     title:
       'a member-named element is never swapped to a span, and its role has no implicit equal',
-    origin: `${release}, LzElementRole`,
+    origin: `${release}, LzJsxElementRole`,
     jsx: '<div><UI.Button>Go</UI.Button><UI.Dialog role="dialog" /></div>',
     expect: [
-      ['LzElementRole', 'role={undefined}'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', 'role={undefined}'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
     id: 'design-22',
     title:
       "an area with an href is swapped to a span, as Playwright's role table gives it the link role",
-    origin: `${release}, LzElementRole`,
+    origin: `${release}, LzJsxElementRole`,
     jsx: '<area href="/x" />',
     expect: [
-      ['LzUrlAttribute', 'href=""'],
-      ['LzElementRole', '<span />'],
+      ['LzJsxUrlAttribute', 'href=""'],
+      ['LzJsxElementRole', '<span />'],
     ],
   },
   {
     id: 'design-47',
     title:
       'the span swap drops every attribute of an a, area or button that a span cannot take, and keeps the rest',
-    origin: `${release}, LzElementRole`,
+    origin: `${release}, LzJsxElementRole`,
     jsx:
       '<div><area href="/x" alt="Map" coords="0,0,1,1" shape="rect" target="_blank" download="m" hrefLang="en" media="print" referrerPolicy="no-referrer" id="m" />' +
       '<a href="/a" target="_blank" rel="noopener" type="text/html" ping="/p" id="a">A</a>' +
       '<button type="submit" name="n" value="v" form="f" formAction="/b" formEncType="text/plain" formMethod="post" formNoValidate formTarget="_self" className="b">B</button></div>',
     expect: [
-      ['LzElementRole', '<span id="m" />'],
-      ['LzElementRole', '<span rel="noopener" id="a">A</span>'],
-      ['LzElementRole', '<span className="b">B</span>'],
-      ['LzUrlAttribute', 'href=""'],
-      ['LzUrlAttribute', 'href=""'],
-      ['LzLabelAttribute', 'alt=""'],
-      ['LzTextLiteral', ''],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span id="m" />'],
+      ['LzJsxElementRole', '<span rel="noopener" id="a">A</span>'],
+      ['LzJsxElementRole', '<span className="b">B</span>'],
+      ['LzJsxUrlAttribute', 'href=""'],
+      ['LzJsxUrlAttribute', 'href=""'],
+      ['LzJsxLabelAttribute', 'alt=""'],
+      ['LzJsxTextLiteral', ''],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
     id: 'design-23',
     title:
       'a guard whose test is an ===, < or >= comparison is left to the built-in ConditionalExpression',
-    origin: `${release}, LzConditionalElement`,
+    origin: `${release}, LzJsxConditionalElement`,
     jsx: '<div>{a == b && <p />}{a != b && <p />}{a === b && <p />}{a < b && <p />}{a <= b && <p />}{a >= b && <p />}</div>',
     expect: [],
   },
   {
     id: 'design-24',
     title: 'a filter call among the children is left to ListExpression',
-    origin: `${release}, LzChildExpression`,
+    origin: `${release}, LzJsxChildExpression`,
     jsx: '<ul>{items.filter(visible)}{groups.flatMap(rows)}</ul>',
     expect: [],
   },
@@ -1193,37 +1204,40 @@ export const cases: readonly Case[] = [
     id: 'design-25',
     title:
       'htmlFor on a label that wraps a select, or an input inside a fragment, is skipped',
-    origin: `${release}, LzLabelAttribute`,
+    origin: `${release}, LzJsxLabelAttribute`,
     jsx: '<div><label htmlFor="a"><select /></label><label htmlFor="b"><><input /></></label><label htmlFor="c"><textarea /></label></div>',
     expect: [],
   },
   {
     id: 'design-29',
     title: 'htmlFor on a label whose children hold no form control is emptied',
-    origin: `${release}, LzLabelAttribute`,
+    origin: `${release}, LzJsxLabelAttribute`,
     jsx: '<label htmlFor="d"><span>Name</span></label>',
     expect: [
-      ['LzLabelAttribute', 'htmlFor=""'],
-      ['LzTextLiteral', ''],
+      ['LzJsxLabelAttribute', 'htmlFor=""'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
     id: 'design-30',
     title:
       'a negated state holds no built-in mutant of its own expression in the instrumented file',
-    origin: `${release}, LzStateAttribute`,
+    origin: `${release}, LzJsxStateAttribute`,
     jsx: '<div aria-expanded={isOpen(a && b)} />',
-    expect: [['LzStateAttribute', 'aria-expanded={!isOpen(a && b)}']],
+    expect: [['LzJsxStateAttribute', 'aria-expanded={!isOpen(a && b)}']],
     instrumented: '? !isOpen(a && b) : (stryCov_9fa48(',
   },
   {
     id: 'design-31',
     title:
       'a flipped ternary state holds no built-in mutant of its test in the instrumented file',
-    origin: `${release}, LzStateAttribute`,
+    origin: `${release}, LzJsxStateAttribute`,
     jsx: "<div aria-pressed={isOpen(a && b) ? 'true' : 'false'} />",
     expect: [
-      ['LzStateAttribute', 'aria-pressed={isOpen(a && b) ? "false" : "true"}'],
+      [
+        'LzJsxStateAttribute',
+        'aria-pressed={isOpen(a && b) ? "false" : "true"}',
+      ],
     ],
     instrumented: '? isOpen(a && b) ? "false" : "true" : (stryCov_9fa48(',
   },
@@ -1231,10 +1245,10 @@ export const cases: readonly Case[] = [
     id: 'design-32',
     title:
       'a ternary state keeps its unflipped consequent free of built-in mutants in the instrumented file',
-    origin: `${release}, LzStateAttribute`,
+    origin: `${release}, LzJsxStateAttribute`,
     jsx: "<div aria-expanded={c ? String(a && b) : 'true'} />",
     expect: [
-      ['LzStateAttribute', 'aria-expanded={c ? String(a && b) : "false"}'],
+      ['LzJsxStateAttribute', 'aria-expanded={c ? String(a && b) : "false"}'],
     ],
     instrumented: '? c ? String(a && b) : "false" : (stryCov_9fa48(',
   },
@@ -1242,10 +1256,10 @@ export const cases: readonly Case[] = [
     id: 'design-33',
     title:
       'a ternary state keeps its unflipped alternate free of built-in mutants in the instrumented file',
-    origin: `${release}, LzStateAttribute`,
+    origin: `${release}, LzJsxStateAttribute`,
     jsx: "<div aria-expanded={c ? 'true' : String(a && b)} />",
     expect: [
-      ['LzStateAttribute', 'aria-expanded={c ? "false" : String(a && b)}'],
+      ['LzJsxStateAttribute', 'aria-expanded={c ? "false" : String(a && b)}'],
     ],
     instrumented: '? c ? "false" : String(a && b) : (stryCov_9fa48(',
   },
@@ -1253,65 +1267,65 @@ export const cases: readonly Case[] = [
     id: 'design-34',
     title:
       'a guard whose test is a ?? expression is removed, as built-in ConditionalExpression leaves ?? alone',
-    origin: `${release}, LzConditionalElement`,
+    origin: `${release}, LzJsxConditionalElement`,
     jsx: '<div>{(a ?? b) && <p />}</div>',
-    expect: [['LzConditionalElement', '<p />']],
+    expect: [['LzJsxConditionalElement', '<p />']],
   },
   {
     id: 'design-35',
     title:
       'a label other than htmlFor, and htmlFor on an element other than label, are emptied though a control is inside',
-    origin: `${release}, LzLabelAttribute`,
+    origin: `${release}, LzJsxLabelAttribute`,
     jsx: '<div><div aria-label="Search"><input /></div><output htmlFor="a"><input /></output><label title="Name"><input /></label></div>',
     expect: [
-      ['LzLabelAttribute', 'aria-label=""'],
-      ['LzLabelAttribute', 'htmlFor=""'],
-      ['LzLabelAttribute', 'title=""'],
+      ['LzJsxLabelAttribute', 'aria-label=""'],
+      ['LzJsxLabelAttribute', 'htmlFor=""'],
+      ['LzJsxLabelAttribute', 'title=""'],
     ],
   },
   {
     id: 'design-36',
     title:
       'an attribute with on inside its name, not at its start, is no handler',
-    origin: `${release}, LzEventHandler`,
+    origin: `${release}, LzJsxEventHandler`,
     jsx: '<Card buttonColor={color} />',
     expect: [],
   },
   {
     id: 'design-37',
     title: 'an || fallback is not a guard',
-    origin: `${release}, LzConditionalElement`,
+    origin: `${release}, LzJsxConditionalElement`,
     jsx: '<div>{fallback || <p />}</div>',
     expect: [],
   },
   {
     id: 'design-38',
     title: 'a ternary with one JSX branch switches to either branch',
-    origin: `${release}, LzConditionalElement`,
+    origin: `${release}, LzJsxConditionalElement`,
     jsx: "<div>{open ? <p /> : 'none'}</div>",
     expect: [
-      ['LzConditionalElement', '<p />'],
-      ['LzConditionalElement', "'none'"],
+      ['LzJsxConditionalElement', '<p />'],
+      ['LzJsxConditionalElement', "'none'"],
     ],
   },
   {
     id: 'design-39',
     title:
       'a removed guard holds no built-in mutant of its element in the instrumented file',
-    origin: `${release}, LzConditionalElement`,
+    origin: `${release}, LzJsxConditionalElement`,
     jsx: '<div>{open && <p>{a + b}</p>}</div>',
-    expect: [['LzConditionalElement', '<p>{a + b}</p>']],
+    expect: [['LzJsxConditionalElement', '<p>{a + b}</p>']],
     instrumented: '? <p>{a + b}</p> : stryMutAct_9fa48(',
   },
   {
     id: 'design-40',
     title:
       'a ternary switched to its consequent holds no built-in mutant of it in the instrumented file',
-    origin: `${release}, LzConditionalElement`,
+    origin: `${release}, LzJsxConditionalElement`,
     jsx: '<div>{open ? <i>{c + d}</i> : <b />}</div>',
     expect: [
-      ['LzConditionalElement', '<i>{c + d}</i>'],
-      ['LzConditionalElement', '<b />'],
+      ['LzJsxConditionalElement', '<i>{c + d}</i>'],
+      ['LzJsxConditionalElement', '<b />'],
     ],
     instrumented: '? <i>{c + d}</i> : (stryCov_9fa48(',
   },
@@ -1319,11 +1333,11 @@ export const cases: readonly Case[] = [
     id: 'design-41',
     title:
       'a ternary switched to its alternate holds no built-in mutant of it in the instrumented file',
-    origin: `${release}, LzConditionalElement`,
+    origin: `${release}, LzJsxConditionalElement`,
     jsx: '<div>{open ? <i /> : <b>{e + f}</b>}</div>',
     expect: [
-      ['LzConditionalElement', '<i />'],
-      ['LzConditionalElement', '<b>{e + f}</b>'],
+      ['LzJsxConditionalElement', '<i />'],
+      ['LzJsxConditionalElement', '<b>{e + f}</b>'],
     ],
     instrumented: '? <b>{e + f}</b> : stryMutAct_9fa48(',
   },
@@ -1334,17 +1348,17 @@ export const cases: readonly Case[] = [
     origin: release,
     jsx: '<form action="/save"><input readOnly /><div aria-hidden={hide} /><UI.Icon aria-hidden="true" /></form>',
     expect: [
-      ['LzUrlAttribute', 'action=""'],
-      ['LzDisabledAttribute', 'readOnly={undefined}'],
-      ['LzHiddenAttribute', 'aria-hidden={false}'],
-      ['LzHiddenAttribute', 'aria-hidden={undefined}'],
+      ['LzJsxUrlAttribute', 'action=""'],
+      ['LzJsxDisabledAttribute', 'readOnly={undefined}'],
+      ['LzJsxHiddenAttribute', 'aria-hidden={false}'],
+      ['LzJsxHiddenAttribute', 'aria-hidden={undefined}'],
     ],
   },
   {
     id: 'design-26',
     title:
-      'a guard or a ternary whose branches are not JSX gives no LzConditionalElement mutant',
-    origin: `${release}, LzConditionalElement`,
+      'a guard or a ternary whose branches are not JSX gives no LzJsxConditionalElement mutant',
+    origin: `${release}, LzJsxConditionalElement`,
     jsx: "<div>{open && label}{open ? 'a' : 'b'}</div>",
     expect: [],
   },
@@ -1352,10 +1366,10 @@ export const cases: readonly Case[] = [
     id: 'design-27',
     title:
       'a const handler that is not a function keeps its mutant; a const function expression is skipped',
-    origin: `${release}, LzEventHandler`,
+    origin: `${release}, LzJsxEventHandler`,
     setup: 'const onSave = makeHandler();\nconst onReset = function () {};',
     jsx: '<form onSubmit={onSave} onReset={onReset}></form>',
-    expect: [['LzEventHandler', 'onSubmit={undefined}']],
+    expect: [['LzJsxEventHandler', 'onSubmit={undefined}']],
   },
   {
     id: 'design-28',
@@ -1377,53 +1391,53 @@ export const cases: readonly Case[] = [
       '<sup role="superscript" /><svg role="img" /><table role="table" /><tbody role="rowgroup" />' +
       '<textarea role="textbox" /><tfoot role="rowgroup" /><thead role="rowgroup" />' +
       '<time role="time" /><tr role="row" /><ul role="list" /></div>',
-    expect: [['LzElementRole', '<span role="button" />']],
+    expect: [['LzJsxElementRole', '<span role="button" />']],
   },
   {
     id: 'design-48',
     title:
       'aria-hidden="false" is not removed, since Playwright reads only "true"; aria-disabled="false" is, since it overrides a disabled ancestor',
     origin:
-      'docs/design/playwright-mutators.md:133, LzDisabledAttribute and LzHiddenAttribute',
+      'docs/design/playwright-mutators.md:133, LzJsxDisabledAttribute and LzJsxHiddenAttribute',
     jsx: '<form><button aria-disabled="false">One</button><p aria-hidden="false">Two</p><p aria-hidden="true">Three</p></form>',
     expect: [
-      ['LzDisabledAttribute', 'aria-disabled={undefined}'],
-      ['LzElementRole', '<span aria-disabled="false">One</span>'],
-      ['LzTextLiteral', ''],
-      ['LzTextLiteral', ''],
-      ['LzHiddenAttribute', 'aria-hidden={undefined}'],
-      ['LzTextLiteral', ''],
+      ['LzJsxDisabledAttribute', 'aria-disabled={undefined}'],
+      ['LzJsxElementRole', '<span aria-disabled="false">One</span>'],
+      ['LzJsxTextLiteral', ''],
+      ['LzJsxTextLiteral', ''],
+      ['LzJsxHiddenAttribute', 'aria-hidden={undefined}'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
     id: 'design-49',
     title: 'a handler already bound to undefined gets no removal mutant',
-    origin: `${release}, LzEventHandler`,
+    origin: `${release}, LzJsxEventHandler`,
     jsx: '<button onClick={undefined}>Three</button>',
     expect: [
-      ['LzElementRole', '<span onClick={undefined}>Three</span>'],
-      ['LzTextLiteral', ''],
+      ['LzJsxElementRole', '<span onClick={undefined}>Three</span>'],
+      ['LzJsxTextLiteral', ''],
     ],
   },
   {
     id: 'design-50',
     title:
       'no forced-off value for a comparison or logical value, and no negation for a comparison: built-in mutants give the same; a ! value is negated, because dropping the ! renders differently when the operand is not a boolean',
-    origin: `${rulesOrigin}, LzDisabledAttribute, LzHiddenAttribute and LzStateAttribute`,
+    origin: `${rulesOrigin}, LzJsxDisabledAttribute, LzJsxHiddenAttribute and LzJsxStateAttribute`,
     jsx:
       '<form><input readOnly={n > 0} /><p aria-disabled={a && b} aria-hidden={a ?? b} />' +
       '<p aria-selected={tab === current} aria-expanded={!open} aria-pressed={!(a && b)} /></form>',
     expect: [
-      ['LzHiddenAttribute', 'aria-hidden={false}'],
-      ['LzStateAttribute', 'aria-expanded={!!open}'],
-      ['LzStateAttribute', 'aria-pressed={!!(a && b)}'],
+      ['LzJsxHiddenAttribute', 'aria-hidden={false}'],
+      ['LzJsxStateAttribute', 'aria-expanded={!!open}'],
+      ['LzJsxStateAttribute', 'aria-pressed={!!(a && b)}'],
     ],
   },
   {
     id: 'design-52',
     title:
       'no negation for a ! value whose operand is boolean by syntax: built-in BooleanLiteral drops the ! and renders the same as !!',
-    origin: `${rulesOrigin}, LzStateAttribute`,
+    origin: `${rulesOrigin}, LzJsxStateAttribute`,
     jsx:
       '<form><p aria-pressed={!(a === b)} aria-expanded={!!open} aria-checked={!true} aria-selected={!(a === b && !c)} />' +
       '<p aria-pressed={!(a === b && c < d)} aria-expanded={!(false || a !== b)} /></form>',
@@ -1433,18 +1447,18 @@ export const cases: readonly Case[] = [
     id: 'design-53',
     title:
       'a ! value whose operand is not boolean by syntax is negated: a call, a member, a -, a &&/|| with an unknown side, or a ?? even between comparisons; so is a - value, which is no ! value',
-    origin: `${rulesOrigin}, LzStateAttribute`,
+    origin: `${rulesOrigin}, LzJsxStateAttribute`,
     jsx:
       '<form><p aria-pressed={!isOn()} aria-expanded={!state.open} aria-checked={!(a === b && c)} />' +
       '<p aria-pressed={!(a || b < c)} aria-expanded={-(a === b)} aria-checked={!-a} aria-selected={!(a === b ?? c === d)} /></form>',
     expect: [
-      ['LzStateAttribute', 'aria-expanded={!-(a === b)}'],
-      ['LzStateAttribute', 'aria-checked={!!-a}'],
-      ['LzStateAttribute', 'aria-pressed={!!isOn()}'],
-      ['LzStateAttribute', 'aria-expanded={!!state.open}'],
-      ['LzStateAttribute', 'aria-checked={!!(a === b && c)}'],
-      ['LzStateAttribute', 'aria-pressed={!!(a || b < c)}'],
-      ['LzStateAttribute', 'aria-selected={!!(a === b ?? c === d)}'],
+      ['LzJsxStateAttribute', 'aria-expanded={!-(a === b)}'],
+      ['LzJsxStateAttribute', 'aria-checked={!!-a}'],
+      ['LzJsxStateAttribute', 'aria-pressed={!!isOn()}'],
+      ['LzJsxStateAttribute', 'aria-expanded={!!state.open}'],
+      ['LzJsxStateAttribute', 'aria-checked={!!(a === b && c)}'],
+      ['LzJsxStateAttribute', 'aria-pressed={!!(a || b < c)}'],
+      ['LzJsxStateAttribute', 'aria-selected={!!(a === b ?? c === d)}'],
     ],
   },
 ];

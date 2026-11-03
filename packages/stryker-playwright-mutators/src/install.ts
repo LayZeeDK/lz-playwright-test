@@ -12,13 +12,13 @@ import {
   type Operator,
 } from './mutator.ts';
 import { withJsxPlacement, type PlacerMethods } from './placer.ts';
-import { pluginName } from './plugin-name.ts';
+import { packageName } from './package-name.ts';
 
 export const testedVersion = '10.1.1';
 const coreBin = /[\\/]@stryker-mutator[\\/]core[\\/]bin[\\/]stryker\.js$/;
 const namePattern = /^[A-Za-z]+$/;
 // `Symbol.for`, so a second copy of this package in the process sees the marks of the first.
-const ownMark: unique symbol = Symbol.for(`@layzee/${pluginName}`);
+const ownMark: unique symbol = Symbol.for(packageName);
 const nothing = (): undefined => undefined;
 const silentLogger = {
   debug: nothing,
@@ -80,7 +80,7 @@ export async function install(
 
   if (instrumenter.version !== testedVersion) {
     warn(
-      `${pluginName} was tested with @stryker-mutator/instrumenter ${testedVersion}, not ` +
+      `${packageName} was tested with @stryker-mutator/instrumenter ${testedVersion}, not ` +
         `${instrumenter.version} in ${instrumenter.dir}; its self-check passed.`,
     );
   }
@@ -95,7 +95,7 @@ function checkNames(
 
   if (invalid.length > 0) {
     throw new Error(
-      `${pluginName}: a mutator name has letters only, as Stryker's directives match no other character: ` +
+      `${packageName}: a mutator name has letters only, as Stryker's directives match no other character: ` +
         invalid.map((name) => JSON.stringify(name)).join(', '),
     );
   }
@@ -116,7 +116,7 @@ function checkNames(
 
   if (taken.length > 0) {
     throw new Error(
-      `${pluginName}: another mutator already has the name ${taken.join(', ')}.`,
+      `${packageName}: another mutator already has the name ${taken.join(', ')}.`,
     );
   }
 }
@@ -169,7 +169,7 @@ async function selfCheck(
 
   if (silent.length > 0) {
     throw new Error(
-      `${pluginName}: the instrumenter ${instrumenter.version} in ${instrumenter.dir} made no mutants of ` +
+      `${packageName}: the instrumenter ${instrumenter.version} in ${instrumenter.dir} made no mutants of ` +
         `${silent.join(', ')} from their samples, so it does not run the mutators this module added. A bundled or ` +
         'second copy of the instrumenter does that.',
     );
@@ -254,7 +254,7 @@ export async function resolveFromCore(
 
           if (typeof placeable !== 'boolean') {
             throw new Error(
-              `${pluginName}: the instrumenter ${version} in ${dir} has an expressionMutantPlacer whose ` +
+              `${packageName}: the instrumenter ${version} in ${dir} has an expressionMutantPlacer whose ` +
                 `canPlace returned a ${typeof placeable}, not a boolean.`,
             );
           }
@@ -271,7 +271,7 @@ export async function resolveFromCore(
 
       if (!Array.isArray(mutants) || !mutants.every(isMutantOrigin)) {
         throw new Error(
-          `${pluginName}: the instrumenter ${version} in ${dir} resolved Instrumenter.instrument() to a ` +
+          `${packageName}: the instrumenter ${version} in ${dir} resolved Instrumenter.instrument() to a ` +
             'value whose mutants are missing or have no string fileName and mutatorName.',
         );
       }
@@ -292,7 +292,7 @@ interface Located {
 function hasNo({ dir, version }: Located): (name: string) => Error {
   return (name) =>
     new Error(
-      `${pluginName}: the instrumenter ${version} in ${dir} has no ${name}.`,
+      `${packageName}: the instrumenter ${version} in ${dir} has no ${name}.`,
     );
 }
 

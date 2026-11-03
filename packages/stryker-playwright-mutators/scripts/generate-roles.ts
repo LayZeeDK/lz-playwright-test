@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import { pluginName } from '../src/plugin-name.ts';
+import { packageName } from '../src/package-name.ts';
 import { generateRoles } from './roles-generator.ts';
 
 try {
@@ -10,7 +10,7 @@ try {
   );
 } catch (error) {
   process.stderr.write(
-    `${pluginName} build: ${error instanceof Error ? error.message : String(error)}\n`,
+    `${packageName} build: ${error instanceof Error ? error.message : String(error)}\n`,
   );
   process.exitCode = 1;
 }

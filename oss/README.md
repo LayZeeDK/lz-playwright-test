@@ -39,7 +39,7 @@ it uses is `oss/realworld-api`. Then run `npx stryker run stryker.playwright.con
    copies `.nx/workspace-data` into its sandbox, and while the daemon that the build started is
    running, the sandbox's Nx connects to it, the daemon refuses a different workspace, and the
    `webServer` fails to start.
-3. Run `npx stryker run stryker.playwright.config.ts`. The config sets `lzStrykerPlaywright.workers` to 2 and
+3. Run `npx stryker run stryker.playwright.config.ts`. The config sets `lzPlaywright.workers` to 2 and
    `dryRunTimeoutMinutes` to 20, because the 234-test dry run takes longer than Stryker's default
    5 minutes on one worker.
 

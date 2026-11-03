@@ -44,12 +44,12 @@ describe('generateRoles', () => {
     assert.equal(existsSync(out), false);
   });
 
-  it('throws naming the missing tags, and writes nothing, when the table lacks entries LzElementRole reads', (t) => {
+  it('throws naming the missing tags, and writes nothing, when the table lacks entries LzJsxElementRole reads', (t) => {
     const { root, bundlePath } = fakePlaywrightCore(t, '1.99.0', buttonOnly);
     const { from, out } = paths(root);
 
     assert.throws(() => generateRoles(from, out), {
-      message: `cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} (Error: kImplicitRoleByTagName lacks the entries for a, area that LzElementRole reads)`,
+      message: `cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} (Error: kImplicitRoleByTagName lacks the entries for a, area that LzJsxElementRole reads)`,
     });
     assert.equal(existsSync(out), false);
   });

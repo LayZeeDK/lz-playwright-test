@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
 import { fieldOf } from './is-record.ts';
-import { pluginName } from './plugin-name.ts';
+import { packageName } from './package-name.ts';
 import { spanSwapRoleByTag } from './span-swap.ts';
 
 export interface ImplicitRole {
@@ -85,8 +85,8 @@ export function consumerRoles(
     }
 
     warn(
-      `${pluginName}: ${error.message}; ` +
-        `LzElementRole uses the table bundled from playwright-core ${bundled.version}.`,
+      `${packageName}: ${error.message}; ` +
+        `LzJsxElementRole uses the table bundled from playwright-core ${bundled.version}.`,
     );
 
     return bundled.roles;
@@ -151,13 +151,13 @@ export function parseRoleTable(bundle: string): RoleTable {
 
   if (missing.length > 0) {
     throw new Error(
-      `kImplicitRoleByTagName lacks the entries for ${missing.join(', ')} that LzElementRole reads`,
+      `kImplicitRoleByTagName lacks the entries for ${missing.join(', ')} that LzJsxElementRole reads`,
     );
   }
 
   if (changed.length > 0) {
     throw new Error(
-      `kImplicitRoleByTagName changes the roles LzElementRole reads: ${changed.join('; ')}`,
+      `kImplicitRoleByTagName changes the roles LzJsxElementRole reads: ${changed.join('; ')}`,
     );
   }
 

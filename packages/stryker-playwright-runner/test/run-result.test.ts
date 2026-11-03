@@ -18,7 +18,7 @@ import {
   type Snapshot,
   type SnapshotLine,
 } from '../src/protocol.ts';
-import { LzStrykerCollectingReporter } from '../src/reporter.ts';
+import { LzPlaywrightCollectingReporter } from '../src/reporter.ts';
 import type { RunRequest } from '../src/run-request.ts';
 import {
   attemptSummary,
@@ -57,7 +57,7 @@ function merge(lines: Partial<SnapshotLine>[]) {
 
 // Playwright reports a test again after each attempt, with every attempt so far in its results.
 function attempt(
-  reporter: LzStrykerCollectingReporter,
+  reporter: LzPlaywrightCollectingReporter,
   id: string,
   outcome: Outcome,
   status: TestResult['status'],
@@ -69,7 +69,7 @@ function attempt(
 }
 
 function classify(
-  reporter: LzStrykerCollectingReporter,
+  reporter: LzPlaywrightCollectingReporter,
   {
     status = 'failed',
     hookInstalled = true,
@@ -104,14 +104,14 @@ function killed(result: MutantRunResult) {
 
 // The output of a run whose tests all passed, with the given snapshot lines.
 function passedRun(lines: Partial<SnapshotLine>[]): RunOutput {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'expected', 'passed');
 
   return runOutput({ reporter, snapshots: lines.map(parsed) });
 }
 
 test('a mutant run fails a test that passes only on a retry', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'failed');
   attempt(reporter, 'a', 'flaky', 'passed');
 
@@ -128,7 +128,7 @@ test('a mutant run fails a test that passes only on a retry', () => {
 });
 
 test('the dry run counts a test that passes on a retry as passing', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'failed');
   attempt(reporter, 'a', 'flaky', 'passed');
 
@@ -144,7 +144,7 @@ test('the dry run counts a test that passes on a retry as passing', () => {
 });
 
 test('a kill outranks a timeout in the same run', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'timedOut');
   attempt(reporter, 'b', 'unexpected', 'failed');
 
@@ -152,7 +152,7 @@ test('a kill outranks a timeout in the same run', () => {
 });
 
 test('a retried test that fails an assertion kills the mutant even when another attempt timed out', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'timedOut');
   attempt(reporter, 'a', 'unexpected', 'failed');
 
@@ -160,7 +160,7 @@ test('a retried test that fails an assertion kills the mutant even when another 
 });
 
 test('a timeout alone makes a mutant run a Timeout', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'timedOut');
   attempt(reporter, 'b', 'expected', 'passed');
 
@@ -168,7 +168,7 @@ test('a timeout alone makes a mutant run a Timeout', () => {
 });
 
 test('a test.fail() test that fails as expected is no kill, so a timeout stays a Timeout', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'timedOut');
   attempt(reporter, 'b', 'expected', 'failed', 'failed');
 
@@ -176,7 +176,7 @@ test('a test.fail() test that fails as expected is no kill, so a timeout stays a
 });
 
 test('the dry run reports a timed-out test as a failed test', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'timedOut');
 
   const result = classify(reporter, { request: dryRequest() });
@@ -189,7 +189,7 @@ test('the dry run reports a timed-out test as a failed test', () => {
 
 test('a mutant run without test results is an error, filtered or not', () => {
   assert.deepEqual(
-    classify(new LzStrykerCollectingReporter(), {
+    classify(new LzPlaywrightCollectingReporter(), {
       status: 'passed',
       request: mutantRequest({ selection: selected(['gone', 'also gone']) }),
     }),
@@ -200,7 +200,7 @@ test('a mutant run without test results is an error, filtered or not', () => {
     },
   );
   assert.deepEqual(
-    classify(new LzStrykerCollectingReporter(), { status: 'passed' }),
+    classify(new LzPlaywrightCollectingReporter(), { status: 'passed' }),
     {
       status: DryRunStatus.Error,
       errorMessage: 'Playwright ran no tests.',
@@ -209,7 +209,7 @@ test('a mutant run without test results is an error, filtered or not', () => {
 });
 
 test('a test result is named by its title path without the empty titles', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'expected', 'passed');
   Object.assign(reporter.testCases.get('a') ?? {}, {
     titlePath: () => ['', '', 'app.spec.ts', 'a'],
@@ -224,7 +224,7 @@ test('a test result is named by its title path without the empty titles', () => 
 });
 
 test('a test.fail() test that passed kills the mutant, though another test timed out', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'timedOut');
   attempt(reporter, 'b', 'unexpected', 'passed', 'failed');
 
@@ -232,7 +232,7 @@ test('a test.fail() test that passed kills the mutant, though another test timed
 });
 
 test('a test that timed out and then passed on a retry makes a mutant run a Timeout', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'timedOut');
   attempt(reporter, 'a', 'flaky', 'passed');
 
@@ -243,7 +243,7 @@ test('a test that timed out and then passed on a retry makes a mutant run a Time
 });
 
 test('a timed-out test that ran without the hook is a hook error, not a Timeout', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'timedOut');
 
   assert.equal(
@@ -253,7 +253,7 @@ test('a timed-out test that ran without the hook is a hook error, not a Timeout'
 });
 
 test('a failed or retried-then-failed attempt counts as failed, a skipped one does not', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'expected', 'passed');
   attempt(reporter, 'b', 'skipped', 'skipped');
 
@@ -266,7 +266,7 @@ test('a failed or retried-then-failed attempt counts as failed, a skipped one do
 });
 
 test('a timed-out or interrupted attempt failed but killed nothing', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'timedOut');
   attempt(reporter, 'b', 'unexpected', 'interrupted');
 
@@ -278,7 +278,7 @@ test('a timed-out or interrupted attempt failed but killed nothing', () => {
 });
 
 test('an unfiltered dry run without tests completes empty, so Stryker applies allowEmpty', () => {
-  const result = classify(new LzStrykerCollectingReporter(), {
+  const result = classify(new LzPlaywrightCollectingReporter(), {
     status: 'passed',
     request: dryRequest(),
   });
@@ -291,7 +291,7 @@ test('an unfiltered dry run without tests completes empty, so Stryker applies al
 });
 
 test('a run that Playwright failed without a test or an error is an error, not an empty run', () => {
-  const result = classify(new LzStrykerCollectingReporter(), {
+  const result = classify(new LzPlaywrightCollectingReporter(), {
     status: 'failed',
     request: dryRequest(),
   });
@@ -451,7 +451,7 @@ test('a deadline stop during config load, before any test, is a Timeout', () => 
 });
 
 test('a deadline stop that interrupted the looping test is a Timeout', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'expected', 'passed');
   attempt(reporter, 'b', 'skipped', 'interrupted');
 
@@ -479,7 +479,7 @@ const coveringA = mutantRequest({
 });
 
 function mutantRunOf(
-  reporter: LzStrykerCollectingReporter,
+  reporter: LzPlaywrightCollectingReporter,
   status: RunStatus,
   request = coveringA,
 ): MutantRunResult {
@@ -487,7 +487,7 @@ function mutantRunOf(
 }
 
 test('a deadline stop after every covering test passed leaves a survivor', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'expected', 'passed');
   attempt(reporter, 'b', 'skipped', 'interrupted');
 
@@ -499,7 +499,7 @@ test('a deadline stop after every covering test passed leaves a survivor', () =>
 });
 
 test('an extra test that hit its test timeout after every covering test passed leaves a survivor', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'expected', 'passed');
   attempt(reporter, 'b', 'unexpected', 'timedOut');
 
@@ -511,7 +511,7 @@ test('an extra test that hit its test timeout after every covering test passed l
 });
 
 test('a covering test the deadline interrupted keeps the run a Timeout', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'b', 'expected', 'passed');
   attempt(reporter, 'a', 'skipped', 'interrupted');
 
@@ -522,7 +522,7 @@ test('a covering test the deadline interrupted keeps the run a Timeout', () => {
 });
 
 test('a covering test that timed out keeps the run a Timeout', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'b', 'expected', 'passed');
   attempt(reporter, 'a', 'unexpected', 'timedOut');
 
@@ -530,7 +530,7 @@ test('a covering test that timed out keeps the run a Timeout', () => {
 });
 
 test('a covering test that timed out and passed only on a retry keeps the run a Timeout', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'b', 'expected', 'passed');
   attempt(reporter, 'a', 'unexpected', 'timedOut');
   attempt(reporter, 'a', 'flaky', 'passed');
@@ -539,7 +539,7 @@ test('a covering test that timed out and passed only on a retry keeps the run a 
 });
 
 test('a covering test that never ran keeps the run a Timeout', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'expected', 'passed');
   attempt(reporter, 'b', 'skipped', 'interrupted');
 
@@ -556,7 +556,7 @@ test('a covering test that never ran keeps the run a Timeout', () => {
 });
 
 test('an empty covering list counts as no covering test that passed', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'timedOut');
 
   assert.equal(
@@ -570,7 +570,7 @@ test('an empty covering list counts as no covering test that passed', () => {
 });
 
 test('a failed extra test still kills the mutant when every covering test passed', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'expected', 'passed');
   attempt(reporter, 'b', 'unexpected', 'failed');
 
@@ -578,7 +578,7 @@ test('a failed extra test still kills the mutant when every covering test passed
 });
 
 test('without a test filter, a timed-out test keeps the run a Timeout though the others passed', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'expected', 'passed');
   attempt(reporter, 'b', 'unexpected', 'timedOut');
 
@@ -589,7 +589,7 @@ test('without a test filter, a timed-out test keeps the run a Timeout though the
 });
 
 test('a run someone else interrupted stays an error', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'skipped', 'interrupted');
 
   assert.equal(
@@ -627,7 +627,7 @@ test('the missing-coverage error blames the webServer when pages answered withou
 });
 
 test('a run with errors and no failed test is an error, with every error', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'expected', 'passed');
   reporter.onError({ message: 'first' });
   reporter.onError({ value: 'second' });
@@ -640,7 +640,7 @@ test('a run with errors and no failed test is an error, with every error', () =>
 });
 
 test('a failed test outranks the errors of its run', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'failed');
   attempt(reporter, 'b', 'expected', 'passed');
   reporter.onError({ message: 'worker teardown' });
@@ -688,7 +688,7 @@ test('the missing-coverage error needs a test that ran, and none that failed', (
 });
 
 test('a run of skipped tests needs no hook', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'skipped', 'skipped');
 
   assert.equal(
@@ -698,7 +698,7 @@ test('a run of skipped tests needs no hook', () => {
 });
 
 test('tests that ran without the hook are an error', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'skipped', 'skipped');
   attempt(reporter, 'b', 'expected', 'passed');
 

@@ -16,14 +16,14 @@ import {
 } from '@stryker-mutator/api/test-runner';
 
 import { strykerPlugins, strykerValidationSchema } from '../src/index.ts';
-import { optionProperties } from '../src/options.ts';
+import { optionProperties } from '../src/lz-playwright-runner-options-with-stryker-options.ts';
 import { fieldOf } from '../src/is-record.ts';
 import { installErrorSuffix } from '../src/protocol.ts';
 import {
   acceptsConnections,
-  LzStrykerPlaywrightTestRunner,
+  LzPlaywrightTestRunner,
   withEnv,
-} from '../src/playwright-test-runner.ts';
+} from '../src/lz-playwright-test-runner.ts';
 import { namespaceToken, ownerFile, rootPrefix } from '../src/temp-root.ts';
 import {
   dryRunOptions,
@@ -52,26 +52,23 @@ async function listening(): Promise<{ server: net.Server; port: number }> {
   return { server, port: address.port };
 }
 
-test('the package declares the runner as the lz-stryker-playwright test runner, with its options schema', () => {
+test('the package declares the runner as the lz-playwright test runner, with its options schema', () => {
   assert.deepEqual(strykerPlugins, [
     {
       kind: PluginKind.TestRunner,
-      name: 'lz-stryker-playwright',
-      injectableClass: LzStrykerPlaywrightTestRunner,
+      name: 'lz-playwright',
+      injectableClass: LzPlaywrightTestRunner,
     },
   ]);
   assert.equal(
-    strykerValidationSchema.properties.lzStrykerPlaywright.properties,
+    strykerValidationSchema.properties.lzPlaywright.properties,
     optionProperties,
   );
 });
 
 test('the runner can reload its environment', () => {
   assert.deepEqual(
-    new LzStrykerPlaywrightTestRunner(
-      strykerOptions({}),
-      logger().log,
-    ).capabilities(),
+    new LzPlaywrightTestRunner(strykerOptions({}), logger().log).capabilities(),
     { reloadEnvironment: true },
   );
 });
@@ -98,10 +95,7 @@ test('init creates the TestRunner on the resolved config with the run overrides,
     outputDir,
     use: { screenshot: 'off', trace: 'off', video: 'off' },
   });
-  assert.match(
-    path.basename(path.dirname(outputDir)),
-    /^lz-stryker-playwright-\d+-/,
-  );
+  assert.match(path.basename(path.dirname(outputDir)), /^lz-playwright-\d+-/);
   assert.equal(path.dirname(path.dirname(outputDir)), fake.tmp);
   assert.deepEqual(rest, [
     ['initialize', {}],
@@ -114,7 +108,7 @@ test('init creates the TestRunner on the resolved config with the run overrides,
 test('init lists the projects the option names', async (t) => {
   const fake = fakePlaywright(t);
   const { shell } = fake.runner({
-    lzStrykerPlaywright: { projects: ['manual'] },
+    lzPlaywright: { projects: ['manual'] },
   });
 
   await shell.init();
@@ -126,7 +120,7 @@ test('without a config file, Playwright is found from the working directory', as
   const fake = fakePlaywright(t);
   const cwd = process.cwd();
   const { shell } = fake.runner({
-    lzStrykerPlaywright: { configFile: undefined },
+    lzPlaywright: { configFile: undefined },
   });
   process.chdir(fake.dir);
 
@@ -307,10 +301,7 @@ test('a temp root that cannot be removed after a failed init leaves the init err
 });
 
 test('a run before init finished fails with a clear error', async () => {
-  const shell = new LzStrykerPlaywrightTestRunner(
-    strykerOptions({}),
-    logger().log,
-  );
+  const shell = new LzPlaywrightTestRunner(strykerOptions({}), logger().log);
 
   await assert.rejects(shell.dryRun(dryRunOptions()), {
     message: 'The Playwright test runner was used before init() finished.',
@@ -334,10 +325,7 @@ test('dispose stops the tests, tears down and removes the temp root, once', asyn
 });
 
 test('dispose without init does nothing', async () => {
-  await new LzStrykerPlaywrightTestRunner(
-    strykerOptions({}),
-    logger().log,
-  ).dispose();
+  await new LzPlaywrightTestRunner(strykerOptions({}), logger().log).dispose();
 });
 
 test('dispose removes the run folders and output before it waits for the workers', async (t) => {
@@ -365,7 +353,7 @@ test('dispose removes the run folders and output before it waits for the workers
 test('a dry run runs every test with the hook and the run settings in the workers environment', async (t) => {
   const fake = fakePlaywright(t);
   const { shell } = fake.runner({
-    lzStrykerPlaywright: { projects: ['chromium'], workers: 3 },
+    lzPlaywright: { projects: ['chromium'], workers: 3 },
   });
   await shell.init();
   const before = { ...process.env };
@@ -912,10 +900,10 @@ test('a run leaves no run settings behind in the environment, also when it throw
 });
 
 test('init refuses --testFiles before it loads the Playwright config', async () => {
-  const shell = new LzStrykerPlaywrightTestRunner(
+  const shell = new LzPlaywrightTestRunner(
     strykerOptions({
       testFiles: ['a.spec.ts'],
-      lzStrykerPlaywright: { configFile: 'missing.playwright.config.ts' },
+      lzPlaywright: { configFile: 'missing.playwright.config.ts' },
     }),
     logger().log,
   );

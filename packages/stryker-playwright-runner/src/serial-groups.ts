@@ -1,6 +1,9 @@
 import { isRecord } from './is-record.ts';
 import type { TestRunner } from './playwright-internals.ts';
-import { LzStrykerCollectingReporter, type ReportedTest } from './reporter.ts';
+import {
+  LzPlaywrightCollectingReporter,
+  type ReportedTest,
+} from './reporter.ts';
 
 /** The ids of a describe.serial group's tests, by the id of each test in it. */
 export type SerialGroups = ReadonlyMap<string, readonly string[]>;
@@ -24,7 +27,7 @@ export async function listSerialGroups(
   projects: readonly string[],
   isSerial: IsSerialSuite,
 ): Promise<SerialGroups> {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   const result = await playwright.listTests(reporter, { projects });
 
   if (!result) {

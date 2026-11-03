@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { fieldOf } from '../src/is-record.ts';
 import { loadPlaywright } from '../src/playwright-internals.ts';
-import { serverTarget } from '../src/playwright-test-runner.ts';
+import { serverTarget } from '../src/lz-playwright-test-runner.ts';
 import { tempTree } from './support/doubles.ts';
 
 type Decision =

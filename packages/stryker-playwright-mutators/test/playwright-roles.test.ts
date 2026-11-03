@@ -98,12 +98,12 @@ describe('parseRoleTable', () => {
       [
         'no entry is constant or set by one attribute',
         'kImplicitRoleByTagName = {\\n  "INPUT": (e) => e.type\\n};',
-        'kImplicitRoleByTagName lacks the entries for a, area, button that LzElementRole reads',
+        'kImplicitRoleByTagName lacks the entries for a, area, button that LzJsxElementRole reads',
       ],
       [
-        'the table lacks some of the entries that LzElementRole reads',
+        'the table lacks some of the entries that LzJsxElementRole reads',
         buttonOnly,
-        'kImplicitRoleByTagName lacks the entries for a, area that LzElementRole reads',
+        'kImplicitRoleByTagName lacks the entries for a, area that LzJsxElementRole reads',
       ],
       [
         'the table lacks only the BUTTON entry',
@@ -111,7 +111,7 @@ describe('parseRoleTable', () => {
           '"BUTTON": () => "button"',
           '"BUTTON": (e) => e.type',
         ),
-        'kImplicitRoleByTagName lacks the entries for button that LzElementRole reads',
+        'kImplicitRoleByTagName lacks the entries for button that LzJsxElementRole reads',
       ],
       [
         'the BUTTON entry names a role the span swap does not take',
@@ -119,12 +119,12 @@ describe('parseRoleTable', () => {
           '"BUTTON": () => "button"',
           '"BUTTON": () => "generic"',
         ),
-        'kImplicitRoleByTagName changes the roles LzElementRole reads: button is generic, not button',
+        'kImplicitRoleByTagName changes the roles LzJsxElementRole reads: button is generic, not button',
       ],
       [
         'the A and AREA entries name a role the span swap does not take',
         excerpt('1.64.1').replaceAll('? "link" :', '? "generic" :'),
-        'kImplicitRoleByTagName changes the roles LzElementRole reads: a is generic, not link; area is generic, not link',
+        'kImplicitRoleByTagName changes the roles LzJsxElementRole reads: a is generic, not link; area is generic, not link',
       ],
       [
         'the BUTTON entry names the role of the A entry',
@@ -132,7 +132,7 @@ describe('parseRoleTable', () => {
           '"BUTTON": () => "button"',
           '"BUTTON": () => "link"',
         ),
-        'kImplicitRoleByTagName changes the roles LzElementRole reads: button is link, not button',
+        'kImplicitRoleByTagName changes the roles LzJsxElementRole reads: button is link, not button',
       ],
     ] as const
   ).forEach(([title, bundle, message]) => {
@@ -207,9 +207,9 @@ describe('consumerRoles', () => {
       otherBundled.roles,
     );
     assert.deepEqual(messages, [
-      'stryker-playwright-mutators: cannot read the implicit role table of playwright-core ' +
+      '@layzee/stryker-playwright-mutators: cannot read the implicit role table of playwright-core ' +
         "(Error: Package subpath './package.json' is not exported, code ERR_PACKAGE_PATH_NOT_EXPORTED); " +
-        'LzElementRole uses the table bundled from playwright-core 0.0.1.',
+        'LzJsxElementRole uses the table bundled from playwright-core 0.0.1.',
     ]);
   });
 
@@ -226,12 +226,12 @@ describe('consumerRoles', () => {
       otherBundled.roles,
     );
     assert.deepEqual(messages, [
-      `stryker-playwright-mutators: cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} ` +
-        '(Error: kImplicitRoleByTagName not found); LzElementRole uses the table bundled from playwright-core 0.0.1.',
+      `@layzee/stryker-playwright-mutators: cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} ` +
+        '(Error: kImplicitRoleByTagName not found); LzJsxElementRole uses the table bundled from playwright-core 0.0.1.',
     ]);
   });
 
-  it('gives the bundled table, and warns once naming the missing tags, when the table lacks entries LzElementRole reads', (t) => {
+  it('gives the bundled table, and warns once naming the missing tags, when the table lacks entries LzJsxElementRole reads', (t) => {
     const { resolve, bundlePath } = fakePlaywrightCore(t, '1.99.0', buttonOnly);
     const { messages, warn } = recorder();
 
@@ -240,9 +240,9 @@ describe('consumerRoles', () => {
       otherBundled.roles,
     );
     assert.deepEqual(messages, [
-      `stryker-playwright-mutators: cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} ` +
-        '(Error: kImplicitRoleByTagName lacks the entries for a, area that LzElementRole reads); ' +
-        'LzElementRole uses the table bundled from playwright-core 0.0.1.',
+      `@layzee/stryker-playwright-mutators: cannot read the implicit role table of playwright-core 1.99.0 in ${bundlePath} ` +
+        '(Error: kImplicitRoleByTagName lacks the entries for a, area that LzJsxElementRole reads); ' +
+        'LzJsxElementRole uses the table bundled from playwright-core 0.0.1.',
     ]);
   });
 
@@ -267,8 +267,8 @@ describe('consumerRoles', () => {
       otherBundled.roles,
     );
     assert.deepEqual(messages, [
-      `stryker-playwright-mutators: cannot read the implicit role table of playwright-core in ${manifest} ` +
-        `(${String(jsonError)}); LzElementRole uses the table bundled from playwright-core 0.0.1.`,
+      `@layzee/stryker-playwright-mutators: cannot read the implicit role table of playwright-core in ${manifest} ` +
+        `(${String(jsonError)}); LzJsxElementRole uses the table bundled from playwright-core 0.0.1.`,
     ]);
   });
 });

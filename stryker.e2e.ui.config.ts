@@ -7,9 +7,9 @@ export default {
     '@layzee/stryker-playwright-runner',
     '@layzee/stryker-playwright-mutators',
   ],
-  ignorers: ['stryker-playwright-mutators'],
-  testRunner: 'lz-stryker-playwright',
-  lzStrykerPlaywright: {
+  ignorers: ['lz-jsx'],
+  testRunner: 'lz-playwright',
+  lzPlaywright: {
     configFile: 'apps/demo-app-e2e/playwright.config.mts',
   },
   mutate: [

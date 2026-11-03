@@ -1,4 +1,4 @@
-// Drives LzStrykerPlaywrightTestRunner against a TSX fixture instrumented with the UI operators of @layzee/stryker-playwright-mutators:
+// Drives LzPlaywrightTestRunner against a TSX fixture instrumented with the UI operators of @layzee/stryker-playwright-mutators:
 // for each operator, a Playwright test kills its mutant and a test that does not observe it lets it survive.
 // Run: npx nx run @layzee/stryker-playwright-runner:test-browser
 import '@layzee/stryker-playwright-mutators';
@@ -106,8 +106,8 @@ test('dry run completes with every test passing', () => {
 
 test('per-test coverage credits a text mutant only to the tests that render its element', () => {
   const { perTest, static: staticCoverage } = session.mutantCoverage;
-  const heading = mutant('LzTextLiteral', 'Orders', '').id;
-  const status = mutant('LzTextLiteral', 'Revealed', '').id;
+  const heading = mutant('LzJsxTextLiteral', 'Orders', '').id;
+  const status = mutant('LzJsxTextLiteral', 'Revealed', '').id;
 
   assert.ok(perTest[session.testId('shows the heading')]?.[heading]);
   assert.ok(perTest[session.testId('reveals the status')]?.[heading]);
@@ -127,70 +127,70 @@ const rows: readonly {
   bystander: string;
 }[] = [
   {
-    operator: 'LzTextLiteral',
+    operator: 'LzJsxTextLiteral',
     original: 'Orders',
     replacement: '',
     killer: 'shows the heading',
     bystander: 'shows the total',
   },
   {
-    operator: 'LzLabelAttribute',
+    operator: 'LzJsxLabelAttribute',
     original: 'aria-label="Close"',
     replacement: 'aria-label=""',
     killer: 'closes the dialog',
     bystander: 'toggle reports expanded',
   },
   {
-    operator: 'LzEventHandler',
+    operator: 'LzJsxEventHandler',
     original: 'onClick={actions.reveal}',
     replacement: 'onClick={undefined}',
     killer: 'reveals the status',
     bystander: 'shows the heading',
   },
   {
-    operator: 'LzConditionalElement',
+    operator: 'LzJsxConditionalElement',
     original: 'open && <p>Details panel</p>',
     replacement: '<p>Details panel</p>',
     killer: 'panel starts hidden',
     bystander: 'shows the heading',
   },
   {
-    operator: 'LzUrlAttribute',
+    operator: 'LzJsxUrlAttribute',
     original: 'href="#/done"',
     replacement: 'href=""',
     killer: 'navigates to done',
     bystander: 'shows the heading',
   },
   {
-    operator: 'LzDisabledAttribute',
+    operator: 'LzJsxDisabledAttribute',
     original: 'disabled={busy}',
     replacement: 'disabled={false}',
     killer: 'submit is disabled while busy',
     bystander: 'shows the heading',
   },
   {
-    operator: 'LzHiddenAttribute',
+    operator: 'LzJsxHiddenAttribute',
     original: 'hidden={!open}',
     replacement: 'hidden={false}',
     killer: 'region hidden until opened',
     bystander: 'shows the heading',
   },
   {
-    operator: 'LzElementRole',
+    operator: 'LzJsxElementRole',
     original: 'role="dialog"',
     replacement: 'role={undefined}',
     killer: 'opens the dialog',
     bystander: 'toggle reports expanded',
   },
   {
-    operator: 'LzChildExpression',
+    operator: 'LzJsxChildExpression',
     original: 'total',
     replacement: 'null',
     killer: 'shows the total',
     bystander: 'shows the heading',
   },
   {
-    operator: 'LzStateAttribute',
+    operator: 'LzJsxStateAttribute',
     original: 'aria-expanded={open}',
     replacement: 'aria-expanded={!open}',
     killer: 'toggle reports expanded',

@@ -28,7 +28,7 @@ import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 
 export default {
   appendPlugins: ['@layzee/stryker-playwright-runner'],
-  testRunner: 'lz-stryker-playwright',
+  testRunner: 'lz-playwright',
   coverageAnalysis: 'perTest',
   concurrency: 1,
   timeoutMS: 11_000,
@@ -121,7 +121,7 @@ Survived from one run to the next.
 
 ## Options
 
-Set these under `lzStrykerPlaywright` in the Stryker config. Stryker checks them against the schema the package
+Set these under `lzPlaywright` in the Stryker config. Stryker checks them against the schema the package
 exports as `strykerValidationSchema`.
 
 - `configFile`: the Playwright config file, relative to the folder you run Stryker from, not to an Nx
@@ -244,7 +244,7 @@ otherwise:
 
 - `screenshot`, `trace`, and `video` are off.
 - The reporters in the Playwright config do not run.
-- `outputDir` is a folder in a private temp directory, `lz-stryker-playwright-<pid>-*` in the OS temp
+- `outputDir` is a folder in a private temp directory, `lz-playwright-<pid>-*` in the OS temp
   directory, which `dispose` removes. A runner that Stryker killed first leaves that directory behind.
   The next runner to start removes it if the process that owned it no longer runs and the directory's
   `owner` file shows it was made on the same host (and, on Linux, in the same PID namespace). Runners

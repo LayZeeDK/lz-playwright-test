@@ -19,8 +19,8 @@ function Get-Listener {
 # Each row: mutant id ('' for none), what it changes, and the expected page.
 $cases = @(
   @{ id = ''; what = 'no mutant'; dts = 'Subtotal|Shipping|Total'; labels = 'Mug|Poster|Discount code'; code = '' },
-  @{ id = '23'; what = 'LzTextLiteral empties <dt>Subtotal</dt>'; dts = '|Shipping|Total'; labels = 'Mug|Poster|Discount code'; code = '' },
-  @{ id = '16'; what = 'LzChildExpression nulls {line.name} in the line label'; dts = 'Subtotal|Shipping|Total'; labels = '||Discount code'; code = '' },
+  @{ id = '23'; what = 'LzJsxTextLiteral empties <dt>Subtotal</dt>'; dts = '|Shipping|Total'; labels = 'Mug|Poster|Discount code'; code = '' },
+  @{ id = '16'; what = 'LzJsxChildExpression nulls {line.name} in the line label'; dts = 'Subtotal|Shipping|Total'; labels = '||Discount code'; code = '' },
   @{ id = '6'; what = "StringLiteral sets useState('') to 'Stryker was here!'"; dts = 'Subtotal|Shipping|Total'; labels = 'Mug|Poster|Discount code'; code = 'Stryker was here!' }
 )
 

@@ -71,7 +71,7 @@
           "{projectRoot}/src/playwright-roles.ts",
           "{projectRoot}/src/span-swap.ts",
           "{projectRoot}/src/is-record.ts",
-          "{projectRoot}/src/plugin-name.ts",
+          "{projectRoot}/src/package-name.ts",
           {
             "externalDependencies": [
               "playwright-core"

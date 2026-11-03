@@ -1,4 +1,4 @@
-// Drives LzStrykerPlaywrightTestRunner directly against a fixture instrumented by Stryker's own instrumenter.
+// Drives LzPlaywrightTestRunner directly against a fixture instrumented by Stryker's own instrumenter.
 // Run: npx nx run @layzee/stryker-playwright-runner:test-browser
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -23,7 +23,7 @@ import {
 } from '@stryker-mutator/api/test-runner';
 import { Instrumenter } from '@stryker-mutator/instrumenter';
 
-import { acceptsConnections } from '../../src/playwright-test-runner.ts';
+import { acceptsConnections } from '../../src/lz-playwright-test-runner.ts';
 import { namespaceToken, ownerFile } from '../../src/temp-root.ts';
 import { stopHeadroomMs } from '../../src/timeouts.ts';
 import { logger } from '../support/doubles.ts';
@@ -31,7 +31,7 @@ import { type Session, startSession, transpile } from './support/session.ts';
 
 // A pid that ran and exited, so no process owns it now.
 const deadPid = spawnSync(process.execPath, ['-e', '']).pid;
-const deadRoot = path.join(tmpdir(), `lz-stryker-playwright-${deadPid}-left00`);
+const deadRoot = path.join(tmpdir(), `lz-playwright-${deadPid}-left00`);
 const oldSchemeRoot = path.join(tmpdir(), 'stryker-pw-0-runner-test');
 
 const fixture = (file: string) =>
@@ -541,7 +541,7 @@ test('no Playwright artifacts are written next to the config', () => {
 test('dispose removes the temp directory the runner kept its output and runs in', async () => {
   const ownRoots = () =>
     readdirSync(tmpdir()).filter((name) =>
-      name.startsWith(`lz-stryker-playwright-${process.pid}-`),
+      name.startsWith(`lz-playwright-${process.pid}-`),
     );
   assert.equal(
     ownRoots().length,

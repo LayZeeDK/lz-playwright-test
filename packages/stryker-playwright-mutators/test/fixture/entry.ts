@@ -5,7 +5,7 @@ import { defined } from '../support/defined.ts';
 const instrumenter = await resolveFromCore();
 
 if (process.argv[2] === 'taken') {
-  instrumenter.allMutators.push({ name: 'LzTextLiteral', mutate: () => [] });
+  instrumenter.allMutators.push({ name: 'LzJsxTextLiteral', mutate: () => [] });
 }
 
 const { strykerPlugins } = await import('../../src/index.ts');

@@ -31,7 +31,7 @@ describe('index.ts', () => {
     assert.deepEqual(JSON.parse(stdout), {
       registered: operatorNames,
       placerWrapped: true,
-      ignorer: 'Ignore stryker-playwright-mutators undefined',
+      ignorer: 'Ignore lz-jsx undefined',
     });
   });
 
@@ -45,7 +45,7 @@ describe('index.ts', () => {
       registered: [],
       placerWrapped: false,
       ignorer:
-        'throws stryker-playwright-mutators: the install did not run, because STRYKER_MUTATOR_WORKER is set in a process ' +
+        'throws @layzee/stryker-playwright-mutators: the install did not run, because STRYKER_MUTATOR_WORKER is set in a process ' +
         'that instruments. Unset it for the Stryker run.',
     });
   });
@@ -57,7 +57,7 @@ describe('index.ts', () => {
     assert.equal(stdout, '');
     assert.match(
       stderr,
-      /stryker-playwright-mutators: another mutator already has the name LzTextLiteral\./,
+      /@layzee\/stryker-playwright-mutators: another mutator already has the name LzJsxTextLiteral\./,
     );
   });
 });

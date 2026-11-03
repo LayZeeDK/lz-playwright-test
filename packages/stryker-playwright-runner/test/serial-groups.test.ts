@@ -5,7 +5,7 @@ import type { FullResult } from '@playwright/test/reporter';
 
 import { isSerialSuite } from '../src/playwright-internals.ts';
 import type {
-  LzStrykerCollectingReporter,
+  LzPlaywrightCollectingReporter,
   ReportedTest,
 } from '../src/reporter.ts';
 import {
@@ -64,7 +64,7 @@ function listing({
   const calls: string[][] = [];
   const playwright = {
     async listTests(
-      reporter: LzStrykerCollectingReporter,
+      reporter: LzPlaywrightCollectingReporter,
       params: { projects?: string[] },
     ) {
       calls.push(params.projects ?? []);

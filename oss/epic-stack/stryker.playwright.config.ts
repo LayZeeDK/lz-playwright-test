@@ -6,9 +6,9 @@ export default {
     '@layzee/stryker-playwright-mutators',
     '@stryker-mutator/typescript-checker',
   ],
-  ignorers: ['stryker-playwright-mutators'],
-  testRunner: 'lz-stryker-playwright',
-  lzStrykerPlaywright: { configFile: 'playwright.config.ts' },
+  ignorers: ['lz-jsx'],
+  testRunner: 'lz-playwright',
+  lzPlaywright: { configFile: 'playwright.config.ts' },
   checkers: ['typescript'],
   tsconfigFile: 'tsconfig.json',
   mutate: [

@@ -12,7 +12,9 @@ import { defined } from './support/defined.ts';
 function elementRoleMutants(code: string, roles: RoleTable): string[] {
   const file = parse(code);
   const mutator = toNodeMutator(
-    defined(operatorsFor(roles).find(({ name }) => name === 'LzElementRole')),
+    defined(
+      operatorsFor(roles).find(({ name }) => name === 'LzJsxElementRole'),
+    ),
     t,
   );
   const show = (node: t.Node): string => {
@@ -38,7 +40,7 @@ function elementRoleMutants(code: string, roles: RoleTable): string[] {
   return found;
 }
 
-describe('LzElementRole', () => {
+describe('LzJsxElementRole', () => {
   it('swaps for a span exactly the elements whose role in the table is button or link', () => {
     const roles: RoleTable = new Map([
       ['div', { role: 'button' }],

@@ -84,7 +84,7 @@ before(async () => {
   await installInto(instrumenter);
   excluded = await instrumentEach(operatorNames);
   oneLeftOn = await instrumentEach(
-    operatorNames.filter((name) => name !== 'LzTextLiteral'),
+    operatorNames.filter((name) => name !== 'LzJsxTextLiteral'),
   );
   on = await instrumentEach([]);
 });
@@ -181,9 +181,9 @@ describe('the JSX placement, with the UI operators on', () => {
     ]);
 
     assert.deepEqual(mutants.map(({ mutatorName }) => mutatorName).sort(), [
-      'LzElementRole',
-      'LzTextLiteral',
-      'LzUrlAttribute',
+      'LzJsxElementRole',
+      'LzJsxTextLiteral',
+      'LzJsxUrlAttribute',
     ]);
     assert.doesNotThrow(() => parseTsx(defined(files[0]).content));
   });

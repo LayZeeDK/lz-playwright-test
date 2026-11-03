@@ -14,8 +14,8 @@ import type {
 import {
   readRunnerOptions,
   type RunnerOptions,
-  type RunnerStrykerOptions,
-} from './options.ts';
+  type LzPlaywrightRunnerOptionsWithStrykerOptions,
+} from './lz-playwright-runner-options-with-stryker-options.ts';
 import {
   type ConfigWebServer,
   isSerialSuite,
@@ -25,7 +25,7 @@ import {
   type TestRunner,
 } from './playwright-internals.ts';
 import { readSnapshotDir } from './protocol.ts';
-import { LzStrykerCollectingReporter } from './reporter.ts';
+import { LzPlaywrightCollectingReporter } from './reporter.ts';
 import {
   dryRunRequest,
   mutantRunRequest,
@@ -75,15 +75,18 @@ const runOverrides = {
   use: { screenshot: 'off', trace: 'off', video: 'off' },
 };
 
-export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
+export class LzPlaywrightTestRunner implements StrykerTestRunner {
   static inject = tokens(commonTokens.options, commonTokens.logger);
 
-  readonly #strykerOptions: RunnerStrykerOptions;
+  readonly #strykerOptions: LzPlaywrightRunnerOptionsWithStrykerOptions;
   readonly #log: Logger;
   readonly #baseNodeOptions = process.env['NODE_OPTIONS'];
   #session: Session | undefined;
 
-  constructor(options: RunnerStrykerOptions, log: Logger) {
+  constructor(
+    options: LzPlaywrightRunnerOptionsWithStrykerOptions,
+    log: Logger,
+  ) {
     this.#strykerOptions = options;
     this.#log = log;
   }
@@ -231,7 +234,7 @@ export class LzStrykerPlaywrightTestRunner implements StrykerTestRunner {
     deadlineAt: number | undefined,
   ): Promise<RunOutput> {
     const outDir = session.root.nextRunDir();
-    const reporter = new LzStrykerCollectingReporter();
+    const reporter = new LzPlaywrightCollectingReporter();
     const deadline = armDeadline(deadlineAt, () =>
       session.playwright.stopTests(),
     );
@@ -358,7 +361,7 @@ export function acceptsConnections(
 }
 
 async function runGlobalSetup(playwright: TestRunner) {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
   const { status } = await playwright.runGlobalSetup([reporter]);
 
   if (status !== 'passed') {

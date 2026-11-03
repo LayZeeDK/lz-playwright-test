@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { LzStrykerCollectingReporter } from '../src/reporter.ts';
+import { LzPlaywrightCollectingReporter } from '../src/reporter.ts';
 
 test('the reporter keeps the last 4000 characters of stdout and stderr, and prints nothing itself', () => {
-  const reporter = new LzStrykerCollectingReporter();
+  const reporter = new LzPlaywrightCollectingReporter();
 
   reporter.onStdOut('a'.repeat(3998));
   reporter.onStdErr(Buffer.from('bcd'));

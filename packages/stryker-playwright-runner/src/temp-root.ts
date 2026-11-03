@@ -17,7 +17,7 @@ export interface TempRoot {
   remove(): void;
 }
 
-export const rootPrefix = 'lz-stryker-playwright-';
+export const rootPrefix = 'lz-playwright-';
 export const ownerFile = 'owner';
 
 // mkdtemp appends six letters or digits.

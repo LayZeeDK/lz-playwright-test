@@ -14,7 +14,7 @@ import {
 
 import { nullPrototypeRecord, type Snapshot } from './protocol.ts';
 import {
-  type LzStrykerCollectingReporter,
+  type LzPlaywrightCollectingReporter,
   errorText,
   type ReportedTest,
 } from './reporter.ts';
@@ -35,7 +35,7 @@ export type RunStatus = FullResult['status'] | 'deadline';
 
 export interface RunOutput {
   readonly status: RunStatus;
-  readonly reporter: LzStrykerCollectingReporter;
+  readonly reporter: LzPlaywrightCollectingReporter;
   readonly snapshots: readonly Snapshot[];
   readonly hookInstalled: boolean;
   readonly installErrors: readonly string[];

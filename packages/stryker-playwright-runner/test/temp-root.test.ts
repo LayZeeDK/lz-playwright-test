@@ -34,40 +34,31 @@ function directory(uid: number) {
 }
 
 test('a root name gives the pid of the runner that made it', () => {
-  assert.equal(rootPid('lz-stryker-playwright-4242-a1B2c3'), 4242);
+  assert.equal(rootPid('lz-playwright-4242-a1B2c3'), 4242);
 });
 
 test('names of the old scheme and other folders give no pid', () => {
   assert.equal(rootPid('stryker-pw-0-a1B2c3'), undefined);
-  assert.equal(rootPid('lz-stryker-playwright-abc-a1B2c3'), undefined);
-  assert.equal(rootPid('lz-stryker-playwright-x12-a1B2c3'), undefined);
-  assert.equal(rootPid('lz-stryker-playwright-'), undefined);
+  assert.equal(rootPid('lz-playwright-abc-a1B2c3'), undefined);
+  assert.equal(rootPid('lz-playwright-x12-a1B2c3'), undefined);
+  assert.equal(rootPid('lz-playwright-'), undefined);
   assert.equal(rootPid('other-4242-a1B2c3'), undefined);
   // As long as the prefix, so only the prefix check keeps it out.
   assert.equal(rootPid('not-a-stryker-root-42-a1B2c3'), undefined);
 });
 
 test('a name gives a pid only in the shape mkdtemp makes, six letters or digits after the pid', () => {
-  assert.equal(rootPid('lz-stryker-playwright-42-AZaz09'), 42);
-  assert.equal(rootPid('lz-stryker-playwright-2024-reports'), undefined);
-  assert.equal(rootPid('lz-stryker-playwright-1-a1B2c'), undefined);
-  assert.equal(rootPid('lz-stryker-playwright-1-a1B_c3'), undefined);
-  assert.equal(rootPid('lz-stryker-playwright-1-a1B2c3-old'), undefined);
+  assert.equal(rootPid('lz-playwright-42-AZaz09'), 42);
+  assert.equal(rootPid('lz-playwright-2024-reports'), undefined);
+  assert.equal(rootPid('lz-playwright-1-a1B2c'), undefined);
+  assert.equal(rootPid('lz-playwright-1-a1B_c3'), undefined);
+  assert.equal(rootPid('lz-playwright-1-a1B2c3-old'), undefined);
 });
 
 test('a pid too large to be a safe integer is no pid', () => {
-  assert.equal(
-    rootPid('lz-stryker-playwright-9007199254740991-a1B2c3'),
-    2 ** 53 - 1,
-  );
-  assert.equal(
-    rootPid('lz-stryker-playwright-9007199254740992-a1B2c3'),
-    undefined,
-  );
-  assert.equal(
-    rootPid('lz-stryker-playwright-12345678901234567890-a1B2c3'),
-    undefined,
-  );
+  assert.equal(rootPid('lz-playwright-9007199254740991-a1B2c3'), 2 ** 53 - 1);
+  assert.equal(rootPid('lz-playwright-9007199254740992-a1B2c3'), undefined);
+  assert.equal(rootPid('lz-playwright-12345678901234567890-a1B2c3'), undefined);
 });
 
 test('on Linux the namespace token is the inode of the pid namespace and the host name', () => {
@@ -205,18 +196,18 @@ function tmpWith(t: TestContext, names: string[]) {
 
 test('a dead root is removed only when its owner marker holds the token of this runner', (t) => {
   const { tmp, removed, remove } = tmpWith(t, [
-    'lz-stryker-playwright-100-ours00',
-    'lz-stryker-playwright-101-theirs',
-    'lz-stryker-playwright-102-nomark',
-    'lz-stryker-playwright-103-notxt0',
+    'lz-playwright-100-ours00',
+    'lz-playwright-101-theirs',
+    'lz-playwright-102-nomark',
+    'lz-playwright-103-notxt0',
   ]);
   writeFileSync(
-    path.join(tmp, 'lz-stryker-playwright-101-theirs', ownerFile),
+    path.join(tmp, 'lz-playwright-101-theirs', ownerFile),
     'ns-of-another-runner',
   );
-  rmSync(path.join(tmp, 'lz-stryker-playwright-102-nomark', ownerFile));
-  rmSync(path.join(tmp, 'lz-stryker-playwright-103-notxt0', ownerFile));
-  mkdirSync(path.join(tmp, 'lz-stryker-playwright-103-notxt0', ownerFile));
+  rmSync(path.join(tmp, 'lz-playwright-102-nomark', ownerFile));
+  rmSync(path.join(tmp, 'lz-playwright-103-notxt0', ownerFile));
+  mkdirSync(path.join(tmp, 'lz-playwright-103-notxt0', ownerFile));
 
   const result = removeLeftRoots(tmp, {
     running: () => false,
@@ -226,16 +217,16 @@ test('a dead root is removed only when its owner marker holds the token of this 
     token: ownerToken,
   });
 
-  assert.deepEqual(result, ['lz-stryker-playwright-100-ours00']);
-  assert.deepEqual(removed, ['lz-stryker-playwright-100-ours00']);
+  assert.deepEqual(result, ['lz-playwright-100-ours00']);
+  assert.deepEqual(removed, ['lz-playwright-100-ours00']);
 });
 
 test('only the roots of dead runners of this user are removed, and named', (t) => {
   const { tmp, removed, remove } = tmpWith(t, [
-    'lz-stryker-playwright-100-dead00',
-    'lz-stryker-playwright-200-live00',
-    'lz-stryker-playwright-300-own000',
-    'lz-stryker-playwright-400-other0',
+    'lz-playwright-100-dead00',
+    'lz-playwright-200-live00',
+    'lz-playwright-300-own000',
+    'lz-playwright-400-other0',
     'stryker-pw-0-old',
     'unrelated-100-x',
   ]);
@@ -248,14 +239,14 @@ test('only the roots of dead runners of this user are removed, and named', (t) =
     token: ownerToken,
   });
 
-  assert.deepEqual(result, ['lz-stryker-playwright-100-dead00']);
-  assert.deepEqual(removed, ['lz-stryker-playwright-100-dead00']);
+  assert.deepEqual(result, ['lz-playwright-100-dead00']);
+  assert.deepEqual(removed, ['lz-playwright-100-dead00']);
 });
 
 test('a root that cannot be removed now is skipped without an error', (t) => {
   const { tmp } = tmpWith(t, [
-    'lz-stryker-playwright-100-aaaaaa',
-    'lz-stryker-playwright-101-bbbbbb',
+    'lz-playwright-100-aaaaaa',
+    'lz-playwright-101-bbbbbb',
   ]);
 
   const result = removeLeftRoots(tmp, {
@@ -270,7 +261,7 @@ test('a root that cannot be removed now is skipped without an error', (t) => {
     token: ownerToken,
   });
 
-  assert.deepEqual(result, ['lz-stryker-playwright-101-bbbbbb']);
+  assert.deepEqual(result, ['lz-playwright-101-bbbbbb']);
 });
 
 test('a new root is named after the pid of the runner that owns it', (t) => {

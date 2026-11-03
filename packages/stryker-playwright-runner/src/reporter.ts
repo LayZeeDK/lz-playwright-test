@@ -24,7 +24,7 @@ export interface ReportedSuite {
   allTests(): readonly ReportedTest[];
 }
 
-export class LzStrykerCollectingReporter {
+export class LzPlaywrightCollectingReporter {
   readonly errors: string[] = [];
   outputTail = '';
   // Playwright reports each attempt of a retried test with the same TestCase, which holds them all.

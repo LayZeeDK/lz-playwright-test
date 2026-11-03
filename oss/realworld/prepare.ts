@@ -122,8 +122,8 @@ writeFileSync(
 
 export default {
   plugins: ['@layzee/stryker-playwright-runner'],
-  testRunner: 'lz-stryker-playwright',
-  lzStrykerPlaywright: { configFile: 'apps/conduit-e2e/playwright.config.ts' },
+  testRunner: 'lz-playwright',
+  lzPlaywright: { configFile: 'apps/conduit-e2e/playwright.config.ts' },
   mutate: ['libs/auth/data-access/src/auth.store.ts'],
   ignorers: ['angular'],
   coverageAnalysis: 'perTest',

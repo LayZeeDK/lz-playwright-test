@@ -13,9 +13,9 @@ import type {
   TestRunner,
 } from '../../src/playwright-internals.ts';
 import {
-  LzStrykerPlaywrightTestRunner,
+  LzPlaywrightTestRunner,
   setEnv,
-} from '../../src/playwright-test-runner.ts';
+} from '../../src/lz-playwright-test-runner.ts';
 import {
   readRunSettings,
   runSettingsEnv,
@@ -24,7 +24,7 @@ import {
   type SnapshotLine,
 } from '../../src/protocol.ts';
 import {
-  LzStrykerCollectingReporter,
+  LzPlaywrightCollectingReporter,
   type ReportedTest,
 } from '../../src/reporter.ts';
 import { finishedTest, logger, strykerOptions, tempTree } from './doubles.ts';
@@ -49,7 +49,7 @@ interface WebServer {
 
 /** What one runTests call saw: its params, the run settings and the environment the workers get. */
 export interface Run {
-  readonly reporter: LzStrykerCollectingReporter;
+  readonly reporter: LzPlaywrightCollectingReporter;
   readonly params: RunTestsParams;
   readonly settings: RunSettings;
   readonly env: Record<string, string | undefined>;
@@ -97,7 +97,7 @@ export function fakePlaywright(
   behaviour: Behaviour = {},
   version = '1.63.0',
 ) {
-  const live: LzStrykerPlaywrightTestRunner[] = [];
+  const live: LzPlaywrightTestRunner[] = [];
   const globals: Record<string, unknown> = globalThis;
 
   // Registered first, so the runners are disposed before the folder goes and the temp variables are restored.
@@ -237,13 +237,13 @@ export function fakePlaywright(
     names: () => calls.map(([name]) => name),
     runner: ({
       timeoutMS = 11_000,
-      lzStrykerPlaywright = {},
-    }: { timeoutMS?: number; lzStrykerPlaywright?: object } = {}) => {
+      lzPlaywright = {},
+    }: { timeoutMS?: number; lzPlaywright?: object } = {}) => {
       const { log, lines } = logger();
-      const shell = new LzStrykerPlaywrightTestRunner(
+      const shell = new LzPlaywrightTestRunner(
         strykerOptions({
           timeoutMS,
-          lzStrykerPlaywright: { configFile, ...lzStrykerPlaywright },
+          lzPlaywright: { configFile, ...lzPlaywright },
         }),
         log,
       );
@@ -261,11 +261,11 @@ export function fakePlaywright(
   };
 }
 
-/** The runner always hands Playwright an LzStrykerCollectingReporter. */
-function collecting(reporter: Reporter): LzStrykerCollectingReporter {
+/** The runner always hands Playwright an LzPlaywrightCollectingReporter. */
+function collecting(reporter: Reporter): LzPlaywrightCollectingReporter {
   assert.ok(
-    reporter instanceof LzStrykerCollectingReporter,
-    'an LzStrykerCollectingReporter',
+    reporter instanceof LzPlaywrightCollectingReporter,
+    'an LzPlaywrightCollectingReporter',
   );
 
   return reporter;

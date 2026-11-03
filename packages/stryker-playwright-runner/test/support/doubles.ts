@@ -10,9 +10,9 @@ import type {
   MutantRunOptions,
 } from '@stryker-mutator/api/test-runner';
 
-import type { RunnerStrykerOptions } from '../../src/options.ts';
+import type { LzPlaywrightRunnerOptionsWithStrykerOptions } from '../../src/lz-playwright-runner-options-with-stryker-options.ts';
 import {
-  LzStrykerCollectingReporter,
+  LzPlaywrightCollectingReporter,
   type ReportedTest,
 } from '../../src/reporter.ts';
 import type {
@@ -129,8 +129,8 @@ export function logger({
 }
 
 export function strykerOptions(
-  options: Partial<RunnerStrykerOptions>,
-): RunnerStrykerOptions {
+  options: Partial<LzPlaywrightRunnerOptionsWithStrykerOptions>,
+): LzPlaywrightRunnerOptionsWithStrykerOptions {
   return { timeoutMS: 10_000, ...options };
 }
 
@@ -168,7 +168,7 @@ export function selected(ids: readonly string[]): TestSelection {
 export function runOutput(output: Partial<RunOutput> = {}): RunOutput {
   return {
     status: 'passed',
-    reporter: new LzStrykerCollectingReporter(),
+    reporter: new LzPlaywrightCollectingReporter(),
     snapshots: [],
     hookInstalled: true,
     installErrors: [],

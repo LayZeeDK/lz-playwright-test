@@ -40,7 +40,7 @@ const labelableElements: ReadonlySet<string> = new Set([
 export function operatorsFor(roles: RoleTable) {
   return operatorTable([
     {
-      name: 'LzTextLiteral',
+      name: 'LzJsxTextLiteral',
       sample: 'export const a = <p>Hello</p>;\n',
       rules: [
         {
@@ -61,7 +61,7 @@ export function operatorsFor(roles: RoleTable) {
       ],
     },
     {
-      name: 'LzLabelAttribute',
+      name: 'LzJsxLabelAttribute',
       sample: 'export const a = <img alt="Logo" />;\n',
       rules: [
         {
@@ -83,7 +83,7 @@ export function operatorsFor(roles: RoleTable) {
       ],
     },
     {
-      name: 'LzEventHandler',
+      name: 'LzJsxEventHandler',
       sample: 'export const a = (f: () => void) => <b onClick={f} />;\n',
       rules: [
         {
@@ -95,7 +95,7 @@ export function operatorsFor(roles: RoleTable) {
       ],
     },
     {
-      name: 'LzConditionalElement',
+      name: 'LzJsxConditionalElement',
       sample:
         'export const a = (open: boolean) => <div>{open && <p />}</div>;\n',
       rules: [
@@ -131,7 +131,7 @@ export function operatorsFor(roles: RoleTable) {
       ],
     },
     {
-      name: 'LzUrlAttribute',
+      name: 'LzJsxUrlAttribute',
       sample: 'export const a = <a href="/about">About</a>;\n',
       rules: [
         {
@@ -142,7 +142,7 @@ export function operatorsFor(roles: RoleTable) {
       ],
     },
     {
-      name: 'LzDisabledAttribute',
+      name: 'LzJsxDisabledAttribute',
       sample: 'export const a = <input disabled />;\n',
       rules: [
         {
@@ -154,7 +154,7 @@ export function operatorsFor(roles: RoleTable) {
       ],
     },
     {
-      name: 'LzHiddenAttribute',
+      name: 'LzJsxHiddenAttribute',
       sample: 'export const a = <div hidden />;\n',
       rules: [
         {
@@ -169,7 +169,7 @@ export function operatorsFor(roles: RoleTable) {
       ],
     },
     {
-      name: 'LzElementRole',
+      name: 'LzJsxElementRole',
       sample: 'export const a = <div role="dialog" />;\n',
       rules: [
         {
@@ -198,7 +198,7 @@ export function operatorsFor(roles: RoleTable) {
       ],
     },
     {
-      name: 'LzChildExpression',
+      name: 'LzJsxChildExpression',
       sample: 'export const a = (n: number) => <p>{n}</p>;\n',
       rules: [
         {
@@ -218,7 +218,7 @@ export function operatorsFor(roles: RoleTable) {
       ],
     },
     {
-      name: 'LzStateAttribute',
+      name: 'LzJsxStateAttribute',
       sample:
         'export const a = (open: boolean) => <button aria-expanded={open} />;\n',
       rules: [

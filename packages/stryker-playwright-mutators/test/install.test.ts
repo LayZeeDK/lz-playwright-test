@@ -188,7 +188,7 @@ describe('install', () => {
       const { canPlace } = expressionPlacer;
 
       await assert.rejects(run([...operators]), {
-        message: `stryker-playwright-mutators: another mutator already has the name ${taken}.`,
+        message: `@layzee/stryker-playwright-mutators: another mutator already has the name ${taken}.`,
       });
 
       assert.deepEqual(names(), strykerMutators);
@@ -205,7 +205,7 @@ describe('install', () => {
 
     await assert.rejects(run([operator('k')]), {
       message:
-        'stryker-playwright-mutators: another mutator already has the name k.',
+        '@layzee/stryker-playwright-mutators: another mutator already has the name k.',
     });
   });
 
@@ -230,7 +230,7 @@ describe('install', () => {
       ]),
       {
         message:
-          "stryker-playwright-mutators: a mutator name has letters only, as Stryker's directives match no other character: " +
+          "@layzee/stryker-playwright-mutators: a mutator name has letters only, as Stryker's directives match no other character: " +
           '"Text1", "Text-Literal", ""',
       },
     );
@@ -244,7 +244,7 @@ describe('install', () => {
       run([operator('Alpha'), operator('Beta'), operator('Gamma')]),
       {
         message:
-          `stryker-playwright-mutators: the instrumenter ${testedVersion} in /stryker/instrumenter made no mutants of Alpha, Gamma from ` +
+          `@layzee/stryker-playwright-mutators: the instrumenter ${testedVersion} in /stryker/instrumenter made no mutants of Alpha, Gamma from ` +
           'their samples, so it does not run the mutators this module added. A bundled or second copy of the ' +
           'instrumenter does that.',
       },
@@ -289,7 +289,7 @@ describe('install', () => {
 
       assert.deepEqual(names(), [...strykerMutators, 'Alpha']);
       assert.deepEqual(warnings, [
-        `stryker-playwright-mutators was tested with @stryker-mutator/instrumenter ${testedVersion}, not ${version} in ` +
+        `@layzee/stryker-playwright-mutators was tested with @stryker-mutator/instrumenter ${testedVersion}, not ${version} in ` +
           '/stryker/instrumenter; its self-check passed.',
       ]);
     });
@@ -511,7 +511,7 @@ describe('resolveFromCore against a fake instrumenter', () => {
     const { corePackage, dir } = fakeCore(t, ['otherPlacer']);
 
     await assert.rejects(resolveFromCore(corePackage), {
-      message: `stryker-playwright-mutators: the instrumenter 9.9.8 in ${dir} has no expressionMutantPlacer.`,
+      message: `@layzee/stryker-playwright-mutators: the instrumenter 9.9.8 in ${dir} has no expressionMutantPlacer.`,
     });
   });
 
@@ -567,7 +567,7 @@ describe('resolveFromCore against a fake instrumenter', () => {
       });
 
       await assert.rejects(resolveFromCore(corePackage), {
-        message: `stryker-playwright-mutators: the instrumenter 9.9.8 in ${dir} has no ${missing}.`,
+        message: `@layzee/stryker-playwright-mutators: the instrumenter 9.9.8 in ${dir} has no ${missing}.`,
       });
     });
   });
@@ -651,7 +651,7 @@ describe('resolveFromCore against a fake instrumenter', () => {
     const path = firstPath(parse('x;'), 'Program');
 
     assert.throws(() => original.canPlace(path), {
-      message: `stryker-playwright-mutators: the instrumenter 9.9.8 in ${dir} has an expressionMutantPlacer whose canPlace returned a number, not a boolean.`,
+      message: `@layzee/stryker-playwright-mutators: the instrumenter 9.9.8 in ${dir} has an expressionMutantPlacer whose canPlace returned a number, not a boolean.`,
     });
   });
 
@@ -662,7 +662,7 @@ describe('resolveFromCore against a fake instrumenter', () => {
       [indexPath]: instrumenterFile({
         mutants: [
           { ...mutant, id: 1, status: 'Done', location: null },
-          { fileName: 'b.tsx', mutatorName: 'LzTextLiteral' },
+          { fileName: 'b.tsx', mutatorName: 'LzJsxTextLiteral' },
         ],
       }),
     });
@@ -670,7 +670,7 @@ describe('resolveFromCore against a fake instrumenter', () => {
 
     assert.deepEqual(
       await instrumenter.instrument([{ name: 'a.tsx', content: 'x' }]),
-      [mutant, { fileName: 'b.tsx', mutatorName: 'LzTextLiteral' }],
+      [mutant, { fileName: 'b.tsx', mutatorName: 'LzJsxTextLiteral' }],
     );
   });
 
@@ -693,7 +693,7 @@ describe('resolveFromCore against a fake instrumenter', () => {
       await assert.rejects(
         instrumenter.instrument([{ name: 'a.tsx', content: 'x' }]),
         {
-          message: `stryker-playwright-mutators: the instrumenter 9.9.8 in ${dir} resolved Instrumenter.instrument() to a value whose mutants are missing or have no string fileName and mutatorName.`,
+          message: `@layzee/stryker-playwright-mutators: the instrumenter 9.9.8 in ${dir} resolved Instrumenter.instrument() to a value whose mutants are missing or have no string fileName and mutatorName.`,
         },
       );
     });

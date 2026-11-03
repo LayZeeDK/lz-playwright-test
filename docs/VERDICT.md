@@ -15,7 +15,7 @@ the active mutant into the browser: a Vite `define` and a dev-server restart per
 
 ## The answer
 
-Yes, with one plugin (`testRunner: 'lz-stryker-playwright'`) for both kinds of test. Playwright 1.63 removed the
+Yes, with one plugin (`testRunner: 'lz-playwright'`) for both kinds of test. Playwright 1.63 removed the
 `@playwright/experimental-ct-*` packages. Component tests are now plain `@playwright/test` tests that
 call the built-in `mount()` fixture against your own dev server. The same runner code runs both, with no
 component-specific branch. The price is a dependency on undocumented Playwright internals, which any
@@ -163,6 +163,8 @@ every other row ran before it and used the old names (`@layzee/stryker-playwrigh
 After every row, the package names changed again, to `@layzee/stryker-playwright-runner` and
 `@layzee/stryker-playwright-mutators`, because `stryker init` lists a package named `@layzee/lz-*` as `@layzee/lz`.
 The plugin name `lz-stryker-playwright`, the `lzStrykerPlaywright` options key and the `Lz` operator names stayed.
+Later still, those became `lz-playwright`, `lzPlaywright` and `LzJsx` operator names; this page uses the current
+names throughout.
 
 | Case                                                                                                                                                                  | Runner                                                                                       | Code                             | Score                                                                                                            | Wall time                      |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------ |
@@ -206,17 +208,17 @@ label text. `spikes/live-mutant/` shows two of the four on a live page, with Str
 build and mutant ids. Mutant 23 removes the "Subtotal" label and mutant 16 removes both line names, while
 the totals the tests read stay the same. The two uncovered mutants are in `price-tag.tsx`, which no e2e page renders. No UI mutant
 was equivalent, and none was a compile or runtime error. The demo app has sites for only three of the
-ten operators (`LzTextLiteral`, `LzChildExpression`, `LzUrlAttribute`). The other seven have evidence from
+ten operators (`LzJsxTextLiteral`, `LzJsxChildExpression`, `LzJsxUrlAttribute`). The other seven have evidence from
 tests only, below.
 
 On epic-stack, the worker that ran it predicted each of the 45 UI mutants before the run; 36 matched.
 Of the 22 kills, 14 come from a test step that reads or follows the mutated element, and 8 from a later,
 unrelated step on a server-rendered page whose hydration the mutant broke (Limits). Of the 16
-survivors, 14 are gaps in the tests, 1 is equivalent (`LzConditionalElement` forcing a span that renders
-empty), and 1 is a `LzUrlAttribute` mutant of a form `action` that server rendering kept out of the DOM.
-Two `LzLabelAttribute` survivors on the search input, its `htmlFor` and its `placeholder`, leave the
+survivors, 14 are gaps in the tests, 1 is equivalent (`LzJsxConditionalElement` forcing a span that renders
+empty), and 1 is a `LzJsxUrlAttribute` mutant of a form `action` that server rendering kept out of the DOM.
+Two `LzJsxLabelAttribute` survivors on the search input, its `htmlFor` and its `placeholder`, leave the
 input named by the other one for role queries; `getByLabel` and `getByPlaceholder` would kill them,
-so they count as gaps. The one `LzElementRole` tag swap, `<a href>` to `<span>` without the `href`,
+so they count as gaps. The one `LzJsxElementRole` tag swap, `<a href>` to `<span>` without the `href`,
 compiled. The 80 built-in compile errors are real type errors, mostly emptied object and string
 literals. epic-stack needed a Prisma engine that runs on Windows arm64, a fixed port, a longer test
 timeout, and one upstream test marked `fixme`; `oss/README.md` lists each change.
@@ -306,7 +308,7 @@ mutant counts as covered because logout creates the handler, but no test makes l
 handler never runs. The 12 uncovered mutants are the inner callbacks of register and update, which the
 suite only calls through the API.
 
-The ngx-yeti run is the only one with `lzStrykerPlaywright.workers` above 1, which `runner.test.ts` does not
+The ngx-yeti run is the only one with `lzPlaywright.workers` above 1, which `runner.test.ts` does not
 cover. Coverage still came back per test. Each mutant was covered by 20 of the 234 tests, and Stryker
 stopped at the first kill, after 7 tests for one mutant and after 1 for the other. On one worker the dry
 run ran longer than Stryker's default 5-minute `dryRunTimeoutMinutes` (decision log, not rerun). With 2
@@ -439,7 +441,7 @@ All 12 reports give every mutant the same status as the first concurrency 1 run.
   mutants only that document reached show as NoCoverage (inferred from the hook's code, not run).
 - Runners before this change named their private temp directories `stryker-pw-<worker>-*`, and a
   runner that Stryker killed while its teardown hung left one behind. The runner now names them
-  `lz-stryker-playwright-<pid>-*` and removes, at `init`, those of runners of the same user that no longer
+  `lz-playwright-<pid>-*` and removes, at `init`, those of runners of the same user that no longer
   run. It never removes `stryker-pw-*` directories, because their number is no pid and a live one of an
   older runner would look dead; remove those from the system temp folder once by hand.
 - A pid names a process only in the PID namespace and on the host that gave it out. Each temp
@@ -449,7 +451,7 @@ All 12 reports give every mutant the same status as the first concurrency 1 run.
   one another's directories, provided those hosts have different host names: every Linux host's first
   PID namespace has the same inode. On Linux without `/proc` the token is unique to the runner, so no
   later runner removes its directory. A directory without a readable `owner` file is kept; remove those
-  by hand. The runner looks only at `lz-stryker-playwright-<pid>-*`, so it never removes the
+  by hand. The runner looks only at `lz-playwright-<pid>-*`, so it never removes the
   `stryker-playwright-<pid>-*` directories of runners from before the rename at 7b9a022 either. The root is removed again at once if its `owner` file cannot be written.
 - In a Stryker run started inside a Playwright worker, the worker hook of the inner runner installs
   and an outer copy of the same hook stays out; a copy from before that rule installs too and counts
@@ -465,7 +467,7 @@ All 12 reports give every mutant the same status as the first concurrency 1 run.
 - Node refuses to strip types under `node_modules`, so a published package needs a JavaScript build of
   the hook and the runner. Both packages therefore ship built JavaScript in `dist`.
 - `disableBail` cannot lift a `maxFailures` set in the user's Playwright config.
-- The runner runs Playwright with `lzStrykerPlaywright.workers` from the Stryker config (default 1), not the
+- The runner runs Playwright with `lzPlaywright.workers` from the Stryker config (default 1), not the
   `workers` value in the Playwright config. A suite that passes only when its tests spread over several
   workers fails the dry run. RealWorld's `auth.spec.ts` makes its user id once per worker and registers
   that user before every test, so it failed the same way under plain `npx playwright test --workers=1`.
