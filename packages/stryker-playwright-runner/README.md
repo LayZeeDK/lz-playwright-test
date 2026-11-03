@@ -149,9 +149,12 @@ detected that the tests may never detect. The runner hands flakiness to Playwrig
 - The dry run warns with the names of the tests that passed only on a retry.
 
 A retry costs time only for a test that failed, so mostly for killed mutants: each one runs its failing
-test once more per retry, and each attempt waits out the `expect.timeout` of its failing assertion. Raise
-`timeoutMS` by the expect timeout per retry. A retry that runs past the runner's deadline is stopped, and
-the mutant counts as Killed, as it would without the retry.
+test once more per retry, and each attempt waits out the `expect.timeout` of its failing assertion. On the
+demo's e2e suite (32 mutants, 27 of them killed, a 5 s expect timeout), one retry makes the mutant runs
+about 1.6 to 1.7 times as long, and two retries about 2.1 to 2.4 times: an estimate from the measured
+times of its killed and surviving mutants. Raise `timeoutMS` by the expect timeout per retry; the runner
+warns when it is lower. A retry that runs past the runner's deadline is stopped, and the mutant counts as
+Killed, as it would without the retry.
 
 Playwright's `repeatEach` stays 1 under Stryker. To find flaky tests before a mutation run, run the suite
 with `npx playwright test --repeat-each=10 --fail-on-flaky-tests`. Web-first assertions such as
