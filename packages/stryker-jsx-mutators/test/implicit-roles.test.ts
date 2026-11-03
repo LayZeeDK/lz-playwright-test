@@ -1,5 +1,3 @@
-// The drift test: implicitRoles against the role tables of the installed playwright-core and aria-query (the
-// version Testing Library pins). A new Playwright or aria-query that changes a role fails it.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 

@@ -12,8 +12,10 @@ export interface Case {
   readonly setup?: string;
   // One JSX expression; free identifiers stand for props.
   readonly jsx: string;
-  // Each mutant as [mutator, replacement source]; mutation names are in the mined-*.md files.
-  readonly expect: readonly (readonly [MutatorName, string])[];
+  readonly expect: readonly (readonly [
+    mutator: MutatorName,
+    replacement: string,
+  ])[];
   // Text the instrumented file must contain, for a rule about placement rather than about the mutants.
   readonly instrumented?: string;
 }

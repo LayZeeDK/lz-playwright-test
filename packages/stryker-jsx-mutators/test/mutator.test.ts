@@ -22,8 +22,7 @@ function firstElement(file: t.File): t.JSXElement {
   return statement.expression;
 }
 
-/** Runs a mutator with one rule on `attribute` over every path of `file`; returns the sites its skip saw. */
-function sitesOf(file: t.File, attribute: string): AttributeSite[] {
+function sitesSkipSees(file: t.File, attribute: string): AttributeSite[] {
   const sites: AttributeSite[] = [];
   const probe: Mutator = {
     name: 'Probe',
@@ -57,7 +56,7 @@ function sitesOf(file: t.File, attribute: string): AttributeSite[] {
 
 describe('toNodeMutator', () => {
   it("gives a rule the element's plain attribute names, leaving out spread and namespaced ones", () => {
-    const [site] = sitesOf(
+    const [site] = sitesSkipSees(
       parse('<a {...rest} xlink:href="#x" href="/x" data-x="1" />;'),
       'href',
     );
@@ -72,7 +71,7 @@ describe('toNodeMutator', () => {
     assert.ok(t.isJSXAttribute(attribute));
     delete attribute.value;
 
-    const sites = sitesOf(file, 'disabled');
+    const sites = sitesSkipSees(file, 'disabled');
 
     assert.deepEqual(
       sites.map(({ value }) => value),
@@ -87,7 +86,10 @@ describe('toNodeMutator', () => {
     assert.ok(t.isJSXAttribute(attribute));
     attribute.value = t.jsxExpressionContainer(t.jsxEmptyExpression());
 
-    assert.deepEqual([sitesOf(file, 'href'), sitesOf(empty, 'href')], [[], []]);
+    assert.deepEqual(
+      [sitesSkipSees(file, 'href'), sitesSkipSees(empty, 'href')],
+      [[], []],
+    );
   });
 
   it('finds no site for an attribute whose opening element has no parent path, as in a traversal of the element alone', () => {

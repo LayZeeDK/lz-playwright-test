@@ -1,6 +1,3 @@
-// Drives LzPlaywrightTestRunner against a TSX fixture instrumented with the UI mutators of @layzee/stryker-jsx-mutators:
-// for each mutator, a Playwright test kills its mutant and a test that does not observe it lets it survive.
-// Run: npx nx run @layzee/stryker-playwright-runner:test-browser
 import '@layzee/stryker-jsx-mutators';
 
 import assert from 'node:assert/strict';

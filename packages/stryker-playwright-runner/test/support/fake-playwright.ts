@@ -274,7 +274,6 @@ export function fakePlaywright(
   };
 }
 
-/** The runner always hands Playwright an LzPlaywrightCollectingReporter. */
 function collecting(reporter: Reporter): LzPlaywrightCollectingReporter {
   assert.ok(
     reporter instanceof LzPlaywrightCollectingReporter,

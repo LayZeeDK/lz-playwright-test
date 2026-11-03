@@ -1,9 +1,4 @@
-// The placer wrap is neutral for built-in mutants, and places UI mutants as valid TSX. One process, ordered: the
-// corpus is instrumented stock first, then the install runs (support/installed.ts), then the corpus is instrumented
-// with every UI mutator excluded. node --test runs each test file in its own process, so no other file has wrapped
-// the placer before. That sequence runs in a before hook, so that an error in it fails every test instead of the file.
-// Corpus: the design spike's sample, the demo app's components, and StrykerJS v10.1.1's
-// packages/instrumenter/testResources/parser/App.tsx and testResources/instrumenter/vue-tsx-sample.vue (copied).
+// node --test runs each test file in its own process, so no other file has wrapped the placer before.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';

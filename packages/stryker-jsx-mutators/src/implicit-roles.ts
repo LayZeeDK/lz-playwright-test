@@ -3,15 +3,8 @@ export interface ImplicitRole {
   readonly requiredAttribute?: string;
 }
 
-/** Keyed by lowercase tag name. */
 export type RoleTable = ReadonlyMap<string, ImplicitRole>;
 
-/**
- * The tags whose implicit role any engine gives by tag alone, or by tag and one attribute: Playwright 1.64.1's
- * table, on which aria-query 5.3.0 (Testing Library 10.4.2's `getByRole`) agrees except for `search` and `svg`.
- * A `role` equal to one of these is kept, since removing it changes nothing for some engine. The drift test,
- * test/implicit-roles.test.ts, checks the table against both.
- */
 export const implicitRoles: RoleTable = new Map([
   ['a', { role: 'link', requiredAttribute: 'href' }],
   ['area', { role: 'link', requiredAttribute: 'href' }],

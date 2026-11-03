@@ -1,5 +1,3 @@
-// withJsxPlacement against a fake original placer, on Babel trees and mutants the UI mutators never give: a bare
-// attribute whose value is missing rather than null, and values the placer cannot hold.
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
