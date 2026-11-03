@@ -152,6 +152,7 @@ test('the dry run counts a test that passes on a retry as passing, and as failin
   const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'unexpected', 'failed');
   attempt(reporter, 'a', 'flaky', 'passed');
+  attempt(reporter, 'b', 'expected', 'passed');
   const statuses = (failOnFlakyTests: boolean) => {
     begin(reporter, failOnFlakyTests);
 
@@ -160,8 +161,8 @@ test('the dry run counts a test that passes on a retry as passing, and as failin
     ).tests.map((t) => t.status);
   };
 
-  assert.deepEqual(statuses(false), [TestStatus.Success]);
-  assert.deepEqual(statuses(true), [TestStatus.Failed]);
+  assert.deepEqual(statuses(false), [TestStatus.Success, TestStatus.Success]);
+  assert.deepEqual(statuses(true), [TestStatus.Failed, TestStatus.Success]);
 });
 
 test('the names of the tests that passed only on a retry', () => {
@@ -252,6 +253,21 @@ test('a test result is named by its title path without the empty titles', () => 
   assert.deepEqual(
     completed(result).tests.map((t) => t.name),
     ['[app.spec.ts] › a'],
+  );
+});
+
+test('a test with only empty titles is named without an undefined project', () => {
+  const reporter = new LzPlaywrightCollectingReporter();
+  attempt(reporter, 'a', 'expected', 'passed');
+  Object.assign(reporter.testCases.get('a') ?? {}, {
+    titlePath: () => ['', ''],
+  });
+
+  const result = classify(reporter, { status: 'passed' });
+
+  assert.deepEqual(
+    completed(result).tests.map((t) => t.name),
+    ['[] › '],
   );
 });
 
@@ -475,6 +491,14 @@ test('a run with a failed attempt may have lost its server', () => {
 
   assert.equal(mayHaveLostItsServer(failed), true);
   assert.equal(mayHaveLostItsServer(passedRun([])), false);
+});
+
+test('a run whose test passed only on a retry may have lost its server on the first attempt', () => {
+  const flaky = passedRun([]);
+  attempt(flaky.reporter, 'b', 'unexpected', 'failed');
+  attempt(flaky.reporter, 'b', 'flaky', 'passed');
+
+  assert.equal(mayHaveLostItsServer(flaky), true);
 });
 
 test('a run the deadline stopped is never rerun, though its stopped test counts as failed', () => {

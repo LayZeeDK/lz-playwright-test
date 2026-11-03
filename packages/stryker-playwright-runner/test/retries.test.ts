@@ -126,7 +126,15 @@ async function flakyRun(run: Run): Promise<Status> {
 }
 
 test('a dry run names the tests that passed only on a retry', async (t) => {
-  const fake = fakePlaywright(t, { runTests: flakyRun });
+  const fake = fakePlaywright(t, {
+    runTests: async (run) => {
+      run.reporter.onTestEnd(
+        addAttempt(finishedTest('b', 'failed'), 'flaky', 'passed'),
+      );
+
+      return flakyRun(run);
+    },
+  });
   const { shell, lines } = fake.runner();
   await shell.init();
 
@@ -136,7 +144,7 @@ test('a dry run names the tests that passed only on a retry', async (t) => {
   assert.deepEqual(lines, [
     [
       'warn',
-      '1 test(s) passed only on a retry in the dry run: [e2e] › app.spec.ts › a',
+      '2 test(s) passed only on a retry in the dry run: [e2e] › app.spec.ts › b, [e2e] › app.spec.ts › a',
     ],
   ]);
 });
