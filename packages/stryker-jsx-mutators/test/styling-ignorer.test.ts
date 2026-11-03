@@ -115,6 +115,27 @@ describe('lz-jsx-styling', () => {
     );
   });
 
+  it('finds a visibility class in an identifier key when no string holds it', async () => {
+    await assertEvery(
+      "export const a = <a className={cn('p-2', { hidden: !open })} />;",
+      'placed',
+    );
+  });
+
+  it('ignores a class builder whose only visibility word is a computed key', async () => {
+    await assertEvery(
+      "export const a = <a className={cn('p-2', { [hidden]: on })} />;",
+      classReason,
+    );
+  });
+
+  it('ignores a className whose only visibility word is in a comment', async () => {
+    await assertEvery(
+      "export const a = <a className={on ? 'p-2' /* hidden */ : 'm-2'} />;",
+      classReason,
+    );
+  });
+
   ['overflow-hidden', 'hiddenish', 'hidden-x', 'md:overflow-hidden'].forEach(
     (token) => {
       it(`ignores a className whose only near match is ${token}`, async () => {
@@ -153,6 +174,14 @@ describe('lz-jsx-styling', () => {
     );
   });
 
+  it('ignores a className that holds none of the visibilityClasses', async () => {
+    await assertEvery(
+      "export const a = <a className={on ? 'p-2' : 'm-2'} />;",
+      classReason,
+      { lzJsxStyling: { visibilityClasses: ['was', 'here'] } },
+    );
+  });
+
   [
     'cn',
     'clsx',
@@ -178,7 +207,7 @@ describe('lz-jsx-styling', () => {
     );
   });
 
-  ['format', 'lib.cn', 'cn.call'].forEach((callee) => {
+  ['format', 'lib.cn', 'cn.call', 'new cn'].forEach((callee) => {
     it(`keeps the mutants of a ${callee} call`, async () => {
       await assertEvery(
         `export const c = ${callee}('p-2', on && 'bg-accent');`,
@@ -320,6 +349,20 @@ describe('lz-jsx-styling', () => {
       );
     });
   });
+
+  it('keeps the mutants of an object literal in an attribute other than style', async () => {
+    await assertEvery(
+      "export const a = <a data-style={{ color: on ? 'red' : 'blue' }} />;",
+      'placed',
+    );
+  });
+
+  it('keeps the mutants of a className whose value is an element, not an expression', async () => {
+    await assertEvery(
+      'export const a = <a className=<b onClick={() => go(true)} /> />;',
+      'placed',
+    );
+  });
 });
 
 describe('strykerValidationSchema', () => {
@@ -371,6 +414,29 @@ describe('strykerValidationSchema', () => {
   }
 
   const unknownOption = /^warn Unknown stryker config option "lzJsxStyling"/;
+
+  it('describes lzJsxStyling.visibilityClasses as a list of class names', () => {
+    assert.deepEqual(strykerValidationSchema, {
+      $schema: 'http://json-schema.org/draft-07/schema#',
+      type: 'object',
+      properties: {
+        lzJsxStyling: {
+          type: 'object',
+          additionalProperties: false,
+          description: 'Options of the lz-jsx-styling ignorer.',
+          properties: {
+            visibilityClasses: {
+              type: 'array',
+              items: { type: 'string', pattern: '^\\S+$' },
+              description:
+                'Class names that hide an element, added to the built-in ones. lz-jsx-styling keeps the mutants of ' +
+                'a class expression that holds one of them.',
+            },
+          },
+        },
+      },
+    });
+  });
 
   it('lets core accept lzJsxStyling without the unknown-option warning it gives when the schema is missing', async () => {
     const options = { lzJsxStyling: { visibilityClasses: ['closed'] } };
