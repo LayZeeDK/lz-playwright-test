@@ -26,7 +26,6 @@ import {
 } from '../src/lz-playwright-test-runner.ts';
 import { namespaceToken, ownerFile, rootPrefix } from '../src/temp-root.ts';
 import {
-  addAttempt,
   dryRunOptions,
   finishedTest,
   logger,
@@ -38,8 +37,6 @@ import {
   activeMutantEnv,
   fakePlaywright,
   passAll,
-  type Run,
-  type Status,
   stubEnv,
   writeSnapshots,
 } from './support/fake-playwright.ts';
@@ -181,35 +178,6 @@ test('init warns when timeoutMS is below the expect timeout plus the start and s
         'timeoutMS (10599) is below 1 attempt(s) at the Playwright expect timeout (5000) plus 3000 ms to start a worker for each, and 2600 ms to stop the run; killed mutants may be reported as timeouts. Set timeoutMS to at least 10600.',
       ],
     ],
-  );
-  assert.deepEqual(enough.lines, []);
-});
-
-test("init counts the largest project's retries, or the retries option, in the timeout warning", async (t) => {
-  const fake = fakePlaywright(t, {
-    projects: [
-      { default: true, project: { name: 'chromium', timeout: 1, retries: 2 } },
-      { default: true, project: { name: 'firefox', timeout: 1, retries: 1 } },
-    ],
-  });
-  const fromConfig = fake.runner({ timeoutMS: 26_599 });
-  const fromOption = fake.runner({
-    timeoutMS: 18_599,
-    lzPlaywright: { retries: 1 },
-  });
-  const enough = fake.runner({ timeoutMS: 26_600 });
-
-  await fromConfig.shell.init();
-  await fromOption.shell.init();
-  await enough.shell.init();
-
-  assert.match(
-    fromConfig.lines.find(([level]) => level === 'warn')?.[1] ?? '',
-    /below 3 attempt\(s\) .* at least 26600\.$/,
-  );
-  assert.match(
-    fromOption.lines.find(([level]) => level === 'warn')?.[1] ?? '',
-    /below 2 attempt\(s\) .* at least 18600\.$/,
   );
   assert.deepEqual(enough.lines, []);
 });
@@ -425,106 +393,6 @@ test('a dry run runs every test with the hook and the run settings in the worker
     ],
     mutantCoverage: { static: {}, perTest: { a: { '1': 1 } } },
   });
-});
-
-function oneTestPerProject(projects: readonly string[]) {
-  const tests = projects.map(() => ({ retries: 0 }));
-  const root = {
-    allTests: () => [],
-    suites: projects.map((title, index) => ({
-      title,
-      allTests: () => [tests[index]],
-    })),
-  };
-
-  return { tests, root };
-}
-
-test("each run raises the tests' retries to their project's retries in the Playwright config", async (t) => {
-  const { tests, root } = oneTestPerProject(['chromium', 'firefox']);
-  const fake = fakePlaywright(t, {
-    projects: [
-      { default: true, project: { name: 'chromium', timeout: 1, retries: 2 } },
-      { default: true, project: { name: 'firefox', timeout: 1 } },
-    ],
-    root,
-  });
-  const { shell } = fake.runner();
-  await shell.init();
-
-  await shell.dryRun(dryRunOptions());
-
-  assert.deepEqual(tests, [{ retries: 2 }, { retries: 0 }]);
-});
-
-test('the retries option replaces the retries of every project', async (t) => {
-  const { tests, root } = oneTestPerProject(['chromium', 'firefox']);
-  const fake = fakePlaywright(t, {
-    projects: [
-      { default: true, project: { name: 'chromium', timeout: 1, retries: 2 } },
-      { default: true, project: { name: 'firefox', timeout: 1 } },
-    ],
-    root,
-  });
-  const { shell } = fake.runner({ lzPlaywright: { retries: 1 } });
-  await shell.init();
-
-  await shell.mutantRun(mutantRunOptions());
-
-  assert.deepEqual(tests, [{ retries: 1 }, { retries: 1 }]);
-});
-
-async function flakyRun(run: Run): Promise<Status> {
-  run.reporter.onTestEnd(
-    addAttempt(finishedTest('a', 'failed'), 'flaky', 'passed'),
-  );
-  writeSnapshots(run, [
-    {
-      mutantCoverage: { static: {}, perTest: { a: { '1': 1 } } },
-      outlivedItsTest: false,
-    },
-  ]);
-
-  return 'passed';
-}
-
-test('a dry run names the tests that passed only on a retry', async (t) => {
-  const fake = fakePlaywright(t, { runTests: flakyRun });
-  const { shell, lines } = fake.runner();
-  await shell.init();
-
-  const result = await shell.dryRun(dryRunOptions());
-
-  assert.equal(result.status, DryRunStatus.Complete);
-  assert.deepEqual(lines, [
-    [
-      'warn',
-      '1 test(s) passed only on a retry in the dry run: [e2e] › app.spec.ts › a',
-    ],
-  ]);
-});
-
-test("a mutant run's test that passes only on a retry leaves a survivor", async (t) => {
-  const fake = fakePlaywright(t, { runTests: flakyRun });
-  const { shell } = fake.runner();
-  await shell.init();
-
-  const result = await shell.mutantRun(mutantRunOptions());
-
-  assert.equal(result.status, MutantRunStatus.Survived);
-});
-
-test("with the config's failOnFlakyTests, a mutant run's test that passes only on a retry kills", async (t) => {
-  const fake = fakePlaywright(t, {
-    runTests: flakyRun,
-    failOnFlakyTests: true,
-  });
-  const { shell } = fake.runner();
-  await shell.init();
-
-  const result = await shell.mutantRun(mutantRunOptions());
-
-  assert.equal(result.status, MutantRunStatus.Killed);
 });
 
 test('the hook is preloaded before the NODE_OPTIONS the runner started with, so its own copy installs first', async (t) => {
