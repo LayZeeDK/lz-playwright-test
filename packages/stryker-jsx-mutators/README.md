@@ -47,7 +47,7 @@ such a role keeps its place even where only one engine would see it go. It joins
   (`columnheader`) their role anywhere. Playwright gives `address` no role, and the others only in some
   places, such as a `header` that is not inside a `section`.
 
-A role that comes from attributes, such as `checkbox` on `<input type="checkbox">`, is not in the
+A role that comes from other attributes, such as `checkbox` on `<input type="checkbox">`, is not in the
 table, so removing a restating one still gives a mutant, even though no engine can tell it apart.
 
 So `<svg role="img">` and `<footer role="contentinfo">` keep their `role`, and get no removal mutant.

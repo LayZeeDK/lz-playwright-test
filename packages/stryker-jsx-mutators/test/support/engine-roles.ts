@@ -131,12 +131,13 @@ export function ariaQueryGives(
   tag: string,
   { role, requiredAttribute }: ImplicitRole,
 ): boolean {
-  return concepts.some(
-    (concept) =>
-      concept.name === tag &&
-      concept.roles.includes(role) &&
-      (requiredAttribute === undefined
-        ? concept.attributes.length === 0
-        : concept.attributes.includes(requiredAttribute)),
+  return (
+    requiredAttribute === undefined &&
+    concepts.some(
+      (concept) =>
+        concept.name === tag &&
+        concept.roles.includes(role) &&
+        concept.attributes.length === 0,
+    )
   );
 }
