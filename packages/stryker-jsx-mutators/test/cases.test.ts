@@ -1,4 +1,4 @@
-// Each case must give exactly the UI mutants it lists, through the real instrumenter with the real install
+// Each case must give exactly the JSX mutants it lists, through the real instrumenter with the real install
 // (support/installed.ts). The install and the instrumentation run in a before hook, so that an error there fails
 // every case instead of the file.
 import assert from 'node:assert/strict';

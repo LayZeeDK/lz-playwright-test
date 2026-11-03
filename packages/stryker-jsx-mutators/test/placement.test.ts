@@ -103,7 +103,7 @@ describe('the JSX placement, with every JSX mutator excluded', () => {
     });
   });
 
-  it('reports each excluded UI mutant as Ignored', () => {
+  it('reports each excluded JSX mutant as Ignored', () => {
     const ui = excluded.flatMap(({ mutants }) =>
       mutants.filter(({ mutatorName }) => ours.has(mutatorName)),
     );

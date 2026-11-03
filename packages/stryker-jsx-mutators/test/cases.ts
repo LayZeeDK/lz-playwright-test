@@ -1,4 +1,4 @@
-// Synthetic UI shapes from the open-source repos the runner was exercised on, as JSX, with the UI mutants the
+// Synthetic JSX shapes from the open-source repos the runner was exercised on, as JSX, with the JSX mutants the
 // design (docs/design/jsx-mutators.md) says each gives. An empty expect is a must-not-generate case. The
 // mined rows and their transcription notes are in spikes/ui-mutator-cases/.
 import type { MutatorName } from '../src/mutators.ts';
@@ -1376,7 +1376,7 @@ export const cases: readonly Case[] = [
   {
     id: 'design-28',
     title:
-      "a role equal to the tag's implicit role in Playwright's getByRole is skipped, for every such tag",
+      "a role equal to the tag's implicit role in the role table is skipped, for every such tag",
     origin: rulesOrigin,
     jsx:
       '<div><article role="article" /><aside role="complementary" /><blockquote role="blockquote" />' +

@@ -95,7 +95,7 @@ describe('withJsxPlacement', () => {
   ).forEach(([title, code, type, mutant]) => {
     it(`throws on ${title}`, () => {
       assert.throws(() => placeOn(code, type).place(mutant), {
-        message: `@layzee/stryker-jsx-mutators: cannot place a UI mutant at a ${type}.`,
+        message: `@layzee/stryker-jsx-mutators: cannot place a JSX mutant at a ${type}.`,
       });
     });
   });

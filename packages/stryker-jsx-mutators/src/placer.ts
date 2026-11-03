@@ -77,7 +77,7 @@ function remap(
 }
 
 function unplaceable(type: string): Error {
-  return new Error(`${packageName}: cannot place a UI mutant at a ${type}.`);
+  return new Error(`${packageName}: cannot place a JSX mutant at a ${type}.`);
 }
 
 function valueExpression(

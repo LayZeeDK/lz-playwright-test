@@ -6,6 +6,6 @@
 package-lock.json
 # Historical spike records
 /spikes
-# Instrumented bundles that runner.test.ts and ui-mutators.test.ts write before each run. Prettier reads
+# Instrumented bundles that runner.test.ts and jsx-mutators.test.ts write before each run. Prettier reads
 # only the root ignore files, so the fixtures' own ignore files do not cover them.
 /packages/stryker-playwright-runner/test/**/public/*.js

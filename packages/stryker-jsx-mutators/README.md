@@ -38,14 +38,17 @@ Playwright test can kill each of them.
 tag and `href` for `a` and `area`. The table decides which tags the span swap changes (`button`, and `a`
 and `area` with an `href`) and which `role` attributes restate a tag's own role and are left in place.
 
-The table holds a tag when any test engine gives it that role by tag alone. So the mutator makes no
-removal mutant that the tests of one engine could not kill. It joins two tables:
+The table holds a tag when any test engine gives it that role by tag alone, so a `role` that restates
+such a role keeps its place even where only one engine would see it go. It joins two tables:
 
 - Playwright 1.64.1's, which alone gives `svg` (`img`) and `search` (`search`) a role.
-- Testing Library 10.4's, from aria-query 5.3.0, which ignores aria-query's context rules and so gives
+- Testing Library 10.4.0's, from aria-query 5.3.0, which ignores aria-query's context rules and so gives
   `address` (`group`), `footer` (`contentinfo`), `header` (`banner`), `td` (`cell`) and `th`
-  (`columnheader`) their role anywhere. Playwright gives those roles only in some places, such as a
-  `header` that is not inside a `section`.
+  (`columnheader`) their role anywhere. Playwright gives `address` no role, and the others only in some
+  places, such as a `header` that is not inside a `section`.
+
+A role that comes from attributes, such as `checkbox` on `<input type="checkbox">`, is not in the
+table, so removing a restating one still gives a mutant, even though no engine can tell it apart.
 
 So `<svg role="img">` and `<footer role="contentinfo">` keep their `role`, and get no removal mutant.
 The `generic` role is left out: Playwright gives it to no tag, and a `role="generic"` is rare.

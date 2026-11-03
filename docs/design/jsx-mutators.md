@@ -138,7 +138,7 @@ these points; Claude settled them on 2026-10-25 from the prototype's behaviour a
   `RoleRemoval` prints `role={undefined}`.
 - `LzJsxChildExpression` empties an identifier, a member expression, an optional chain, or a call, and skips a
   string literal, a conditional (left to `LzJsxConditionalElement`), and a `.map`, `.filter` or `.flatMap` list,
-  which the later `ListExpression` owns. Until then a rendered list gets no UI mutant of its own.
+  which the later `ListExpression` owns. Until then a rendered list gets no JSX mutant of its own.
 - `LzJsxEventHandler` applies to an `onX` prop on a component as well as on an element.
 - `LzJsxConditionalElement` forces branches of a ternary rendered as a JSX child only, not a ternary inside an
   attribute value (`href={last ? null : '/replay'}`).
@@ -240,7 +240,7 @@ Mutants that a lint rule would reject stay, unlabelled. Claude decided this on 2
 `eslint-plugin-jsx-a11y` rules at `error`, 88 of the 224 JSX mutants of the synthetic cases, the demo app,
 the UI fixture and the corpus add a finding the original did not have: an emptied heading, label or link
 text (`LzJsxTextLiteral`, `LzJsxLabelAttribute`), an empty `href` (`LzJsxUrlAttribute`), or a `span` that keeps a click
-handler (`ElementToSpan`). Claude measured this at 63d0209 by applying each UI mutant's replacement at
+handler (`ElementToSpan`). Claude measured this at 63d0209 by applying each JSX mutant's replacement at
 its location and linting the original and the mutant. They are kept because:
 
 - a mutator cannot know a project's lint config, and a skip keyed to jsx-a11y would drop 39 percent of
@@ -378,7 +378,7 @@ with one broken sample both exit 1 with that mutator's name.
 
 The `ElementToSpan` rule rests on `tsc` output for three hand-written elements and on one Stryker run:
 on epic-stack, with `@stryker-mutator/typescript-checker`, its one mutant (`<a href>` to a `<span>`
-without the `href`) compiled, and no UI mutant reported CompileError. One mutant is thin evidence for
+without the `href`) compiled, and no JSX mutant reported CompileError. One mutant is thin evidence for
 the `button` swap, which no real app run has produced yet.
 
 ## What the verification plan adds

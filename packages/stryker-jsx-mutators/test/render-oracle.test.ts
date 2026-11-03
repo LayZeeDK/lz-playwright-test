@@ -229,7 +229,7 @@ describe('render oracle on spikes/design-opus/sample.tsx', () => {
     assert.equal(renderAll(build), original);
   });
 
-  it('renders each UI mutant like its hand-applied replacement, in both prop scenarios', async () => {
+  it('renders each JSX mutant like its hand-applied replacement, in both prop scenarios', async () => {
     assert.deepEqual(
       await mismatches(
         result.mutants.filter(({ mutatorName }) => ours.has(mutatorName)),
