@@ -58,31 +58,28 @@ const classValueTypes: readonly unknown[] = [
   'TemplateLiteral',
   'ObjectExpression',
 ];
-// Playwright counts an element hidden by its box, `visibility` and `display`; the box and position also decide
-// `toBeInViewport` and clicks.
-const boxKeys: readonly string[] = [
-  'display',
-  'visibility',
-  'contentVisibility',
-  'pointerEvents',
-  'width',
-  'height',
-  'minWidth',
-  'minHeight',
-  'maxWidth',
-  'maxHeight',
-  'transform',
-  'scale',
-  'position',
-  'top',
-  'right',
-  'bottom',
-  'left',
-  'inset',
-  'overflow',
-  'opacity',
-  'clip',
-  'clipPath',
+// Keys that change only how an element is painted. Any other key can change its box, position or visibility, which
+// Playwright's visibility, viewport and click checks and the app's own layout measurements read.
+const paintKeys: readonly string[] = [
+  'color',
+  'background',
+  'backgroundColor',
+  'backgroundImage',
+  'borderColor',
+  'borderTopColor',
+  'borderRightColor',
+  'borderBottomColor',
+  'borderLeftColor',
+  'borderRadius',
+  'outlineColor',
+  'boxShadow',
+  'textShadow',
+  'textDecorationColor',
+  'accentColor',
+  'caretColor',
+  'cursor',
+  'fill',
+  'stroke',
 ];
 
 export function stylingIgnorer(options: object): Ignorer {
@@ -169,7 +166,7 @@ function isPlainStyleProperty(property: unknown): boolean {
   return (
     fieldOf(property, 'computed') === false &&
     typeof name === 'string' &&
-    !boxKeys.includes(
+    paintKeys.includes(
       name.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase()),
     )
   );

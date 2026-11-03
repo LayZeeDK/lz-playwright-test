@@ -116,20 +116,24 @@ It matches whole class names, split on whitespace. A class with variants matches
 Add your project's own hiding classes with `lzJsxStyling.visibilityClasses`. They add to the list above;
 they do not replace it.
 
-### Style keys that change the box
+### Paint-only style keys
 
-The ignorer keeps the mutants of a `style` value when any of these is true:
+The ignorer hides the mutants of a `style` object literal only when every key is one of these paint-only
+keys, in camelCase or kebab-case, quoted or not: `color`, `background`, `backgroundColor`,
+`backgroundImage`, `borderColor`, `borderTopColor`, `borderRightColor`, `borderBottomColor`,
+`borderLeftColor`, `borderRadius`, `outlineColor`, `boxShadow`, `textShadow`, `textDecorationColor`,
+`accentColor`, `caretColor`, `cursor`, `fill`, `stroke`.
+
+It keeps the mutants of a `style` value in every other case:
 
 - It is not an object literal, such as `style={styles.card}`.
 - It has a spread (`...base`) or a computed key (`[name]: value`).
-- It has one of these keys, in camelCase or kebab-case, quoted or not: `display`, `visibility`,
-  `contentVisibility`, `pointerEvents`, `width`, `height`, `minWidth`, `minHeight`, `maxWidth`,
-  `maxHeight`, `transform`, `scale`, `position`, `top`, `right`, `bottom`, `left`, `inset`, `overflow`,
-  `opacity`, `clip`, `clipPath`.
+- It has any other key, such as `width`, `padding`, `border`, `display` or `fontSize`.
 
-Playwright treats an element as hidden when its box is empty, or by `visibility` or `display: none`.
-Transforms, sizes and position change the box and what `toBeInViewport` sees. `opacity` and `clip-path`
-are on the list to be safe.
+Any key that can change an element's size, position or visibility can change what a test observes.
+Playwright reads the box for `toBeVisible`, `toBeInViewport` and clicks, and an app can measure its own
+elements. In react-virtuoso's e2e suite, a mutant that removed a list item's `border` or a list's `padding`
+changed which items rendered, and a test caught it.
 
 ### Turn it on
 

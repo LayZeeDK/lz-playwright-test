@@ -245,11 +245,41 @@ describe('lz-jsx-styling', () => {
     });
   });
 
-  it('ignores every mutant in a style object of keys that do not change visibility or the box', async () => {
+  it('ignores every mutant in a style object of paint-only keys', async () => {
     await assertEvery(
-      "export const a = <a style={{ color: on ? 'red' : 'blue', 'animation-delay': `${n}s` }} />;",
+      "export const a = <a style={{ color: on ? 'red' : 'blue', 'background-color': `#${hex}`, boxShadow: on ? 'none' : 'x' }} />;",
       styleReason,
     );
+  });
+
+  [
+    'color',
+    'background',
+    'backgroundColor',
+    'backgroundImage',
+    'borderColor',
+    'borderTopColor',
+    'borderRightColor',
+    'borderBottomColor',
+    'borderLeftColor',
+    'borderRadius',
+    'outlineColor',
+    'boxShadow',
+    'textShadow',
+    'textDecorationColor',
+    'accentColor',
+    'caretColor',
+    'cursor',
+    'fill',
+    'stroke',
+    "'border-radius'",
+  ].forEach((key) => {
+    it(`ignores the mutants of a style object with only the paint key ${key}`, async () => {
+      await assertEvery(
+        `export const a = <a style={{ ${key}: on ? 'a' : 'b' }} />;`,
+        styleReason,
+      );
+    });
   });
 
   it('ignores a style object whose only hidden word is in a value', async () => {
@@ -262,30 +292,21 @@ describe('lz-jsx-styling', () => {
   [
     'display',
     'visibility',
-    'contentVisibility',
-    'pointerEvents',
     'width',
     'height',
-    'minWidth',
-    'minHeight',
-    'maxWidth',
-    'maxHeight',
     'transform',
-    'scale',
     'position',
-    'top',
-    'right',
-    'bottom',
-    'left',
-    'inset',
-    'overflow',
     'opacity',
-    'clip',
-    'clipPath',
+    'border',
+    'padding',
+    'paddingTop',
+    'margin',
+    'gap',
+    'fontSize',
+    'zIndex',
     "'pointer-events'",
-    "'content-visibility'",
+    "'animation-delay'",
     "'maxHeight'",
-    "'clip-path'",
   ].forEach((key) => {
     it(`keeps the mutants of a style object with the key ${key}`, async () => {
       await assertEvery(
