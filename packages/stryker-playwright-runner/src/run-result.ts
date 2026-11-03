@@ -353,9 +353,9 @@ function testStatus(
 
 function testName(test: ReportedTest): string {
   // The root suite's title is the empty first one.
-  const titles = test.titlePath().filter(Boolean);
+  const [project = '', ...rest] = test.titlePath().filter(Boolean);
 
-  return `[${titles[0]}] › ${titles.slice(1).join(' › ')}`;
+  return `[${project}] › ${rest.join(' › ')}`;
 }
 
 function toTestResult(
