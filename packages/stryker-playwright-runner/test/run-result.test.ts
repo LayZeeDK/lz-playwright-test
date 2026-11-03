@@ -695,6 +695,20 @@ test('a failed test outranks the errors of its run', () => {
   assert.equal(classify(reporter).status, DryRunStatus.Complete);
 });
 
+test('a run whose retries could not be raised is an error, even when a test failed', () => {
+  const reporter = new LzPlaywrightCollectingReporter(new Map([['a', 1]]));
+  reporter.onBegin({}, { allTests: () => [] });
+  attempt(reporter, 'a', 'unexpected', 'failed');
+
+  const result = classify(reporter);
+
+  assert.equal(result.status, DryRunStatus.Error);
+  assert.match(
+    result.status === DryRunStatus.Error ? result.errorMessage : '',
+    /TestCase\.retries/,
+  );
+});
+
 test('coverage from a Playwright worker alone satisfies the dry run', () => {
   assert.equal(
     missingCoverageError(

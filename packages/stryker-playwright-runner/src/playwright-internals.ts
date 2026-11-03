@@ -281,8 +281,8 @@ function parseConfig(
   const changed = () =>
     internalsChanged(
       version,
-      'TestRunner.loadConfig() resolving to projects[].default, project.name, project.timeout and expect.timeout, ' +
-        'and webServers[].url, port and ignoreHTTPSErrors',
+      'TestRunner.loadConfig() resolving to projects[].default, project.name, project.timeout, project.retries and ' +
+        'expect.timeout, webServers[].url, port and ignoreHTTPSErrors, and config.failOnFlakyTests',
     );
   const projects = fieldOf(value, 'projects');
   const webServers = fieldOf(value, 'webServers');
@@ -291,7 +291,7 @@ function parseConfig(
     throw changed();
   }
 
-  return {
+  const parsed = {
     projects: projects.map((project: unknown): ConfigProject => {
       const settings = fieldOf(project, 'project');
       const expect = fieldOf(project, 'expect');
@@ -358,8 +358,17 @@ function parseConfig(
         ignoreHTTPSErrors: !!server['ignoreHTTPSErrors'],
       };
     }),
-    failOnFlakyTests: !!fieldOf(fieldOf(value, 'config'), 'failOnFlakyTests'),
   };
+  const failOnFlakyTests = fieldOf(
+    fieldOf(value, 'config'),
+    'failOnFlakyTests',
+  );
+
+  if (typeof failOnFlakyTests !== 'boolean') {
+    throw changed();
+  }
+
+  return { ...parsed, failOnFlakyTests };
 }
 
 /**

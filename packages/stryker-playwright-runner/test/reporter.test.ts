@@ -16,13 +16,13 @@ test('the reporter keeps the last 4000 characters of stdout and stderr, and prin
 test('the reporter raises retries at onBegin only when a project has some, and reports a suite it cannot read', () => {
   const unreadable = { allTests: () => [] };
 
-  new LzPlaywrightCollectingReporter(new Map([['a', 0]])).onBegin(
-    {},
-    unreadable,
-  );
+  const noRetries = new LzPlaywrightCollectingReporter(new Map([['a', 0]]));
+  noRetries.onBegin({}, unreadable);
+
+  assert.equal(noRetries.retriesError, undefined);
+
   const reporter = new LzPlaywrightCollectingReporter(new Map([['a', 1]]));
   reporter.onBegin({}, unreadable);
 
-  assert.equal(reporter.errors.length, 1);
-  assert.match(reporter.errors[0] ?? '', /TestCase\.retries/);
+  assert.match(reporter.retriesError ?? '', /TestCase\.retries/);
 });

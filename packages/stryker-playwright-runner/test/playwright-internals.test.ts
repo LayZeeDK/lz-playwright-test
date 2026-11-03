@@ -244,6 +244,7 @@ test('the test runner reads loaded config values the way Playwright does: a nume
         { port: '3000', ignoreHTTPSErrors: 1 },
         { port: 4000, ignoreHTTPSErrors: '' },
       ],
+      config: { failOnFlakyTests: false },
     },
   });
 
@@ -288,6 +289,7 @@ test('the test runner reads what Playwright runs though its types refuse it: a f
         { url: 'http://localhost:3000/health', port: null },
         { url: 'http://localhost/health', port: false },
       ],
+      config: { failOnFlakyTests: false },
     },
   });
 
@@ -375,6 +377,10 @@ const refusedConfigs = [
       webServers: [],
     },
   ],
+  [
+    'has no boolean config.failOnFlakyTests',
+    { projects: [validProject], webServers: [], config: {} },
+  ],
 ] as const;
 
 // Playwright passes webServer entries on unread, so these are mistakes in the consumer's config.
@@ -433,7 +439,8 @@ refusedConfigs.forEach(([title, config]) => {
     await assert.rejects(runner.loadConfig(), {
       message:
         'Playwright 1.99.0 changed the internals this runner calls (TestRunner.loadConfig() resolving to projects[].default, ' +
-        'project.name, project.timeout and expect.timeout, and webServers[].url, port and ignoreHTTPSErrors).',
+        'project.name, project.timeout, project.retries and expect.timeout, webServers[].url, port and ignoreHTTPSErrors, ' +
+        'and config.failOnFlakyTests).',
     });
   });
 });
@@ -498,7 +505,11 @@ test('the test runner calls each method on the instance Playwright constructed, 
         seen.push([method, this, ...args]);
 
         return method === 'loadConfig'
-          ? { projects: [], webServers: [] }
+          ? {
+              projects: [],
+              webServers: [],
+              config: { failOnFlakyTests: false },
+            }
           : { status: 'passed' };
       },
     });

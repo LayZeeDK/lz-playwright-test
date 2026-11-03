@@ -126,6 +126,11 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
     coveringTestsPassed,
   });
 
+  // Without its retries, a test that fails once would kill the mutant, whatever else failed.
+  if (reporter.retriesError) {
+    return errorRun(reporter.retriesError);
+  }
+
   if (status === 'interrupted') {
     return errorRun('The Playwright run was interrupted');
   }

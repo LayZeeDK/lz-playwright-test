@@ -28,6 +28,7 @@ export interface ReportedSuite {
 
 export class LzPlaywrightCollectingReporter {
   readonly errors: string[] = [];
+  retriesError: string | undefined;
   outputTail = '';
   // Playwright reports each attempt of a retried test with the same TestCase, which holds them all.
   readonly testCases = new Map<string, ReportedTest>();
@@ -49,7 +50,7 @@ export class LzPlaywrightCollectingReporter {
       try {
         raiseRetries(suite, this.#retriesByProject);
       } catch (error) {
-        this.errors.push(String(error));
+        this.retriesError = String(error);
       }
     }
   }
