@@ -23,7 +23,6 @@ function captured(value: string | undefined): string {
   return value;
 }
 
-/** The tags the installed playwright-core gives a role by tag alone, or by tag and one attribute. */
 export function playwrightRoles(): RoleTable {
   const manifest = require.resolve('playwright-core/package.json');
   const bundle = readFileSync(
@@ -70,11 +69,9 @@ function conceptOf(entry: unknown): Concept {
   }
 
   const concept: unknown = entry[0];
-  const roleList: unknown = entry[1];
+  const roles: unknown = entry[1];
   const name = fieldOf(concept, 'name');
   const attributes = fieldOf(concept, 'attributes') ?? [];
-  // aria-query 5.3.0 holds the roles in an array, 5.3.2 in a Set.
-  const roles: unknown = roleList instanceof Set ? [...roleList] : roleList;
 
   if (!isString(name) || !Array.isArray(attributes) || !Array.isArray(roles)) {
     throw new Error('an aria-query elementRoles entry has an unknown shape');
@@ -89,7 +86,6 @@ function conceptOf(entry: unknown): Concept {
   };
 }
 
-/** aria-query's element concepts, the ones Testing Library's `getByRole` matches by name and attributes. */
 export function ariaQueryConcepts(): readonly Concept[] {
   const ariaQuery: unknown = require('aria-query');
   const elementRoles = fieldOf(ariaQuery, 'elementRoles');
@@ -108,10 +104,6 @@ export function ariaQueryConcepts(): readonly Concept[] {
   return list.map(conceptOf);
 }
 
-/**
- * Whether aria-query gives `tag` the role: by tag alone when the entry needs no attribute, else with that
- * attribute. Like Testing Library, it ignores a concept's constraints (such as `li` in a list).
- */
 export function ariaQueryGives(
   concepts: readonly Concept[],
   tag: string,
