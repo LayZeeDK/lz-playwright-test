@@ -117,9 +117,16 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       });
       const config = await playwright.loadConfig();
       const timeouts = configTimeouts(config.projects);
+      const retriesByProject = new Map(
+        config.projects.map(({ project }) => [
+          project.name,
+          options.retries ?? project.retries,
+        ]),
+      );
       const warning = assertionTimeoutWarning(
         timeouts,
         options.strykerTimeoutMS,
+        Math.max(0, ...retriesByProject.values()),
       );
 
       if (warning) {
@@ -145,12 +152,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         servers,
         serialGroups,
         timeouts,
-        retriesByProject: new Map(
-          config.projects.map(({ project }) => [
-            project.name,
-            options.retries ?? project.retries,
-          ]),
-        ),
+        retriesByProject,
         failOnFlakyTests: config.failOnFlakyTests,
       };
     } catch (error) {

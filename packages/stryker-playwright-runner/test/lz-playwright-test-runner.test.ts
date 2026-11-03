@@ -185,6 +185,35 @@ test('init warns when timeoutMS is below the expect timeout plus the start and s
   assert.deepEqual(enough.lines, []);
 });
 
+test("init counts the largest project's retries, or the retries option, in the timeout warning", async (t) => {
+  const fake = fakePlaywright(t, {
+    projects: [
+      { default: true, project: { name: 'chromium', timeout: 1, retries: 2 } },
+      { default: true, project: { name: 'firefox', timeout: 1, retries: 1 } },
+    ],
+  });
+  const fromConfig = fake.runner({ timeoutMS: 20_599 });
+  const fromOption = fake.runner({
+    timeoutMS: 15_599,
+    lzPlaywright: { retries: 1 },
+  });
+  const enough = fake.runner({ timeoutMS: 20_600 });
+
+  await fromConfig.shell.init();
+  await fromOption.shell.init();
+  await enough.shell.init();
+
+  assert.match(
+    fromConfig.lines.find(([level]) => level === 'warn')?.[1] ?? '',
+    /below 3 attempts .* at least 20600\.$/,
+  );
+  assert.match(
+    fromOption.lines.find(([level]) => level === 'warn')?.[1] ?? '',
+    /below 2 attempts .* at least 15600\.$/,
+  );
+  assert.deepEqual(enough.lines, []);
+});
+
 function leaveDeadRoots(tmp: string, suffixes: string[]): string[] {
   const dead = spawnSync(process.execPath, ['-e', '']).pid;
 

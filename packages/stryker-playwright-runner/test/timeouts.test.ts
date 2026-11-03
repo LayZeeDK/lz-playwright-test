@@ -58,22 +58,33 @@ test('the assertion warning fires below the expect timeout plus the run start an
   const config = { testTimeoutCap: Infinity, expectTimeout: 5000 };
 
   assert.equal(
-    assertionTimeoutWarning(config, 10_599),
+    assertionTimeoutWarning(config, 10_599, 0),
     "timeoutMS (10599) is below the Playwright expect timeout (5000) plus the runner's 5600 ms to start and stop a run; killed mutants may be reported as timeouts. Set timeoutMS to at least 10600.",
   );
-  assert.equal(assertionTimeoutWarning(config, 10_600), undefined);
+  assert.equal(assertionTimeoutWarning(config, 10_600, 0), undefined);
+});
+
+test('with retries, the warning asks for every attempt at the expect timeout', () => {
+  const config = { testTimeoutCap: Infinity, expectTimeout: 5000 };
+
+  assert.equal(
+    assertionTimeoutWarning(config, 15_599, 2),
+    "timeoutMS (15599) is below 3 attempts at the Playwright expect timeout (5000) plus the runner's 5600 ms to start and stop a run; a failed test's retries may not finish, and a flaky test can then kill a mutant. Set timeoutMS to at least 20600.",
+  );
+  assert.equal(assertionTimeoutWarning(config, 20_600, 2), undefined);
+  assert.equal(assertionTimeoutWarning(config, 10_600, 0), undefined);
 });
 
 test('the warning fires exactly when a test would get less than the expect timeout with no Stryker overhead', () => {
   const config = { testTimeoutCap: Infinity, expectTimeout: 7000 };
   const lowest = config.expectTimeout + runStartMs + stopHeadroomMs;
 
-  assert.equal(assertionTimeoutWarning(config, lowest), undefined);
+  assert.equal(assertionTimeoutWarning(config, lowest, 0), undefined);
   assert.equal(
     mutantRunBudget(lowest, config).testTimeout,
     config.expectTimeout,
   );
-  assert.notEqual(assertionTimeoutWarning(config, lowest - 1), undefined);
+  assert.notEqual(assertionTimeoutWarning(config, lowest - 1, 0), undefined);
   assert.ok(
     (mutantRunBudget(lowest - 1, config).testTimeout ?? Infinity) <
       config.expectTimeout,

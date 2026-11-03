@@ -41,14 +41,20 @@ export function configTimeouts(
 export function assertionTimeoutWarning(
   config: ConfigTimeouts,
   strykerTimeoutMS: number,
+  retries: number,
 ): string | undefined {
   // Stryker's measured overhead (dry run time less test time) shrinks to 0 when Playwright workers overlap tests.
   const runHeadroomMs = runStartMs + stopHeadroomMs;
-  const needed = config.expectTimeout + runHeadroomMs;
+  // Leaves out the new worker a retry starts in.
+  const needed = (retries + 1) * config.expectTimeout + runHeadroomMs;
 
-  return strykerTimeoutMS < needed
+  if (strykerTimeoutMS >= needed) {
+    return undefined;
+  }
+
+  return retries === 0
     ? `timeoutMS (${strykerTimeoutMS}) is below the Playwright expect timeout (${config.expectTimeout}) plus the runner's ${runHeadroomMs} ms to start and stop a run; killed mutants may be reported as timeouts. Set timeoutMS to at least ${needed}.`
-    : undefined;
+    : `timeoutMS (${strykerTimeoutMS}) is below ${retries + 1} attempts at the Playwright expect timeout (${config.expectTimeout}) plus the runner's ${runHeadroomMs} ms to start and stop a run; a failed test's retries may not finish, and a flaky test can then kill a mutant. Set timeoutMS to at least ${needed}.`;
 }
 
 export interface RunBudget {
