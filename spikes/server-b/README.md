@@ -89,4 +89,34 @@ run at the first failure, so `killedBy` may list one test where the table names 
 
 ## Result
 
-(to be filled in by the coordinator)
+Measured 2026-11-03, 13:51-13:53Z, main at 3422ea8, concurrency 1, `--logLevel debug`. Logs and reports in `out/`
+(gitignored).
+
+| Run | Exit | Score | Killed / Survived / NoCoverage | Static mutants | webServer restarts | Mutant phase |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 off w1 | 1 | - | dry run fails: "No page loaded instrumented code" | - | - | - |
+| 1 header w1 | 0 | 91.67 | 11 / 1 / 0 | 1 (mutant 0) | 1 | 18 s |
+| 2 header w2 | 0 | 91.67 | 11 / 1 / 0 | 1 (mutant 0) | 1 | 19 s |
+| 3 arrival w1 | 0 | 91.67 | 11 / 1 / 0 | 1 (mutant 0) | 1 | 17 s |
+| 4 arrival w2 | 0 | 91.67 | 11 / 1 / 0 | 12 (all) | 12 | 24 s |
+
+- Run 0 fails as predicted.
+- Every outcome matches the table above: mutant 7 is the one survivor, and no mutant is NoCoverage.
+- Header mode, 1 and 2 workers: mutant 9 is covered by API small and Page small only. Every other non-static mutant
+  is covered by all four tests. Every `killedBy` is a subset of `coveredBy`. Mutant 0 is static with an empty
+  `coveredBy`, as Stryker reports static mutants, and needs the one restart.
+- Arrival mode, 1 worker: the prediction failed. Mutant 9 is covered by all four tests, not by the two small ones.
+  The over-approximation shows up even when tests run one at a time.
+- Arrival mode, 2 workers: Stryker's dry run counted all 12 mutants as static ("Detected 12 static mutants (100% of
+  total)"). Each mutant restarted the webServer and ran all four tests. The result is correct but slower, and it
+  carries no per-test coverage.
+- Dry run net time: header 404 ms (w1) and 517 ms (w2); arrival 376 ms (w1) and 473 ms (w2). With one run per
+  mode, no cost of routing page requests through the worker shows at this size; this is not a benchmark.
+- Afterwards nothing listened on 4830 or 4831 (only TIME_WAIT). Run 0's error left `.stryker-tmp-server-b`, as Stryker
+  does after a failed run; it was removed by hand.
+
+Cause of the arrival-mode results [inferred, not measured]: `mergeCoverage` (`src/run-result.ts:255-313`) gives an
+untagged request to every test whose window, widened by `arrivalSlackMs` (50 ms), holds its arrival time, and counts
+it as static when none does. These API tests last a few ms, so a 50 ms margin spans neighbouring tests (run 3). Run 4
+needs a request that arrived outside every window. A request before the first test or between tests would do it;
+which request it is has not been observed.
