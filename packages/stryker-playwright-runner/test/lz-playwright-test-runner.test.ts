@@ -427,8 +427,7 @@ test('a dry run runs every test with the hook and the run settings in the worker
   });
 });
 
-// The tests of a run as onBegin hands them to the reporter, one per project.
-function retriedRun(projects: readonly string[]) {
+function oneTestPerProject(projects: readonly string[]) {
   const tests = projects.map(() => ({ retries: 0 }));
   const root = {
     allTests: () => [],
@@ -447,7 +446,7 @@ function retriedRun(projects: readonly string[]) {
 }
 
 test("each run raises the tests' retries to their project's retries in the Playwright config", async (t) => {
-  const { tests, runTests } = retriedRun(['chromium', 'firefox']);
+  const { tests, runTests } = oneTestPerProject(['chromium', 'firefox']);
   const fake = fakePlaywright(t, {
     projects: [
       { default: true, project: { name: 'chromium', timeout: 1, retries: 2 } },
@@ -464,7 +463,7 @@ test("each run raises the tests' retries to their project's retries in the Playw
 });
 
 test('the retries option replaces the retries of every project', async (t) => {
-  const { tests, runTests } = retriedRun(['chromium', 'firefox']);
+  const { tests, runTests } = oneTestPerProject(['chromium', 'firefox']);
   const fake = fakePlaywright(t, {
     projects: [
       { default: true, project: { name: 'chromium', timeout: 1, retries: 2 } },
@@ -480,7 +479,6 @@ test('the retries option replaces the retries of every project', async (t) => {
   assert.deepEqual(tests, [{ retries: 1 }, { retries: 1 }]);
 });
 
-// A run whose one test fails, then passes on its retry.
 async function flakyRun(run: Run): Promise<Status> {
   run.reporter.onTestEnd(
     addAttempt(finishedTest('a', 'failed'), 'flaky', 'passed'),

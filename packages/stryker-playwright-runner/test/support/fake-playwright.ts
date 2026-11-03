@@ -157,7 +157,6 @@ export function fakePlaywright(
           ignoreHTTPSErrors: false,
           ...server,
         })),
-        // Playwright keeps it in config; the runner reads it from there.
         config: { failOnFlakyTests: behaviour.failOnFlakyTests ?? false },
         failOnFlakyTests: false,
       };

@@ -69,7 +69,7 @@ export function attemptSummary(
   failOnFlakyTests: boolean,
 ): AttemptSummary {
   const attempts = [...testCases]
-    // Playwright passes a run whose tests pass on a retry, unless failOnFlakyTests is set.
+    // Playwright 1.64.1 passes a run whose tests pass on a retry, unless failOnFlakyTests is set.
     .filter((test) => failOnFlakyTests || test.outcome() !== 'flaky')
     .flatMap((test) =>
       test.results.map(({ status }) => ({
@@ -97,7 +97,6 @@ export function mayHaveLostItsServer(output: RunOutput): boolean {
   );
 }
 
-/** The tests that passed only on a retry. */
 export function flakyTestNames(output: RunOutput): string[] {
   return [...output.reporter.testCases.values()]
     .filter((test) => test.outcome() === 'flaky')
@@ -126,9 +125,8 @@ export function toRunResult(output: RunOutput, request: RunRequest): RunResult {
     coveringTestsPassed,
   });
 
-  // Without its retries, a test that fails once would kill the mutant, whatever else failed.
-  if (reporter.retriesError) {
-    return errorRun(reporter.retriesError);
+  if (reporter.retriesNotRaised) {
+    return errorRun(reporter.retriesNotRaised);
   }
 
   if (status === 'interrupted') {
@@ -184,7 +182,6 @@ function survivorTests(tests: readonly TestResult[]): TestResult[] {
   return tests.filter((test) => test.status !== TestStatus.Failed);
 }
 
-// No ids, no pass.
 function allPassed(
   ids: readonly string[] | undefined,
   testCases: ReadonlyMap<string, ReportedTest>,

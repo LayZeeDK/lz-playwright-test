@@ -19,7 +19,6 @@ export type RunRequest = DryRunRequest | MutantRunRequest;
 export interface DryRunRequest {
   readonly kind: 'dry';
   readonly disableBail: boolean;
-  /** The Playwright config's failOnFlakyTests: a test that passes only on a retry fails the run. */
   readonly failOnFlakyTests: boolean;
   readonly coverageAnalysis: DryRunOptions['coverageAnalysis'];
   readonly budget: RunBudget;
