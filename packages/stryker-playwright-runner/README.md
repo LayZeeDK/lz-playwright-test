@@ -155,9 +155,9 @@ detected that the tests may never detect. The runner hands flakiness to Playwrig
 
 A retry costs time only for a test that failed, so mostly for killed mutants: each one runs its failing
 test once more per retry, and each attempt waits out the `expect.timeout` of its failing assertion. On
-this repository's demo e2e suite (32 mutants, 27 of them killed, a 5 s expect timeout), one retry makes the mutant runs
-about 1.6 to 1.7 times as long, and two retries about 2.1 to 2.4 times: an estimate from the measured
-times of its killed and surviving mutants. Playwright starts a new worker for each retry, so raise
+this repository's demo e2e suite (32 mutants, 27 of them killed, a 5 s expect timeout), one retry makes
+the mutant runs about 1.6 to 1.7 times as long, and two retries about 2.1 to 2.4 times: an estimate from
+the measured times of its killed and surviving mutants. Playwright starts a new worker for each retry, so raise
 `timeoutMS` by the expect timeout plus about 3 s per retry; the runner warns when it is lower and names the
 value to set. A retry that runs past the runner's deadline is stopped, and the mutant counts as Killed, as
 it would without the retry.
