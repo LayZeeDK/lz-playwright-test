@@ -133,7 +133,7 @@ exports as `strykerValidationSchema`.
   Stryker fails the run when the dry run takes longer than `dryRunTimeoutMinutes`, 5 by default. A suite
   that takes a few minutes on Playwright's default workers can take longer than that on one, so raise
   `workers` or `dryRunTimeoutMinutes`.
-- `retries`: how often to retry a failed test, in every project. Without it, each project keeps the
+- `retries`: how many times to retry a failed test, in every project. Without it, each project keeps the
   `retries` that the Playwright config gives it. See Flaky tests.
 
 ## Flaky tests
@@ -141,20 +141,31 @@ exports as `strykerValidationSchema`.
 A test that fails without a mutant at fault kills that mutant, and the report then counts a mutant as
 detected that the tests may never detect. The runner hands flakiness to Playwright's own settings:
 
-- Each failed test is retried as often as the Playwright config's `retries` says, or the `retries` option.
-  Retries set with `describe.configure({ retries })` apply too.
+- Each failed test is retried as many times as the Playwright config's `retries` says, or the `retries`
+  option. A `describe.configure({ retries })` above 0 applies to its tests and wins over both.
+  `describe.configure({ retries: 0 })` does not turn retries off: Playwright gives the runner no way to tell
+  it from no setting, so those tests get their project's retries.
+- Projects that share a name must get the same retries, since the runner looks retries up by project
+  name. When they would not, the runner stops with an error; give the projects distinct names or set the
+  `retries` option.
 - A test that passes on a retry passes, as in `npx playwright test`: the mutant survives that test. With
   `failOnFlakyTests: true` in the Playwright config, it fails, and the mutant is killed. The same holds in
   the dry run, where a failed test stops Stryker.
 - The dry run warns with the names of the tests that passed only on a retry.
 
 A retry costs time only for a test that failed, so mostly for killed mutants: each one runs its failing
-test once more per retry, and each attempt waits out the `expect.timeout` of its failing assertion. On the
-demo's e2e suite (32 mutants, 27 of them killed, a 5 s expect timeout), one retry makes the mutant runs
+test once more per retry, and each attempt waits out the `expect.timeout` of its failing assertion. On
+this repository's demo e2e suite (32 mutants, 27 of them killed, a 5 s expect timeout), one retry makes the mutant runs
 about 1.6 to 1.7 times as long, and two retries about 2.1 to 2.4 times: an estimate from the measured
-times of its killed and surviving mutants. Raise `timeoutMS` by the expect timeout per retry; the runner
-warns when it is lower. A retry that runs past the runner's deadline is stopped, and the mutant counts as
-Killed, as it would without the retry.
+times of its killed and surviving mutants. Playwright starts a new worker for each retry, so raise
+`timeoutMS` by the expect timeout plus about 3 s per retry; the runner warns when it is lower and names the
+value to set. A retry that runs past the runner's deadline is stopped, and the mutant counts as Killed, as
+it would without the retry.
+
+Playwright's `runTests` turns retries off, so the runner sets them again on Playwright's internal test
+objects when a run begins. If a Playwright version changes those objects, every run, the dry run included,
+ends in an error that names what changed. Set the `retries` option to 0 to run without retries until the
+runner supports that version.
 
 Playwright's `repeatEach` stays 1 under Stryker. To find flaky tests before a mutation run, run the suite
 with `npx playwright test --repeat-each=10 --fail-on-flaky-tests`. Web-first assertions such as
