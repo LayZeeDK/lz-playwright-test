@@ -616,10 +616,11 @@ test("the retries of each test that has none are raised to its project's", () =>
   );
 });
 
-test('a root suite without project suites or numeric retries fails loudly', () => {
+test('a root suite without project suites titled by a config project, or without numeric retries, fails loudly', () => {
   [
     {},
     { suites: [{ title: 'a' }] },
+    rootSuite({ b: [{ retries: 0 }] }),
     rootSuite({ a: [{}] }),
     { suites: [{ title: 'a', allTests: () => 'tests' }] },
   ].forEach((suite) => {

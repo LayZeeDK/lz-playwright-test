@@ -363,7 +363,8 @@ function parseConfig(
  * Playwright's runTests sets retries to 0 for every project (playwright 1.64.1 lib/runner/index.js:7010). Its
  * dispatcher reads each test's retries from the TestCase objects that onBegin receives (lib/runner/index.js:6128,
  * set at lib/common/index.js:2060), so the runner raises them there. A test whose describe.configure({ retries })
- * set a number keeps it, unless that number is 0.
+ * set a number keeps it, unless that number is 0. Each project suite is titled with its project's name
+ * (lib/runner/index.js:6614).
  */
 export function raiseRetries(
   suite: unknown,
@@ -378,12 +379,13 @@ export function raiseRetries(
   projects.forEach((project: unknown) => {
     const title = fieldOf(project, 'title');
     const allTests = fieldOf(project, 'allTests');
+    const retries =
+      typeof title === 'string' ? retriesByProject.get(title) : undefined;
 
-    if (typeof title !== 'string' || typeof allTests !== 'function') {
+    if (retries === undefined || typeof allTests !== 'function') {
       throw retriesChanged();
     }
 
-    const retries = retriesByProject.get(title) ?? 0;
     const tests: unknown = Reflect.apply(allTests, project, []);
 
     if (!Array.isArray(tests)) {
