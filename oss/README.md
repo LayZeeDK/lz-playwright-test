@@ -267,3 +267,29 @@ above is the rerun with the 11 specs. Run times come from Stryker's "Done in" li
 lists `suggestedVideos.js` from an earlier, wider `mutate`; it is not in the config. The timeouts are likely
 mutants that stop playback, so that a spec waits for a `currentTime` or `readyState`
 that never comes until Stryker's 20-second limit; the traces of individual timeouts were not checked.
+
+## use-debouncy: eavam/use-debouncy at d8597b0
+
+The component-test case. use-debouncy's tests are Playwright component tests in the stories model that
+Playwright 1.62 introduced: plain `@playwright/test` tests call the built-in `mount('<story id>')` fixture, and
+the repo's own Vite dev server serves a gallery page (`playwright/gallery/`) that renders each story. The config
+mutates the hook's one source file, `src/index.ts`, against the 8 spec files in `playwright/tests` (Playwright
+1.64.1); 7 of them take `test` from the repo's fake-clock fixture, `playwright/tests/fixtures.ts`.
+
+1. Apply `use-debouncy/copy.patch` and copy `use-debouncy/stryker.ct.config.ts` into the copy's root. The patch:
+   - adds `playwright.stryker.config.ts`: Chromium only (upstream also runs Firefox and WebKit), no retries,
+     and a `webServer` that runs `npx vite --port 3100 --strictPort` instead of `yarn vite`, which needs yarn
+     on the `PATH`;
+   - adds `.stryker-tmp` and `/reports` to `.gitignore`.
+2. Run `node .yarn/releases/yarn-4.18.1.cjs install`, then
+   `node .yarn/releases/yarn-4.18.1.cjs add -D @stryker-mutator/core@10.1.1 @layzee/stryker-playwright-runner@file:<runner tarball>`.
+   The repo commits its yarn release, so neither Corepack nor a global yarn is needed.
+3. Run `npx playwright install chromium`. Plain `npx playwright test -c playwright.stryker.config.ts` then
+   passes 47 tests in 14 seconds.
+4. Run `npx stryker run stryker.ct.config.ts`. It sets `inPlace: true`: Stryker 10.1.1 rewrites a sandbox's
+   `tsconfig.json` through TypeScript's JavaScript API, and the call it makes (`parseConfigFileTextToJson`)
+   is missing from TypeScript 7, this repo's version. A sandbox run stopped with
+   "ts.parseConfigFileTextToJson is not a function". Stryker skips that rewrite in place.
+
+Result on Windows 11 arm64, concurrency 2, 5.4 minutes (2026-11-04): 43 mutants, 37 killed, 6 survived, none
+without coverage, a score of 86%. The dry run ran the 47 tests in 34 seconds.
