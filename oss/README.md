@@ -185,3 +185,34 @@ config (2026-11-04):
 The `A11y.tsx` run includes Vite's cold start, the first of the JSX runs. `PlainTextLabel.tsx` is not in the config: only the
 speech-bubble example uses it, and no spec opens that example, so its run stopped in the dry run
 with "No page loaded instrumented code".
+
+## sigma: jacomyal/sigma.js at 1db3385
+
+The WebGL case. sigma draws graphs with WebGL2, and its regression suite compares screenshots of the canvas,
+so a mutant in a shader string or in the geometry code is killed only when the picture changes. The config
+mutates the node shapes and their instance registry, the arrow edge extremity and the line, curved and loop
+edge paths, the code the 12 regression scenarios run when they render, against `packages/browser-tests/regression` on its Vite dev server.
+
+1. Apply `sigma/copy.patch` and copy `sigma/stryker.webgl.config.ts` into the copy's root. The patch:
+   - adds `packages/browser-tests/playwright.stryker.config.ts`: the regression suite only, no retries, and
+     only the regression `webServer`. The examples suite needs the Astro website, whose dev server downloads
+     datasets first;
+   - adds `.stryker-tmp` and `/reports` to `.gitignore`.
+2. Run `npm ci`, then
+   `npm i -D @stryker-mutator/core@10.1.1 @playwright/test@1.64.1 playwright@1.64.1 file:<runner tarball>`.
+   The lockfile has Playwright 1.60, below the runner's 1.63 floor. npm 12 blocks the esbuild and sharp
+   install scripts; the regression suite runs without them. The root `postinstall` (`preconstruct dev`)
+   still runs and points the `sigma` package at its source.
+3. Run `npx playwright install chromium`. Plain
+   `npx playwright test -c packages/browser-tests/playwright.stryker.config.ts` then passes 12 tests. The
+   upstream config pins Chromium to software WebGL (SwiftShader), and with it the Linux baselines match on
+   Windows 11 arm64 within upstream's 0.1% tolerance: `--update-snapshots` rewrote none of them.
+4. Run `npx stryker run stryker.webgl.config.ts`. It sets `inPlace: true`: npm workspaces link `sigma` to
+   `packages/sigma`, and preconstruct points that at `src`, so a sandbox would serve unmutated code.
+
+Result on Windows 11 arm64, concurrency 4, 15.5 minutes (2026-11-04). Free memory fell from 15.1 to 10.8 GB
+during the run, about 1.1 GB per unit of concurrency:
+523 mutants, 168 killed, 105 survived, 250 without coverage. The run used a wider `mutate` than the config
+now has; 191 of the uncovered mutants came from files no scenario draws (`instance-registry.test.ts`,
+`rectangle.ts` and four edge extremities). Without them, from the same run's per-file rows: 332 mutants,
+168 killed, 105 survived, 59 without coverage, a score of 50.6%.
