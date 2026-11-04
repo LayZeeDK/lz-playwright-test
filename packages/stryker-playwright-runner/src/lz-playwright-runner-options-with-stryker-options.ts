@@ -64,7 +64,7 @@ export const optionProperties = {
     type: 'boolean',
     default: false,
     description:
-      'Add screenshots to the traces that survivorTraces records. The trace viewer needs them to show canvas content; they make each trace several times larger.',
+      'Add screenshots to the traces that survivorTraces records. The trace viewer needs them to show canvas content; they can make a trace several times larger.',
   },
 } satisfies OptionSchemas;
 
