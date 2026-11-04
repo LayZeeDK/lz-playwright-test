@@ -24,6 +24,7 @@ import {
   LzPlaywrightTestRunner,
   withEnv,
 } from '../src/lz-playwright-test-runner.ts';
+import { LzPlaywrightTracesReporter } from '../src/traces-reporter.ts';
 import { namespaceToken, ownerFile, rootPrefix } from '../src/temp-root.ts';
 import {
   dryRunOptions,
@@ -58,6 +59,11 @@ test('the package declares the runner as the lz-playwright test runner, with its
       kind: PluginKind.TestRunner,
       name: 'lz-playwright',
       injectableClass: LzPlaywrightTestRunner,
+    },
+    {
+      kind: PluginKind.Reporter,
+      name: 'lz-playwright-traces',
+      injectableClass: LzPlaywrightTracesReporter,
     },
   ]);
   assert.equal(

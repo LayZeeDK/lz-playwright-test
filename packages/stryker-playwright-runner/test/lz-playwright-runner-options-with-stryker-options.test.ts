@@ -27,6 +27,8 @@ const defaults = {
   projects: undefined,
   workers: 1,
   retries: undefined,
+  survivorTraces: undefined,
+  traceScreenshots: false,
   strykerTimeoutMS: 10_000,
 };
 
@@ -75,6 +77,8 @@ test('the runner options refuse lzPlaywright options that are not an object or h
     { retries: '1' },
     { retries: 0.5 },
     { retries: -1 },
+    { survivorTraces: 1 },
+    { traceScreenshots: 'on' },
   ].forEach((lzPlaywright) => {
     assert.throws(() => readRunnerOptions(strykerOptions({ lzPlaywright })), {
       message: `The lzPlaywright options do not match their schema: ${JSON.stringify(lzPlaywright)}`,
@@ -110,7 +114,7 @@ function validate(options: object) {
 test("Stryker's check of the options fills in the defaults", () => {
   assert.deepEqual(validate({}), {
     valid: true,
-    options: { lzPlaywright: { workers: 1 } },
+    options: { lzPlaywright: { workers: 1, traceScreenshots: false } },
   });
   assert.deepEqual(
     validate({
@@ -133,6 +137,7 @@ test("Stryker's check of the options refuses wrong types, workers below 1 and un
     { workers: 1.5 },
     { workers: 0 },
     { retries: -1 },
+    { traceScreenshots: 'on' },
     { browser: 'chromium' },
   ].forEach((lzPlaywright) => {
     assert.equal(

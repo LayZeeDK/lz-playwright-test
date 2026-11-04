@@ -3,7 +3,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 
-import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
+import { INSTRUMENTER_CONSTANTS, type Mutant } from '@stryker-mutator/api/core';
 import type { Logger } from '@stryker-mutator/api/logging';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 import type {
@@ -13,6 +13,7 @@ import type {
   MutantRunResult,
   TestRunner as StrykerTestRunner,
 } from '@stryker-mutator/api/test-runner';
+import { MutantRunStatus } from '@stryker-mutator/api/test-runner';
 
 import {
   readRunnerOptions,
@@ -28,7 +29,10 @@ import {
   type TestRunner,
 } from './playwright-internals.ts';
 import { readSnapshotDir } from './protocol.ts';
-import { LzPlaywrightCollectingReporter } from './reporter.ts';
+import {
+  LzPlaywrightCollectingReporter,
+  type ReportedTest,
+} from './reporter.ts';
 import {
   dryRunRequest,
   mutantRunRequest,
@@ -59,6 +63,11 @@ import {
   serverSupportEnv,
   writeServerControl,
 } from './server-protocol.ts';
+import {
+  copySurvivorTraces,
+  readTracesTarget,
+  type TracesTarget,
+} from './survivor-traces.ts';
 import { claimTempRoot, removeDir, type TempRoot } from './temp-root.ts';
 import {
   armDeadline,
@@ -89,6 +98,7 @@ interface Session {
   readonly serialGroups: SerialGroups;
   readonly timeouts: ConfigTimeouts;
   readonly retriesByProject: ReadonlyMap<string, number>;
+  readonly traces: TracesTarget | undefined;
 }
 
 const hookUrl = (name: string) =>
@@ -98,9 +108,19 @@ const workerHookUrl = hookUrl('worker-hook');
 const serverHookUrl = hookUrl('server-hook');
 const hookedWaitMs = 1000;
 
-const runOverrides = {
-  use: { screenshot: 'off', trace: 'off', video: 'off' },
-};
+const runOverrides = ({
+  traced,
+  screenshots,
+}: {
+  traced: boolean;
+  screenshots: boolean;
+}) => ({
+  use: {
+    screenshot: 'off',
+    trace: traced ? { mode: 'on', screenshots, snapshots: true } : 'off',
+    video: 'off',
+  },
+});
 
 export class LzPlaywrightTestRunner implements StrykerTestRunner {
   static inject = tokens(commonTokens.options, commonTokens.logger);
@@ -126,6 +146,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
 
   async init(): Promise<void> {
     const options = readRunnerOptions(this.#strykerOptions);
+    const traces = readTracesTarget(options.survivorTraces, process.env);
     const pw = loadPlaywright(options.configFile);
     const root = claimTempRoot((removed) => {
       if (removed.length) {
@@ -139,7 +160,10 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     try {
       playwright = await pw.createTestRunner(options.configFile, {
         outputDir: root.outputDir,
-        ...runOverrides,
+        ...runOverrides({
+          traced: traces !== undefined,
+          screenshots: options.traceScreenshots,
+        }),
       });
       const config = await playwright.loadConfig();
       const timeouts = configTimeouts(config.projects);
@@ -181,6 +205,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         serialGroups,
         timeouts,
         retriesByProject,
+        traces,
       };
     } catch (error) {
       await playwright?.runGlobalTeardown().catch(() => undefined);
@@ -234,15 +259,37 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
   async mutantRun(options: MutantRunOptions): Promise<MutantRunResult> {
     const session = this.#ready();
     const request = mutantRunRequest(options, session);
-    const { result, hitCount } = mutantRunResult(
-      await this.#run(session, request),
-      request,
-    );
+    const output = await this.#run(session, request);
+    const { result, hitCount } = mutantRunResult(output, request);
     this.#log.debug(
       `Mutant ${request.activeMutant}: ${result.status}, hitCount ${hitCount}/${request.hitLimit}`,
     );
 
+    // Playwright deletes a test's output folder when that test runs again, so copy before the next run.
+    if (session.traces && result.status === MutantRunStatus.Survived) {
+      this.#keepSurvivorTraces(
+        session.traces,
+        options.activeMutant,
+        output.reporter.testCases.values(),
+      );
+    }
+
     return result;
+  }
+
+  #keepSurvivorTraces(
+    target: TracesTarget,
+    mutant: Mutant,
+    tests: Iterable<ReportedTest>,
+  ): void {
+    try {
+      const dir = copySurvivorTraces(target, mutant, tests);
+      this.#log.debug(`Mutant ${mutant.id}: traces in ${dir}`);
+    } catch (error) {
+      this.#log.warn(
+        `Mutant ${mutant.id}: could not copy its traces: ${String(error)}`,
+      );
+    }
   }
 
   #ready(): Session {

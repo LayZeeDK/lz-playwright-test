@@ -13,6 +13,7 @@ import type {
 import type { LzPlaywrightRunnerOptionsWithStrykerOptions } from '../../src/lz-playwright-runner-options-with-stryker-options.ts';
 import {
   LzPlaywrightCollectingReporter,
+  type ReportedAttempt,
   type ReportedTest,
 } from '../../src/reporter.ts';
 import type {
@@ -70,6 +71,7 @@ export function addAttempt(
   testCase: ReportedTest,
   outcome: Outcome,
   status: TestResult['status'],
+  attachments: ReportedAttempt['attachments'] = [],
 ): ReportedTest {
   return {
     ...testCase,
@@ -78,6 +80,7 @@ export function addAttempt(
       {
         status,
         duration: 7,
+        attachments,
         error:
           status === 'passed'
             ? undefined

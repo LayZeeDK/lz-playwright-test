@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>trace media</title>
+    <style>
+      body { margin: 0; background: white; }
+      .box { position: absolute; top: 20px; width: 160px; height: 120px; }
+    </style>
+  </head>
+  <body>
+    <div id="dom" class="box" style="left: 20px; background: #ffff00"></div>
+    <canvas id="c2d" class="box" style="left: 200px" width="160" height="120"></canvas>
+    <canvas id="gl" class="box" style="left: 380px" width="160" height="120"></canvas>
+    <video id="video" class="box" style="left: 560px" src="blue.webm" muted autoplay loop></video>
+    <button id="go" style="position: absolute; top: 200px; left: 20px">go</button>
+    <script>
+      const c2d = document.getElementById('c2d').getContext('2d');
+      c2d.fillStyle = '#ff0000';
+      c2d.fillRect(0, 0, 160, 120);
+      const gl = document.getElementById('gl').getContext('webgl');
+      gl.clearColor(0, 1, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    </script>
+  </body>
+</html>

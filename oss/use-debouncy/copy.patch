@@ -1,0 +1,33 @@
+diff --git a/.gitignore b/.gitignore
+index 7b4878a..01f02eb 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -90,3 +90,7 @@ playwright/.cache/
+ # smoke test workspace
+ smoke/node_modules/
+ smoke/package-lock.json
++
++# Stryker
++.stryker-tmp
++/reports
+diff --git a/playwright.stryker.config.ts b/playwright.stryker.config.ts
+new file mode 100644
+index 0000000..c60ceeb
+--- /dev/null
++++ b/playwright.stryker.config.ts
+@@ -0,0 +1,15 @@
++import { defineConfig, devices } from '@playwright/test';
++import base from './playwright.config';
++
++// Chromium only, and Vite through npx: `yarn vite` needs yarn on the PATH.
++export default defineConfig({
++  ...base,
++  retries: 0,
++  reporter: [['list']],
++  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
++  webServer: {
++    command: 'npx vite --port 3100 --strictPort',
++    url: 'http://localhost:3100/playwright/gallery/index.html',
++    reuseExistingServer: true,
++  },
++});

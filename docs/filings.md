@@ -614,6 +614,27 @@ package now builds the table through a helper with a `const` type parameter, and
 survivors. Worth a comment on #6208 if Lars wants one: a `const` assertion is the common case, and it
 hides the most code.
 
+## stryker-mutator/stryker-js: the HTML report never shows its "Stryker" title postfix
+
+Status: draft, not filed (2026-11-03). A search of stryker-js issues and PRs for "titlePostfix", and of
+mutation-testing-elements issues for "title-postfix", found nothing on 2026-11-03.
+
+**Versions.** `@stryker-mutator/core` 10.1.1 with `mutation-testing-elements` 3.9.0; stryker-js `master` at
+8f24ef0be (2026-10-29) has the same line.
+
+**Cause.** `packages/core/src/reporters/html-reporter.ts` writes
+`<mutation-test-report-app titlePostfix="Stryker">`. The element declares the property as
+`@property({ attribute: 'title-postfix' }) titlePostfix`, and HTML parsing lowercases attribute names, so the
+page sets `titlepostfix`, which nothing reads.
+
+**Reproduction.** Run Stryker with the `html` reporter and open `reports/mutation/mutation.html`. The tab title
+is "All files", not "All files - Stryker". Changing the attribute to `title-postfix="Stryker"` gives
+"All files - Stryker" (measured 2026-11-03 headless in Chromium, on a page built the same way by
+`@layzee/stryker-playwright-runner`'s `lz-playwright-traces` reporter).
+
+**Possible fix.** `title-postfix="Stryker"` in `html-reporter.ts`, with the reporter's test asserting the
+attribute name.
+
 ## michael-denyer/pstack-claude: `arena` trusts the runner's model and lets the parent overrule the judge unchecked
 
 Status: draft, not filed (2026-10-31). Observed 2026-10-26 in one arena run. Not searched for existing issues
