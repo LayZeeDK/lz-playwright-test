@@ -216,3 +216,54 @@ during the run, about 1.1 GB per unit of concurrency:
 now has; 191 of the uncovered mutants came from files no scenario draws (`instance-registry.test.ts`,
 `rectangle.ts` and four edge extremities). Without them, from the same run's per-file rows: 332 mutants,
 168 killed, 105 survived, 59 without coverage, a score of 50.6%.
+
+## fluid-player: fluid-player/fluid-player at 68aa004
+
+The video case. fluid-player is an HTML5 video player whose e2e specs check the `<video>` element itself:
+`currentTime`, `paused`, `readyState` and `playbackRate`, read through `evaluate` and `waitForFunction`. The
+config mutates three playback modules (the timeline preview, the miniplayer and subtitles) against the repo's
+own specs on its webpack dev server. The 3,551-line player core and the ad code are left out: at the measured
+10 to 30 mutants a minute, depending on concurrency, they would need several more hours of runs.
+
+1. Apply `fluid-player/copy.patch` and copy `fluid-player/stryker.video.config.ts` into the copy's root. The
+   patch:
+   - adds `playwright.stryker.config.ts`: Chromium instead of upstream's Firefox-only project, no retries, and a
+     `webServer` that runs `webpack serve --mode=development --no-live-reload`. The webpack config emits the e2e
+     pages and copies the test media only in development mode, so upstream's `dev-server-test` script
+     (production mode) serves none of them;
+   - runs 11 of the 22 specs. Ten play local media (WebM, or an unplayable `.flv` in `ads_error_code`);
+     `skip_stuck` streams `.mkv` files from `cdn.fluidplayer.com` and passed in every dry run. The other 11
+     stream an H.264 MP4 from `media.w3.org` or `fluidplayer.com`, play local H.264 and HLS ads, or compare a
+     screenshot made in Firefox. In a plain run most of them pass, but under Stryker's load they timed out at
+     random in the dry run, and their results depend on the network;
+   - deletes `.babelrc`. It only repeats the `@babel/preset-env` preset that `webpack.config.js` passes to
+     `babel-loader`, and Stryker's instrumenter, which runs Babel 8, refused to load that Babel 7 preset;
+   - adds `.stryker-tmp` and `/reports` to `.gitignore`.
+2. Run `npx yarn@1.22.22 install --frozen-lockfile`, then
+   `npx yarn@1.22.22 add -D @stryker-mutator/core@10.1.1 @playwright/test@1.64.1 file:<runner tarball>`. Add
+   `--registry https://registry.npmjs.org` when your yarn configuration names another registry: the lockfile
+   install uses the URLs in `yarn.lock`, but `yarn add` resolves through the configured registry.
+3. Run `npx playwright install chromium`. With the 11 specs, Stryker's dry runs passed 39 tests in 1 to 3
+   minutes. Before the spec list was cut down, a plain run of all 22 specs with 5 tests left out passed the
+   other 73.
+4. Run `npx stryker run stryker.video.config.ts`. It runs in Stryker's sandbox: webpack builds the sandbox's
+   `src`. All test runner processes share one dev server on port 8080 (`reuseExistingServer`). To split the
+   run, pass one file at a time with `--mutate`; the incremental file carries finished files into the next run.
+   `--mutate` takes a comma-separated list, so a brace glob such as `{a,b}.js` breaks into pieces that match
+   nothing.
+
+Results on Windows 11 arm64, one file per run, concurrency 2 to 4 as free memory allowed (2026-11-04):
+
+| File | Mutants | Killed | Timed out | Survived | No coverage | Score | Run |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `src/modules/timeline.js` | 215 | 56 | 41 | 69 | 49 | 45% | 22 min |
+| `src/modules/miniplayer.js` | 305 | 101 | 12 | 78 | 114 | 37% | 12 min |
+| `src/modules/subtitles.js` | 369 | 171 | 19 | 108 | 71 | 51% | 19 min |
+| Total | 889 | 328 | 72 | 255 | 234 | 45% | |
+
+`timeline.js` was measured twice: with 68 tests (all specs but the two H.264 and HLS ones, and two tests) it
+had 62 killed and 35 timed out; the row
+above is the rerun with the 11 specs. Run times come from Stryker's "Done in" lines. The final report also
+lists `suggestedVideos.js` from an earlier, wider `mutate`; it is not in the config. The timeouts are likely
+mutants that stop playback, so that a spec waits for a `currentTime` or `readyState`
+that never comes until Stryker's 20-second limit; the traces of individual timeouts were not checked.
