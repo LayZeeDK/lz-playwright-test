@@ -18,6 +18,24 @@ npm install -D @stryker-mutator/core@^10.1.1 file:<this repo>/packages/stryker-p
 The runner needs `@playwright/test` 1.63 or a later 1.x release. If the copy has an older one or none,
 also install `@playwright/test@^1.64.1`. ngx-yeti ran on its own `@playwright/test` 1.63.0.
 
+## Resuming a stopped run
+
+Stryker writes its incremental file when a run ends, or on SIGINT, SIGTERM, SIGHUP or SIGABRT. On Windows a
+run stopped with `Stop-Process -Force` or `taskkill /F` gets none of these, so it keeps nothing.
+`tools/stryker-checkpoint.ts` is a reporter that writes the mutants tested so far to the incremental file
+as they finish, at most once every 5 seconds. Add it to the run, with the config's own reporters listed again:
+
+```sh
+npx stryker run <config> --incremental --appendPlugins <this repo>/tools/stryker-checkpoint.ts --reporters <the config's reporters>,lz-checkpoint
+```
+
+Run the same command again to resume. Stryker reuses each result whose code and tests did not change.
+
+An in-place run that was stopped leaves its changed files behind: the instrumented source, and
+`// @ts-nocheck` at the top of every file Stryker checked. Restore them before you resume, from git or from
+`.stryker-tmp/backup-*`. The checkpoint reads each file's original from that backup, so the resumed run sees
+the original source.
+
 ## realworld: stefanoslig/angular-ngrx-nx-realworld-example-app at bc7158d
 
 `node oss/realworld/prepare.ts <copy>` makes every change and writes the Stryker config. The API double
@@ -165,8 +183,8 @@ screenshots, against the repo's own e2e tests on its Vite dev server (`pnpm dev`
 5. Let an in-place run finish. Stryker puts the original files back only when the run ends, and a
    stopped run leaves thousands of files instrumented; restore them from `.stryker-tmp/backup-*`. The
    JSX run is incremental, but Stryker writes the incremental file only at the end, so a stopped run
-   keeps nothing. To fit a run into shorter slots, run one file at a time with
-   `--mutate <file>`.
+   keeps nothing unless it ran with the checkpoint reporter ("Resuming a stopped run"). To fit a run into
+   shorter slots, run one file at a time with `--mutate <file>`.
 
 Results on Windows 11 arm64, one file per run, concurrency 2 for the JSX config and 1 for the canvas
 config (2026-11-04):
