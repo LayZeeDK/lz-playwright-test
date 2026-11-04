@@ -53,12 +53,12 @@ export function reportKey(
 }
 
 export function mutantKey(
+  fileName: string,
   {
     mutatorName,
     replacement,
     location: { start, end },
   }: Pick<Mutant, 'mutatorName' | 'replacement' | 'location'>,
-  fileName: string,
 ): string {
   return reportKey(fileName, {
     mutatorName,
@@ -70,7 +70,7 @@ export function mutantKey(
   });
 }
 
-const unsafe = /[^-0-9A-Za-z\u0080-￿]+/g;
+const unsafe = /[^-0-9A-Za-z\P{ASCII}]+/gu;
 
 export function folderName(key: string): string {
   const hash = createHash('sha1').update(key).digest('hex').slice(0, 8);
@@ -107,30 +107,29 @@ export function copySurvivorTraces(
   mutant: Pick<Mutant, 'fileName' | 'mutatorName' | 'replacement' | 'location'>,
   tests: Iterable<ReportedTest>,
 ): string {
-  const key = mutantKey(mutant, reportFileName(mutant.fileName, projectRoot));
+  const key = mutantKey(reportFileName(mutant.fileName, projectRoot), mutant);
   const dir = path.join(tracesDir, folderName(key));
   fs.mkdirSync(dir, { recursive: true });
   const copied: CopiedTrace[] = [];
 
   for (const test of tests) {
-    test.results.forEach((attempt, index) => {
+    for (const [index, attempt] of test.results.entries()) {
       const source = attempt.attachments.find(
         (attachment) => attachment.name === 'trace' && attachment.path,
       )?.path;
-      let trace: string | undefined;
+      const copy = `${test.id}-${index}.zip`;
 
       if (source) {
-        trace = `${test.id}-${index}.zip`;
-        fs.copyFileSync(source, path.join(dir, trace));
+        fs.copyFileSync(source, path.join(dir, copy));
       }
 
       copied.push({
         test: testName(test),
         attempt: index,
         status: attempt.status,
-        trace,
+        trace: source ? copy : undefined,
       });
-    });
+    }
   }
 
   const written: MutantTraces = { key, tests: copied };

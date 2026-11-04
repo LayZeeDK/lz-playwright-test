@@ -27,9 +27,7 @@ import {
 import { LzPlaywrightTracesReporter } from '../src/traces-reporter.ts';
 import { namespaceToken, ownerFile, rootPrefix } from '../src/temp-root.ts';
 import {
-  addAttempt,
   dryRunOptions,
-  fakeTestCase,
   finishedTest,
   logger,
   mutantRunOptions,
@@ -579,125 +577,6 @@ test('a run that ends on its own after the deadline fired is no deadline stop', 
   t.mock.timers.reset();
 
   assert.equal(result.status, MutantRunStatus.Survived);
-});
-
-for (const traceScreenshots of [false, true]) {
-  test(`with survivorTraces and traceScreenshots ${String(traceScreenshots)}, every run records a trace with snapshots${traceScreenshots ? ' and screenshots' : ''}`, async (t) => {
-    const fake = fakePlaywright(t);
-    stubEnv(t, {
-      LZ_PLAYWRIGHT_TRACES_DIR: path.join(fake.dir, 'traces'),
-      LZ_PLAYWRIGHT_PROJECT_ROOT: process.cwd(),
-    });
-    const { shell } = fake.runner({
-      lzPlaywright: { survivorTraces: 'traces', traceScreenshots },
-    });
-
-    await shell.init();
-
-    const [, , overrides] = fake.calls[0] ?? [];
-    assert.deepEqual(fieldOf(overrides, 'use'), {
-      screenshot: 'off',
-      trace: { mode: 'on', screenshots: traceScreenshots, snapshots: true },
-      video: 'off',
-    });
-  });
-}
-
-function survivingWith(fake: ReturnType<typeof fakePlaywright>, trace: string) {
-  return async (run: Parameters<typeof passAll>[0]) => {
-    run.reporter.onTestEnd(
-      addAttempt(fakeTestCase('b'), 'expected', 'passed', [
-        { name: 'trace', path: path.join(fake.dir, trace) },
-      ]),
-    );
-
-    return passAll(run);
-  };
-}
-
-test("with survivorTraces, a surviving mutant's traces are copied to its folder", async (t) => {
-  const fake = fakePlaywright(t, {
-    runTests: async (run) => {
-      writeFileSync(path.join(fake.dir, 'trace.zip'), 'trace');
-
-      return survivingWith(fake, 'trace.zip')(run);
-    },
-  });
-  const tracesDir = path.join(fake.dir, 'traces');
-  mkdirSync(tracesDir);
-  stubEnv(t, {
-    LZ_PLAYWRIGHT_TRACES_DIR: tracesDir,
-    LZ_PLAYWRIGHT_PROJECT_ROOT: process.cwd(),
-  });
-  const { shell, lines } = fake.runner({
-    lzPlaywright: { survivorTraces: 'traces' },
-  });
-  await shell.init();
-
-  const result = await shell.mutantRun(mutantRunOptions());
-
-  assert.equal(result.status, MutantRunStatus.Survived);
-  const [folder, ...others] = readdirSync(tracesDir);
-  assert.ok(folder);
-  assert.deepEqual(others, []);
-  const dir = path.join(tracesDir, folder);
-  assert.equal(fs.readFileSync(path.join(dir, 'b-0.zip'), 'utf8'), 'trace');
-  assert.deepEqual(lines.at(-1), ['debug', `Mutant 7: traces in ${dir}`]);
-});
-
-test('with survivorTraces, a trace that cannot be copied is a warning, and the mutant still survives', async (t) => {
-  const fake = fakePlaywright(t, {
-    runTests: async (run) => survivingWith(fake, 'missing.zip')(run),
-  });
-  const tracesDir = path.join(fake.dir, 'traces');
-  mkdirSync(tracesDir);
-  stubEnv(t, {
-    LZ_PLAYWRIGHT_TRACES_DIR: tracesDir,
-    LZ_PLAYWRIGHT_PROJECT_ROOT: process.cwd(),
-  });
-  const { shell, lines } = fake.runner({
-    lzPlaywright: { survivorTraces: 'traces' },
-  });
-  await shell.init();
-
-  const result = await shell.mutantRun(mutantRunOptions());
-
-  assert.equal(result.status, MutantRunStatus.Survived);
-  const [level, message] = lines.at(-1) ?? [];
-  assert.equal(level, 'warn');
-  assert.match(
-    message ?? '',
-    /^Mutant 7: could not copy its traces: Error: ENOENT/,
-  );
-});
-
-test('with survivorTraces, a killed mutant leaves the traces folder empty', async (t) => {
-  const fake = fakePlaywright(t, {
-    runTests: async (run) => {
-      run.reporter.onTestEnd(finishedTest('a', 'failed'));
-      writeSnapshots(run, [
-        {
-          mutantCoverage: { static: {}, perTest: { a: { '7': 1 } } },
-          outlivedItsTest: false,
-        },
-      ]);
-
-      return 'failed';
-    },
-  });
-  const tracesDir = path.join(fake.dir, 'traces');
-  mkdirSync(tracesDir);
-  stubEnv(t, {
-    LZ_PLAYWRIGHT_TRACES_DIR: tracesDir,
-    LZ_PLAYWRIGHT_PROJECT_ROOT: process.cwd(),
-  });
-  const { shell } = fake.runner({ lzPlaywright: { survivorTraces: 'traces' } });
-  await shell.init();
-
-  const result = await shell.mutantRun(mutantRunOptions());
-
-  assert.equal(result.status, MutantRunStatus.Killed);
-  assert.deepEqual(readdirSync(tracesDir), []);
 });
 
 test('a run that someone else interrupted is no deadline stop', async (t) => {

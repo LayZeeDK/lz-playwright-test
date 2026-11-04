@@ -203,7 +203,7 @@ test('a trace folder without a valid mutant.json is reported, not trusted', (t) 
   );
 });
 
-test('a survivor lists a test that recorded no trace, and its recheck command names no config file when the report has none', () => {
+test('a survivor lists a test that recorded no trace', () => {
   const folders = new Map([
     [
       'src/price-tag.tsx@9:7-9:30\nEqualityOperator: a < b',
@@ -222,10 +222,7 @@ test('a survivor lists a test that recorded no trace, and its recheck command na
   ]);
 
   const described = describeSurvivors(
-    {
-      ...report({ id: '1', status: 'Survived', replacement: 'a < b' }),
-      config: {},
-    },
+    report({ id: '1', status: 'Survived', replacement: 'a < b' }),
     folders,
   );
 
@@ -236,8 +233,25 @@ test('a survivor lists a test that recorded no trace, and its recheck command na
       '  [chromium] › cart.spec.ts › totals (skipped):',
       '    no trace recorded',
       'Recheck this mutant after a test change:',
-      '  npx stryker run --mutate "src/price-tag.tsx:9:6-9:29"',
+      '  npx stryker run "stryker.config.ts" --mutate "src/price-tag.tsx:9:6-9:29"',
     ].join('\n'),
+  );
+});
+
+test('the recheck command names no config file when the report has none', () => {
+  const described = describeSurvivors(
+    {
+      ...report({ id: '1', status: 'Survived', replacement: 'a < b' }),
+      config: {},
+    },
+    new Map(),
+  );
+
+  assert.equal(
+    described.files['src/price-tag.tsx']?.mutants[0]?.description
+      ?.split('\n')
+      .at(-1),
+    '  npx stryker run --mutate "src/price-tag.tsx:9:6-9:29"',
   );
 });
 

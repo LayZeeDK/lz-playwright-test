@@ -18,7 +18,6 @@ export function describeSurvivors(
   const configFile = isRecord(report.config)
     ? report.config['configFile']
     : undefined;
-  const config = typeof configFile === 'string' ? ` "${configFile}"` : '';
   const files = Object.fromEntries(
     Object.entries(report.files).map(([fileName, file]) => [
       fileName,
@@ -32,7 +31,7 @@ export function describeSurvivors(
                   fileName,
                   mutant,
                   folders.get(reportKey(fileName, mutant)),
-                  config,
+                  typeof configFile === 'string' ? configFile : undefined,
                 ),
               }
             : mutant,
@@ -48,7 +47,7 @@ function describe(
   fileName: string,
   { location: { start, end } }: schema.MutantResult,
   folder: TraceFolder | undefined,
-  config: string,
+  configFile: string | undefined,
 ): string {
   const traces = folder
     ? [
@@ -65,11 +64,16 @@ function describe(
       ];
   // A --mutate range counts lines from 1 and columns from 0; the report counts both from 1.
   const range = `${start.line}:${start.column - 1}-${end.line}:${end.column - 1}`;
+  const command = [
+    'npx stryker run',
+    ...(configFile === undefined ? [] : [`"${configFile}"`]),
+    `--mutate "${fileName}:${range}"`,
+  ].join(' ');
 
   return [
     ...traces,
     'Recheck this mutant after a test change:',
-    `  npx stryker run${config} --mutate "${fileName}:${range}"`,
+    `  ${command}`,
   ].join('\n');
 }
 

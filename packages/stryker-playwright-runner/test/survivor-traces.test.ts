@@ -29,14 +29,14 @@ const mutant = (replacement: string, fileName = 'unused') => ({
 
 test('a mutant key uses the report positions, which count lines and columns from 1', () => {
   assert.equal(
-    mutantKey(mutant('compareAtCents < cents'), 'src/price-tag.tsx'),
+    mutantKey('src/price-tag.tsx', mutant('compareAtCents < cents')),
     'src/price-tag.tsx@9:7-9:30\nEqualityOperator: compareAtCents < cents',
   );
 });
 
 test('folder names keep apart mutants that differ only in operators', () => {
-  const less = mutantKey(mutant('compareAtCents < cents'), 'src/price-tag.tsx');
-  const more = mutantKey(mutant('compareAtCents > cents'), 'src/price-tag.tsx');
+  const less = mutantKey('src/price-tag.tsx', mutant('compareAtCents < cents'));
+  const more = mutantKey('src/price-tag.tsx', mutant('compareAtCents > cents'));
 
   assert.notEqual(folderName(less), folderName(more));
   assert.match(
@@ -45,13 +45,16 @@ test('folder names keep apart mutants that differ only in operators', () => {
   );
 });
 
-test('folder names trim long keys in the middle and replace unsafe characters', () => {
+test('folder names keep a key of up to 91 characters whole and trim a longer one in the middle', () => {
   assert.match(folderName('x'.repeat(91)), /^x{91}-[0-9a-f]{8}$/);
   assert.match(
     folderName('a'.repeat(300) + 'b'.repeat(300)),
     /^a{45}-b{45}-[0-9a-f]{8}$/,
   );
-  assert.match(folderName('a\u0000b<>c_d.é'), /^a-b-c-d-é-[0-9a-f]{8}$/);
+});
+
+test('folder names replace each run of unsafe ASCII characters with one dash and keep other characters', () => {
+  assert.match(folderName('a\u0000b<>c_d.é😀'), /^a-b-c-d-é😀-[0-9a-f]{8}$/u);
 });
 
 test('a survivor gets one trace per attempt of every test that ran, and a mutant.json with each status', (t) => {
@@ -122,7 +125,7 @@ test('cleaning the traces folder empties it, or creates it when it is missing', 
   assert.deepEqual(fs.readdirSync(fresh), []);
 });
 
-test('the runner names files relative to the project root the reporter passed, not to its sandbox', () => {
+test('the runner reads the traces folder and project root that the reporter passed, not its own sandbox', () => {
   const env = {
     [tracesDirEnv]: 'D:/p/reports/traces',
     [projectRootEnv]: 'D:/p',
@@ -132,14 +135,20 @@ test('the runner names files relative to the project root the reporter passed, n
     dir: 'D:/p/reports/traces',
     projectRoot: 'D:/p',
   });
+});
+
+test('a report file name is relative to the project root, with forward slashes', () => {
   assert.equal(
-    reportFileName('D:/p/apps/demo/src/app.tsx', 'D:/p'),
+    reportFileName(path.join('D:/p', 'apps', 'demo', 'src', 'app.tsx'), 'D:/p'),
     'apps/demo/src/app.tsx',
   );
 });
 
-test('without survivorTraces the runner reads no target, and with it the reporter must have run', () => {
+test('without survivorTraces the runner reads no traces target', () => {
   assert.equal(readTracesTarget(undefined, {}), undefined);
+});
+
+test('with survivorTraces and no lz-playwright-traces reporter the runner stops', () => {
   assert.throws(
     () => readTracesTarget('reports/traces', {}),
     /lz-playwright-traces reporter is not in reporters\. Add it: it empties the traces folder/,
