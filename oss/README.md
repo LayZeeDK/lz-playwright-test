@@ -126,3 +126,62 @@ below runs in `packages/react-virtuoso` unless it says otherwise.
    ...\sandbox-...\node_modules\@ladle\react\lib\cli\cli.js". Keep `tempDirName: '.stryker-tmp'`
    inside the package: Stryker rewrites the sandbox's `tsconfig.json` `extends` for that depth, and a
    temp folder elsewhere leaves Vite unable to load `../../tsconfig.base.json`.
+
+## tldraw: tldraw/tldraw at 12921f6
+
+The canvas case. tldraw draws its overlays and its minimap on 2D canvases, so a trace shows them only
+with `traceScreenshots`. Both configs record traces of survivors with
+screenshots, against the repo's own e2e tests on its Vite dev server (`pnpm dev` in `apps/examples`).
+
+- `tldraw/stryker.playwright.config.ts` runs the JSX mutators, and no built-in mutator, on seven
+  files the seven specs drive: comment pins, stack and composer, menu items, the rich-text shape label,
+  the live region and the minimap component.
+- `tldraw/stryker.canvas.config.ts` runs the built-in mutators on the minimap's background fill and
+  transform (`MinimapManager.ts:233-241`). The minimap spec checks only that the minimap shows, so these
+  mutants survive, and their traces show what they drew.
+
+1. Apply `tldraw/copy.patch` and copy both configs into the copy's root. The patch:
+   - sets the workspace's `@playwright/test` to 1.64.1. The root and `apps/examples` both declare
+     `^1.61.0`, below the runner's 1.63 floor;
+   - on win32-arm64 only: raises sqlite3's `node-gyp` to `^13`. sqlite3 5.1.7 ships node-gyp 8.4.1, which
+     finds neither Visual Studio 2026 nor the Windows 11 SDK, so `apps/docs` fails to install;
+   - adds `apps/examples/e2e/playwright.stryker.config.ts`: the seven specs, chromium only, no retries,
+     and the Vite dev server instead of upstream's build and preview. It leaves out the `text measurement`
+     tests, whose expected widths come from another platform's fonts: on Windows 11 arm64 "measures
+     text" measured 88.06 px against 87, and the custom `renderMethod` case 168.53 px against at most
+     167. The other specs then pass: 31 tests, 2 skipped;
+   - adds `.stryker-tmp` and `/reports` to `.gitignore`.
+2. Run `pnpm install` with the `pnpm` on your `PATH`, not the npm line above; it switches to the
+   version in `packageManager`. Through `corepack pnpm install`, the nested `pnpm` in the copy's
+   `postinstall` refuses to switch.
+3. Add the packages as dev dependencies at the root:
+   `pnpm add -D -w @stryker-mutator/core@10.1.1 file:<runner tarball> file:<mutators tarball>`, with the
+   tarballs from `npm pack` of both packages in this repo; then
+   `pnpm install --no-frozen-lockfile` and `npx playwright install chromium`.
+4. Run `npx stryker run stryker.playwright.config.ts`, then `npx stryker run stryker.canvas.config.ts`.
+   Both set `inPlace: true`: the workspace packages resolve through per-package `node_modules` links to
+   the copy's own source, so a sandbox would serve unmutated code. Copy
+   `reports/lz-playwright-traces` aside between the runs; each run empties it.
+5. Let an in-place run finish. Stryker puts the original files back only when the run ends, and a
+   stopped run leaves thousands of files instrumented; restore them from `.stryker-tmp/backup-*`. The
+   JSX run is incremental, but Stryker writes the incremental file only at the end, so a stopped run
+   keeps nothing. To fit a run into shorter slots, run one file at a time with
+   `--mutate <file>`.
+
+Results on Windows 11 arm64, one file per run, concurrency 2 for the JSX config and 1 for the canvas
+config (2026-11-04):
+
+| File | Mutants | Killed | Timed out | Survived | No coverage | Score | Run |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `MinimapManager.ts:233-241` (canvas config) | 4 | 0 | 0 | 4 | 0 | 0% | 3 min |
+| `A11y.tsx` | 5 | 0 | 0 | 5 | 0 | 0% | 12 min |
+| `thread-stack.tsx` | 15 | 3 | 0 | 12 | 0 | 20% | 4 min |
+| `thread-pin.tsx` | 25 | 7 | 0 | 17 | 1 | 28% | 4 min |
+| `RichTextLabel.tsx` | 27 | 7 | 1 | 18 | 1 | 30% | 6 min |
+| `DefaultMinimap.tsx` | 32 | 7 | 1 | 23 | 1 | 25% | 4 min |
+| `comment-composer.tsx` | 40 | 7 | 1 | 31 | 1 | 20% | 4 min |
+| `TldrawUiMenuItem.tsx` | 79 | 14 | 4 | 51 | 10 | 23% | 31 min |
+
+The `A11y.tsx` run includes Vite's cold start, the first of the JSX runs. `PlainTextLabel.tsx` is not in the config: only the
+speech-bubble example uses it, and no spec opens that example, so its run stopped in the dry run
+with "No page loaded instrumented code".

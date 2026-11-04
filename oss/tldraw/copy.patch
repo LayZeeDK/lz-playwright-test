@@ -1,0 +1,64 @@
+diff --git a/.gitignore b/.gitignore
+index 693c926..1e4f96e 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,3 +1,6 @@
++.stryker-tmp
++/reports
++
+ # Logs
+ logs
+ *.log
+diff --git a/apps/examples/e2e/playwright.stryker.config.ts b/apps/examples/e2e/playwright.stryker.config.ts
+new file mode 100644
+index 0000000..dd94004
+--- /dev/null
++++ b/apps/examples/e2e/playwright.stryker.config.ts
+@@ -0,0 +1,32 @@
++import { fileURLToPath } from 'url'
++import type { PlaywrightTestConfig } from '@playwright/test'
++import base from './playwright.config'
++
++const config: PlaywrightTestConfig = {
++	...base,
++	retries: 0,
++	// Font metrics differ by platform: on Windows 11 arm64 "measures text" measured 88.06 px against an
++	// expected 87, and the custom renderMethod case 168.53 against at most 167.
++	grepInvert: /text measurement/,
++	testMatch: [
++		'**/tests/test-commenting-a11y.spec.ts',
++		'**/tests/test-shapes.spec.ts',
++		'**/tests/test-focus.spec.ts',
++		'**/tests/test-toolbar.spec.ts',
++		'**/tests/test-text.spec.ts',
++		'**/tests/test-rich-text-toolbar.spec.ts',
++		'**/tests/test-navigation-panel.spec.ts',
++	],
++	projects: base.projects?.filter((p) => p.name === 'chromium'),
++	// Vite dev server instead of upstream's full build and preview, and no bemo worker: none of these
++	// specs talk to it.
++	webServer: {
++		command: 'pnpm dev',
++		port: 5420,
++		reuseExistingServer: true,
++		cwd: fileURLToPath(new URL('..', import.meta.url)),
++		timeout: 300_000,
++	},
++}
++
++export default config
+diff --git a/pnpm-workspace.yaml b/pnpm-workspace.yaml
+index c7ae330..b4be1ae 100644
+--- a/pnpm-workspace.yaml
++++ b/pnpm-workspace.yaml
+@@ -46,6 +46,10 @@ minimumReleaseAgeExclude:
+   - '@opentelemetry/instrumentation-winston@0.68.1'
+ 
+ overrides:
++  # Local only, win32-arm64: sqlite3's node-gyp 8 cannot find VS 2026 or the Windows 11 SDK, so it cannot build.
++  'sqlite3>node-gyp': ^13.0.0
++  # Local only: one Playwright for the workspace; the Stryker Playwright runner needs >=1.63.
++  '@playwright/test': 1.64.1
+   '@types/node': ^22.15.31
+   ws: 8.21.0
+   js-cookie: 3.0.7
