@@ -293,3 +293,56 @@ mutates the hook's one source file, `src/index.ts`, against the 8 spec files in 
 
 Result on Windows 11 arm64, concurrency 2, 5.4 minutes (2026-11-04): 43 mutants, 37 killed, 6 survived, none
 without coverage, a score of 86%. The dry run ran the 47 tests in 34 seconds.
+
+## punktlandung: davidvornholt/punktlandung at 0972969
+
+The second component-test case, a React app in a bun workspace. Its `apps/web` package has 13
+`*.story-test.ts` specs in the same stories model as use-debouncy: each test calls `mount('<story id>')`, and a
+Vite server started with `playwright/vite.config.ts` serves the gallery page that renders the stories. The
+config mutates 10 feature components that the specs mount, with the built-in mutators and the JSX mutators.
+
+1. Apply `punktlandung/copy.patch` at the repo root and copy `punktlandung/stryker.ct.config.ts` into
+   `apps/web`. The patch:
+   - adds `apps/web/playwright.stryker.config.ts`, which extends upstream's `playwright-stories.config.ts` with
+     no retries and a `webServer` that runs `node node_modules/vite/bin/vite.js`. Upstream runs
+     `./node_modules/.bin/vite`, which cmd.exe cannot run, and `npx vite` is no way out: bun writes only `.exe`
+     shims to `node_modules/.bin`, which npx does not see, so it can fetch a package of that name from the
+     registry instead, as `npx stryker` does (step 3). The server is also reused (`reuseExistingServer: true`), so all test runner processes share it;
+   - adds `.stryker-tmp` and `/reports` to a new `apps/web/.gitignore`.
+2. Run `bun install` at the repo root (bun 1.4.4 was used; the repo names 1.4.3), then in `apps/web`
+   `bun add -d @stryker-mutator/core@10.1.1 <runner tarball> <JSX mutators tarball>`.
+3. In `apps/web`, run `node node_modules/@playwright/test/cli.js install chromium`. Plain
+   `node node_modules/@playwright/test/cli.js test -c playwright.stryker.config.ts --workers=2` then passes 49
+   tests in 22 to 26 seconds with Playwright 1.64.1. Call both CLIs through `node`: `npx stryker` runs the
+   unrelated `stryker` 1.0.1 package from the registry, which stops with "Cannot find module 'rx'".
+4. Run `node node_modules/@stryker-mutator/core/bin/stryker.js run stryker.ct.config.ts`. It runs in place:
+   the `#/` imports resolve through the workspace's tsconfig paths and bun's links back to the package, so a
+   sandbox would serve unmutated code, and Stryker 10.1.1 cannot rewrite a sandbox's `tsconfig.json` with
+   TypeScript 7 (see use-debouncy). The config's brace globs work in the file; on the command line,
+   `--mutate` takes a comma-separated list.
+
+Results on Windows 11 arm64 (2026-11-04), in five incremental runs of one to three files, concurrency 1 to 3 as
+free memory and busy cores allowed:
+
+| File | Mutants | Killed | Timed out | Survived | No coverage | Score |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `noten/ui/upcoming-block.tsx` | 56 | 35 | 5 | 15 | 1 | 71% |
+| `noten/ui/trend-chart.tsx` | 125 | 48 | 1 | 75 | 1 | 39% |
+| `noten/ui/noten-list.tsx` | 71 | 29 | 27 | 15 | 0 | 79% |
+| `noten/ui/leistung-detail.tsx` | 94 | 48 | 7 | 29 | 10 | 59% |
+| `halbjahre/ui/halbjahre-management.tsx` | 1 | 0 | 0 | 0 | 1 | 0% |
+| `halbjahre/ui/halbjahr-form.tsx` | 110 | 65 | 7 | 31 | 7 | 65% |
+| `halbjahre/ui/conversion-reference.tsx` | 20 | 13 | 2 | 5 | 0 | 75% |
+| `lernen/ui/learned-for-leistung.tsx` | 25 | 10 | 5 | 7 | 3 | 60% |
+| `faecher/ui/gewichtung-field.tsx` | 56 | 13 | 0 | 43 | 0 | 23% |
+| `faecher/ui/fach-form.tsx` | 40 | 16 | 5 | 18 | 1 | 53% |
+| Total | 598 | 277 | 59 | 238 | 24 | 56% |
+
+The paths are under `apps/web/src/features/`. The five runs took 4.5 to 14 minutes each, 44 minutes in all.
+The first three ran with `timeoutMS: 10_000`; the runner warned that this is below the 10,600 ms it suggests, so
+some kills may count as timeouts there, such as noten-list's 27. The last two, and the config here, use
+`11_000`. gewichtung-field's low score comes from its tests, not the runner. Its two tests check the radio
+choice between one list and a fixed ratio, the ratio inputs and one preset. No assertion reads the rows per
+type of grade, and the survivors sit there: the rows that map GFS, other grades and tests onto another grade
+type (`controlFor`), the split of the rows into written and oral, their event handlers, and the summary line
+below them. halbjahre-management is a 6-line wrapper whose single mutant no spec reaches.
