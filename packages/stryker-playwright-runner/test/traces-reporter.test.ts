@@ -52,18 +52,35 @@ function tracedReporter(survivorTraces: string) {
   return { reporter, lines };
 }
 
-test('with survivorTraces, the reporter empties the folder, hands its path and the project root to the test runner processes, and warns that tracing changes timing', (t) => {
+test('with survivorTraces, the reporter empties the folder', (t) => {
   isolateEnv(t);
   const dir = path.join(
     tempTree(t, 'lz-traces-reporter-', { 'traces/stale.zip': '' }),
     'traces',
   );
 
-  const { lines } = tracedReporter(dir);
+  tracedReporter(dir);
 
   assert.deepEqual(fs.readdirSync(dir), []);
+});
+
+test('with survivorTraces, the reporter hands the folder and the project root to the test runner processes', (t) => {
+  isolateEnv(t);
+  const dir = path.join(tempTree(t, 'lz-traces-reporter-'), 'traces');
+
+  tracedReporter(dir);
+
   assert.equal(process.env[tracesDirEnv], dir);
   assert.equal(process.env[projectRootEnv], process.cwd());
+});
+
+test('with survivorTraces, the reporter warns that tracing can change timing', (t) => {
+  isolateEnv(t);
+
+  const { lines } = tracedReporter(
+    path.join(tempTree(t, 'lz-traces-reporter-'), 'traces'),
+  );
+
   assert.deepEqual(lines, [
     [
       'warn',
@@ -76,6 +93,11 @@ for (const survivorTraces of ['', '.', '..', path.parse(process.cwd()).root]) {
   test(`the reporter refuses survivorTraces "${survivorTraces}", which holds the project, and empties nothing`, (t) => {
     isolateEnv(t);
     const { log } = logger();
+    const rmSync = t.mock.method(fs, 'rmSync', () => {
+      throw new Error(
+        'the reporter tried to empty a folder that holds the project',
+      );
+    });
 
     assert.throws(
       () =>
@@ -86,11 +108,11 @@ for (const survivorTraces of ['', '.', '..', path.parse(process.cwd()).root]) {
       /which holds the project, and the lz-playwright-traces reporter empties that folder/,
     );
     assert.equal(process.env[tracesDirEnv], undefined);
-    assert.notDeepEqual(fs.readdirSync(process.cwd()), []);
+    assert.equal(rmSync.mock.callCount(), 0);
   });
 }
 
-test('the reporter accepts a folder outside the project', (t) => {
+test('the reporter accepts a folder on another drive or under another root', (t) => {
   isolateEnv(t);
   const dir = path.join(tempTree(t, 'lz-traces-reporter-'), 'traces');
 
@@ -98,6 +120,35 @@ test('the reporter accepts a folder outside the project', (t) => {
 
   assert.equal(process.env[tracesDirEnv], dir);
 });
+
+function inTempProject(t: TestContext): string {
+  const cwd = process.cwd();
+  // Registered before tempTree's removal, which Windows refuses while the folder is the cwd.
+  t.after(() => process.chdir(cwd));
+  const tmp = tempTree(t, 'lz-traces-reporter-', {
+    'project/package.json': '{}',
+  });
+  process.chdir(path.join(tmp, 'project'));
+
+  return tmp;
+}
+
+for (const [where, survivorTraces, folder] of [
+  ['beside the project', '../traces', 'traces'],
+  ['inside the project', 'reports/traces', 'project/reports/traces'],
+] as const) {
+  test(`the reporter accepts a folder ${where}`, (t) => {
+    isolateEnv(t);
+    const tmp = inTempProject(t);
+
+    tracedReporter(survivorTraces);
+
+    assert.equal(
+      fs.realpathSync(process.env[tracesDirEnv] ?? ''),
+      fs.realpathSync(path.join(tmp, folder)),
+    );
+  });
+}
 
 test("at the end, the reporter writes index.html with Stryker's report app and each survivor's traces", (t) => {
   isolateEnv(t);
@@ -152,7 +203,7 @@ test('at the end, the reporter names the trace folders it could not read', (t) =
   ]);
 });
 
-test('without survivorTraces, the reporter warns that it does nothing, and leaves the environment and the report alone', (t) => {
+test('without survivorTraces, the reporter warns once that it does nothing and sets no environment', (t) => {
   isolateEnv(t);
   const { log, lines } = logger();
 
