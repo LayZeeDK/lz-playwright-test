@@ -1,46 +1,51 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { isRecord } from '../src/is-record.ts';
-import type { ReportedTest } from '../src/reporter.ts';
 import {
   cleanTracesDir,
   copySurvivorTraces,
   folderName,
+  mutantFile,
   mutantKey,
   projectRootEnv,
   readTracesTarget,
   reportFileName,
   tracesDirEnv,
 } from '../src/survivor-traces.ts';
+import { addAttempt, fakeTestCase, tempTree } from './support/doubles.ts';
 
 const location = {
   start: { line: 8, column: 6 },
   end: { line: 8, column: 29 },
 };
-const mutant = (replacement: string) => ({
-  fileName: 'unused',
+const mutant = (replacement: string, fileName = 'unused') => ({
+  fileName,
   mutatorName: 'EqualityOperator',
   replacement,
   location,
 });
 
-test('the key uses the report positions, and folder names keep apart mutants that differ only in operators', () => {
+test('a mutant key uses the report positions, which count lines and columns from 1', () => {
+  assert.equal(
+    mutantKey(mutant('compareAtCents < cents'), 'src/price-tag.tsx'),
+    'src/price-tag.tsx@9:7-9:30\nEqualityOperator: compareAtCents < cents',
+  );
+});
+
+test('folder names keep apart mutants that differ only in operators', () => {
   const less = mutantKey(mutant('compareAtCents < cents'), 'src/price-tag.tsx');
   const more = mutantKey(mutant('compareAtCents > cents'), 'src/price-tag.tsx');
 
-  assert.equal(
-    less,
-    'src/price-tag.tsx@9:7-9:30\nEqualityOperator: compareAtCents < cents',
-  );
   assert.notEqual(folderName(less), folderName(more));
   assert.match(
     folderName(less),
     /^src-price-tag-tsx-9-7-9-30-EqualityOperator-compareAtCents-cents-[0-9a-f]{8}$/,
   );
+});
+
+test('folder names trim long keys in the middle and replace unsafe characters', () => {
   assert.match(folderName('x'.repeat(91)), /^x{91}-[0-9a-f]{8}$/);
   assert.match(
     folderName('a'.repeat(300) + 'b'.repeat(300)),
@@ -49,81 +54,72 @@ test('the key uses the report positions, and folder names keep apart mutants tha
   assert.match(folderName('a\u0000b<>c_d.é'), /^a-b-c-d-é-[0-9a-f]{8}$/);
 });
 
-function reportedTest(
-  id: string,
-  attempts: { status: 'passed' | 'failed'; trace?: string }[],
-): ReportedTest {
-  return {
-    id,
-    expectedStatus: 'passed',
-    location: { file: 'a.spec.ts', line: 1, column: 1 },
-    parent: undefined,
-    titlePath: () => ['', 'chromium', 'a.spec.ts', `test ${id}`],
-    outcome: () => 'expected',
-    results: attempts.map(({ status, trace }) => ({
-      status,
-      duration: 1,
-      attachments: [
-        { name: 'screenshot', path: 'missing.png' },
-        { name: 'trace' },
-        ...(trace ? [{ name: 'trace', path: trace }] : []),
+test('a survivor gets one trace per attempt of every test that ran, and a mutant.json with each status', (t) => {
+  const tmp = tempTree(t, 'lz-traces-test-', {
+    'first.zip': 'one',
+    'retry.zip': 'two',
+  });
+  const traces = path.join(tmp, 'reports', 'traces');
+  const trace = (file: string) => [
+    { name: 'screenshot', path: 'missing.png' },
+    { name: 'trace' },
+    { name: 'trace', path: path.join(tmp, file) },
+  ];
+  const retried = addAttempt(
+    addAttempt(fakeTestCase('t1'), 'flaky', 'failed', trace('first.zip')),
+    'flaky',
+    'passed',
+    trace('retry.zip'),
+  );
+  const untraced = addAttempt(fakeTestCase('t2'), 'expected', 'passed');
+
+  const dir = copySurvivorTraces(
+    { dir: traces, projectRoot: tmp },
+    mutant('a > b', path.join(tmp, 'src', 'a.ts')),
+    [retried, untraced],
+  );
+
+  assert.equal(path.dirname(dir), traces);
+  assert.deepEqual(fs.readdirSync(dir).sort(), [
+    mutantFile,
+    't1-0.zip',
+    't1-1.zip',
+  ]);
+  assert.equal(fs.readFileSync(path.join(dir, 't1-1.zip'), 'utf8'), 'two');
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(path.join(dir, mutantFile), 'utf8')),
+    {
+      key: 'src/a.ts@9:7-9:30\nEqualityOperator: a > b',
+      tests: [
+        {
+          test: '[e2e] › app.spec.ts › t1',
+          attempt: 0,
+          status: 'failed',
+          trace: 't1-0.zip',
+        },
+        {
+          test: '[e2e] › app.spec.ts › t1',
+          attempt: 1,
+          status: 'passed',
+          trace: 't1-1.zip',
+        },
+        { test: '[e2e] › app.spec.ts › t2', attempt: 0, status: 'passed' },
       ],
-    })),
-  };
-}
+    },
+  );
+});
 
-test('a survivor gets one trace per attempt of every test that ran, and a mutant.json with each status', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'lz-traces-test-'));
+test('cleaning the traces folder empties it, or creates it when it is missing', (t) => {
+  const tmp = tempTree(t, 'lz-traces-test-', {
+    'traces/old/mutant.json': '{}',
+  });
+  const fresh = path.join(tmp, 'new', 'traces');
 
-  try {
-    const traces = path.join(tmp, 'reports', 'traces');
-    const first = path.join(tmp, 'first.zip');
-    const retry = path.join(tmp, 'retry.zip');
-    fs.writeFileSync(first, 'one');
-    fs.writeFileSync(retry, 'two');
+  cleanTracesDir(path.join(tmp, 'traces'));
+  cleanTracesDir(fresh);
 
-    const dir = copySurvivorTraces(traces, mutant('a > b'), 'src/a.ts', [
-      reportedTest('t1', [
-        { status: 'failed', trace: first },
-        { status: 'passed', trace: retry },
-      ]),
-      reportedTest('t2', [{ status: 'passed' }]),
-    ]);
-    const written: unknown = JSON.parse(
-      fs.readFileSync(path.join(dir, 'mutant.json'), 'utf8'),
-    );
-
-    assert.deepEqual(fs.readdirSync(dir).sort(), [
-      'mutant.json',
-      't1-0.zip',
-      't1-1.zip',
-    ]);
-    assert.equal(fs.readFileSync(path.join(dir, 't1-1.zip'), 'utf8'), 'two');
-    assert.ok(isRecord(written));
-    assert.deepEqual(written['tests'], [
-      {
-        test: 'chromium › a.spec.ts › test t1',
-        attempt: 0,
-        status: 'failed',
-        trace: 't1-0.zip',
-      },
-      {
-        test: 'chromium › a.spec.ts › test t1',
-        attempt: 1,
-        status: 'passed',
-        trace: 't1-1.zip',
-      },
-      { test: 'chromium › a.spec.ts › test t2', attempt: 0, status: 'passed' },
-    ]);
-
-    cleanTracesDir(traces);
-    assert.deepEqual(fs.readdirSync(traces), []);
-    const fresh = path.join(tmp, 'new', 'reports', 'traces');
-    cleanTracesDir(fresh);
-    assert.deepEqual(fs.readdirSync(fresh), []);
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
+  assert.deepEqual(fs.readdirSync(path.join(tmp, 'traces')), []);
+  assert.deepEqual(fs.readdirSync(fresh), []);
 });
 
 test('the runner names files relative to the project root the reporter passed, not to its sandbox', () => {
@@ -140,7 +136,10 @@ test('the runner names files relative to the project root the reporter passed, n
     reportFileName('D:/p/apps/demo/src/app.tsx', 'D:/p'),
     'apps/demo/src/app.tsx',
   );
-  assert.equal(readTracesTarget(undefined, env), undefined);
+});
+
+test('without survivorTraces the runner reads no target, and with it the reporter must have run', () => {
+  assert.equal(readTracesTarget(undefined, {}), undefined);
   assert.throws(
     () => readTracesTarget('reports/traces', {}),
     /lz-playwright-traces reporter is not in reporters\. Add it: it empties the traces folder/,

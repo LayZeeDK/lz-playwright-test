@@ -1,18 +1,17 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 
 import type { schema } from '@stryker-mutator/api/core';
 
-import type { ReportedTest } from '../src/reporter.ts';
-import { copySurvivorTraces } from '../src/survivor-traces.ts';
+import { copySurvivorTraces, mutantFile } from '../src/survivor-traces.ts';
 import {
   describeSurvivors,
   indexHtml,
   readTraceFolders,
 } from '../src/traces-index.ts';
+import { addAttempt, fakeTestCase, tempTree } from './support/doubles.ts';
 
 const location = {
   start: { line: 9, column: 7 },
@@ -40,16 +39,6 @@ function report(
   };
 }
 
-const untracedTest: ReportedTest = {
-  id: 't1',
-  expectedStatus: 'skipped',
-  location: { file: 'cart.spec.ts', line: 1, column: 1 },
-  parent: undefined,
-  titlePath: () => ['', 'chromium', 'cart.spec.ts', 'totals'],
-  outcome: () => 'skipped',
-  results: [{ status: 'skipped', duration: 0, attachments: [] }],
-};
-
 test('a survivor without a trace folder says its result has no trace from this run, and other mutants stay as they are', () => {
   const killed = { id: '2', status: 'Killed', replacement: 'a > b' } as const;
 
@@ -62,9 +51,9 @@ test('a survivor without a trace folder says its result has no trace from this r
   assert.equal(
     survivor?.description,
     [
-      'No trace from this run: incremental mode reused this result. Recheck it to record one.',
+      'No trace from this run: incremental mode reused this result, or copying its traces failed. Recheck it to record one.',
       'Recheck this mutant after a test change:',
-      '  npx stryker run stryker.config.ts --mutate "src/price-tag.tsx:9:7-9:30"',
+      '  npx stryker run "stryker.config.ts" --mutate "src/price-tag.tsx:9:6-9:29"',
     ].join('\n'),
   );
   assert.deepEqual(other, {
@@ -74,7 +63,7 @@ test('a survivor without a trace folder says its result has no trace from this r
   });
 });
 
-test('a survivor with a trace folder lists one show-trace command per trace and its recheck command', () => {
+test('a survivor with a trace folder lists one show-trace command per attempt, marking retries, and its recheck command', () => {
   const dir = path.join(
     'D:/p/reports/lz-playwright-traces',
     'src-price-tag-tsx-9-7-9-30-EqualityOperator-a-b-1234abcd',
@@ -86,13 +75,19 @@ test('a survivor with a trace folder lists one show-trace command per trace and 
         dir,
         traces: [
           {
-            test: 'chromium › cart.spec.ts › totals',
+            test: '[chromium] › cart.spec.ts › totals',
             attempt: 0,
-            status: 'passed',
+            status: 'failed',
             trace: '7f-0.zip',
           },
           {
-            test: 'chromium › cart.spec.ts › subtotal',
+            test: '[chromium] › cart.spec.ts › totals',
+            attempt: 1,
+            status: 'passed',
+            trace: '7f-1.zip',
+          },
+          {
+            test: '[chromium] › cart.spec.ts › subtotal',
             attempt: 0,
             status: 'passed',
             trace: '8a-0.zip',
@@ -111,112 +106,101 @@ test('a survivor with a trace folder lists one show-trace command per trace and 
     described.files['src/price-tag.tsx']?.mutants[0]?.description,
     [
       'Traces of this mutant run:',
-      '  chromium › cart.spec.ts › totals (passed):',
+      '  [chromium] › cart.spec.ts › totals (failed):',
       `    npx playwright show-trace "${path.join(dir, '7f-0.zip')}"`,
-      '  chromium › cart.spec.ts › subtotal (passed):',
+      '  [chromium] › cart.spec.ts › totals (retry 1, passed):',
+      `    npx playwright show-trace "${path.join(dir, '7f-1.zip')}"`,
+      '  [chromium] › cart.spec.ts › subtotal (passed):',
       `    npx playwright show-trace "${path.join(dir, '8a-0.zip')}"`,
       'Recheck this mutant after a test change:',
-      '  npx stryker run stryker.config.ts --mutate "src/price-tag.tsx:9:7-9:30"',
+      '  npx stryker run "stryker.config.ts" --mutate "src/price-tag.tsx:9:6-9:29"',
     ].join('\n'),
   );
 });
 
-test('trace folders are read back by key from what the runner wrote, and a folder without a valid mutant.json is reported, not trusted', () => {
-  const tracesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lz-traces-index-'));
-
-  try {
-    const zip = path.join(tracesDir, 'trace.zip');
-    fs.writeFileSync(zip, '');
-    const tracedTest: ReportedTest = {
-      ...untracedTest,
-      id: 't2',
-      titlePath: () => ['', 'chromium', 'cart.spec.ts', 'subtotal'],
-      results: [
-        {
-          status: 'passed',
-          duration: 1,
-          attachments: [{ name: 'trace', path: zip }],
-        },
-      ],
-    };
-    const dir = copySurvivorTraces(
-      tracesDir,
-      {
-        fileName: 'unused',
-        mutatorName: 'EqualityOperator',
-        replacement: 'a < b',
-        location: {
-          start: { line: 8, column: 6 },
-          end: { line: 8, column: 29 },
-        },
+test('trace folders are read back by the key the report uses, from what the runner wrote', (t) => {
+  const project = tempTree(t, 'lz-traces-index-', { 'trace.zip': '' });
+  const tracesDir = path.join(project, 'traces');
+  const dir = copySurvivorTraces(
+    { dir: tracesDir, projectRoot: project },
+    {
+      fileName: path.join(project, 'src', 'price-tag.tsx'),
+      mutatorName: 'EqualityOperator',
+      replacement: 'a < b',
+      location: {
+        start: { line: 8, column: 6 },
+        end: { line: 8, column: 29 },
       },
-      'src/price-tag.tsx',
-      [untracedTest, tracedTest],
-    );
-    const broken = (name: string, json: string) => {
-      fs.mkdirSync(path.join(tracesDir, name));
-      fs.writeFileSync(path.join(tracesDir, name, 'mutant.json'), json);
-    };
-    broken('key-not-text', '{"key": 3, "tests": []}');
-    broken(
-      'trace-not-text',
-      '{"key": "k", "tests": [{"test": "t", "attempt": 0, "status": "passed", "trace": 3}]}',
-    );
-    broken(
-      'attempt-not-number',
-      '{"key": "k", "tests": [{"test": "t", "attempt": "0", "status": "passed"}]}',
-    );
-    broken(
-      'test-not-text',
-      '{"key": "k", "tests": [{"test": 1, "attempt": 0, "status": "passed"}]}',
-    );
-    broken(
-      'status-not-text',
-      '{"key": "k", "tests": [{"test": "t", "attempt": 0, "status": null}]}',
-    );
-    broken('not-json', '{');
-    fs.writeFileSync(path.join(tracesDir, 'index.html'), '');
+    },
+    [
+      addAttempt(fakeTestCase('t1'), 'skipped', 'skipped'),
+      addAttempt(fakeTestCase('t2'), 'expected', 'passed', [
+        { name: 'trace', path: path.join(project, 'trace.zip') },
+      ]),
+    ],
+  );
+  fs.writeFileSync(path.join(tracesDir, 'index.html'), '');
 
-    const { folders, unreadable } = readTraceFolders(tracesDir);
+  const { folders, unreadable } = readTraceFolders(tracesDir);
 
-    assert.deepEqual(
-      [...folders],
+  assert.deepEqual(
+    [...folders],
+    [
       [
-        [
-          'src/price-tag.tsx@9:7-9:30\nEqualityOperator: a < b',
-          {
-            dir,
-            traces: [
-              {
-                test: 'chromium › cart.spec.ts › totals',
-                attempt: 0,
-                status: 'skipped',
-              },
-              {
-                test: 'chromium › cart.spec.ts › subtotal',
-                attempt: 0,
-                status: 'passed',
-                trace: 't2-0.zip',
-              },
-            ],
-          },
-        ],
+        'src/price-tag.tsx@9:7-9:30\nEqualityOperator: a < b',
+        {
+          dir,
+          traces: [
+            { test: '[e2e] › app.spec.ts › t1', attempt: 0, status: 'skipped' },
+            {
+              test: '[e2e] › app.spec.ts › t2',
+              attempt: 0,
+              status: 'passed',
+              trace: 't2-0.zip',
+            },
+          ],
+        },
       ],
-    );
-    assert.deepEqual(
-      [...unreadable].sort(),
-      [
-        'attempt-not-number',
-        'key-not-text',
-        'not-json',
-        'status-not-text',
-        'test-not-text',
-        'trace-not-text',
-      ].map((name) => path.join(tracesDir, name)),
-    );
-  } finally {
-    fs.rmSync(tracesDir, { recursive: true, force: true });
-  }
+    ],
+  );
+  assert.deepEqual(unreadable, []);
+});
+
+test('a trace folder without a valid mutant.json is reported, not trusted', (t) => {
+  const broken = {
+    'key-not-text': '{"key": 3, "tests": []}',
+    'trace-not-text':
+      '{"key": "k", "tests": [{"test": "t", "attempt": 0, "status": "passed", "trace": 3}]}',
+    'attempt-not-number':
+      '{"key": "k", "tests": [{"test": "t", "attempt": "0", "status": "passed"}]}',
+    'test-not-text':
+      '{"key": "k", "tests": [{"test": 1, "attempt": 0, "status": "passed"}]}',
+    'status-not-text':
+      '{"key": "k", "tests": [{"test": "t", "attempt": 0, "status": null}]}',
+    'tests-not-list': '{"key": "k", "tests": {}}',
+    'not-json': '{',
+  };
+  const tracesDir = tempTree(
+    t,
+    'lz-traces-index-',
+    Object.fromEntries(
+      Object.entries(broken).map(([name, json]) => [
+        path.join(name, mutantFile),
+        json,
+      ]),
+    ),
+  );
+  fs.mkdirSync(path.join(tracesDir, 'no-mutant-json'));
+
+  const { folders, unreadable } = readTraceFolders(tracesDir);
+
+  assert.equal(folders.size, 0);
+  assert.deepEqual(
+    [...unreadable].sort(),
+    [...Object.keys(broken), 'no-mutant-json']
+      .sort()
+      .map((name) => path.join(tracesDir, name)),
+  );
 });
 
 test('a survivor lists a test that recorded no trace, and its recheck command names no config file when the report has none', () => {
@@ -227,7 +211,7 @@ test('a survivor lists a test that recorded no trace, and its recheck command na
         dir: 'traces',
         traces: [
           {
-            test: 'chromium › cart.spec.ts › totals',
+            test: '[chromium] › cart.spec.ts › totals',
             attempt: 0,
             status: 'skipped',
             trace: undefined,
@@ -249,10 +233,10 @@ test('a survivor lists a test that recorded no trace, and its recheck command na
     described.files['src/price-tag.tsx']?.mutants[0]?.description,
     [
       'Traces of this mutant run:',
-      '  chromium › cart.spec.ts › totals (skipped):',
+      '  [chromium] › cart.spec.ts › totals (skipped):',
       '    no trace recorded',
       'Recheck this mutant after a test change:',
-      '  npx stryker run --mutate "src/price-tag.tsx:9:7-9:30"',
+      '  npx stryker run --mutate "src/price-tag.tsx:9:6-9:29"',
     ].join('\n'),
   );
 });

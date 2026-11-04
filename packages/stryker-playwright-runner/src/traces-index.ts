@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { schema } from '@stryker-mutator/api/core';
 
 import { isRecord } from './is-record.ts';
-import { type CopiedTrace, mutantRange, reportKey } from './survivor-traces.ts';
+import { type CopiedTrace, mutantFile, reportKey } from './survivor-traces.ts';
 
 export interface TraceFolder {
   readonly dir: string;
@@ -18,6 +18,7 @@ export function describeSurvivors(
   const configFile = isRecord(report.config)
     ? report.config['configFile']
     : undefined;
+  const config = typeof configFile === 'string' ? ` "${configFile}"` : '';
   const files = Object.fromEntries(
     Object.entries(report.files).map(([fileName, file]) => [
       fileName,
@@ -30,8 +31,8 @@ export function describeSurvivors(
                 description: describe(
                   fileName,
                   mutant,
-                  folders,
-                  typeof configFile === 'string' ? configFile : undefined,
+                  folders.get(reportKey(fileName, mutant)),
+                  config,
                 ),
               }
             : mutant,
@@ -45,30 +46,30 @@ export function describeSurvivors(
 
 function describe(
   fileName: string,
-  mutant: schema.MutantResult,
-  folders: ReadonlyMap<string, TraceFolder>,
-  configFile: string | undefined,
+  { location: { start, end } }: schema.MutantResult,
+  folder: TraceFolder | undefined,
+  config: string,
 ): string {
-  const folder = folders.get(reportKey(fileName, mutant));
   const traces = folder
     ? [
         'Traces of this mutant run:',
-        ...folder.traces.flatMap(({ test, status, trace }) => [
-          `  ${test} (${status}):`,
+        ...folder.traces.flatMap(({ test, attempt, status, trace }) => [
+          `  ${test} (${attempt > 0 ? `retry ${attempt}, ` : ''}${status}):`,
           trace
             ? `    npx playwright show-trace "${path.join(folder.dir, trace)}"`
             : '    no trace recorded',
         ]),
       ]
     : [
-        'No trace from this run: incremental mode reused this result. Recheck it to record one.',
+        'No trace from this run: incremental mode reused this result, or copying its traces failed. Recheck it to record one.',
       ];
-  const config = configFile ? ` ${configFile}` : '';
+  // A --mutate range counts lines from 1 and columns from 0; the report counts both from 1.
+  const range = `${start.line}:${start.column - 1}-${end.line}:${end.column - 1}`;
 
   return [
     ...traces,
     'Recheck this mutant after a test change:',
-    `  npx stryker run${config} --mutate "${fileName}:${mutantRange(mutant.location)}"`,
+    `  npx stryker run${config} --mutate "${fileName}:${range}"`,
   ].join('\n');
 }
 
@@ -85,7 +86,7 @@ export function readTraceFolders(tracesDir: string): {
     }
 
     const dir = path.join(tracesDir, entry.name);
-    const written = readJson(path.join(dir, 'mutant.json'));
+    const written = readJson(path.join(dir, mutantFile));
 
     if (
       isRecord(written) &&

@@ -8,15 +8,18 @@ export interface LzPlaywrightOptions {
   readonly workers?: number;
   readonly retries?: number;
   readonly survivorTraces?: string;
+  readonly traceScreenshots?: boolean;
 }
 
 type JsonType<T> = T extends string
   ? 'string'
   : T extends number
     ? 'integer'
-    : T extends readonly string[]
-      ? 'array'
-      : never;
+    : T extends boolean
+      ? 'boolean'
+      : T extends readonly string[]
+        ? 'array'
+        : never;
 
 type OptionSchemas = {
   [K in keyof Required<LzPlaywrightOptions>]: {
@@ -55,7 +58,13 @@ export const optionProperties = {
   survivorTraces: {
     type: 'string',
     description:
-      'Folder, relative to the project root, for the Playwright traces of surviving mutants. Records a trace of every test run; needs the lz-playwright-traces reporter.',
+      'Folder, relative to the folder you run Stryker from, for the Playwright traces of surviving mutants. Records a trace of every test run; needs the lz-playwright-traces reporter.',
+  },
+  traceScreenshots: {
+    type: 'boolean',
+    default: false,
+    description:
+      'Add screenshots to the traces that survivorTraces records. The trace viewer needs them to show canvas content; they make each trace several times larger.',
   },
 } satisfies OptionSchemas;
 
@@ -78,6 +87,7 @@ export interface RunnerOptions {
   readonly workers: number;
   readonly retries: number | undefined;
   readonly survivorTraces: string | undefined;
+  readonly traceScreenshots: boolean;
   readonly strykerTimeoutMS: number;
 }
 
@@ -93,6 +103,8 @@ const optionGuards = {
   workers: (value) => value === undefined || typeof value === 'number',
   retries: (value) => value === undefined || typeof value === 'number',
   survivorTraces: (value) => value === undefined || typeof value === 'string',
+  traceScreenshots: (value) =>
+    value === undefined || typeof value === 'boolean',
 } satisfies {
   readonly [K in keyof LzPlaywrightOptions]-?: (
     value: unknown,
@@ -111,14 +123,22 @@ export function readRunnerOptions(
   const own = options.lzPlaywright ?? {};
 
   if (isRecord(own) && !Array.isArray(own)) {
-    const { configFile, projects, workers, retries, survivorTraces } = own;
+    const {
+      configFile,
+      projects,
+      workers,
+      retries,
+      survivorTraces,
+      traceScreenshots,
+    } = own;
 
     if (
       optionGuards.configFile(configFile) &&
       optionGuards.projects(projects) &&
       optionGuards.workers(workers) &&
       optionGuards.retries(retries) &&
-      optionGuards.survivorTraces(survivorTraces)
+      optionGuards.survivorTraces(survivorTraces) &&
+      optionGuards.traceScreenshots(traceScreenshots)
     ) {
       const workerCount = workers ?? optionProperties.workers.default;
 
@@ -135,6 +155,8 @@ export function readRunnerOptions(
           workers: workerCount,
           retries,
           survivorTraces,
+          traceScreenshots:
+            traceScreenshots ?? optionProperties.traceScreenshots.default,
           strykerTimeoutMS: options.timeoutMS,
         };
       }

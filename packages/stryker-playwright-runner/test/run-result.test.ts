@@ -423,7 +423,9 @@ test('a dry run merges the coverage of every snapshot exactly and reports the ga
 function withAttempt(id: string, startTime: Date, duration: number) {
   return {
     ...fakeTestCase(id),
-    results: [{ status: 'passed' as const, startTime, duration }],
+    results: [
+      { status: 'passed' as const, startTime, duration, attachments: [] },
+    ],
   };
 }
 
@@ -433,8 +435,18 @@ test('a server request without a test id counts for every test that ran when it 
     {
       ...withAttempt('b', new Date(1050), 100),
       results: [
-        { status: 'failed', startTime: new Date(1050), duration: 100 },
-        { status: 'passed', startTime: new Date(1060), duration: 100 },
+        {
+          status: 'failed',
+          startTime: new Date(1050),
+          duration: 100,
+          attachments: [],
+        },
+        {
+          status: 'passed',
+          startTime: new Date(1060),
+          duration: 100,
+          attachments: [],
+        },
       ],
     },
     fakeTestCase('never-started'),

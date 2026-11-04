@@ -50,6 +50,15 @@ export class LzPlaywrightTracesReporter implements Reporter {
     }
 
     this.#dir = path.resolve(survivorTraces);
+    const toProject = path.relative(this.#dir, process.cwd());
+
+    if (!path.isAbsolute(toProject) && toProject.split(path.sep)[0] !== '..') {
+      throw new Error(
+        `lzPlaywright.survivorTraces is ${this.#dir}, which holds the project, and the lz-playwright-traces ` +
+          'reporter empties that folder. Choose a folder inside the project, such as reports/lz-playwright-traces.',
+      );
+    }
+
     cleanTracesDir(this.#dir);
     process.env[tracesDirEnv] = this.#dir;
     process.env[projectRootEnv] = process.cwd();

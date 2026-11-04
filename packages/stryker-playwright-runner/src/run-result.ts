@@ -413,7 +413,7 @@ function testStatus(
     : statusByOutcome[outcome];
 }
 
-function testName(test: ReportedTest): string {
+export function testName(test: ReportedTest): string {
   // The root suite's title is the empty first one.
   const [project = '', ...rest] = test.titlePath().filter(Boolean);
 

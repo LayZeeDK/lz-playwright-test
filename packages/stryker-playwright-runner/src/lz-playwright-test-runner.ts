@@ -63,7 +63,6 @@ import {
 import {
   copySurvivorTraces,
   readTracesTarget,
-  reportFileName,
   type TracesTarget,
 } from './survivor-traces.ts';
 import { claimTempRoot, removeDir, type TempRoot } from './temp-root.ts';
@@ -106,16 +105,10 @@ const workerHookUrl = hookUrl('worker-hook');
 const serverHookUrl = hookUrl('server-hook');
 const hookedWaitMs = 1000;
 
-const traceWithoutScreenshots = {
-  mode: 'on',
-  screenshots: false,
-  snapshots: true,
-} as const;
-
-const runOverrides = (traced: boolean) => ({
+const runOverrides = (traced: boolean, screenshots: boolean) => ({
   use: {
     screenshot: 'off',
-    trace: traced ? traceWithoutScreenshots : 'off',
+    trace: traced ? { mode: 'on', screenshots, snapshots: true } : 'off',
     video: 'off',
   },
 });
@@ -158,7 +151,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     try {
       playwright = await pw.createTestRunner(options.configFile, {
         outputDir: root.outputDir,
-        ...runOverrides(traces !== undefined),
+        ...runOverrides(traces !== undefined, options.traceScreenshots),
       });
       const config = await playwright.loadConfig();
       const timeouts = configTimeouts(config.projects);
@@ -262,16 +255,18 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
 
     // Playwright deletes a test's output folder when that test runs again, so copy before the next run.
     if (session.traces && result.status === MutantRunStatus.Survived) {
-      const dir = copySurvivorTraces(
-        session.traces.dir,
-        options.activeMutant,
-        reportFileName(
-          options.activeMutant.fileName,
-          session.traces.projectRoot,
-        ),
-        output.reporter.testCases.values(),
-      );
-      this.#log.debug(`Mutant ${request.activeMutant}: traces in ${dir}`);
+      try {
+        const dir = copySurvivorTraces(
+          session.traces,
+          options.activeMutant,
+          output.reporter.testCases.values(),
+        );
+        this.#log.debug(`Mutant ${request.activeMutant}: traces in ${dir}`);
+      } catch (error) {
+        this.#log.warn(
+          `Mutant ${request.activeMutant}: could not copy its traces: ${String(error)}`,
+        );
+      }
     }
 
     return result;

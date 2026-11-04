@@ -5,6 +5,7 @@ import path from 'node:path';
 import type { Mutant, schema } from '@stryker-mutator/api/core';
 
 import type { ReportedTest } from './reporter.ts';
+import { testName } from './run-result.ts';
 
 export const tracesDirEnv = 'LZ_PLAYWRIGHT_TRACES_DIR';
 export const projectRootEnv = 'LZ_PLAYWRIGHT_PROJECT_ROOT';
@@ -39,29 +40,24 @@ export function reportFileName(fileName: string, projectRoot: string): string {
   return path.relative(projectRoot, fileName).replaceAll('\\', '/');
 }
 
-export type MutantIdentity = Pick<
-  Mutant,
-  'fileName' | 'mutatorName' | 'replacement' | 'location'
->;
-
 type ReportedMutant = Pick<
   schema.MutantResult,
   'mutatorName' | 'replacement' | 'location'
 >;
 
-export function mutantRange({ start, end }: schema.Location): string {
-  return `${start.line}:${start.column}-${end.line}:${end.column}`;
-}
-
 export function reportKey(
   fileName: string,
-  { mutatorName, replacement, location }: ReportedMutant,
+  { mutatorName, replacement, location: { start, end } }: ReportedMutant,
 ): string {
-  return `${fileName}@${mutantRange(location)}\n${mutatorName}: ${replacement}`;
+  return `${fileName}@${start.line}:${start.column}-${end.line}:${end.column}\n${mutatorName}: ${replacement}`;
 }
 
 export function mutantKey(
-  { mutatorName, replacement, location: { start, end } }: MutantIdentity,
+  {
+    mutatorName,
+    replacement,
+    location: { start, end },
+  }: Pick<Mutant, 'mutatorName' | 'replacement' | 'location'>,
   fileName: string,
 ): string {
   return reportKey(fileName, {
@@ -99,52 +95,48 @@ export interface CopiedTrace {
   readonly trace: string | undefined;
 }
 
+export const mutantFile = 'mutant.json';
+
+export interface MutantTraces {
+  readonly key: string;
+  readonly tests: readonly CopiedTrace[];
+}
+
 export function copySurvivorTraces(
-  tracesDir: string,
-  mutant: MutantIdentity,
-  relativeFileName: string,
+  { dir: tracesDir, projectRoot }: TracesTarget,
+  mutant: Pick<Mutant, 'fileName' | 'mutatorName' | 'replacement' | 'location'>,
   tests: Iterable<ReportedTest>,
 ): string {
-  const key = mutantKey(mutant, relativeFileName);
+  const key = mutantKey(mutant, reportFileName(mutant.fileName, projectRoot));
   const dir = path.join(tracesDir, folderName(key));
   fs.mkdirSync(dir, { recursive: true });
   const copied: CopiedTrace[] = [];
 
   for (const test of tests) {
-    const name = test.titlePath().filter(Boolean).join(' › ');
-
     test.results.forEach((attempt, index) => {
-      const source = attempt.attachments?.find(
+      const source = attempt.attachments.find(
         (attachment) => attachment.name === 'trace' && attachment.path,
       )?.path;
-      const file = source ? `${test.id}-${index}.zip` : undefined;
+      let trace: string | undefined;
 
-      if (source && file) {
-        fs.copyFileSync(source, path.join(dir, file));
+      if (source) {
+        trace = `${test.id}-${index}.zip`;
+        fs.copyFileSync(source, path.join(dir, trace));
       }
 
       copied.push({
-        test: name,
+        test: testName(test),
         attempt: index,
         status: attempt.status,
-        trace: file,
+        trace,
       });
     });
   }
 
+  const written: MutantTraces = { key, tests: copied };
   fs.writeFileSync(
-    path.join(dir, 'mutant.json'),
-    JSON.stringify(
-      {
-        key,
-        fileName: relativeFileName,
-        mutatorName: mutant.mutatorName,
-        replacement: mutant.replacement,
-        tests: copied,
-      },
-      null,
-      2,
-    ),
+    path.join(dir, mutantFile),
+    JSON.stringify(written, null, 2),
   );
 
   return dir;

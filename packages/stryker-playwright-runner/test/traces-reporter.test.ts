@@ -1,37 +1,22 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { test, type TestContext } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
 import type { schema } from '@stryker-mutator/api/core';
 
-import { copySurvivorTraces } from '../src/survivor-traces.ts';
+import {
+  copySurvivorTraces,
+  projectRootEnv,
+  tracesDirEnv,
+} from '../src/survivor-traces.ts';
 import { LzPlaywrightTracesReporter } from '../src/traces-reporter.ts';
-import { logger, strykerOptions } from './support/doubles.ts';
-
-const envNames = ['LZ_PLAYWRIGHT_TRACES_DIR', 'LZ_PLAYWRIGHT_PROJECT_ROOT'];
+import { logger, strykerOptions, tempTree } from './support/doubles.ts';
+import { stubEnv } from './support/fake-playwright.ts';
 
 function isolateEnv(t: TestContext): void {
-  const saved = envNames.map((name) => [name, process.env[name]] as const);
-  envNames.forEach((name) => delete process.env[name]);
-  t.after(() => {
-    saved.forEach(([name, value]) => {
-      if (value === undefined) {
-        delete process.env[name];
-      } else {
-        process.env[name] = value;
-      }
-    });
-  });
-}
-
-function tempDir(t: TestContext): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lz-traces-reporter-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-
-  return dir;
+  stubEnv(t, { [tracesDirEnv]: undefined, [projectRootEnv]: undefined });
 }
 
 const survivingReport: schema.MutationTestResult = {
@@ -57,21 +42,28 @@ const survivingReport: schema.MutationTestResult = {
   },
 };
 
-test('with survivorTraces, the reporter empties the folder, hands its path and the project root to the test runner processes, and warns that tracing changes timing', (t) => {
-  isolateEnv(t);
-  const dir = path.join(tempDir(t), 'traces');
-  fs.mkdirSync(dir);
-  fs.writeFileSync(path.join(dir, 'stale.zip'), '');
+function tracedReporter(survivorTraces: string) {
   const { log, lines } = logger();
-
-  new LzPlaywrightTracesReporter(
-    strykerOptions({ lzPlaywright: { survivorTraces: dir } }),
+  const reporter = new LzPlaywrightTracesReporter(
+    strykerOptions({ lzPlaywright: { survivorTraces } }),
     log,
   );
 
+  return { reporter, lines };
+}
+
+test('with survivorTraces, the reporter empties the folder, hands its path and the project root to the test runner processes, and warns that tracing changes timing', (t) => {
+  isolateEnv(t);
+  const dir = path.join(
+    tempTree(t, 'lz-traces-reporter-', { 'traces/stale.zip': '' }),
+    'traces',
+  );
+
+  const { lines } = tracedReporter(dir);
+
   assert.deepEqual(fs.readdirSync(dir), []);
-  assert.equal(process.env['LZ_PLAYWRIGHT_TRACES_DIR'], dir);
-  assert.equal(process.env['LZ_PLAYWRIGHT_PROJECT_ROOT'], process.cwd());
+  assert.equal(process.env[tracesDirEnv], dir);
+  assert.equal(process.env[projectRootEnv], process.cwd());
   assert.deepEqual(lines, [
     [
       'warn',
@@ -80,27 +72,47 @@ test('with survivorTraces, the reporter empties the folder, hands its path and t
   ]);
 });
 
-test("at the end, the reporter writes index.html with Stryker's report app and each survivor's traces, and names the folders it could not read", (t) => {
+for (const survivorTraces of ['', '.', '..', path.parse(process.cwd()).root]) {
+  test(`the reporter refuses survivorTraces "${survivorTraces}", which holds the project, and empties nothing`, (t) => {
+    isolateEnv(t);
+    const { log } = logger();
+
+    assert.throws(
+      () =>
+        new LzPlaywrightTracesReporter(
+          strykerOptions({ lzPlaywright: { survivorTraces } }),
+          log,
+        ),
+      /which holds the project, and the lz-playwright-traces reporter empties that folder/,
+    );
+    assert.equal(process.env[tracesDirEnv], undefined);
+    assert.notDeepEqual(fs.readdirSync(process.cwd()), []);
+  });
+}
+
+test('the reporter accepts a folder outside the project', (t) => {
   isolateEnv(t);
-  const dir = path.join(tempDir(t), 'traces');
-  const { log, lines } = logger();
-  const reporter = new LzPlaywrightTracesReporter(
-    strykerOptions({ lzPlaywright: { survivorTraces: dir } }),
-    log,
-  );
+  const dir = path.join(tempTree(t, 'lz-traces-reporter-'), 'traces');
+
+  tracedReporter(dir);
+
+  assert.equal(process.env[tracesDirEnv], dir);
+});
+
+test("at the end, the reporter writes index.html with Stryker's report app and each survivor's traces", (t) => {
+  isolateEnv(t);
+  const dir = path.join(tempTree(t, 'lz-traces-reporter-'), 'traces');
+  const { reporter, lines } = tracedReporter(dir);
   copySurvivorTraces(
-    dir,
+    { dir, projectRoot: process.cwd() },
     {
-      fileName: 'unused',
+      fileName: path.join(process.cwd(), 'src', 'a.ts'),
       mutatorName: 'EqualityOperator',
       replacement: 'a > b',
       location: { start: { line: 0, column: 0 }, end: { line: 0, column: 5 } },
     },
-    'src/a.ts',
     [],
   );
-  fs.mkdirSync(path.join(dir, 'broken'));
-  fs.mkdirSync(path.join(dir, 'broken-2'));
   lines.length = 0;
 
   reporter.onMutationTestReportReady(survivingReport);
@@ -109,6 +121,21 @@ test("at the end, the reporter writes index.html with Stryker's report app and e
   const html = fs.readFileSync(index, 'utf8');
   assert.ok(html.includes('var MutationTestElements='));
   assert.ok(html.includes('Traces of this mutant run:'));
+  assert.deepEqual(lines, [
+    ['info', `Traces of 1 survivor(s): ${pathToFileURL(index).href}`],
+  ]);
+});
+
+test('at the end, the reporter names the trace folders it could not read', (t) => {
+  isolateEnv(t);
+  const dir = path.join(tempTree(t, 'lz-traces-reporter-'), 'traces');
+  const { reporter, lines } = tracedReporter(dir);
+  fs.mkdirSync(path.join(dir, 'broken'));
+  fs.mkdirSync(path.join(dir, 'broken-2'));
+  lines.length = 0;
+
+  reporter.onMutationTestReportReady(survivingReport);
+
   const [skipped, ...rest] = lines;
   const prefix = 'Skipped trace folder(s) without a readable mutant.json: ';
   assert.equal(skipped?.[0], 'warn');
@@ -118,16 +145,10 @@ test("at the end, the reporter writes index.html with Stryker's report app and e
     path.join(dir, 'broken-2'),
   ]);
   assert.deepEqual(rest, [
-    ['info', `Traces of 1 survivor(s): ${pathToFileURL(index).href}`],
-  ]);
-
-  fs.rmSync(path.join(dir, 'broken'), { recursive: true });
-  fs.rmSync(path.join(dir, 'broken-2'), { recursive: true });
-  lines.length = 0;
-  reporter.onMutationTestReportReady(survivingReport);
-
-  assert.deepEqual(lines, [
-    ['info', `Traces of 1 survivor(s): ${pathToFileURL(index).href}`],
+    [
+      'info',
+      `Traces of 0 survivor(s): ${pathToFileURL(path.join(dir, 'index.html')).href}`,
+    ],
   ]);
 });
 
@@ -138,8 +159,8 @@ test('without survivorTraces, the reporter warns that it does nothing, and leave
   const reporter = new LzPlaywrightTracesReporter(strykerOptions({}), log);
   reporter.onMutationTestReportReady(survivingReport);
 
-  assert.equal(process.env['LZ_PLAYWRIGHT_TRACES_DIR'], undefined);
-  assert.equal(process.env['LZ_PLAYWRIGHT_PROJECT_ROOT'], undefined);
+  assert.equal(process.env[tracesDirEnv], undefined);
+  assert.equal(process.env[projectRootEnv], undefined);
   assert.deepEqual(lines, [
     [
       'warn',
