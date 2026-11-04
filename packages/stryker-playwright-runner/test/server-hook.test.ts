@@ -40,7 +40,7 @@ const serverSource = [
   "  const n = Number(new URL(request.url, 'http://x').searchParams.get('n'));",
   '  response.end(answer(n));',
   '});',
-  "server.listen(0, '127.0.0.1', () => console.log(server.address().port));",
+  "server.listen(0, '127.0.0.1', () => process.stdout.write(`${server.address().port}\\n`));",
   '',
 ].join('\n');
 let instrumented = '';
