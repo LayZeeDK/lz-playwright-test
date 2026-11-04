@@ -176,6 +176,41 @@ with `npx playwright test --repeat-each=10 --fail-on-flaky-tests`. Web-first ass
 `await expect(locator).toHaveText()` retry until `expect.timeout`, so they make tests less flaky without
 any setting in the runner.
 
+## Surviving mutants
+
+Stryker's clear-text reporter prints each surviving mutant: its start `file:line:column`, each original
+line marked `-` and each mutated line marked `+`, and under `Tests ran:` the tests that ran against it. By
+default it lists at most 3 tests. To list more, raise `maxTestsToLog` in the Stryker config:
+
+```ts
+clearTextReporter: { maxTestsToLog: 20 },
+```
+
+A static mutant, one whose code ran outside any test, such as when a module loads or in a `beforeAll`
+hook, prints `Ran all tests for this mutant.` instead. With
+`coverageAnalysis: 'off'`, no tests are listed. To kill a surviving mutant:
+
+1. Edit a test that ran against it, so that the test checks what the mutant changes.
+2. Optionally, run those tests on the unmutated code first. Paste the `Tests ran:` lines into a file and run
+   `npx playwright test --config <configFile> --test-list <file>`.
+   - For a config without named projects, remove the `[...] › ` prefix from each line.
+   - Tests that pass say nothing about the mutant.
+   - A line that matches no test runs nothing and still exits 0, so compare the number of tests that ran
+     with the number of lines.
+   - A test from a `describe.serial` group runs alone.
+   - `--test-list` has no effect with `--ui`.
+3. Run the mutant again with Stryker:
+   `npx stryker run stryker.config.ts --mutate "<file>:<startLine>-<endLine>" --reporters clear-text,progress`.
+   `<startLine>` is the line that clear-text prints, and `<endLine>` is `<startLine>` plus the number of `-`
+   lines, minus 1. Stryker tests a mutant only when the range holds all of it. `--reporters` on the command
+   line replaces the config's list, so this run leaves the HTML and JSON reports as they were.
+
+   If the last full run used `--incremental`, run `npx stryker run stryker.config.ts --incremental` instead.
+   Stryker then tests once more each mutant whose covering test changed.
+
+With `survivorTraces`, the traces index prints the `--mutate` command for each surviving mutant. See
+[Traces of surviving mutants](#traces-of-surviving-mutants).
+
 ## Traces of surviving mutants
 
 A surviving mutant shows that the tests miss a change, not what the page did with it. To see what the
@@ -222,6 +257,45 @@ Playwright's default trace, and 1.3 times as long with the runner's trace. The r
 10 MB, against 42 MB with screenshots. No test changed status. A test that waits on timing can still
 change status under tracing, so the reporter warns. Compare a mutant's status in a traced run with an
 untraced run's report before you act on it, and leave `survivorTraces` unset in runs that gate a build.
+
+## What killed the mutants
+
+Stryker's JSON reporter writes each killed mutant's failure message as `statusReason`, in
+`reports/mutation/mutation.json` by default. This script counts the kills by the kind of failure in the
+message's first line:
+
+```js
+// kill-kinds.mjs. Run: node kill-kinds.mjs reports/mutation/mutation.json
+import { readFileSync } from 'node:fs';
+
+const report = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const mutants = Object.values(report.files).flatMap((file) => file.mutants);
+const rules = [
+  ['action timeout', /Timeout \d+ms exceeded/],
+  ['assertion', /^Error: expect\(/],
+  ['test timeout', /Test timeout of/],
+];
+const kinds = {};
+
+for (const { statusReason = '' } of mutants.filter((m) => m.status === 'Killed')) {
+  const first = statusReason.replace(/\u001b\[[0-9;]*m/g, '').split('\n')[0];
+  const kind = rules.find(([, rule]) => rule.test(first))?.[0] ?? 'other';
+
+  kinds[kind] = (kinds[kind] ?? 0) + 1;
+}
+
+console.table(kinds);
+console.log('Timeout:', mutants.filter((m) => m.status === 'Timeout').length);
+```
+
+Playwright's messages hold terminal color codes, so the script removes them before it matches. The
+table counts only killed mutants, so the script also prints the number of `Timeout` mutants, which Stryker
+counts as detected too.
+
+- Each kill's kind is one sample. Stryker keeps the message of the first test that failed, and a mutant
+  that several tests cover may fail differently in each.
+- A kill caused by a page that fails to hydrate has an ordinary message, such as a locator timeout, so the
+  table does not show those kills as a group.
 
 ## Faster mutation runs
 
