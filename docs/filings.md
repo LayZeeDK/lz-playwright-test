@@ -598,6 +598,30 @@ and is the mutant `true` stands for in plain JavaScript. A smaller fix drops the
 `LzConditionalElement`, and skips a `&&` whose left operand is a comparison or a `&&` or `||` expression,
 because there the built-in `true` already exists. An upstream fix would make that skip need revisiting.
 
+## stryker-mutator/stryker-js: mutator filters never drop mutants inside an ignored subtree
+
+Status: draft, not filed (2026-11-05). Searches of the repo's issues for "ignored mutants CallExpression" and
+"empty-expression-mutator filter" found nothing on 2026-11-05; a search for "ignorer" returned issues, as a control.
+
+**Versions.** `@stryker-mutator/instrumenter` 10.1.1, built-in mutators only.
+
+**Reproduction.** Instrument a file twice with the stock `Instrumenter`, once without ignorers and once with an
+ignorer that ignores a function body holding statements such as `expect(summary.total).toBeGreaterThan(0)`.
+Measured on 12 Storybook story files (api-diff-viewer at 4848282, ignoring `play` functions): with the ignorer,
+the report holds 1 to 37 more mutants per file than without it. Every extra mutant is an ignored `CallExpression`
+mutant (statement replaced by `;`). The placed mutants are the same in both runs.
+
+**Cause.** `CallExpression` (`empty-expression-mutator.ts`) keeps its mutant only when
+`mutantsInScope.length === 1`. `applyMutantFilters` in `babel-transformer.ts:138-148` builds the scope from mutants
+without an `ignoreReason` and removes only mutants without one. Inside an ignored subtree the scope is empty and
+the mutator's own mutant is ignored, so the filter fails but removes nothing. The report then counts ignored
+mutants that would never exist outside the ignored subtree.
+
+**Effect.** Ignored counts in reports run high; scores and placed mutants are not affected.
+
+**Possible fix.** Apply the filter to ignored mutants as well: build `mutantsInScope` from every mutant in the
+subtree, and remove the filtered mutants whatever their `ignoreReason`.
+
 ## stryker-mutator/stryker-js: no mutants inside an `as` expression (already reported)
 
 Status: no draft needed (2026-10-26). Reported upstream as
