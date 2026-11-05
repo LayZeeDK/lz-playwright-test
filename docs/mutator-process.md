@@ -135,7 +135,9 @@ A proposal is a guess about how tests behave. Measure before deciding.
 - Known setup traps: under pnpm, StrykerJS does not find `@stryker-mutator/*` plugins from the project (load the
   runner through a local re-export file in `plugins`); Vitest browser mode with `@storybook/addon-vitest` fails
   inside Stryker's sandbox under both pnpm and npm ("Failed to import test file .../setup-file.js") and needs
-  `inPlace: true`.
+  `inPlace: true`. In insights-rbac-ui (Storybook 10, Vitest 4, npm) the dry run crashed in Vite's SSR transform with
+  "Cannot split a chunk that has already been edited (… "import.meta")" with every config variant tried, while the
+  same Vitest project passed without Stryker; pick another corpus repository rather than debugging it inside a slot.
 
 ## 5. Decide
 
