@@ -130,8 +130,9 @@ A proposal is a guess about how tests behave. Measure before deciding.
 - Triage every survivor by hand: **Useful** (points at a missing or weak check), **Noise** (survives by
   construction), **Coverage** (killed whenever the line runs; costs run time only). The useful share decides.
 - Known setup traps: under pnpm, StrykerJS does not find `@stryker-mutator/*` plugins from the project (load the
-  runner through a local re-export file in `plugins`); some browser-mode runners fail inside Stryker's sandbox and
-  need `inPlace: true`.
+  runner through a local re-export file in `plugins`); Vitest browser mode with `@storybook/addon-vitest` fails
+  inside Stryker's sandbox under both pnpm and npm ("Failed to import test file .../setup-file.js") and needs
+  `inPlace: true`.
 
 ## 5. Decide
 
