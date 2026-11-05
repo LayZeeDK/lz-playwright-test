@@ -725,3 +725,78 @@ Playwright release that moves them fails with a named error):
 
 **Before filing.** Read #7275's closing comments, cut the list to what Playwright maintainers would accept as one
 feature request, and decide whether it is a new issue or a comment on a closed one.
+
+## storybookjs/storybook (eslint-plugin-storybook): flag stubs chained on `fn()` at story definition
+
+Status: draft, not filed (2026-11-05). `gh search issues --repo storybookjs/storybook` for
+"restoreMocks fn mockReturnValue args", "restoreAllMocks other stories" and "mockReturnValue args reset" found nothing on
+2026-11-05; "loader" returned issues, as a control. Related and open:
+[#31897](https://github.com/storybookjs/storybook/issues/31897) ("Function passed on mockImplementationOnce is never
+called"), which this rule would catch.
+
+**Versions.** Storybook 10.6.2 with Vitest 3.2.7, and Storybook 10.6.5 with Vitest 5.1.0 (`@storybook/addon-vitest`,
+`@vitest/browser-playwright`). The plugin at v10.6.5 has 16 rules (`code/lib/eslint-plugin/src/rules`); none looks at
+`fn()` stubs.
+
+**Reproduction.** A story file with:
+
+```tsx
+function Probe({ getValue }: { getValue: () => unknown }) {
+  return <output data-testid="value">{String(getValue())}</output>;
+}
+
+export const ChainedAtDefinition: Story = {
+  args: { getValue: fn().mockReturnValue('stubbed') },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId('value')).toHaveTextContent('stubbed');
+  },
+};
+```
+
+The play fails in the Storybook UI and under the Vitest addon: the component renders `undefined`. The same story passes
+with `fn(() => 'stubbed')`, or with `fn()` in `args` and `args.getValue.mockReturnValue('stubbed')` in `beforeEach`.
+
+**Cause.** The default loader `resetAllMocksLoader` (`code/core/src/test/preview.ts:15-25`) calls `restoreAllMocks()`
+before every story renders, and `restoreAllMocks` restores every spy `fn()` has created (`code/core/src/test/spy.ts:98-99`).
+A stub chained when the module loads is gone before any story uses it.
+
+**Request.** A rule, for example `storybook/no-definition-time-mock-stub`, that reports a call
+`fn(...).mockReturnValue|mockResolvedValue|mockRejectedValue|mockImplementation(...)` (and the `Once` forms) that runs at
+module load: in `args` or `argTypes` of meta or a story, or in a module-level declaration. Calls inside functions (play,
+`beforeEach`, loaders, factories called at render) are fine. Suggested message: "This stub is reset before the story
+renders. Pass the implementation to fn() or set the stub in beforeEach." A fixer can rewrite
+`fn().mockReturnValue(x)` to `fn(() => x)` and `fn().mockResolvedValue(x)` to `fn(async () => x)`.
+
+**Evidence of use.** In an open-source corpus of Storybook projects, 29 such calls in 11 story files of 4 projects
+(coder, langfuse, explorer, twenty), counted with an AST predicate. One coder story
+(`site/src/pages/AgentsPage/components/AgentCreateForm.stories.tsx`, `PreservesAttachmentsOnFailedSend`) sets
+`onCreateChat: fn().mockRejectedValue(new Error("server error"))`, so its "failed send" never fails (inferred; the
+component was not run).
+
+## storybookjs/storybook (docs): the mock reset runs before render and reaches every story's spies
+
+Status: draft, not filed (2026-11-05). Same searches as the entry above, nothing found.
+
+**Versions.** Storybook 10.6.2 and 10.6.5, docs at `v10.6.5`.
+
+**What the docs say.** `docs/api/parameters.mdx`, "clearMocks", "mockReset" and "restoreMocks": each "will call ... on
+all spies created with `fn()` from `storybook/test` when a story unmounts".
+
+**What happens (measured).**
+1. The reset runs as a loader before the story renders (`code/core/src/test/preview.ts:15-25,188`), not when a story
+   unmounts. A stub chained on `fn()` in `args` is erased before the first render.
+2. It reaches every spy `fn()` has created in the module, so one story's reset erases the stubs of other stories in
+   the same file. A story with `parameters: { test: { restoreMocks: false } }` and a definition-time stub:
+   - passes when run alone under the Vitest addon, and fails when a story with the default reset runs before it in the
+     same file;
+   - renders the stub on a fresh load of its story page, and `undefined` after the reader opens a default-reset story
+     and comes back without a reload;
+   - renders `undefined` on the Docs page.
+   With `restoreMocks: false` in the file's `meta`, both such stories pass.
+
+**Suggested change.** Say that the reset runs before each story renders, that it reaches all spies created with `fn()`
+(including other stories' spies when they share a module), and that stubs belong in `fn(impl)` or `beforeEach`; and
+that `restoreMocks: false` is reliable at the file (`meta`) or project level, not for a single story.
+
+**Evidence.** Probe stories and scripts kept outside this repository; results recorded in this project's audit notes
+(Storybook 10.6.2 with Vitest 3.2.7; Storybook 10.6.5 with Vitest 5.1.0).
