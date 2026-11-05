@@ -24,18 +24,51 @@ Mutators are chosen per configuration, so settle which code each configuration m
 - Write the split down as a ruling before research starts. Proposals that do not say which configuration they
   serve cannot be judged.
 
-## 2. Research
+## 2. Research: common mistakes first
 
-Run these in parallel, one agent per lens, each writing its own file early (see section 7 on briefs).
+The research question is: **what mistakes do people commonly make with the target APIs and globals?** Ask it once
+per configuration:
+
+- **Production code:** mistakes when using the runtime or framework APIs and globals in the code under test (for
+  Node.js: the `node:*` modules and globals; for a UI library: its components' inputs and story data). A mutator
+  for one of these mistakes writes the mistake into the code; a survivor means the tests would not catch a developer
+  making it.
+- **Test code:** mistakes when writing tests with the test APIs and the globals tests commonly use (for Node.js:
+  `node:test`, `node:assert` and other testing modules; for Playwright: actions, assertions, waits, mocks; for
+  Storybook: `play`, Testing Library, spies). A mutator for one of these exposes a test that passes while checking
+  less than its author thinks; a survivor points at that weak test.
+
+Every proposal in section 3 starts from a mistake in this catalog. An idea with no common mistake behind it needs a
+stated reason to exist, and usually belongs in the rejected list.
+
+### 2a. The mistakes catalog
+
+Write one catalog per configuration (for example `.audit/common-mistakes/<area>.md`) before proposing anything.
+
+- Sources, in order: lint plugins for the APIs (each rule is a recorded mistake; note the mistakes that have no
+  rule), the official best-practice, pitfall and migration pages, the API's issue tracker and discussions, then
+  experience reports (blog posts, flaky-test studies, "common mistakes with X" articles). Cite each with a URL or a
+  file:line in a local clone.
+- One row per mistake: a one-line description, its source, a corpus count (section 2b), and its fit:
+  - **lint** when the pattern is visible in the syntax alone; name the rule if one exists;
+  - **mutator** when only running the tests tells weak from strong (for example whether anything after a call
+    depends on it);
+  - **both** when a lint rule catches the obvious form and a mutator the rest.
+- Group the rows (for test code: assertions, waits, isolation and hooks, mocking, API or framework specifics).
+- The "mutator" and "both" rows feed section 3; the "lint" rows feed upstream lint-rule drafts in the filing ledger.
+- Worked examples: `.audit/common-mistakes/playwright.md` (40 mistakes) and `.audit/common-mistakes/storybook.md`
+  (26 mistakes).
+
+### 2b. Lenses that serve the catalog
+
+Run these beside the catalog, one agent per lens, each writing its own file early (see section 7 on briefs).
 
 - **API lens.** Read the API's primary sources: the docs and the source in a local clone at the installed
-  version's tag, never `node_modules`. List every call, option and return value whose misuse changes behaviour.
-- **Common-mistakes lens.** Mistakes are where weak code and weak tests live. Sources, in order: lint plugins (each
-  rule is a recorded mistake; note which mistakes have no rule), the official best-practice and pitfall pages,
-  issue trackers, then experience reports. For each mistake say whether a lint rule fits (the pattern is visible in
-  the syntax alone), a mutator fits (only running the tests tells weak from strong), or both, and name any rule
-  that already exists.
-- **Evidence lens.** Count real sites in a corpus of open-source repositories.
+  version's tag, never `node_modules`. It explains how each mistake behaves (does the call throw, resolve early,
+  match nothing?), which decides whether a mutant is killed, survives or is noise. It also lists calls, options and
+  return values whose misuse changes behaviour, as candidate mistakes for the catalog.
+- **Evidence lens.** Count real sites of each mistake, and of each pattern a mutator would change, in a corpus of
+  open-source repositories.
   - Clone into a fixed folder and write a manifest of repository, commit and origin, so counts can be compared
     across reports. A corpus that grows while agents count gives counts nobody can compare.
   - Count with word boundaries and run a positive control first: `play:` also matches `display:`, and a zero from
@@ -53,6 +86,8 @@ Run these in parallel, one agent per lens, each writing its own file early (see 
 
 One entry per mutator, in this shape:
 
+- The common mistake it exposes, with its row in the mistakes catalog (section 2a), and why a lint rule does not
+  cover it.
 - Name: `Lz<Area><Name>`, letters only (for example `LzPlaywrightFulfill`, `LzStorybookInteraction`).
 - Configuration it serves, and the exact syntax it matches.
 - Before and after code.
@@ -101,7 +136,7 @@ how it ships. A proposal can move between outcomes as evidence arrives; record e
 | **Prototype** | A new name with no overlap, a clear survivor meaning, enough corpus sites (counted, with repos), and a static predicate for its noise. | A spike plugin and one measured run per mutator (section 4). The result goes to the next ruling batch. Nothing is built in the package yet. |
 | **Fold in** | The idea is a new case of an existing or approved mutator: a further call it should match, a coarse mode of a planned mutator, an extra site class. | No new public name. Add the case to the target mutator's proposal and build it with that mutator. |
 | **Defer** | Another mutator's measurement settles this one (the same idea on another API, a shared noise risk), or it waits on a ruling or a build. | Write down what it waits on and what result would revive it. Revisit when that measurement lands. |
-| **Drop** | No static predicate can skip its noise, a survivor would not point at a specific weak check, or a lint rule catches the mistake from the syntax alone. | Record the reason in the rejected list so the idea does not come back. A lint-shaped mistake gets an upstream lint-rule draft in the filing ledger; nothing is filed without Lars's yes. |
+| **Drop** | No static predicate can skip its noise, a survivor would not point at a specific weak check, no common mistake stands behind it, or a lint rule catches the mistake from the syntax alone. | Record the reason in the rejected list so the idea does not come back. A lint-shaped mistake gets an upstream lint-rule draft in the filing ledger; nothing is filed without Lars's yes. |
 
 Prototypes run while other work waits on rulings, so they delay no build. Book each in its own lock slot.
 
