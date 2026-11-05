@@ -30,7 +30,7 @@ fix, and it keeps the Fable `ListExpression` for Later.
 | Emptied text                                  | `null`, identical render to the original                            | `""`                                                                                    | Opus                                                                                       |
 | Element-level mutants (tag swap)              | yes, with the JSX child wrap                                        | none in v1                                                                              | Opus (`LzJsxElementRole` can swap a tag)                                                   |
 | Conditional with a comparison or logical test | no skip, so it repeats the built-in `ConditionalExpression` mutants | skips the test shapes that `ConditionalExpression` already forces (`builtInForcesTrue`) | Fable                                                                                      |
-| Silent plugin failure                         | warning only                                                        | import-time self-check that throws                                                      | Fable, moved to an `Ignore` plugin factory (see Integration)                               |
+| Silent plugin failure                         | warning only                                                        | import-time self-check that throws                                                      | Fable, moved to an awaited `lzJsxMutators()` call (see Integration)                        |
 | Version drift                                 | peer pinned to `10.1.1` exactly                                     | peer `~10.1.0` plus a runtime warning                                                   | Fable                                                                                      |
 | Upstream fixes found                          | JSX comment directives are ignored for every mutator                | built-in `ConditionalExpression` makes a duplicate `true` mutant for JSX `&&`           | both                                                                                       |
 | Names                                         | framework-neutral (`TextContent`)                                   | `Jsx` prefix                                                                            | neither: renamed to the StrykerJS convention, still framework-neutral (see Names)          |
@@ -257,70 +257,46 @@ shapes cannot ship there, and the mutators measure what lint cannot see.
 
 ## Integration
 
-- **Package.** `@layzee/stryker-jsx-mutators`. The user lists it in `plugins` and lists its ignorer in
-  `ignorers`, or imports it from a JavaScript or TypeScript config (see "Fail loud"). No other options in v1. Users exclude mutators with
-  `mutator.excludedMutations` and with `// Stryker disable` comments, both of which already match custom
-  mutator names.
+- **Package.** `@layzee/stryker-jsx-mutators`. A JavaScript or TypeScript config imports `lzJsxMutators`
+  and awaits it at the top (see "Fail loud"). Importing the module installs nothing, so the package
+  declares `sideEffects: false`. The call takes no options in v1: the package has no opt-in or experimental
+  mutators yet, and the call throws on any option, so a config cannot name one that does nothing. Users
+  exclude mutators with `mutator.excludedMutations` and with `// Stryker disable` comments, both of which
+  already match custom mutator names.
 - **Version range.** Peer dependency `@stryker-mutator/core` `~10.1.0`. At run time the plugin reads the
   version of the instrumenter it resolved. A version other than `10.1.1`, the tested one, logs a warning
   and the install goes on. The self-check, not the version, decides whether the run may continue. The
   Opus prototype throws on any other version.
-- **Registration without an upstream change.** On import, the plugin finds the instrumenter that the
-  running `@stryker-mutator/core` uses. When `process.argv[1]`, after `realpath`, is core's
+- **Registration without an upstream change.** When the config calls `lzJsxMutators`, the plugin finds the
+  instrumenter that the running `@stryker-mutator/core` uses. When `process.argv[1]`, after `realpath`, is core's
   `bin/stryker.js`, the plugin resolves the instrumenter from that core's folder, so a global or
   differently hoisted `stryker` gets the mutators too. Otherwise, as when a program calls Stryker's API,
   it resolves core from its own folder. The thermos plugin's Node mutators resolve core the same way
   (`LayZeeDK/thermos-claude-plugin`, `tools/stryker-node-mutators/install.ts`). The plugin then pushes its
   mutators into the live `allMutators` array, and wraps `expressionMutantPlacer.canPlace` and `place` so that `JSXAttribute` and
   `JSXText` become placement sites. Details: Opus draft, sections 3.2 and 3.3.
-- **Fail loud.** Still at import, the plugin instruments one JSX sample per mutator and checks that
+- **Fail loud.** In the same call, the plugin instruments one JSX sample per mutator and checks that
   each sample gives a mutant of its mutator. The error names every mutator whose sample gave none, so
   one mutator that a StrykerJS change breaks cannot hide behind the others. An install or self-check
-  error rejects the module's import. Core turns a plugin import error into a warning and runs on without
-  the mutators (`packages/core/src/di/plugin-loader.ts:193-209`), so the module also exports an `Ignore`
-  plugin named `lz-jsx`. Core creates every ignorer listed in `ignorers` right before `instrument()`
-  (`2-mutant-instrumenter-executor.ts:67-69`), with no catch. After a failed install the module exported
-  nothing, so core throws `Cannot find Ignore plugin "lz-jsx"` there (`plugin-creator.ts:57-64`), and
-  the install error is in the warning above it. After a skipped install (see "Process placement") the
-  factory throws "install did not run". Otherwise it returns an ignorer that ignores nothing.
-  `spikes/ignorer-route/` measured on StrykerJS 10.1.1 that a factory that throws makes `stryker run` exit
-  1 with the error's message, and `spikes/fail-loud/` measured that a failed install exits 1 on both
-  routes with the failing mutator's name. An earlier version of this
-  design kept the error and threw it from the factory. That cannot hold together with the config import
-  below: a module that keeps its error loads without one, so a config that imports it would not stop.
-- **The `ignorers` entry is required.** `ignorers` defaults to `[]`
-  (`packages/api/schema/stryker-core.json:509-516`), and core creates only the listed names. A
-  documented config that lists the plugin in `plugins` therefore always has `ignorers: ['lz-jsx']`
-  next to it.
-  Without it, a successful install still registers and runs every mutator, because registration
-  happens at import. A failed install falls back to core's warning
-  `Error during loading "@layzee/stryker-jsx-mutators" plugin`, and the run finishes without JSX mutants. The
-  plugin cannot detect the missing entry in that case, because its import has already failed.
-- **A config import fails loud with one entry.** A config written as a JavaScript or TypeScript module
-  can `import '@layzee/stryker-jsx-mutators'` on its first line instead. The module installs with a
-  top-level `await`, so an install or self-check error rejects the config import, and the run stops
-  before it starts, with no `ignorers` entry. The thermos plugin's Node mutators use this route
-  (`stryker.config.mjs:1`). A JSON config cannot import, so it keeps `plugins` and `ignorers`. The same
-  spike measured this route: a config that imports a module whose top-level `await` rejects makes
-  `stryker run` exit 1 with `Invalid config file` and the error's message.
-- **A second install adds nothing.** A config that both imports the module and lists it in `plugins`
-  installs twice in one process. The second install skips the mutators that the first one registered,
-  the name check does not count them as collisions, and the placer is wrapped once.
-- **Options, later.** A plugin module can export `strykerValidationSchema`, so options such as extra
-  accessible-name props validate against the Stryker config. Mutators still cannot read them at run
-  time, because `NodeMutatorContext` carries only `isExpressionContext`. The `lz-jsx` ignorer
-  factory receives the full options before `instrument()` and is the hook that can pass them on.
-- **Process placement.** Exporting `strykerPlugins` puts the module into `pluginModulePaths`
-  (`plugin-loader.ts:83-86`). Every test-runner and checker worker re-imports those modules
+  error rejects the call. The config awaits the call at the top, so the error rejects the config import,
+  and the run stops before it starts. `spikes/fail-loud/` measured on StrykerJS 10.1.1 that a config whose
+  import rejects through a top-level `await` makes `stryker run` exit 1 with `Invalid config file`, the
+  error's message and the failing mutator's name. The install is a call in the config, and not a side
+  effect of a module in `plugins`, because core turns a plugin import error into a warning and runs on
+  without the mutators (`packages/core/src/di/plugin-loader.ts:193-209`). A JSON config cannot import, so
+  it cannot turn the mutators on.
+- **A second install adds nothing.** Two calls in one process install twice. The second install skips
+  the mutators that the first one registered, the name check does not count them as collisions, and the
+  placer is wrapped once.
+- **Options, later.** Options for the mutators, such as extra accessible-name props, would go to
+  `lzJsxMutators`, which has them before any file is instrumented. Mutators cannot read Stryker's own
+  options at run time, because `NodeMutatorContext` carries only `isExpressionContext`.
+- **Process placement.** The install runs where the config is loaded, in Stryker's main process, which is
+  the process that instruments. The module exports `strykerPlugins` for the `lz-jsx-styling` ignorer
+  only, so a config that lists the package in `plugins` puts it into `pluginModulePaths`
+  (`plugin-loader.ts:83-86`), and every test-runner and checker worker re-imports it
   (`child-process-proxy-worker.ts:97-100`, passed by both proxies in `child-process-proxy.ts:104,139`).
-  Workers never instrument, so the plugin skips the install and the self-check when
-  `STRYKER_MUTATOR_WORKER` is set, which core sets for every child process (`child-process-proxy.ts:83`).
-  The module still exports the ignorer there, and core never calls its factory in a worker. Reason for
-  this option: it keeps one module and one config entry and removes all worker cost, while a second
-  module would add a `plugins` entry users can also forget. If Stryker itself runs inside a Stryker
-  worker, for example a mutation run of a test that starts Stryker, the inner main process inherits the
-  variable. The ignorer then throws the "install did not run" error, so the run stops instead of
-  silently losing JSX mutants.
+  That import installs nothing, so a worker pays no install cost.
 - **Reports.** Each mutator keeps its own `mutatorName`, so reports and filters show `LzJsxTextLiteral` next
   to `StringLiteral`.
 
@@ -343,7 +319,7 @@ Javascript and not Stryker for HTML"), not on mechanism. PR 2 therefore ships th
 text cites #4375 as the user demand. Issue #701 (2018) added the `JSXAttribute` skip to `StringLiteral`
 after `class="row"` became `class=""`. These mutators change attributes by what they mean to a user, so
 PR 2 says why they do not bring that mutant back. Issue #4141 complained about too many JSX mutants, and
-the answer was Ignore plugins, the plugin kind that "Fail loud" uses. For Angular templates, the nearest
+the answer was Ignore plugins, the plugin kind of `lz-jsx-styling`. For Angular templates, the nearest
 precedent is `azat-io/mootant`, which mutates Svelte and Vue template expressions but not static markup
 (section 1.2).
 
@@ -392,7 +368,7 @@ decides each mutator.
    this diff runs on the built package, not the prototype.
 2. **Negative control for fail loud.** Break the install on purpose: give one mutator a sample that it
    cannot mutate. Then assert that `stryker run` exits non-zero with that mutator's name in the error,
-   once through the `ignorers` entry and once through the config import. Without this control, a green
+   through the `lzJsxMutators` call in the config. Without this control, a green
    gate cannot tell a working fail-loud route from an install that never failed.
 3. **The bar per mutator.** A mutator stays in the first release only when all of these hold on the
    demo app and the fixtures. A mutator that misses one moves to Later, with its counts recorded.

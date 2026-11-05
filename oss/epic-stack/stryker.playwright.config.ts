@@ -1,12 +1,13 @@
+import { lzJsxMutators } from '@layzee/stryker-jsx-mutators';
 import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
+
+await lzJsxMutators();
 
 export default {
   plugins: [
     '@layzee/stryker-playwright-runner',
-    '@layzee/stryker-jsx-mutators',
     '@stryker-mutator/typescript-checker',
   ],
-  ignorers: ['lz-jsx'],
   testRunner: 'lz-playwright',
   lzPlaywright: { configFile: 'playwright.config.ts' },
   checkers: ['typescript'],

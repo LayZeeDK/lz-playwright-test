@@ -1,4 +1,5 @@
 import type { Ignorer } from '@stryker-mutator/api/ignore';
+import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
 import { fieldOf, isRecord } from './is-record.ts';
 import { packageName } from './package-name.ts';
@@ -109,6 +110,7 @@ export function stylingIgnorer(options: object): Ignorer {
     },
   };
 }
+stylingIgnorer.inject = tokens(commonTokens.options);
 
 function hidingClasses(options: object): readonly string[] {
   const own = fieldOf(fieldOf(options, 'lzJsxStyling'), 'visibilityClasses');

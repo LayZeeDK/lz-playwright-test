@@ -1,55 +1,45 @@
-import type { StrykerOptions } from '@stryker-mutator/api/core';
-import type { Ignorer } from '@stryker-mutator/api/ignore';
-import {
-  commonTokens,
-  declareFactoryPlugin,
-  PluginKind,
-  tokens,
-} from '@stryker-mutator/api/plugin';
+import { declareFactoryPlugin, PluginKind } from '@stryker-mutator/api/plugin';
 
 import { implicitRoles } from './implicit-roles.ts';
 import { install } from './install.ts';
+import { isRecord } from './is-record.ts';
 import { mutatorsFor } from './mutators.ts';
 import { packageName } from './package-name.ts';
 import { stylingIgnorer } from './styling-ignorer.ts';
 
 export { strykerValidationSchema } from './styling-ignorer.ts';
 
-// Core sets this in every test-runner and checker child process (child-process-proxy.js:32), which re-import plugin
-// modules but never instrument.
-const installRan = process.env['STRYKER_MUTATOR_WORKER'] === undefined;
+/** This package has no opt-in or experimental mutators yet, so the options name none. */
+export type LzJsxMutatorOptions = Readonly<Record<string, never>>;
 
-if (installRan) {
-  // A failure rejects this module's evaluation, and every later import of it rejects with the same error. A config
-  // that imports it stops at once; under `plugins`, core only warns with the message, and the run then stops where
-  // core creates the ignorer this module never got to export.
+/**
+ * Installs this package's mutators into Stryker. A Stryker configuration file awaits it, so that an error in the install
+ * stops the run; Stryker only warns when a module in `plugins` fails to load.
+ */
+export async function lzJsxMutators(
+  options?: LzJsxMutatorOptions,
+): Promise<void> {
+  assertNoOptions(options);
   await install(mutatorsFor(implicitRoles));
 }
 
-function assertInstalled(): void {
-  if (!installRan) {
+function assertNoOptions(options: unknown): void {
+  if (options === undefined) {
+    return;
+  }
+
+  if (
+    !isRecord(options) ||
+    Array.isArray(options) ||
+    Object.values(options).some((value) => value !== undefined)
+  ) {
     throw new Error(
-      `${packageName}: the install did not run, because STRYKER_MUTATOR_WORKER is set in a process that ` +
-        'instruments. Unset it for the Stryker run.',
+      `${packageName}: the package has no opt-in or experimental mutators yet, so lzJsxMutators() takes no ` +
+        'options. Turn a mutator off with mutator.excludedMutations.',
     );
   }
 }
 
-function uiMutatorsIgnorer(): Ignorer {
-  assertInstalled();
-
-  return { shouldIgnore: () => undefined };
-}
-uiMutatorsIgnorer.inject = [] satisfies [];
-
-function uiStylingIgnorer(options: StrykerOptions): Ignorer {
-  assertInstalled();
-
-  return stylingIgnorer(options);
-}
-uiStylingIgnorer.inject = tokens(commonTokens.options);
-
 export const strykerPlugins = [
-  declareFactoryPlugin(PluginKind.Ignore, 'lz-jsx', uiMutatorsIgnorer),
-  declareFactoryPlugin(PluginKind.Ignore, 'lz-jsx-styling', uiStylingIgnorer),
+  declareFactoryPlugin(PluginKind.Ignore, 'lz-jsx-styling', stylingIgnorer),
 ];

@@ -32,9 +32,7 @@
     "dist",
     "!dist/**/*.tsbuildinfo"
   ],
-  "sideEffects": [
-    "./dist/index.js"
-  ],
+  "sideEffects": false,
   "engines": {
     "node": ">=22.0.0"
   },

@@ -1,13 +1,12 @@
+import { lzJsxMutators } from '@layzee/stryker-jsx-mutators';
 import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 import base from './stryker.base.ts';
 
+await lzJsxMutators();
+
 export default {
   ...base,
-  appendPlugins: [
-    '@layzee/stryker-playwright-runner',
-    '@layzee/stryker-jsx-mutators',
-  ],
-  ignorers: ['lz-jsx'],
+  appendPlugins: ['@layzee/stryker-playwright-runner'],
   testRunner: 'lz-playwright',
   lzPlaywright: {
     configFile: 'apps/demo-app-e2e/playwright.config.mts',

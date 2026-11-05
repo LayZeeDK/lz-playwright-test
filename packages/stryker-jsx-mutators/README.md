@@ -55,32 +55,29 @@ The `generic` role is left out: Playwright gives it to no tag, and a `role="gene
 
 ## Turn the mutators on
 
-Use one of two ways:
+Call `lzJsxMutators` at the top of your Stryker configuration file. It adds the mutators to Stryker's own:
 
-- List the plugin and its ignorer. Both lines are required: without `ignorers`, a failed install only
-  prints a warning, and the run goes on without JSX mutants.
+```ts
+import { lzJsxMutators } from '@layzee/stryker-jsx-mutators';
 
-  ```ts
-  appendPlugins: ['@layzee/stryker-playwright-runner', '@layzee/stryker-jsx-mutators'],
-  ignorers: ['lz-jsx'],
-  ```
+await lzJsxMutators();
 
-  `appendPlugins` keeps the plugins Stryker loads by default. `plugins` replaces them, so a checker such
-  as `@stryker-mutator/typescript-checker` no longer loads unless the list names it too.
+export default {
+  appendPlugins: ['@layzee/stryker-playwright-runner'],
+  testRunner: 'lz-playwright',
+};
+```
 
-- In a JavaScript or TypeScript config, import the plugin on the first line instead, and list nothing:
+Call it in the configuration file, not through `plugins`. Stryker only warns when a module in `plugins` fails to
+load, while a failed call stops the run. The configuration file must be a JavaScript or TypeScript ES module, such
+as `stryker.config.mjs`, as a JSON configuration cannot import a module.
 
-  ```ts
-  import '@layzee/stryker-jsx-mutators';
-  ```
+The package has no opt-in or experimental mutators yet, so `lzJsxMutators` takes no options. It throws when it
+gets any. Turn a mutator off with `mutator.excludedMutations`, as below.
 
-Stryker finds its default plugins by listing the `@stryker-mutator` folder next to its own install, which
-under pnpm or Yarn Plug'n'Play does not hold your checker. With either, name the checker in
-`appendPlugins` whichever way you load this plugin, as in `'@stryker-mutator/typescript-checker'`.
-
-Either way, the install checks that each mutator makes a mutant of a sample. It stops the run with the
-names of the mutators that do not, and with the instrumenter's folder and version when an internal it
-patches is missing.
+The call checks that each mutator makes a mutant of a sample. It stops the run with the names of the
+mutators that do not, and with the instrumenter's folder and version when an internal it patches is
+missing. It also stops the run when another mutator already has one of these mutators' names.
 
 ## Hide styling mutants with lz-jsx-styling
 
@@ -137,20 +134,25 @@ changed which items rendered, and a test caught it.
 
 ### Turn it on
 
-List the plugin, then the ignorer. Load the plugin through `plugins` or `appendPlugins`: an `import` in
-the config does not give Stryker the ignorer or the option's schema.
+List the plugin in `appendPlugins` or `plugins`, then the ignorer. The `lzJsxMutators` call does not give
+Stryker the ignorer or the option's schema.
 
 ```ts
 appendPlugins: ['@layzee/stryker-playwright-runner', '@layzee/stryker-jsx-mutators'],
-ignorers: ['lz-jsx', 'lz-jsx-styling'],
+ignorers: ['lz-jsx-styling'],
 lzJsxStyling: {
   visibilityClasses: ['closed', 'is-collapsed'],
 },
 ```
 
-Both ignorers come from the same module, and loading that module installs the mutators. So
-`ignorers: ['lz-jsx-styling']` alone also turns the mutators on, and also stops the run when the install
-fails. Listing `lz-jsx` too costs nothing and keeps it clear that the JSX mutators are on.
+The ignorer does not need the JSX mutators: it also hides StrykerJS's own class name and style mutants.
+Listing the plugin does not turn the JSX mutators on; only the `lzJsxMutators` call does.
+
+`appendPlugins` keeps the plugins Stryker loads by default. `plugins` replaces them, so a checker such as
+`@stryker-mutator/typescript-checker` does not load unless the list names it too. Stryker finds its
+default plugins by listing the `@stryker-mutator` folder next to its own install, which under pnpm or Yarn
+Plug'n'Play does not hold your checker. With either, name the checker in `appendPlugins`, as in
+`'@stryker-mutator/typescript-checker'`.
 
 `visibilityClasses` must be an array of class names without whitespace. Stryker checks it against the
 schema the plugin exports, and the ignorer throws when it is created with any other value.

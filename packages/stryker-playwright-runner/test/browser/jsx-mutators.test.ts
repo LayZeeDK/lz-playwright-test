@@ -1,10 +1,9 @@
-import '@layzee/stryker-jsx-mutators';
-
 import assert from 'node:assert/strict';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import { lzJsxMutators } from '@layzee/stryker-jsx-mutators';
 import type { Location, Mutant } from '@stryker-mutator/api/core';
 import { MutantRunStatus, TestStatus } from '@stryker-mutator/api/test-runner';
 import { Instrumenter } from '@stryker-mutator/instrumenter';
@@ -66,6 +65,7 @@ function mutantRun(m: Mutant, title: string) {
 }
 
 before(async () => {
+  await lzJsxMutators();
   const result = await new Instrumenter(log).instrument(
     [{ name: fixture('src/app.tsx'), content: source, mutate: true }],
     { plugins: null, excludedMutations: [], ignorers: [] },
