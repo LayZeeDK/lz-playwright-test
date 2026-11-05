@@ -61,7 +61,9 @@ Write one catalog per configuration (for example `.audit/common-mistakes/<area>.
   file:line in a local clone.
 - One row per mistake: a one-line description, its source, a corpus count (section 2c), and its fit:
   - **lint** when the pattern is visible in the syntax alone; search the lint plugins for the API and name the rule.
-    If no rule exists, mark the row *lint-replaceable mutator candidate without existing lint rule* and reconsider
+    A highly configurable rule that only matches the pattern when given a project-specific selector or pattern
+    (`no-restricted-syntax`, `no-invalid-regexp`, `no-restricted-imports` and the like) counts as a custom lint
+    rule, not an available one. If no available rule exists, mark the row *lint-replaceable mutator candidate without existing lint rule* and reconsider
     it as a mutator proposal (section 3), so it gets a different triage outcome than Drop;
   - **mutator** when only running the tests tells weak from strong (for example whether anything after a call
     depends on it);
