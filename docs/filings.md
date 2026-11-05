@@ -800,3 +800,41 @@ that `restoreMocks: false` is reliable at the file (`meta`) or project level, no
 
 **Evidence.** Probe stories and scripts kept outside this repository; results recorded in this project's audit notes
 (Storybook 10.6.2 with Vitest 3.2.7; Storybook 10.6.5 with Vitest 5.1.0).
+
+## vitest-dev/vitest: browser mode refuses a setup file when `node_modules` is a symlink outside the root
+
+Status: draft, not filed (2026-11-05).
+
+**Versions.** vitest 5.1.0, @vitest/browser-playwright 5.1.0, vite 8.3.6, Node 24.22.0, Windows 11 arm64. Seen with
+@storybook/addon-vitest 10.6.5 (setup file `@storybook/addon-vitest/internal/setup-file`) inside a StrykerJS 10.1.1
+sandbox, which copies the project into `.stryker-tmp/sandbox-<id>/` and links `node_modules` back to the project's.
+
+**Reproduction.** A Storybook project with addon-vitest in browser mode, and a Stryker config with `inPlace: false`
+(the default). The dry run fails at once:
+
+```
+Failed to import test file <project>/node_modules/@storybook/addon-vitest/dist/vitest-plugin/setup-file.js
+```
+
+Running Vitest directly in the sandbox copy, with the sandbox as the working directory, gives the same error, and
+Vite logs `The request id "<project>\node_modules\...\setup-file.js" is outside of Vite serving allow list.` With
+`inPlace: true` the same project passes. A smaller reproduction without Storybook or Stryker (a folder whose
+`node_modules` is a symlink to a folder outside it, and a `setupFiles` entry from a package) follows from the cause
+below but was not run.
+
+**Cause.** Vitest resolves the setup file's bare specifier to its real path, outside the symlink, and the browser
+imports it as `/@fs/<real path>`. `server.fs.allow` holds the config folder, the workspace root and Vitest's own
+folders; none of them holds the symlink's target, so Vite refuses the request. Files that served modules import
+afterwards pass, through Vite's safe module paths, so only files the browser client imports directly are hit. At
+v5.1.0, `packages/browser/src/node/project.ts:104-108` already adds the provider's `initScripts` to
+`server.fs.allow`, but not the resolved setup files.
+
+**Possible fix.** Add each resolved setup file (or its folder) to `server.fs.allow` when it is outside it, as for
+`initScripts`.
+
+**Workaround.** In the Vitest config:
+`server: { fs: { allow: [searchForWorkspaceRoot(process.cwd()), realpathSync('node_modules')] } }`
+(`searchForWorkspaceRoot` from `vite`, `realpathSync` from `node:fs`). Measured: the Stryker dry run in sandbox mode
+then passes (4 tests).
+
+**Evidence.** Logs and configs kept outside this repository, in the probe project of this project's Storybook spike.
