@@ -183,7 +183,22 @@ Do not exclude all built-ins from test code, and do not keep them all. Decide pe
 
 The Playwright analysis (`.audit/builtin-mutators/analysis.md`) is the worked example.
 
-## 7. Running it with agents
+## 7. Auditing mutators that already ship
+
+Shipped mutators get the same treatment as new proposals, so both answer to the same rules.
+
+1. Map each shipped mutator to its row in the mistakes catalog (section 2b). A mutator with no common mistake behind it
+   is flagged.
+2. Join the measured outcomes it already has: every corpus run's `mutation.json`, per mutator, killed, survived,
+   timeout and NoCoverage, with a hand triage of its survivors (Useful, Noise, Coverage; section 4). Note the repos
+   and commits; a mutator measured on one repo only is thin evidence.
+3. Check its noise predicates against the survivors: a survivor class that recurs by construction needs a new skip
+   rule or a lower entry.
+4. Give each a recommended outcome with the section 5 tables: stays in the main entry, moves to opt-in or
+   experimental, folds into another mutator, or is dropped. Moving or removing a shipped mutator changes public API,
+   so it is Lars's call, asked with what changes for a user's configuration.
+
+## 8. Running it with agents
 
 - One deliverable file per agent, at a named path, created in its first minutes and extended as it goes.
 - The brief carries Lars's words verbatim, the rulings the agent cannot see, the corpus location and manifest, the
