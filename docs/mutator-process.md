@@ -60,12 +60,15 @@ Write one catalog per configuration (for example `.audit/common-mistakes/<area>.
   experience reports (blog posts, flaky-test studies, "common mistakes with X" articles). Cite each with a URL or a
   file:line in a local clone.
 - One row per mistake: a one-line description, its source, a corpus count (section 2c), and its fit:
-  - **lint** when the pattern is visible in the syntax alone; name the rule if one exists;
+  - **lint** when the pattern is visible in the syntax alone; search the lint plugins for the API and name the rule.
+    If no rule exists, mark the row *lint-replaceable mutator candidate without existing lint rule* and reconsider
+    it as a mutator proposal (section 3), so it gets a different triage outcome than Drop;
   - **mutator** when only running the tests tells weak from strong (for example whether anything after a call
     depends on it);
   - **both** when a lint rule catches the obvious form and a mutator the rest.
 - Group the rows (for test code: assertions, waits, isolation and hooks, mocking, API or framework specifics).
-- The "mutator" and "both" rows feed section 3; the "lint" rows feed upstream lint-rule drafts in the filing ledger.
+- The "mutator" and "both" rows and the lint-replaceable rows without a rule feed section 3; the lint-replaceable
+  rows without a rule also feed upstream lint-rule drafts in the filing ledger.
 - Worked examples: `.audit/common-mistakes/playwright.md` (40 mistakes) and `.audit/common-mistakes/storybook.md`
   (26 mistakes).
 
@@ -147,7 +150,7 @@ how it ships. A proposal can move between outcomes as evidence arrives; record e
 | **Prototype** | A new name with no overlap, a clear survivor meaning, enough corpus sites (counted, with repos), and a static predicate for its noise. | A spike plugin and one measured run per mutator (section 4). The result goes to the next ruling batch. Nothing is built in the package yet. |
 | **Fold in** | The idea is a new case of an existing or approved mutator: a further call it should match, a coarse mode of a planned mutator, an extra site class. | No new public name. Add the case to the target mutator's proposal and build it with that mutator. |
 | **Defer** | Another mutator's measurement settles this one (the same idea on another API, a shared noise risk), or it waits on a ruling or a build. | Write down what it waits on and what result would revive it. Revisit when that measurement lands. |
-| **Drop** | No static predicate can skip its noise, a survivor would not point at a specific weak check, no common mistake stands behind it, or a lint rule catches the mistake from the syntax alone. | Record the reason in the rejected list so the idea does not come back. A lint-shaped mistake gets an upstream lint-rule draft in the filing ledger; nothing is filed without Lars's yes. |
+| **Drop** | No static predicate can skip its noise, a survivor would not point at a specific weak check, no common mistake stands behind it, or an existing lint rule catches the mistake from the syntax alone. A lint-shaped mistake with no existing rule is not dropped for being lint-shaped: it is a *lint-replaceable mutator candidate without existing lint rule* and is triaged on its merits as a mutator. | Record the reason in the rejected list so the idea does not come back. A lint-shaped mistake without a rule gets an upstream lint-rule draft in the filing ledger; nothing is filed without Lars's yes. |
 
 Prototypes run while other work waits on rulings, so they delay no build. Book each in its own lock slot.
 
