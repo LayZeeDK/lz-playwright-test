@@ -41,7 +41,17 @@ per configuration:
 Every proposal in section 3 starts from a mistake in this catalog. An idea with no common mistake behind it needs a
 stated reason to exist, and usually belongs in the rejected list.
 
-### 2a. The mistakes catalog
+### 2a. The API inventory
+
+Before cataloguing mistakes, list the whole public API surface the code under each configuration uses, from source
+at the installed version: every entry point in each package's `exports` (for example `storybook`, every
+`storybook/*` entry point and the `@storybook/*` packages; for Node.js every `node:*` module and the globals), the
+annotations and conventions the framework reads (CSF fields, hooks), and what each recent major version added,
+renamed or removed. Give each API its home (production code, test code, configuration, or tooling only) and note
+which catalog covers it. A catalog written without the inventory misses whole entry points; this happened on
+2026-11-05, when no Storybook report had looked at `storybook/actions`, `storybook/preview-api` or CSF factories.
+
+### 2b. The mistakes catalog
 
 Write one catalog per configuration (for example `.audit/common-mistakes/<area>.md`) before proposing anything.
 
@@ -49,7 +59,7 @@ Write one catalog per configuration (for example `.audit/common-mistakes/<area>.
   rule), the official best-practice, pitfall and migration pages, the API's issue tracker and discussions, then
   experience reports (blog posts, flaky-test studies, "common mistakes with X" articles). Cite each with a URL or a
   file:line in a local clone.
-- One row per mistake: a one-line description, its source, a corpus count (section 2b), and its fit:
+- One row per mistake: a one-line description, its source, a corpus count (section 2c), and its fit:
   - **lint** when the pattern is visible in the syntax alone; name the rule if one exists;
   - **mutator** when only running the tests tells weak from strong (for example whether anything after a call
     depends on it);
@@ -59,7 +69,7 @@ Write one catalog per configuration (for example `.audit/common-mistakes/<area>.
 - Worked examples: `.audit/common-mistakes/playwright.md` (40 mistakes) and `.audit/common-mistakes/storybook.md`
   (26 mistakes).
 
-### 2b. Lenses that serve the catalog
+### 2c. Lenses that serve the catalog
 
 Run these beside the catalog, one agent per lens, each writing its own file early (see section 7 on briefs).
 
@@ -86,7 +96,7 @@ Run these beside the catalog, one agent per lens, each writing its own file earl
 
 One entry per mutator, in this shape:
 
-- The common mistake it exposes, with its row in the mistakes catalog (section 2a), and why a lint rule does not
+- The common mistake it exposes, with its row in the mistakes catalog (section 2b), and why a lint rule does not
   cover it.
 - Name: `Lz<Area><Name>`, letters only (for example `LzPlaywrightFulfill`, `LzStorybookInteraction`).
 - Configuration it serves, and the exact syntax it matches.
