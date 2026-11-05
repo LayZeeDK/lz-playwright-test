@@ -67,8 +67,8 @@ One entry per mutator, in this shape:
 - Entry: main entry, opt-in, or experimental.
 - Sites counted (measured) and the outcome expected (inferred until a run backs it).
 
-Rank the proposals and say which to build first. List rejected ideas with reasons; they stop the same idea coming
-back.
+Rank the proposals, give each a recommended triage outcome (section 5) and say which to prototype first. List
+rejected ideas with reasons; they stop the same idea coming back.
 
 ## 4. Prototype and measure
 
@@ -90,11 +90,32 @@ A proposal is a guess about how tests behave. Measure before deciding.
 
 ## 5. Decide
 
-Bring Lars one question per decision, with options, trade-offs and one recommendation. Typical outcomes:
+Bring Lars one question per decision, with options, trade-offs and one recommendation. Decide in two passes: first
+sort every proposal from section 3 into one of the triage outcomes below, then, once a prototype is measured, decide
+how it ships. A proposal can move between outcomes as evidence arrives; record each move.
 
-- Main entry, opt-in entry, or experimental pending more evidence (and what evidence would settle it).
-- Fold into an existing mutator, defer behind another mutator's measurement, or drop.
-- Lint instead: draft the upstream lint rule into the filing ledger; nothing is filed without Lars's yes.
+### Triage outcomes (before anything is built)
+
+| Outcome | When it fits | What happens next |
+| --- | --- | --- |
+| **Prototype** | A new name with no overlap, a clear survivor meaning, enough corpus sites (counted, with repos), and a static predicate for its noise. | A spike plugin and one measured run per mutator (section 4). The result goes to the next ruling batch. Nothing is built in the package yet. |
+| **Fold in** | The idea is a new case of an existing or approved mutator: a further call it should match, a coarse mode of a planned mutator, an extra site class. | No new public name. Add the case to the target mutator's proposal and build it with that mutator. |
+| **Defer** | Another mutator's measurement settles this one (the same idea on another API, a shared noise risk), or it waits on a ruling or a build. | Write down what it waits on and what result would revive it. Revisit when that measurement lands. |
+| **Drop** | No static predicate can skip its noise, a survivor would not point at a specific weak check, or a lint rule catches the mistake from the syntax alone. | Record the reason in the rejected list so the idea does not come back. A lint-shaped mistake gets an upstream lint-rule draft in the filing ledger; nothing is filed without Lars's yes. |
+
+Prototypes run while other work waits on rulings, so they delay no build. Book each in its own lock slot.
+
+### How a measured mutator ships
+
+| Outcome | When it fits |
+| --- | --- |
+| **Main entry** | Measured on at least two corpus repositories; survivors are mostly Useful; kills are cheap (no timeout-only kills). |
+| **Opt-in entry** | Useful, but costly (timeout kills, slow runs) or noisy in some codebases, so users turn it on deliberately. |
+| **Experimental** | Approved to ship but resting on thin evidence: measured on one repository or few sites, a flaky kill risk, or a survivor meaning not yet confirmed by triage. It ships marked experimental in the package and README, with the evidence it waits for written down (which repositories, how many sites, what useful share). A later measurement promotes it to main or opt-in, or demotes it to fold in or drop. |
+| **Back to triage** | The measurement contradicts the proposal (mostly Noise, or kills only by crashing the test). Re-sort it with the table above. |
+
+Example from 2026-11-05: Lars approved seven Storybook play mutators, marking three as experimental "pending more
+evidence"; the common-mistakes proposals were sorted into four prototypes, three fold-ins, one deferral and one drop.
 
 Record the ruling verbatim, update the plan, and restate every public name and default at each report until it
 ships.
