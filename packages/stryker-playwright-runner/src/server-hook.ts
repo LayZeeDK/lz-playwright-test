@@ -51,13 +51,29 @@ export function installServerHook(
   let control: ServerControl | undefined;
   let writtenHits = 0;
   let marked = false;
+  let evaluating = false;
+
+  Object.defineProperty(globalThis, ns, {
+    configurable: true,
+    get: () => {
+      if (!evaluating) {
+        evaluating = true;
+        queueMicrotask(() => {
+          evaluating = false;
+        });
+      }
+
+      return namespace;
+    },
+    set: () => undefined,
+  });
 
   Object.defineProperty(namespace, 'currentTestId', {
     configurable: true,
     get: () => {
       const tag = requests.getStore();
 
-      if (!control?.perTest || tag === undefined) {
+      if (evaluating || !control?.perTest || tag === undefined) {
         return undefined;
       }
 

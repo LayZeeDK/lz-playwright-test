@@ -33,16 +33,19 @@ const source = [
   '}',
   '',
 ].join('\n');
-const serverSource = [
-  "import http from 'node:http';",
+const bigRequestIds = ['1', '2', '3', '4', '5', '6'];
+const namespaceGlobal = `globalThis.${INSTRUMENTER_CONSTANTS.NAMESPACE}`;
+const answerLines = [
+  "const n = Number(new URL(request.url, 'http://x').searchParams.get('n'));",
+  'response.end(answer(n));',
+];
+const serverSource = serverSourceOf(answerLines, [
   "import { answer } from './app.mjs';",
-  'const server = http.createServer((request, response) => {',
-  "  const n = Number(new URL(request.url, 'http://x').searchParams.get('n'));",
-  '  response.end(answer(n));',
-  '});',
-  "server.listen(0, '127.0.0.1', () => process.stdout.write(`${server.address().port}\\n`));",
-  '',
-].join('\n');
+]);
+const lazyServerSource = serverSourceOf([
+  "const { answer } = await import('./app.mjs');",
+  ...answerLines,
+]);
 let instrumented = '';
 
 before(async () => {
@@ -68,19 +71,45 @@ before(async () => {
   instrumented = file.content;
 });
 
+function serverSourceOf(
+  handler: readonly string[],
+  imports: readonly string[] = [],
+): string {
+  return [
+    "import http from 'node:http';",
+    ...imports,
+    'const server = http.createServer(async (request, response) => {',
+    ...handler.map((line) => `  ${line}`),
+    '});',
+    "server.listen(0, '127.0.0.1', () => process.stdout.write(`${server.address().port}\\n`));",
+    '',
+  ].join('\n');
+}
+
 async function startServer(
   t: TestContext,
-  env: Readonly<Record<string, string>> = {},
+  {
+    env = {},
+    server = serverSource,
+    hooks = [serverHookUrl],
+  }: {
+    readonly env?: Readonly<Record<string, string>>;
+    readonly server?: string;
+    readonly hooks?: readonly string[];
+  } = {},
 ) {
   const dir = tempTree(t, 'server-hook-test-', {
     'app.mjs': instrumented,
-    'server.mjs': serverSource,
+    'server.mjs': server,
   });
   const serverDir = path.join(dir, 'server');
   mkdirSync(serverDir);
   const child = spawn(
     process.execPath,
-    ['--import', serverHookUrl, path.join(dir, 'server.mjs')],
+    [
+      ...hooks.flatMap((hook) => ['--import', hook]),
+      path.join(dir, 'server.mjs'),
+    ],
     {
       env: { ...process.env, [serverDirEnv]: serverDir, ...env },
       stdio: ['ignore', 'pipe', 'inherit'],
@@ -154,7 +183,7 @@ test('a mutant run once at module scope is active only in a server started with 
   assert.equal(await switched.ask(2), 'hi many');
 
   const started = await startServer(t, {
-    [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: '0',
+    env: { [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: '0' },
   });
   started.run({ perTest: false, activeMutant: '0' });
 
@@ -179,14 +208,7 @@ test('coverage goes to the run folder per test id header, with what ran before t
     ['0', '1', '2', '3', '4', '5', '6'],
     'module scope, and a request before any run, such as a readiness check',
   );
-  assert.deepEqual(idsOf(coverage.perTest['big']), [
-    '1',
-    '2',
-    '3',
-    '4',
-    '5',
-    '6',
-  ]);
+  assert.deepEqual(idsOf(coverage.perTest['big']), bigRequestIds);
   assert.deepEqual(idsOf(coverage.perTest['small']), [
     '1',
     '2',
@@ -204,6 +226,87 @@ test('coverage goes to the run folder per test id header, with what ran before t
     }),
     'each run gets only its own hits',
   );
+});
+
+test("module scope evaluated lazily inside a request is static, and the rest of that request is its test's", async (t) => {
+  const server = await startServer(t, { server: lazyServerSource });
+  const outDir = server.run({ perTest: true });
+  await server.ask(2, 'big');
+
+  const coverage = coverageOf(outDir);
+
+  assert.deepEqual(idsOf(coverage.static), ['0']);
+  assert.deepEqual(idsOf(coverage.perTest['big']), bigRequestIds);
+});
+
+test('hits count as static only until the microtask after the first read of the namespace global', async (t) => {
+  const server = await startServer(t, {
+    server: serverSourceOf([
+      `const ns = ${namespaceGlobal};`,
+      'const during = ns.currentTestId;',
+      'await null;',
+      'response.end(JSON.stringify([during, ns.currentTestId]));',
+    ]),
+  });
+  server.run({ perTest: true });
+
+  assert.equal(await server.ask(0, 'small'), '[null,"small"]');
+});
+
+test('a read of the namespace global inside an open window does not keep it open', async (t) => {
+  const server = await startServer(t, {
+    server: serverSourceOf([
+      `queueMicrotask(() => ${namespaceGlobal});`,
+      `const ns = ${namespaceGlobal};`,
+      'await null;',
+      'response.end(String(ns.currentTestId));',
+    ]),
+  });
+  server.run({ perTest: true });
+
+  assert.equal(await server.ask(0, 'small'), 'small');
+});
+
+test('a second copy of the hook leaves lazily evaluated module scope static', async (t) => {
+  const server = await startServer(t, {
+    server: lazyServerSource,
+    hooks: [serverHookUrl, `${serverHookUrl}?copy`],
+  });
+  const outDir = server.run({ perTest: true });
+  await server.ask(2, 'big');
+
+  const coverage = coverageOf(outDir);
+
+  assert.deepEqual(idsOf(coverage.static), ['0']);
+  assert.deepEqual(idsOf(coverage.perTest['big']), bigRequestIds);
+});
+
+test('without per-test coverage lazily evaluated module scope and the request are static', async (t) => {
+  const server = await startServer(t, { server: lazyServerSource });
+  const outDir = server.run({ perTest: false });
+  await server.ask(2, 'big');
+
+  const coverage = coverageOf(outDir);
+
+  assert.deepEqual(Object.keys(coverage.perTest), []);
+  assert.deepEqual(idsOf(coverage.static), ['0', '1', '2', '3', '4', '5', '6']);
+});
+
+test('assigning the namespace global is ignored, not a throw', async (t) => {
+  const server = await startServer(t, {
+    server: serverSourceOf([
+      `const before = ${namespaceGlobal};`,
+      'try {',
+      `  ${namespaceGlobal} = {};`,
+      '} catch (error) {',
+      '  response.end(String(error));',
+      '  return;',
+      '}',
+      `response.end(String(${namespaceGlobal} === before));`,
+    ]),
+  });
+
+  assert.equal(await server.ask(0), 'true');
 });
 
 test('a request without the header counts under its arrival time', async (t) => {
