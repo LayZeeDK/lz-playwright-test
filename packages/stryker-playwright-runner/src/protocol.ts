@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import type { MutantCoverage } from '@stryker-mutator/api/core';
 
-import { isRecord } from './is-record.ts';
+import { isRecord, isStringArray } from './is-record.ts';
 import { serverSnapshotPrefix } from './server-protocol.ts';
 
 export const runSettingsEnv = 'LZ_STRYKER_PLAYWRIGHT_RUN';
@@ -212,10 +212,4 @@ export function readRunSettings(
   }
 
   throw new Error(refused);
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return (
-    Array.isArray(value) && value.every((item) => typeof item === 'string')
-  );
 }

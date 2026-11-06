@@ -24,6 +24,7 @@ test('a control file written by the runner reads back whole, and its temp file i
     perTest: false,
     activeMutant: '7',
     hitLimit: 40,
+    issuedTestIds: ['a1b2-c3', 'd4e5-f6'],
   };
 
   writeServerControl(dir, control);
@@ -45,6 +46,8 @@ test('a missing or invalid control file reads as none', (t) => {
     '{"outDir":"o","perTest":"yes"}',
     '{"outDir":"o","perTest":true,"activeMutant":7}',
     '{"outDir":"o","perTest":true,"hitLimit":"9"}',
+    '{"outDir":"o","perTest":true,"issuedTestIds":"a"}',
+    '{"outDir":"o","perTest":true,"issuedTestIds":["a",1]}',
   ].forEach((raw) => {
     writeFileSync(path.join(dir, controlFile), raw);
 

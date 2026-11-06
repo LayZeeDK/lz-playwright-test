@@ -51,9 +51,10 @@ import {
   type RunOutput,
 } from './run-result.ts';
 import {
-  listSerialGroups,
+  listTests,
   projectsThatRun,
   type SerialGroups,
+  serialGroups,
 } from './serial-groups.ts';
 import {
   moveServersApart,
@@ -67,7 +68,6 @@ import {
   mutateOption,
   refusalMessage,
   serverDirEnv,
-  type ServerSupport,
   ServerSupportRefused,
   writeServerControl,
 } from './server-protocol.ts';
@@ -102,7 +102,7 @@ interface ServerCheck {
 interface ServerSide {
   /** Holds the control file and the hooked marks of the processes global setup starts. */
   readonly dir: string;
-  readonly testIdHosts: readonly string[] | undefined;
+  readonly testIdHosts: readonly string[];
 }
 
 interface Session {
@@ -112,6 +112,7 @@ interface Session {
   readonly servers: readonly ServerCheck[];
   readonly server: ServerSide | undefined;
   readonly serialGroups: SerialGroups;
+  readonly listedTestIds: readonly string[];
   readonly timeouts: ConfigTimeouts;
   readonly retriesByProject: ReadonlyMap<string, number>;
   readonly traces: TracesTarget | undefined;
@@ -241,12 +242,9 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       const servers = webServers.flatMap((server) =>
         serverCheck(server, pw.isURLAvailable),
       );
-      const server = await serverSide(
-        mutates ? { mode: 'header' } : undefined,
-        root,
-        webServers,
-        pw.isURLAvailable,
-      );
+      const server = mutates
+        ? await serverSide(root, webServers, pw.isURLAvailable)
+        : undefined;
       await this.#globalSetupWatchingConfiguredPorts(
         playwright,
         server,
@@ -261,10 +259,9 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       // Every Stryker test runner process needs the groups, and only one of them runs the dry run.
       // Listed after global setup, like Playwright's own CLI, because test files may read what it
       // creates.
-      const serialGroups = await listSerialGroups(
+      const listed = await listTests(
         playwright,
         projectsThatRun(options.projects, config.projects),
-        (suite) => isSerialSuite(suite, pw.version),
       );
       this.#session = {
         options,
@@ -272,7 +269,10 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         root,
         servers,
         server,
-        serialGroups,
+        serialGroups: serialGroups(listed, (suite) =>
+          isSerialSuite(suite, pw.version),
+        ),
+        listedTestIds: listed.map((test) => test.id),
         timeouts,
         retriesByProject,
         traces,
@@ -479,6 +479,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         request,
         outDir,
         session.server?.testIdHosts,
+        session.listedTestIds,
       );
 
       if (session.server) {
@@ -671,6 +672,12 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         ', but no process that Playwright global setup started loaded the server hook. ' +
           'A webServer that is not Node.js, a command that sets NODE_OPTIONS itself, or a server that was already ' +
           'running cannot get the active mutant.',
+        {
+          mutate:
+            this.#session?.options.webServer.mutate === 'auto'
+              ? "'auto'"
+              : 'true',
+        },
       );
     }
   }
@@ -728,8 +735,8 @@ function boundConfiguredPort(
     " and Stryker starts more than one test runner process, so each process's webServer " +
       `moves to a port of its own, but the command of webServer ${index} bound port ${from} instead of ${to}. ` +
       "Make the command take its port from PORT, from the webServer's env, or from a --port in the command " +
-      '(the runner moves all three), or derive the port from STRYKER_MUTATOR_WORKER in the Playwright config ' +
-      '(see Configure in the README).',
+      '(the runner moves all three), or run Stryker with concurrency 1 and no checker ' +
+      '(see More than one Stryker process in the README).',
     cause === undefined ? undefined : { cause },
   );
 }
@@ -739,16 +746,11 @@ function boundConfiguredPort(
  * a server that answers before global setup with reuseExistingServer belongs to another process, which
  * this runner cannot switch to its mutant.
  */
-export async function serverSide(
-  support: ServerSupport | undefined,
+async function serverSide(
   root: Pick<TempRoot, 'dir'>,
   webServers: readonly ConfigWebServer[],
   isURLAvailable: Playwright['isURLAvailable'],
-): Promise<ServerSide | undefined> {
-  if (!support) {
-    return undefined;
-  }
-
+): Promise<ServerSide> {
   if (webServers.some((server) => server.setsNodeOptions)) {
     throw new ServerSupportRefused(
       ", but a webServer's env sets NODE_OPTIONS, which replaces the one that loads " +
@@ -775,8 +777,7 @@ export async function serverSide(
 
   return {
     dir,
-    testIdHosts:
-      support.mode === 'header' ? webServers.flatMap(serverHosts) : undefined,
+    testIdHosts: webServers.flatMap(serverHosts),
   };
 }
 

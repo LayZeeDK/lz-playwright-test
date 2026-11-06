@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { fieldOf, isRecord } from './is-record.ts';
+import { fieldOf, isRecord, isStringArray } from './is-record.ts';
 
 export interface LzPlaywrightOptions {
   readonly configFile?: string;
@@ -237,10 +237,4 @@ function readWebServer(value: unknown): WebServerOptions {
     mutate: mutate ?? false,
     isolate: isolate ?? true,
   };
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return (
-    Array.isArray(value) && value.every((item) => typeof item === 'string')
-  );
 }

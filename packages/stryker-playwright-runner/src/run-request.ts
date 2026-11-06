@@ -83,11 +83,11 @@ export interface RunPlan {
   readonly control: ServerControl;
 }
 
-/** `testIdHosts` are the webServer hosts whose requests carry the test id header in a per-test run. */
 export function runPlan(
   request: RunRequest,
   outDir: string,
   testIdHosts?: readonly string[],
+  issuedTestIds?: readonly string[],
 ): RunPlan {
   const mutant = request.kind === 'mutant' ? request : undefined;
   const perTest =
@@ -114,6 +114,7 @@ export function runPlan(
       perTest,
       activeMutant: mutant?.activeMutant,
       hitLimit: mutant?.hitLimit,
+      ...(perTest && issuedTestIds !== undefined ? { issuedTestIds } : {}),
     },
   };
 }

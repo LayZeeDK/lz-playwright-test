@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { isRecord } from './is-record.ts';
+import { isRecord, isStringArray } from './is-record.ts';
 
 /** Tells the server hook, in the processes global setup starts, the folder that holds its control file. */
 export const serverDirEnv = 'LZ_STRYKER_PLAYWRIGHT_SERVER';
@@ -24,16 +24,13 @@ export function refusalMessage(mutate: string, reason: string): string {
 export class ServerSupportRefused extends Error {
   readonly reason: string;
 
-  constructor(reason: string, options?: ErrorOptions) {
-    super(refusalMessage('true', reason), options);
+  constructor(
+    reason: string,
+    { mutate = 'true', ...options }: ErrorOptions & { mutate?: string } = {},
+  ) {
+    super(refusalMessage(mutate, reason), options);
     this.reason = reason;
   }
-}
-
-export type PerTestMode = 'header' | 'arrival';
-
-export interface ServerSupport {
-  readonly mode: PerTestMode;
 }
 
 /** What one run tells the server hook, read again on every request. */
@@ -42,6 +39,7 @@ export interface ServerControl {
   readonly perTest: boolean;
   readonly activeMutant?: string | undefined;
   readonly hitLimit?: number | undefined;
+  readonly issuedTestIds?: readonly string[];
 }
 
 export function parseServerControl(raw: string): ServerControl | undefined {
@@ -57,18 +55,25 @@ export function parseServerControl(raw: string): ServerControl | undefined {
     return undefined;
   }
 
-  const { outDir, perTest, activeMutant, hitLimit } = value;
+  const { outDir, perTest, activeMutant, hitLimit, issuedTestIds } = value;
 
   if (
     typeof outDir !== 'string' ||
     typeof perTest !== 'boolean' ||
     (activeMutant !== undefined && typeof activeMutant !== 'string') ||
-    (hitLimit !== undefined && typeof hitLimit !== 'number')
+    (hitLimit !== undefined && typeof hitLimit !== 'number') ||
+    (issuedTestIds !== undefined && !isStringArray(issuedTestIds))
   ) {
     return undefined;
   }
 
-  return { outDir, perTest, activeMutant, hitLimit };
+  return {
+    outDir,
+    perTest,
+    activeMutant,
+    hitLimit,
+    ...(issuedTestIds === undefined ? {} : { issuedTestIds }),
+  };
 }
 
 /** Replaces the file in one rename, so a server that reads it mid-write sees the old run or the new one. */

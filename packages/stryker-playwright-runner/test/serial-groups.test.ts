@@ -9,7 +9,7 @@ import type {
   ReportedTest,
 } from '../src/reporter.ts';
 import {
-  listSerialGroups,
+  listTests,
   projectsThatRun,
   serialGroups,
   withSerialGroups,
@@ -97,9 +97,12 @@ test('listing passes the projects to Playwright and groups the describe.serial t
   );
   const { playwright, calls } = listing({ status: 'passed', tests });
 
-  const groups = await listSerialGroups(playwright, ['chromium'], isSerial);
+  const listed = await listTests(playwright, ['chromium']);
 
-  assert.deepEqual(groups.get('edit'), ['create', 'edit']);
+  assert.deepEqual(serialGroups(listed, isSerial).get('edit'), [
+    'create',
+    'edit',
+  ]);
   assert.deepEqual(calls, [['chromium']]);
 });
 
@@ -109,7 +112,7 @@ test('listing fails when a test file does not load, though the status says passe
     errors: ['SyntaxError in a.spec.ts', 'SyntaxError in b.spec.ts'],
   });
 
-  await assert.rejects(listSerialGroups(playwright, [], isSerial), {
+  await assert.rejects(listTests(playwright, []), {
     message:
       'Playwright could not load every test file:\nSyntaxError in a.spec.ts\nSyntaxError in b.spec.ts',
   });
@@ -121,7 +124,7 @@ test('listing fails with the status Playwright reports', async () => {
     errors: ['config error', 'second error'],
   });
 
-  await assert.rejects(listSerialGroups(playwright, [], isSerial), {
+  await assert.rejects(listTests(playwright, []), {
     message:
       'Playwright could not list the tests (failed):\nconfig error\nsecond error',
   });
@@ -130,7 +133,7 @@ test('listing fails with the status Playwright reports', async () => {
 test('listing fails and points at the trace log when Playwright throws', async () => {
   const { playwright } = listing({});
 
-  await assert.rejects(listSerialGroups(playwright, [], isSerial), {
+  await assert.rejects(listTests(playwright, []), {
     message: /--logLevel trace/,
   });
 });

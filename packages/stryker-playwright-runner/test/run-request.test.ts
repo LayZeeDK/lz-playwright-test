@@ -120,6 +120,24 @@ test('a run plan names the webServer hosts for the test id header only when it c
   );
 });
 
+test('a run plan issues the test ids to the webServer only when it collects per-test coverage', () => {
+  const ids = ['a', 'b'];
+
+  assert.deepEqual(
+    runPlan(dryRequest(), 'out', [], ids).control.issuedTestIds,
+    ids,
+  );
+  assert.ok(
+    !(
+      'issuedTestIds' in
+      runPlan(dryRequest({ coverageAnalysis: 'all' }), 'out', [], ids).control
+    ),
+  );
+  assert.ok(
+    !('issuedTestIds' in runPlan(mutantRequest(), 'out', [], ids).control),
+  );
+});
+
 test('the webServer starts with the mutant of a statically activated mutant run, and with none otherwise', () => {
   assert.equal(
     serverMutantFor(

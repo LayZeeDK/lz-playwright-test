@@ -178,7 +178,9 @@ a file that the hook reads at the start of each request.
 The runner adds an `x-lz-stryker-test` header with the test's id to the requests that a test sends to the
 `webServer`: the page requests to the `webServer`'s host and port, and the requests of a Playwright
 `APIRequestContext`, such as the `request` fixture. The hook counts the code that a request runs for that
-test, so Stryker runs each server-side mutant against the tests whose requests reached it.
+test, so Stryker runs each server-side mutant against the tests whose requests reached it. The hook takes
+only the ids of the tests the runner listed at startup. A request whose header holds any other value counts
+as a request without the header (see [Limits](#limits)).
 
 Code that runs once when the server starts, such as module scope, cannot switch mutants per request. A
 module that the server loads at its first request counts as such code too. Stryker runs a mutant in that
@@ -220,7 +222,10 @@ it. The runner moves:
 So the `command` must take its port from one of these. A `command` that binds the configured port anyway
 fails the startup with an error that names both ports, as soon as the configured port answers. The runner
 also refuses a project `baseURL` that points at no `webServer`, and projects whose `baseURL`s point at
-different `webServer`s.
+different `webServer`s. Point every project's `baseURL` at the `url` or `port` of the same `webServer`, or
+leave it unset. Deriving the port from `STRYKER_MUTATOR_WORKER` does not help here, because the runner
+moves the port either way. Only one test runner process, `concurrency` 1 with no checker, keeps the
+configured port.
 
 ### When the setup cannot work
 
@@ -540,8 +545,9 @@ otherwise:
 - The `webServer` restarts only for the runs that [Server-side code](#server-side-code) names, and a
   restart keeps what the server wrote to its backend, such as a database file. So what one run writes is
   still there in the next. A suite that needs a fresh backend can report a mutant wrongly.
-- A request to the `webServer` without the test id header, such as one the server sends to itself or one
-  from a page that a `beforeAll` hook opened, counts for every test that ran when it arrived. When no
+- A request to the `webServer` without the test id header, such as one the server sends to itself, one
+  from a page that a `beforeAll` hook opened, or one that the test routes itself with `page.route(...)` and
+  `route.continue()` or `route.fulfill()`, counts for every test that ran when it arrived. When no
   test ran then, it counts as reached outside any test, so Stryker runs every test for its mutants.
 - When the runner moves a `webServer` to a free port, another process can take that port before the
   `webServer` binds it. Playwright then reports the bind error.

@@ -34,6 +34,7 @@ const source = [
   '',
 ].join('\n');
 const bigRequestIds = ['1', '2', '3', '4', '5', '6'];
+const testIdsTheseTestsSend = ['big', 'small'];
 const namespaceGlobal = `globalThis.${INSTRUMENTER_CONSTANTS.NAMESPACE}`;
 const answerLines = [
   "const n = Number(new URL(request.url, 'http://x').searchParams.get('n'));",
@@ -136,11 +137,14 @@ async function startServer(
 
   return {
     serverDir,
-    /** Writes the control file for the next run and returns that run's folder. */
     run(control: Omit<ServerControl, 'outDir'>) {
       const outDir = path.join(dir, 'runs', String(runs++));
       mkdirSync(outDir, { recursive: true });
-      writeServerControl(serverDir, { outDir, ...control });
+      writeServerControl(serverDir, {
+        outDir,
+        issuedTestIds: testIdsTheseTestsSend,
+        ...control,
+      });
 
       return outDir;
     },
@@ -390,6 +394,19 @@ test('a request without the header counts under its arrival time', async (t) => 
       arrivedAt <= answered + crossProcessClockSkewMs,
     `${sent} ${key} ${answered}`,
   );
+});
+
+test('a test id header the runner did not issue counts as untagged, under its arrival time', async (t) => {
+  const server = await startServer(t);
+  const outDir = server.run({ perTest: true });
+  await server.ask(0, '__proto__');
+
+  const keys = readSnapshotDir(outDir).snapshots.flatMap(({ coverage }) =>
+    Object.keys(coverage?.perTest ?? {}),
+  );
+
+  assert.equal(keys.length, 1);
+  assert.notEqual(untaggedArrival(keys[0] ?? ''), undefined, keys[0]);
 });
 
 test('without per-test coverage every hit is static, header or not', async (t) => {

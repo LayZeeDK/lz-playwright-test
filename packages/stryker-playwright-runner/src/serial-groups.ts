@@ -22,11 +22,10 @@ export function projectsThatRun(
         .map(({ project }) => project.name);
 }
 
-export async function listSerialGroups(
+export async function listTests(
   playwright: Pick<TestRunner, 'listTests'>,
   projects: readonly string[],
-  isSerial: IsSerialSuite,
-): Promise<SerialGroups> {
+): Promise<readonly ReportedTest[]> {
   const reporter = new LzPlaywrightCollectingReporter();
   const result = await playwright.listTests(reporter, { projects });
 
@@ -49,7 +48,7 @@ export async function listSerialGroups(
     );
   }
 
-  return serialGroups(reporter.listedTests, isSerial);
+  return reporter.listedTests;
 }
 
 export function serialGroups(

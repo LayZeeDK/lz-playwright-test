@@ -249,7 +249,8 @@ test('an http url without a port moves from port 80', async () => {
 
 const cannotMove = (reason: string) =>
   "lzPlaywright.webServer.mutate is true and Stryker starts more than one test runner process, so each process needs a webServer port of its own, but the runner cannot move the projects' baseURL along: " +
-  `${reason}. Derive the port from STRYKER_MUTATOR_WORKER in the Playwright config instead (see Configure in the README).`;
+  `${reason}. Point every project's baseURL at the url or port of the same webServer, or leave it unset, ` +
+  'or run Stryker with concurrency 1 and no checker (see More than one Stryker process in the README).';
 
 test('a baseURL that points at no webServer cannot be moved along', async () => {
   await assert.rejects(

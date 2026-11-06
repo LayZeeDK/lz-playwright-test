@@ -7,7 +7,6 @@ import { setImmediate, setTimeout } from 'node:timers/promises';
 
 import { DryRunStatus } from '@stryker-mutator/api/test-runner';
 
-import { serverSide } from '../src/lz-playwright-test-runner.ts';
 import { serializeSnapshot } from '../src/protocol.ts';
 import {
   readServerMutantsFile,
@@ -21,6 +20,7 @@ import {
 } from '../src/server-protocol.ts';
 import {
   dryRunOptions,
+  fakeTestCase,
   finishedTest,
   mutantRunOptions,
   tempTree,
@@ -61,7 +61,7 @@ function serverFake(
   {
     hooked = true,
     ...behaviour
-  }: Behaviour & { readonly hooked?: boolean } = {},
+  }: Behaviour & { readonly hooked?: boolean | (() => boolean) } = {},
 ) {
   stubEnv(t, { NODE_OPTIONS: '--no-warnings' });
   const sandbox = inSandbox(t);
@@ -78,7 +78,10 @@ function serverFake(
         activeMutant: process.env[activeMutantEnv],
       });
 
-      if (hooked && serverDir !== undefined) {
+      if (
+        (typeof hooked === 'function' ? hooked() : hooked) &&
+        serverDir !== undefined
+      ) {
         writeFileSync(path.join(serverDir, `${hookedPrefix}1`), '');
       }
 
@@ -209,8 +212,10 @@ test('global setup starts the webServer with the server hook before the base NOD
   assert.equal(process.env[serverDirEnv], undefined, 'restored after setup');
 });
 
-test('each run writes the control file before its tests run, and a per-test dry run names the webServer hosts', async (t) => {
-  const fake = serverFake(t);
+test('each run writes the control file before its tests run, and a per-test dry run names the webServer hosts and issues the listed test ids', async (t) => {
+  const fake = serverFake(t, {
+    listed: [fakeTestCase('a'), fakeTestCase('b')],
+  });
   const { shell } = fake.runner();
   await shell.init();
 
@@ -231,6 +236,7 @@ test('each run writes the control file before its tests run, and a per-test dry 
       perTest: true,
       activeMutant: undefined,
       hitLimit: undefined,
+      issuedTestIds: ['a', 'b'],
     },
     {
       outDir: mutant.settings.outDir,
@@ -241,24 +247,6 @@ test('each run writes the control file before its tests run, and a per-test dry 
   ]);
   assert.deepEqual(dry.settings.testIdHosts, ['localhost:4820']);
   assert.equal(mutant.settings.testIdHosts, undefined);
-});
-
-test('in arrival mode no test id header is asked for', async (t) => {
-  const server = await serverSide(
-    { mode: 'arrival' },
-    { dir: tempTree(t, 'server-side-') },
-    [
-      {
-        ...webServer,
-        ignoreHTTPSErrors: false,
-        reuseExistingServer: false,
-        setsNodeOptions: false,
-      },
-    ],
-    async () => false,
-  );
-
-  assert.equal(server?.testIdHosts, undefined);
 });
 
 test('a static mutant run restarts the webServer with that mutant, and the next runtime run restarts it without', async (t) => {
@@ -958,8 +946,9 @@ test("with webServer.mutate: 'auto', init turns server support off with one warn
   assert.deepEqual(warnings(lines), [
     "lzPlaywright.webServer.mutate is 'auto' and Stryker starts more than one test runner process, so each process " +
       "needs a webServer port of its own, but the runner cannot move the projects' baseURL along: the baseURL " +
-      'http://127.0.0.1:9999 points at no webServer. Derive the port from STRYKER_MUTATOR_WORKER in the Playwright ' +
-      'config instead (see Configure in the README).' +
+      "http://127.0.0.1:9999 points at no webServer. Point every project's baseURL at the url or port of the same " +
+      'webServer, or leave it unset, or run Stryker with concurrency 1 and no checker (see More than one Stryker ' +
+      'process in the README).' +
       autoOff,
   ]);
   assert.deepEqual(fake.webServerOptions(), moved.webServers);
@@ -988,8 +977,8 @@ const boundMessage = (mutate: string, port: string | undefined) =>
   `lzPlaywright.webServer.mutate is ${mutate} and Stryker starts more than one test runner process, so each process's ` +
   'webServer moves to a port of its own, but the command of webServer 0 bound port 4820 instead of ' +
   `${port}. Make the command take its port from PORT, from the webServer's env, or from a --port in ` +
-  'the command (the runner moves all three), or derive the port from STRYKER_MUTATOR_WORKER in the Playwright ' +
-  'config (see Configure in the README).';
+  'the command (the runner moves all three), or run Stryker with concurrency 1 and no checker (see More than ' +
+  'one Stryker process in the README).';
 
 function bindingFake(
   t: TestContext,
@@ -1194,4 +1183,22 @@ test('init fails when no process global setup started loaded the server hook', a
       'A webServer that is not Node.js, a command that sets NODE_OPTIONS itself, or a server that was already running ' +
       'cannot get the active mutant.',
   });
+});
+
+test("with webServer.mutate: 'auto', a later webServer restart that loads no server hook fails with a message that says 'auto'", async (t) => {
+  let hooks = true;
+  const fake = serverFake(t, { hooked: () => hooks });
+  const { shell } = fake.runner({ mutate: 'auto', isolate: false });
+  await shell.init();
+  hooks = false;
+
+  await assert.rejects(
+    shell.mutantRun(mutantRunOptions({ mutantActivation: 'static' })),
+    {
+      message:
+        "lzPlaywright.webServer.mutate is 'auto', but no process that Playwright global setup started loaded the server hook. " +
+        'A webServer that is not Node.js, a command that sets NODE_OPTIONS itself, or a server that was already running ' +
+        'cannot get the active mutant.',
+    },
+  );
 });
