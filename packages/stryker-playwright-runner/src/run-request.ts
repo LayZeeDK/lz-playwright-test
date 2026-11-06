@@ -115,6 +115,7 @@ export function runPlan(
       activeMutant: mutant?.activeMutant,
       hitLimit: mutant?.hitLimit,
       ...(perTest && issuedTestIds !== undefined ? { issuedTestIds } : {}),
+      ...(perTest && testIdHosts !== undefined ? { testIdHosts } : {}),
     },
   };
 }

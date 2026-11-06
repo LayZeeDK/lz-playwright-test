@@ -182,6 +182,15 @@ test, so Stryker runs each server-side mutant against the tests whose requests r
 only the ids of the tests the runner listed at startup. A request whose header holds any other value counts
 as a request without the header (see [Limits](#limits)).
 
+The hook passes the test id on when the server sends a request to a `webServer` host and port while it
+answers a test's request, such as a page loader that fetches the server's own API route. The code that the
+second request runs then counts for the same test. The hook adds the header to global `fetch` requests and
+to `http` and `https` requests that go through an `http.Agent`, which covers `http.get`, `http.request`,
+named imports of them, and libraries built on them. It keeps a test id header that the request already
+has. It adds no header to a request to any other host, to a redirect that leaves the `webServer`'s hosts,
+or to a request that code outside a test's request sends. A request that starts after the test's response
+ended, such as one from a timer that the handler set, still counts for that test.
+
 Code that runs once when the server starts, such as module scope, cannot switch mutants per request. A
 module that the server loads at its first request counts as such code too. Stryker runs a mutant in that
 code against every test, and the runner restarts the `webServer` with the mutant in its environment for
@@ -546,10 +555,15 @@ otherwise:
 - The `webServer` restarts only for the runs that [Server-side code](#server-side-code) names, and a
   restart keeps what the server wrote to its backend, such as a database file. So what one run writes is
   still there in the next. A suite that needs a fresh backend can report a mutant wrongly.
-- A request to the `webServer` without the test id header, such as one the server sends to itself, one
-  from a page that a `beforeAll` hook opened, or one that the test routes itself with `page.route(...)` and
-  `route.continue()` or `route.fulfill()`, counts for every test that ran when it arrived. When no
-  test ran then, it counts as reached outside any test, so Stryker runs every test for its mutants.
+- A request to the `webServer` without the test id header counts for every test that ran when it arrived.
+  When no test ran then, it counts as reached outside any test, so Stryker runs every test for its
+  mutants. Such requests include one from a page that a `beforeAll` hook opened, and one that the test
+  routes itself with `page.route(...)` and `route.continue()` or `route.fulfill()`. They also include a
+  request that the server sends to itself in a way the hook does not see: from an `http2` client session,
+  with headers given as an array, without an `http.Agent` (a `createConnection` option and no agent), or
+  through a custom agent that does not call `http.Agent`'s `addRequest`. A request to a host and port that
+  are not the `webServer`'s, such as a proxy in front of it, gets no header even when the proxy forwards it
+  to the server.
 - A request that a service worker sends reaches the `webServer` without the test id header, because
   Playwright's `route` does not see it. Set `serviceWorkers: 'block'` in the Playwright config's `use`
   so that the page sends those requests itself.

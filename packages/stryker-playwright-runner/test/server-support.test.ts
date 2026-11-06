@@ -237,6 +237,7 @@ test('each run writes the control file before its tests run, and a per-test dry 
       activeMutant: undefined,
       hitLimit: undefined,
       issuedTestIds: ['a', 'b'],
+      testIdHosts: ['localhost:4820'],
     },
     {
       outDir: mutant.settings.outDir,

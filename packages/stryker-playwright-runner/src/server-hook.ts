@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
+import diagnosticsChannel from 'node:diagnostics_channel';
 import fs from 'node:fs';
 import http from 'node:http';
 import http2 from 'node:http2';
@@ -13,6 +14,7 @@ import { globalNamespace, type StrykerNamespace } from './namespace.ts';
 import { serializeSnapshot, snapshotSuffix } from './protocol.ts';
 import {
   hookedPrefix,
+  hostKey,
   readServerControl,
   type ServerControl,
   serverDirEnv,
@@ -197,7 +199,95 @@ export function installServerHook(
       });
     });
 
+  function testIdFor(target: URL): string | undefined {
+    const testId = requests.getStore()?.testId;
+
+    return control?.testIdHosts?.includes(hostKey(target)) ? testId : undefined;
+  }
+
+  // Each hop of a fetch, redirects included, creates its own undici request with its own origin.
+  diagnosticsChannel.subscribe('undici:request:create', (message) => {
+    const request = isRecord(message) ? message['request'] : undefined;
+
+    if (!isRecord(request)) {
+      return;
+    }
+
+    const { origin, headers, addHeader } = request;
+    const testId =
+      typeof origin === 'string' ? testIdFor(new URL(origin)) : undefined;
+
+    if (
+      testId !== undefined &&
+      typeof addHeader === 'function' &&
+      Array.isArray(headers) &&
+      !hasUndiciHeader(headers, testIdHeader)
+    ) {
+      Reflect.apply(addHeader, request, [testIdHeader, testId]);
+    }
+  });
+
+  // The agent gets the host and port a ClientRequest connects to; the request itself keeps no port, and its
+  // Host header is the caller's to set.
+  const addRequest: unknown = Reflect.get(http.Agent.prototype, 'addRequest');
+
+  if (typeof addRequest === 'function') {
+    Object.defineProperty(http.Agent.prototype, 'addRequest', {
+      configurable: true,
+      writable: true,
+      value: function addRequestWithStryker(
+        this: unknown,
+        request: unknown,
+        options: unknown,
+        ...rest: unknown[]
+      ): unknown {
+        const target = agentTarget(options);
+        const testId = target === undefined ? undefined : testIdFor(target);
+
+        if (
+          testId !== undefined &&
+          request instanceof http.ClientRequest &&
+          !request.headersSent &&
+          !request.hasHeader(testIdHeader)
+        ) {
+          request.setHeader(testIdHeader, testId);
+        }
+
+        return Reflect.apply(addRequest, this, [request, options, ...rest]);
+      },
+    });
+  }
+
   process.on('exit', flush);
+}
+
+function agentTarget(options: unknown): URL | undefined {
+  if (!isRecord(options)) {
+    return undefined;
+  }
+
+  const { host, port } = options;
+
+  if (
+    typeof host !== 'string' ||
+    (typeof port !== 'number' && typeof port !== 'string')
+  ) {
+    return undefined;
+  }
+
+  const url = `http://${host.includes(':') ? `[${host}]` : host}:${port}`;
+
+  return URL.canParse(url) ? new URL(url) : undefined;
+}
+
+/** undici keeps a request's headers as [name, value, name, value, ...]. */
+function hasUndiciHeader(headers: readonly unknown[], name: string): boolean {
+  return headers.some(
+    (entry, index) =>
+      index % 2 === 0 &&
+      typeof entry === 'string' &&
+      entry.toLowerCase() === name,
+  );
 }
 
 // Before end, not on 'finish': the client may have the response, and the runner may read the run's folder,

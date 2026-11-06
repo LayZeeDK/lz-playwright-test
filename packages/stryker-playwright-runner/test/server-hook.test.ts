@@ -50,6 +50,93 @@ const answerLines = [
 ];
 const answerImport = "import { answer } from './app.mjs';";
 const serverSource = serverSourceOf(answerLines, [answerImport]);
+const selfRequestLines = [
+  "const url = new URL(request.url, 'http://x');",
+  "if (url.pathname === '/redirect') {",
+  "  response.writeHead(302, { location: `http://127.0.0.1:${url.searchParams.get('to')}/` });",
+  '  response.end();',
+  '  return;',
+  '}',
+  "if (url.pathname === '/late') {",
+  "  const self = `http://127.0.0.1:${server.address().port}/?n=${url.searchParams.get('n')}`;",
+  '  globalThis.late = new Promise((resolve) => setTimeout(resolve, 20)).then(() => fetch(self)).then((answer) => answer.text());',
+  "  response.end('sent later');",
+  '  return;',
+  '}',
+  "if (url.pathname === '/late-answer') {",
+  '  response.end(await globalThis.late);',
+  '  return;',
+  '}',
+  "if (url.pathname === '/secure-port') {",
+  '  response.end(String(secure.address().port));',
+  '  return;',
+  '}',
+  "if (url.pathname !== '/') {",
+  "  const scheme = url.searchParams.get('scheme') ?? 'http';",
+  "  const port = url.searchParams.get('port') ?? (scheme === 'https' ? secure : server).address().port;",
+  "  const self = `${scheme}://127.0.0.1:${port}/${url.searchParams.get('then') ?? ''}?${url.searchParams}`;",
+  '  response.end(await clients[url.pathname.slice(1)](self, request));',
+  '  return;',
+  '}',
+  ...answerLines,
+];
+const selfRequestClients = [
+  "import https from 'node:https';",
+  "import { readFileSync } from 'node:fs';",
+  "import { get as namedGet } from 'node:http';",
+  `const tls = { key: readFileSync(${JSON.stringify(tlsKeyPath)}), cert: readFileSync(${JSON.stringify(tlsCertPath)}) };`,
+  'const secure = https.createServer(tls, (request, response) => {',
+  "  response.end(answer(Number(new URL(request.url, 'http://x').searchParams.get('n'))));",
+  '});',
+  "secure.listen(0, '127.0.0.1');",
+  'const ca = tls.cert;',
+  'const optionsOf = (url) => {',
+  '  const { hostname, port, pathname, search } = new URL(url);',
+  '  return { hostname, port, path: pathname + search, ca };',
+  '};',
+  'const sent = (request) => {',
+  '  request.end();',
+  '  return request;',
+  '};',
+  'const textOf = (request) => new Promise((resolve, reject) => {',
+  "  request.on('error', reject);",
+  "  request.on('response', (response) => {",
+  "    response.setEncoding('utf8');",
+  "    let body = '';",
+  "    response.on('data', (chunk) => (body += chunk));",
+  "    response.on('end', () => resolve(body));",
+  '  });',
+  '});',
+  'const clients = {',
+  "  'fetch-string': async (url) => (await fetch(url)).text(),",
+  "  'http-get-url': (url) => textOf(http.get(new URL(url))),",
+  "  'fetch-url': async (url) => (await fetch(new URL(url))).text(),",
+  "  'fetch-request': async (url) => (await fetch(new Request(url))).text(),",
+  "  'http-get-options': (url) => textOf(http.get(optionsOf(url))),",
+  "  'http-get-named-import': (url) => textOf(namedGet(url)),",
+  "  'http-request-url': (url) => textOf(sent(http.request(new URL(url)))),",
+  "  'http-request-options': (url) => textOf(sent(http.request(optionsOf(url)))),",
+  "  'https-get-url': (url) => textOf(https.get(new URL(url), { ca })),",
+  "  'https-request-options': (url) => textOf(sent(https.request(optionsOf(url)))),",
+  `  'fetch-own-header': async (url) => (await fetch(url, { headers: { '${testIdHeader}': 'small' } })).text(),`,
+  `  'http-get-own-header': (url) => textOf(http.get(url, { headers: { '${testIdHeader}': 'small' } })),`,
+  "  'http-get-own-host': (url) => textOf(http.get(url, { headers: { host: `127.0.0.1:${server.address().port}` } })),",
+  `  'fetch-forward': async (url, incoming) => (await fetch(url, { headers: { '${testIdHeader}': incoming.headers['${testIdHeader}'] } })).text(),`,
+  "  'http-get-bad-host': async () => {",
+  "    const kind = (error) => (error instanceof TypeError ? 'TypeError' : 'other');",
+  '    try {',
+  "      return await textOf(http.get({ hostname: 'a b', port: 1 })).then(() => 'answered', kind);",
+  '    } catch (error) {',
+  '      return kind(error);',
+  '    }',
+  '  },',
+  "  'http-request-array-headers': (url) => textOf(sent(http.request(url, { headers: ['host', new URL(url).host] }))),",
+  '};',
+];
+const selfRequestServerSource = serverSourceOf(selfRequestLines, [
+  answerImport,
+  ...selfRequestClients,
+]);
 const lazyServerSource = serverSourceOf([
   "const { answer } = await import('./app.mjs');",
   ...answerLines,
@@ -153,19 +240,42 @@ async function startServer(
       writeServerControl(serverDir, {
         outDir,
         issuedTestIds: testIdsTheseTestsSend,
+        testIdHosts: [`localhost:${port}`],
         ...control,
       });
 
       return outDir;
     },
-    async ask(n: number, testId?: string): Promise<string> {
-      const response = await fetch(`http://127.0.0.1:${port}/?n=${n}`, {
-        headers: testId === undefined ? {} : { [testIdHeader]: testId },
-      });
+    async ask(
+      n: number,
+      testId?: string,
+      via = '',
+      query: Readonly<Record<string, string>> = {},
+    ): Promise<string> {
+      const search = new URLSearchParams({ n: String(n), ...query });
+      const response = await fetch(
+        `http://127.0.0.1:${port}/${via}?${search}`,
+        {
+          headers: testId === undefined ? {} : { [testIdHeader]: testId },
+        },
+      );
 
       return response.text();
     },
   };
+}
+
+async function startHeaderEcho(t: TestContext): Promise<number> {
+  const echo = http.createServer((request, response) =>
+    response.end(String(request.headers[testIdHeader])),
+  );
+  echo.listen(0, '127.0.0.1');
+  await once(echo, 'listening');
+  t.after(() => echo.close());
+  const address = echo.address();
+  assert.ok(address !== null && typeof address === 'object');
+
+  return address.port;
 }
 
 function secureHttp2ServerSource(options: string): string {
@@ -474,6 +584,205 @@ test('assigning the namespace global is ignored, not a throw', async (t) => {
   });
 
   assert.equal(await server.ask(0), 'true');
+});
+
+[
+  { client: 'fetch-string', how: 'fetch and a string url' },
+  { client: 'http-get-url', how: 'http.get and a URL' },
+  { client: 'fetch-url', how: 'fetch and a URL' },
+  { client: 'fetch-request', how: 'fetch and a Request' },
+  { client: 'http-get-options', how: 'http.get and options' },
+  { client: 'http-get-named-import', how: 'a named import of get' },
+  { client: 'http-request-url', how: 'http.request and a URL' },
+  { client: 'http-request-options', how: 'http.request and options' },
+  { client: 'https-get-url', how: 'https.get and a URL', scheme: 'https' },
+  {
+    client: 'https-request-options',
+    how: 'https.request and options',
+    scheme: 'https',
+  },
+].forEach(({ client, how, scheme = 'http' }) => {
+  test(`a request the server sends itself with ${how} counts under the test of the request that sent it`, async (t) => {
+    const server = await startServer(t, { server: selfRequestServerSource });
+    const securePort = await server.ask(0, undefined, 'secure-port');
+    const outDir = server.run({
+      perTest: true,
+      testIdHosts: [`localhost:${server.port}`, `localhost:${securePort}`],
+    });
+
+    assert.equal(await server.ask(2, 'big', client, { scheme }), 'hi many');
+    assert.deepEqual(
+      appMutantIdsOf(coverageOf(outDir).perTest['big']),
+      bigRequestIds,
+    );
+  });
+});
+
+[
+  { client: 'fetch-own-header', how: 'fetch' },
+  { client: 'http-get-own-header', how: 'http.get' },
+].forEach(({ client, how }) => {
+  test(`a test id header the server sets on a request to itself with ${how} is kept`, async (t) => {
+    const server = await startServer(t, { server: selfRequestServerSource });
+    const outDir = server.run({ perTest: true });
+
+    assert.equal(await server.ask(2, 'big', client), 'hi many');
+
+    const coverage = coverageOf(outDir);
+
+    assert.deepEqual(appMutantIdsOf(coverage.perTest['small']), bigRequestIds);
+    assert.deepEqual(appMutantIdsOf(coverage.perTest['big']), []);
+  });
+});
+
+[
+  { why: 'without a test id header', testId: undefined },
+  { why: 'with a test id the runner did not issue', testId: '__proto__' },
+].forEach(({ why, testId }) => {
+  test(`a request the server sends itself for a request ${why} names no test`, async (t) => {
+    const server = await startServer(t, { server: selfRequestServerSource });
+    const outDir = server.run({ perTest: true });
+
+    assert.equal(await server.ask(2, testId, 'fetch-string'), 'hi many');
+
+    const keys = readSnapshotDir(outDir).snapshots.flatMap(({ coverage }) =>
+      Object.keys(coverage?.perTest ?? {}),
+    );
+
+    assert.ok(keys.length > 0);
+    assert.ok(
+      keys.every((key) => untaggedArrival(key) !== undefined),
+      keys.join(),
+    );
+  });
+});
+
+test('requests two tests make at once each send their own test id to the server itself', async (t) => {
+  const server = await startServer(t, { server: selfRequestServerSource });
+  const outDir = server.run({ perTest: true });
+
+  await Promise.all([
+    server.ask(2, 'big', 'fetch-string'),
+    server.ask(0, 'small', 'http-get-url'),
+    server.ask(2, 'big', 'http-get-url'),
+    server.ask(0, 'small', 'fetch-string'),
+  ]);
+
+  const coverage = coverageOf(outDir);
+
+  assert.deepEqual(appMutantIdsOf(coverage.perTest['big']), bigRequestIds);
+  assert.deepEqual(appMutantIdsOf(coverage.perTest['small']), [
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '7',
+  ]);
+});
+
+test('without per-test coverage a request the server sends itself is static', async (t) => {
+  const server = await startServer(t, { server: selfRequestServerSource });
+  const outDir = server.run({ perTest: false });
+
+  assert.equal(await server.ask(2, 'big', 'fetch-string'), 'hi many');
+
+  const coverage = coverageOf(outDir);
+
+  assert.deepEqual(Object.keys(coverage.perTest), []);
+  assert.deepEqual(appMutantIdsOf(coverage.static), [
+    '0',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+  ]);
+});
+
+test('a request the server sends itself after the response ended still counts under the test of the request that started it', async (t) => {
+  const server = await startServer(t, { server: selfRequestServerSource });
+  const outDir = server.run({ perTest: true });
+
+  assert.equal(await server.ask(2, 'big', 'late'), 'sent later');
+  assert.equal(await server.ask(0, undefined, 'late-answer'), 'hi many');
+  assert.deepEqual(
+    appMutantIdsOf(coverageOf(outDir).perTest['big']),
+    bigRequestIds,
+  );
+});
+
+test('a test id header the server forwards to a second hooked server counts there under the same test', async (t) => {
+  const second = await startServer(t);
+  const secondOutDir = second.run({ perTest: true });
+  const first = await startServer(t, { server: selfRequestServerSource });
+  first.run({ perTest: true });
+
+  assert.equal(
+    await first.ask(2, 'big', 'fetch-forward', { port: String(second.port) }),
+    'hi many',
+  );
+  assert.deepEqual(
+    appMutantIdsOf(coverageOf(secondOutDir).perTest['big']),
+    bigRequestIds,
+  );
+});
+
+test('a request to a host name a URL cannot hold fails as it would without the hook', async (t) => {
+  const server = await startServer(t, { server: selfRequestServerSource });
+  server.run({ perTest: true });
+
+  assert.equal(await server.ask(2, 'big', 'http-get-bad-host'), 'other');
+});
+
+test('a request the server sends itself with raw array headers still goes out, without the test id', async (t) => {
+  const server = await startServer(t, { server: selfRequestServerSource });
+  const outDir = server.run({ perTest: true });
+
+  assert.equal(
+    await server.ask(2, 'big', 'http-request-array-headers'),
+    'hi many',
+  );
+  assert.deepEqual(appMutantIdsOf(coverageOf(outDir).perTest['big']), []);
+});
+
+test('a request the server sends to another host gets no test id header', async (t) => {
+  const otherPort = await startHeaderEcho(t);
+  const server = await startServer(t, { server: selfRequestServerSource });
+  server.run({ perTest: true });
+
+  assert.equal(
+    await server.ask(2, 'big', 'fetch-string', { port: String(otherPort) }),
+    'undefined',
+  );
+});
+
+test("a request the server sends to another port with the server's own Host header gets no test id header", async (t) => {
+  const otherPort = await startHeaderEcho(t);
+  const server = await startServer(t, { server: selfRequestServerSource });
+  server.run({ perTest: true });
+
+  assert.equal(
+    await server.ask(2, 'big', 'http-get-own-host', {
+      port: String(otherPort),
+    }),
+    'undefined',
+  );
+});
+
+test('a redirect from the server to another host carries no test id header', async (t) => {
+  const otherPort = await startHeaderEcho(t);
+  const server = await startServer(t, { server: selfRequestServerSource });
+  server.run({ perTest: true });
+
+  assert.equal(
+    await server.ask(2, 'big', 'fetch-string', {
+      then: 'redirect',
+      to: String(otherPort),
+    }),
+    'undefined',
+  );
 });
 
 test('a request without the header counts under its arrival time', async (t) => {

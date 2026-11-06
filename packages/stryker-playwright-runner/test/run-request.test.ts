@@ -138,6 +138,24 @@ test('a run plan issues the test ids to the webServer only when it collects per-
   );
 });
 
+test('a run plan names the webServer hosts to the webServer only when it collects per-test coverage', () => {
+  const hosts = ['localhost:4820'];
+
+  assert.deepEqual(
+    runPlan(dryRequest(), 'out', hosts, []).control.testIdHosts,
+    hosts,
+  );
+  assert.ok(
+    !(
+      'testIdHosts' in
+      runPlan(dryRequest({ coverageAnalysis: 'all' }), 'out', hosts, []).control
+    ),
+  );
+  assert.ok(
+    !('testIdHosts' in runPlan(mutantRequest(), 'out', hosts, []).control),
+  );
+});
+
 test('the webServer starts with the mutant of a statically activated mutant run, and with none otherwise', () => {
   assert.equal(
     serverMutantFor(

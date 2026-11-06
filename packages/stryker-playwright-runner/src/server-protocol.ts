@@ -40,6 +40,7 @@ export interface ServerControl {
   readonly activeMutant?: string | undefined;
   readonly hitLimit?: number | undefined;
   readonly issuedTestIds?: readonly string[];
+  readonly testIdHosts?: readonly string[];
 }
 
 export function parseServerControl(raw: string): ServerControl | undefined {
@@ -55,14 +56,22 @@ export function parseServerControl(raw: string): ServerControl | undefined {
     return undefined;
   }
 
-  const { outDir, perTest, activeMutant, hitLimit, issuedTestIds } = value;
+  const {
+    outDir,
+    perTest,
+    activeMutant,
+    hitLimit,
+    issuedTestIds,
+    testIdHosts,
+  } = value;
 
   if (
     typeof outDir !== 'string' ||
     typeof perTest !== 'boolean' ||
     (activeMutant !== undefined && typeof activeMutant !== 'string') ||
     (hitLimit !== undefined && typeof hitLimit !== 'number') ||
-    (issuedTestIds !== undefined && !isStringArray(issuedTestIds))
+    (issuedTestIds !== undefined && !isStringArray(issuedTestIds)) ||
+    (testIdHosts !== undefined && !isStringArray(testIdHosts))
   ) {
     return undefined;
   }
@@ -73,6 +82,7 @@ export function parseServerControl(raw: string): ServerControl | undefined {
     activeMutant,
     hitLimit,
     ...(issuedTestIds === undefined ? {} : { issuedTestIds }),
+    ...(testIdHosts === undefined ? {} : { testIdHosts }),
   };
 }
 
