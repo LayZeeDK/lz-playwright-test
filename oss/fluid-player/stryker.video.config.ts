@@ -1,5 +1,13 @@
 import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 
+const webServerMutate = process.env['LZ_CORPUS_WEBSERVER_MUTATE'] ?? 'true';
+
+if (webServerMutate !== 'true' && webServerMutate !== 'auto') {
+  throw new Error(
+    `LZ_CORPUS_WEBSERVER_MUTATE must be true or auto, got ${JSON.stringify(webServerMutate)}.`,
+  );
+}
+
 // The video case: the player's playback, seek, volume, miniplayer, subtitle and timeline code, which the specs
 // check through the <video> element's currentTime, paused, readyState and playbackRate.
 export default {
@@ -9,6 +17,7 @@ export default {
     configFile: 'playwright.stryker.config.ts',
     survivorTraces: 'reports/lz-playwright-traces',
     traceScreenshots: true,
+    webServer: { mutate: webServerMutate === 'auto' ? 'auto' : true },
   },
   // Three playback modules the video specs drive; the 3,551-line player core and the ad code would take several
   // more hours of runs.

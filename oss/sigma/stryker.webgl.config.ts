@@ -1,5 +1,13 @@
 import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 
+const webServerMutate = process.env['LZ_CORPUS_WEBSERVER_MUTATE'] ?? 'true';
+
+if (webServerMutate !== 'true' && webServerMutate !== 'auto') {
+  throw new Error(
+    `LZ_CORPUS_WEBSERVER_MUTATE must be true or auto, got ${JSON.stringify(webServerMutate)}.`,
+  );
+}
+
 // The WebGL case: sigma's node shapes, edge extremities and edge paths, mostly GLSL held in TS strings, which
 // only the regression suite's screenshots of the WebGL canvas can catch.
 export default {
@@ -9,6 +17,7 @@ export default {
     configFile: 'packages/browser-tests/playwright.stryker.config.ts',
     survivorTraces: 'reports/lz-playwright-traces',
     traceScreenshots: true,
+    webServer: { mutate: webServerMutate === 'auto' ? 'auto' : true },
   },
   // npm workspaces link `sigma` to packages/sigma, and preconstruct points it at src, so a sandbox would serve
   // unmutated code.

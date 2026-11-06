@@ -18,6 +18,11 @@ npm install -D @stryker-mutator/core@^10.1.1 file:<this repo>/packages/stryker-p
 The runner needs `@playwright/test` 1.63 or a later 1.x release. If the copy has an older one or none,
 also install `@playwright/test@^1.64.1`. ngx-yeti ran on its own `@playwright/test` 1.63.0.
 
+The e2e configs here set `lzPlaywright.webServer.mutate` to `true`, so their mutants in server code run
+too. To run one with `'auto'` instead, set `LZ_CORPUS_WEBSERVER_MUTATE=auto` in the environment that runs
+Stryker. The configs refuse any value other than `true` or `auto`. The component-test configs of
+use-debouncy and punktlandung leave the option unset.
+
 ## Resuming a stopped run
 
 Stryker writes its incremental file when a run ends, or on SIGINT, SIGTERM, SIGHUP or SIGABRT. On Windows a
@@ -103,10 +108,12 @@ dev server (`npm run dev`), which compiles Stryker's sandbox on the fly.
 4. Run the repo's setup steps: `npx prisma migrate deploy`, then `npx prisma generate --sql`, which
    reads the tables the migration creates ("no such table: User" otherwise), then `npm run build`,
    `npx playwright install chromium`, and `npx react-router typegen` for the checker. Plain `npx playwright test --workers=1` then passes 25 tests and skips 1.
-5. Run `npx stryker run stryker.playwright.config.ts`. Keep the copy's `reuseExistingServer: true`:
-   when the type checker finishes, Stryker starts a second test runner, which would otherwise fail
-   with "http://localhost:3313 is already used". So from then on two test runners share one dev
-   server and one SQLite database, even at `concurrency: 1`. A test that one runner's data breaks can
+5. Run `npx stryker run stryker.playwright.config.ts`. When the type checker finishes, Stryker starts a
+   second test runner. With `webServer.mutate` on, the runner moves each test runner's dev server to a
+   port of its own. Keep the copy's `reuseExistingServer: true` for a run where server support is off,
+   such as `'auto'` after a fallback: the second test runner would otherwise fail with
+   "http://localhost:3313 is already used", and the two then share one dev server. Either way they share
+   one SQLite database, even at `concurrency: 1`. A test that one runner's data breaks can
    fail without a mutant at fault, which turns a survivor into a kill; that may be why two mutants
    killed on 2026-10-29 survived on 2026-10-31.
 
@@ -265,8 +272,9 @@ own specs on its webpack dev server. The 3,551-line player core and the ad code 
    minutes. Before the spec list was cut down, a plain run of all 22 specs with 5 tests left out passed the
    other 73.
 4. Run `npx stryker run stryker.video.config.ts`. It runs in Stryker's sandbox: webpack builds the sandbox's
-   `src`. All test runner processes share one dev server on port 8080 (`reuseExistingServer`). To split the
-   run, pass one file at a time with `--mutate`; the incremental file carries finished files into the next run.
+   `src`. With server support off, all test runner processes share one dev server on port 8080
+   (`reuseExistingServer`). With it on, the runner moves each process's server to a port of its own. To
+   split the run, pass one file at a time with `--mutate`; the incremental file carries finished files into the next run.
    `--mutate` takes a comma-separated list, so a brace glob such as `{a,b}.js` breaks into pieces that match
    nothing.
 

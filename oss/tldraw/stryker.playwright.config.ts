@@ -3,6 +3,14 @@ import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 
 await lzJsxMutators();
 
+const webServerMutate = process.env['LZ_CORPUS_WEBSERVER_MUTATE'] ?? 'true';
+
+if (webServerMutate !== 'true' && webServerMutate !== 'auto') {
+  throw new Error(
+    `LZ_CORPUS_WEBSERVER_MUTATE must be true or auto, got ${JSON.stringify(webServerMutate)}.`,
+  );
+}
+
 export default {
   plugins: ['@layzee/stryker-playwright-runner'],
   testRunner: 'lz-playwright',
@@ -10,6 +18,7 @@ export default {
     configFile: 'apps/examples/e2e/playwright.stryker.config.ts',
     survivorTraces: 'reports/lz-playwright-traces',
     traceScreenshots: true,
+    webServer: { mutate: webServerMutate === 'auto' ? 'auto' : true },
   },
   // Workspace packages resolve through per-package node_modules links back to the copy's own source, so a
   // sandbox would serve unmutated code.

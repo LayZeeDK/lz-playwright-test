@@ -1,5 +1,13 @@
 import type { PartialStrykerOptions } from '@stryker-mutator/api/core';
 
+const webServerMutate = process.env['LZ_CORPUS_WEBSERVER_MUTATE'] ?? 'true';
+
+if (webServerMutate !== 'true' && webServerMutate !== 'auto') {
+  throw new Error(
+    `LZ_CORPUS_WEBSERVER_MUTATE must be true or auto, got ${JSON.stringify(webServerMutate)}.`,
+  );
+}
+
 export default {
   plugins: ['@layzee/stryker-playwright-runner'],
   testRunner: 'lz-playwright',
@@ -7,6 +15,7 @@ export default {
     configFile: 'apps/ngx-yeti-e2e/playwright.config.mts',
     projects: ['chromium'],
     workers: 2,
+    webServer: { mutate: webServerMutate === 'auto' ? 'auto' : true },
   },
   dryRunTimeoutMinutes: 20,
   mutate: ['packages/ngx-yeti/cluster/src/cluster.ts'],
