@@ -74,7 +74,8 @@ const selfRequestLines = [
   "if (url.pathname !== '/') {",
   "  const scheme = url.searchParams.get('scheme') ?? 'http';",
   "  const port = url.searchParams.get('port') ?? (scheme === 'https' ? secure : server).address().port;",
-  "  const self = `${scheme}://127.0.0.1:${port}/${url.searchParams.get('then') ?? ''}?${url.searchParams}`;",
+  "  const host = url.searchParams.get('host') ?? '127.0.0.1';",
+  "  const self = `${scheme}://${host}:${port}/${url.searchParams.get('then') ?? ''}?${url.searchParams}`;",
   '  response.end(await clients[url.pathname.slice(1)](self, request));',
   '  return;',
   '}',
@@ -119,6 +120,8 @@ const selfRequestClients = [
   "  'https-get-url': (url) => textOf(https.get(new URL(url), { ca })),",
   "  'https-request-options': (url) => textOf(sent(https.request(optionsOf(url)))),",
   `  'fetch-own-header': async (url) => (await fetch(url, { headers: { '${testIdHeader}': 'small' } })).text(),`,
+  `  'fetch-own-header-after-another': async (url) => (await fetch(url, { headers: [['x-other', 'other'], ['${testIdHeader}', 'small']] })).text(),`,
+  `  'fetch-header-named-in-a-value': async (url) => (await fetch(url, { headers: { 'x-other': '${testIdHeader}' } })).text(),`,
   `  'http-get-own-header': (url) => textOf(http.get(url, { headers: { '${testIdHeader}': 'small' } })),`,
   "  'http-get-own-host': (url) => textOf(http.get(url, { headers: { host: `127.0.0.1:${server.address().port}` } })),",
   `  'fetch-forward': async (url, incoming) => (await fetch(url, { headers: { '${testIdHeader}': incoming.headers['${testIdHeader}'] } })).text(),`,
@@ -279,11 +282,14 @@ async function startServer(
   };
 }
 
-async function startHeaderEcho(t: TestContext): Promise<number> {
+async function startHeaderEcho(
+  t: TestContext,
+  host = '127.0.0.1',
+): Promise<number> {
   const echo = http.createServer((request, response) =>
     response.end(String(request.headers[testIdHeader])),
   );
-  echo.listen(0, '127.0.0.1');
+  echo.listen(0, host);
   await once(echo, 'listening');
   t.after(() => echo.close());
   const address = echo.address();
@@ -419,6 +425,80 @@ test('a secure http2 server that allows HTTP/1 switches the active mutant for an
   response.setEncoding('utf8');
 
   assert.equal((await response.toArray()).join(''), 'hi many');
+});
+
+test("a server that answers 'Expect: 100-continue' itself switches the active mutant per request too", async (t) => {
+  const server = await startServer(t, {
+    server: serverSourceOf(
+      ['response.writeContinue();', ...answerLines],
+      [answerImport],
+      "http.createServer().on('checkContinue', ",
+    ),
+  });
+  server.run({ perTest: false, activeMutant: '2' });
+  const request = http.request(`http://127.0.0.1:${server.port}/?n=0`, {
+    method: 'POST',
+    headers: { expect: '100-continue' },
+  });
+  request.on('continue', () => request.end());
+  const responded: unknown[] = await once(request, 'response');
+  const [response] = responded;
+  assert.ok(response instanceof http.IncomingMessage);
+  response.setEncoding('utf8');
+
+  assert.equal((await response.toArray()).join(''), 'hi many');
+});
+
+test('instrumentation that wraps emit after the hook, by assignment and by redefining it, still runs, and the mutant still switches', async (t) => {
+  const wrapEmit = (how: string, wrap: string) => [
+    'try {',
+    '  const before = http.Server.prototype.emit;',
+    `  const wrapper = function (event, ...args) { if (event === 'request') wrapped.push('${how}'); return before.call(this, event, ...args); };`,
+    `  ${wrap};`,
+    '} catch (error) {',
+    '  wrapErrors.push(String(error));',
+    '}',
+  ];
+  const server = await startServer(t, {
+    server: serverSourceOf(
+      [
+        "const n = Number(new URL(request.url, 'http://x').searchParams.get('n'));",
+        'response.end(JSON.stringify({ answer: answer(n), wrapped: wrapped.splice(0), wrapErrors }));',
+      ],
+      [
+        answerImport,
+        'const wrapped = [];',
+        'const wrapErrors = [];',
+        ...wrapEmit('assigned', 'http.Server.prototype.emit = wrapper'),
+        ...wrapEmit(
+          'redefined',
+          "Object.defineProperty(http.Server.prototype, 'emit', { configurable: true, writable: true, value: wrapper })",
+        ),
+      ],
+    ),
+  });
+  server.run({ perTest: false, activeMutant: '2' });
+
+  assert.deepEqual(JSON.parse(await server.ask(0)), {
+    answer: 'hi many',
+    wrapped: ['redefined', 'assigned'],
+    wrapErrors: [],
+  });
+});
+
+test('a server that fails to listen is not marked hooked', async (t) => {
+  const takenPort = await startHeaderEcho(t);
+  const server = await startServer(t, {
+    server: [
+      "import http from 'node:http';",
+      'const server = http.createServer();',
+      "server.on('error', () => process.stdout.write('failed\\n'));",
+      `server.listen(${takenPort}, '127.0.0.1');`,
+      '',
+    ].join('\n'),
+  });
+
+  assert.equal(anyHooked(server.serverDir), false);
 });
 
 test('a mutant run once at module scope is active only in a server started with it', async (t) => {
@@ -656,6 +736,10 @@ test('assigning the namespace global is ignored, not a throw', async (t) => {
 
 [
   { client: 'fetch-own-header', how: 'fetch' },
+  {
+    client: 'fetch-own-header-after-another',
+    how: 'fetch after another header',
+  },
   { client: 'http-get-own-header', how: 'http.get' },
 ].forEach(({ client, how }) => {
   test(`a test id header the server sets on a request to itself with ${how} is kept`, async (t) => {
@@ -781,6 +865,34 @@ test('a request the server sends itself with raw array headers still goes out, w
     'hi many',
   );
   assert.deepEqual(appMutantIdsOf(coverageOf(outDir).perTest['big']), []);
+});
+
+test('a request the server sends itself with fetch and the test id header name as another header value still names the test', async (t) => {
+  const server = await startServer(t, { server: selfRequestServerSource });
+  const outDir = server.run({ perTest: true });
+
+  assert.equal(
+    await server.ask(2, 'big', 'fetch-header-named-in-a-value'),
+    'hi many',
+  );
+  assert.deepEqual(
+    appMutantIdsOf(coverageOf(outDir).perTest['big']),
+    bigRequestIds,
+  );
+});
+
+test('a request the server sends with http.get to an IPv6 loopback host of the run carries the test id', async (t) => {
+  const echoPort = await startHeaderEcho(t, '::1');
+  const server = await startServer(t, { server: selfRequestServerSource });
+  server.run({ perTest: true, testIdHosts: [`localhost:${echoPort}`] });
+
+  assert.equal(
+    await server.ask(2, 'big', 'http-get-url', {
+      host: '[::1]',
+      port: String(echoPort),
+    }),
+    'big',
+  );
 });
 
 test('a request the server sends to another host gets no test id header', async (t) => {

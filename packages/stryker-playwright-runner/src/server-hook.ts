@@ -169,7 +169,6 @@ export function installServerHook(
           }
 
           if (
-            event !== 'request' ||
             !(
               (request instanceof http.IncomingMessage &&
                 response instanceof http.ServerResponse) ||
