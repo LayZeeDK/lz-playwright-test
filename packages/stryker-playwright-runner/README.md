@@ -550,6 +550,16 @@ otherwise:
   from a page that a `beforeAll` hook opened, or one that the test routes itself with `page.route(...)` and
   `route.continue()` or `route.fulfill()`, counts for every test that ran when it arrived. When no
   test ran then, it counts as reached outside any test, so Stryker runs every test for its mutants.
+- A request that a service worker sends reaches the `webServer` without the test id header, because
+  Playwright's `route` does not see it. Set `serviceWorkers: 'block'` in the Playwright config's `use`
+  so that the page sends those requests itself.
+- The runner adds the test id header to page requests with `BrowserContext.route`, in the dry run with
+  `coverageAnalysis: 'perTest'`, and in Playwright a route turns off the browser's HTTP cache. In that run
+  the browser fetches every resource in full, and never sends a conditional request. So the `webServer`
+  serves full responses where it would otherwise answer 304 Not Modified. Code that only a 304 or an ETag
+  match reaches can then get no coverage in the dry run, and its mutants count as NoCoverage. Each test
+  gets a new browser context with an empty cache, so this affects only a resource that one test loads
+  more than once.
 - When the runner moves a `webServer` to a free port, another process can take that port before the
   `webServer` binds it. Playwright then reports the bind error.
 - Dependency projects, such as a `setup` project that logs in, run on every mutant run with the mutant
