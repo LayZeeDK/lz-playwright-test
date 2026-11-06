@@ -141,6 +141,20 @@ const lazyServerSource = serverSourceOf([
   "const { answer } = await import('./app.mjs');",
   ...answerLines,
 ]);
+const edgeRuntimeLikeServerSource = serverSourceOf(
+  [
+    "const n = Number(new URL(request.url, 'http://x').searchParams.get('n'));",
+    'response.end(realmAnswer(n));',
+  ],
+  [
+    "import { readFileSync } from 'node:fs';",
+    "import vm from 'node:vm';",
+    'const realm = vm.createContext({ process: { env: { ...process.env } } });',
+    "const app = readFileSync(new URL('./app.mjs', import.meta.url), 'utf8');",
+    "vm.runInContext(app.replace('export function', 'function'), realm);",
+    "const realmAnswer = vm.runInContext('answer', realm);",
+  ],
+);
 const withoutTestRunnerHooksAndActiveMutant = {
   NODE_OPTIONS: undefined,
   [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: undefined,
@@ -419,6 +433,28 @@ test('a mutant run once at module scope is active only in a server started with 
   started.run({ perTest: false, activeMutant: '0' });
 
   assert.equal(await started.ask(2), ' many');
+});
+
+test('code the server runs in a vm realm reports no coverage and gets only the mutant the server started with', async (t) => {
+  const switched = await startServer(t, {
+    server: edgeRuntimeLikeServerSource,
+  });
+  const dryRun = switched.run({ perTest: true });
+
+  assert.equal(await switched.ask(2, 'big'), 'hi many');
+  assert.deepEqual(readSnapshotDir(dryRun).snapshots, []);
+
+  switched.run({ perTest: false, activeMutant: '2' });
+
+  assert.equal(await switched.ask(0), 'one', 'no per-request mutant');
+
+  const started = await startServer(t, {
+    server: edgeRuntimeLikeServerSource,
+    env: { [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: '2' },
+  });
+  started.run({ perTest: false });
+
+  assert.equal(await started.ask(0), 'hi many', 'the env copy carries it');
 });
 
 test('coverage goes to the run folder per test id header, with what ran before the first run as static', async (t) => {
