@@ -3,8 +3,8 @@
 A StrykerJS test runner for Playwright Test. It runs Playwright e2e tests and Playwright component
 tests (`mount()`) as Stryker tests, reports per-test coverage, and starts the Playwright `webServer`
 once per Stryker test runner process instead of once per mutant. With
-[server-side mutants](#server-side-code) on, it also restarts the `webServer` around the runs that need
-it.
+[server-side mutants](#server-side-code) on, it also gives each mutant to the code that the `webServer`
+runs, with no change to the app.
 
 ## Requirements
 
@@ -85,8 +85,8 @@ There are two ways to keep the processes from fighting over one port:
   state in memory. Stop any dev server of your own first: a server that was already running serves the
   original sources, not Stryker's instrumented copy.
 
-With `lzPlaywright.webServer.mutate` on, the runner moves each process's `webServer` to a port of its
-own instead, so the processes never share one. See
+With `lzPlaywright.webServer.mutate` on and more than one test runner process, the runner moves each
+process's `webServer` to a port of its own instead, so the processes never share one. See
 [More than one Stryker process](#more-than-one-stryker-process).
 
 Either way, every process runs in the same Stryker sandbox, so what one server writes there, such as a
@@ -109,7 +109,9 @@ reached a mutant, except for a mutant reached outside any test, which Stryker ru
 Coverage from the browser pages counts for the test that opened the page. Coverage of code that the
 Playwright worker itself imports counts for the test whose body or `beforeEach` and `afterEach` hooks ran
 it. Code that a `beforeAll` or `afterAll` hook, a fixture, or the import itself ran is reached outside
-any test.
+any test. With `lzPlaywright.webServer.mutate` on, keep `perTest`: with `off` or `all`, the runner
+restarts the `webServer` before every mutant run, as
+[Before you turn it on](#before-you-turn-it-on) says.
 
 The runner runs more than the tests Stryker selects: the whole `describe.serial` group that a selected
 test belongs to, and the dependency projects, such as a `setup` project, of the selected tests'
@@ -145,16 +147,16 @@ exports as `strykerValidationSchema`.
   surviving mutants, such as `reports/lz-playwright-traces`. See Traces of surviving mutants.
 - `traceScreenshots`: add screenshots to the traces that `survivorTraces` records. The default is
   `false`. See Traces of surviving mutants.
-- `webServer`: mutants in the code that the Playwright config's `webServer` runs. `mutate` is `false`,
-  the default, `true`, or `'auto'`. `isolate` defaults to `true`. See
-  [Server-side code](#server-side-code).
+- `webServer`: test the mutants in the code that the Playwright config's `webServer` runs. `mutate`
+  turns this on: `false`, the default, `true`, or `'auto'`. `isolate` restarts the server between runs
+  that test server-side mutants, and is `true` by default. See [Server-side code](#server-side-code).
 
 ## Server-side code
 
-Without this option, only code that runs in the page or in a Playwright test worker gets the active
-mutant. Code that the Playwright config's `webServer` runs, such as server rendering, loaders, actions and
-API routes, runs without one, so its mutants stay NoCoverage. To test those mutants with e2e tests or API
-tests against a Node.js `webServer`, set `mutate`:
+Without `lzPlaywright.webServer.mutate`, only code that runs in the page or in a Playwright test worker
+gets the active mutant. Code that the Playwright config's `webServer` runs, such as server rendering,
+loaders, actions and API routes, runs without one, so its mutants stay NoCoverage. To test those
+mutants with e2e tests or API tests against a Node.js `webServer`, set `mutate`:
 
 ```ts
 lzPlaywright: { webServer: { mutate: true } },
@@ -168,16 +170,43 @@ lzPlaywright: { webServer: { mutate: true } },
   cause and runs as with `false`. When the dry run reaches no mutant in the code the `webServer` runs, the
   runner turns server support off too, with one info line.
 
+Start with `true`, so that a setup that cannot work stops with its cause. Use `'auto'` in a config that
+several projects share when some of them have no Node.js `webServer`. No log line says that server
+support is on. It works when the report's mutants in server code are no longer NoCoverage.
+
+### Before you turn it on
+
+Check these before you set `mutate`. [Limits](#limits) lists what the runner cannot do with server
+code.
+
+- The `webServer` is a Node.js server that serves with `node:http`, `node:https`, or the `node:http2`
+  compatibility API, which emits the `'request'` event.
+- Keep `coverageAnalysis: 'perTest'`, Stryker's default. With `off`, Stryker gives no mutant a test
+  filter and activates every mutant when the server starts. The runner then restarts the `webServer`
+  before every mutant run, client-side mutants and `isolate: false` included. With `all`, every mutant
+  that a test reached counts as reached outside any test, with the same restarts. On the epic-stack
+  measurement under [Isolate server-side mutants](#isolate-server-side-mutants), a restart adds about
+  10 s to a run.
+- With a checker, or with `concurrency` above 1, the `command` takes its port from `PORT`, from its
+  `env`, or from a port in the `command` itself. See
+  [More than one Stryker process](#more-than-one-stryker-process).
+- The `webServer`'s `env` sets no `NODE_OPTIONS`.
+- When `reuseExistingServer` is `true`, no server answers on the `webServer`'s port before the runner
+  starts it.
+- When the app registers a service worker, the Playwright config's `use` sets
+  `serviceWorkers: 'block'`.
+
 ### How a mutant reaches the server
 
 The runner starts the `webServer` in Playwright global setup, with `NODE_OPTIONS` set to import the
-runner's server hook, after any `NODE_OPTIONS` of the environment that runs Stryker. Every Node.js process
-that the `webServer` command starts loads the hook. Before each run, the runner writes the run's mutant to
-a file that the hook reads at the start of each request.
+runner's server hook, followed by any `NODE_OPTIONS` of the environment that runs Stryker. Every
+Node.js process that the `webServer` command starts loads the hook. Before each run, the runner writes
+the run's mutant to a file that the hook reads at the start of each request.
 
-The runner adds an `x-lz-stryker-test` header with the test's id to the requests that a test sends to the
-`webServer`: the page requests to the `webServer`'s host and port, and the requests of a Playwright
-`APIRequestContext`, such as the `request` fixture. The hook counts the code that a request runs for that
+In the dry run with `coverageAnalysis: 'perTest'`, the runner adds an `x-lz-stryker-test` header with
+the test's id to the requests that a test sends to the `webServer`. Mutant runs send no such header.
+The header goes on the page requests to the `webServer`'s host and port, and on the requests of a
+Playwright `APIRequestContext`, such as the `request` fixture. The hook counts the code that a request runs for that
 test, so Stryker runs each server-side mutant against the tests whose requests reached it. The hook takes
 only the ids of the tests the runner listed at startup. A request whose header holds any other value counts
 as a request without the header (see [Limits](#limits)).
@@ -199,10 +228,11 @@ that run, then without it for the next run.
 ### Isolate server-side mutants
 
 A mutant run can leave state behind in the server, such as a cache filled with its mutated value, and the
-next run then reads it. With `isolate: true`, the default, the runner restarts the `webServer` before a
-mutant run when that run or the one before it in the same process tests a server-side mutant: a mutant
-that the server reached in the dry run. With `isolate: false`, one server serves every run except those
-of mutants in start-up code. Set it for a server that keeps no state between requests.
+next run then reads it. A server-side mutant is one that the server reached in the dry run. With
+`isolate: true`, the default, the runner restarts the `webServer` before a mutant run when that run or
+the one before it in the same process tests a server-side mutant. With `isolate: false`, one server
+serves every run except those of mutants in start-up code, and except every run under
+`coverageAnalysis: 'off'` or `'all'`. Set it for a server that keeps no state between requests.
 
 A restart costs the server's start and its cold first requests. On the epic-stack app's Vite dev server,
 one measurement put that at about 10 s per restarted run.
@@ -229,9 +259,9 @@ it. The runner moves:
 - the projects' `baseURL`.
 
 So the `command` must take its port from one of these. A `command` that binds the configured port anyway
-fails the startup with an error that names both ports, as soon as the configured port answers. The runner
-also refuses a project `baseURL` that points at no `webServer`, and projects whose `baseURL`s point at
-different `webServer`s. Point every project's `baseURL` at the `url` or `port` of the same `webServer`, or
+fails the startup as soon as that port answers. The error names both ports. The runner also refuses a
+project `baseURL` that points at no `webServer`, and projects whose `baseURL`s point at different
+`webServer`s. Point every project's `baseURL` at the `url` or `port` of the same `webServer`, or
 leave it unset. Deriving the port from `STRYKER_MUTATOR_WORKER` does not help here, because the runner
 moves the port either way. Only one test runner process, `concurrency` 1 with no checker, keeps the
 configured port.
@@ -241,8 +271,9 @@ configured port.
 With `mutate: true`, each of these stops the runner at startup. With `mutate: 'auto'`, each logs one
 warning and the process runs as with `false`:
 
-- No process that global setup started loaded the server hook within 1 s: the `webServer` is not
-  Node.js, or its `command` replaces `NODE_OPTIONS`.
+- No process that global setup started listened on a server that the hook supports within 1 s after
+  global setup. The `webServer` is not Node.js, serves with another HTTP stack than `node:http`,
+  `node:https`, or `node:http2`, or its `command` replaces `NODE_OPTIONS`.
 - A `webServer`'s `env` sets `NODE_OPTIONS`, which replaces the one that loads the hook. Set it in the
   environment that runs Stryker instead.
 - A `webServer` has `reuseExistingServer: true` and already answers before global setup. Only the process
@@ -548,13 +579,26 @@ otherwise:
 ## Limits
 
 - Server-side code gets the active mutant only with `webServer.mutate` on, and only in a Node.js
-  `webServer`. Otherwise its mutants are NoCoverage, or Survived with `coverageAnalysis: 'off'`, and on a
-  server-rendered app, a mutant in code that both the server and the page run is active in the page only.
-  A mutant there that changes text or an element then breaks hydration and counts as Killed even when no
-  test checks it, and one that changes an attribute never reaches the DOM.
+  `webServer` that serves with `node:http`, `node:https`, or the `node:http2` compatibility API.
+  Otherwise its mutants are NoCoverage, or Survived with `coverageAnalysis: 'off'`. Without
+  `webServer.mutate`, on a server-rendered app, a mutant in code that both the server and the page run is
+  active in the page only. A mutant there that changes text or an element then breaks hydration and
+  counts as Killed even when no test checks it, and one that changes an attribute never reaches the DOM.
+- Code that the server runs in a `vm` context of its own, such as Next.js middleware and routes on the
+  edge runtime, has its own Stryker namespace. It reports no coverage, so with
+  `coverageAnalysis: 'perTest'` or `'all'` its mutants are NoCoverage, and it never gets the mutant that
+  the hook switches per request. It gets only a mutant that the `webServer` started with, through the
+  context's copy of `process.env`. Leave such code out of `mutate`, or run it on the Node.js runtime for the mutation run.
+- Server code that no request runs, such as a timer that module scope sets, a WebSocket message, or a
+  queue consumer, counts as reached outside any test. Stryker then runs every test for its mutants, and
+  the runner restarts the `webServer` for each. That code also runs with the mutant of the server's last
+  request, so before a run's first request it still has the previous run's mutant. Code that a request
+  handler starts, a timer included, is not affected.
 - The `webServer` restarts only for the runs that [Server-side code](#server-side-code) names, and a
   restart keeps what the server wrote to its backend, such as a database file. So what one run writes is
-  still there in the next. A suite that needs a fresh backend can report a mutant wrongly.
+  still there in the next. A suite that needs a fresh backend can report a mutant wrongly. Reset the
+  backend in Playwright global setup, which runs again at each restart, or in a `beforeEach`, and give
+  each process its own store from `STRYKER_MUTATOR_WORKER`.
 - A request to the `webServer` without the test id header counts for every test that ran when it arrived.
   When no test ran then, it counts as reached outside any test, so Stryker runs every test for its
   mutants. Such requests include one from a page that a `beforeAll` hook opened, and one that the test
@@ -563,7 +607,11 @@ otherwise:
   with headers given as an array, without an `http.Agent` (a `createConnection` option and no agent), or
   through a custom agent that does not call `http.Agent`'s `addRequest`. A request to a host and port that
   are not the `webServer`'s, such as a proxy in front of it, gets no header even when the proxy forwards it
-  to the server.
+  to the server. A request without the header that a worker fixture's teardown sends after the worker's
+  last test, such as a Node.js `fetch` that resets the backend, arrives after every test of that worker
+  ended. It counts for the tests that other workers run then, or as reached outside any test. Where the
+  server sends a request to itself in a way the hook does not see, a direct function call instead keeps
+  the code under the test that sent the first request.
 - A request that a service worker sends reaches the `webServer` without the test id header, because
   Playwright's `route` does not see it. Set `serviceWorkers: 'block'` in the Playwright config's `use`
   so that the page sends those requests itself.
@@ -575,14 +623,17 @@ otherwise:
   gets a new browser context with an empty cache, so this affects only a resource that one test loads
   more than once.
 - When the runner moves a `webServer` to a free port, another process can take that port before the
-  `webServer` binds it. Playwright then reports the bind error.
+  `webServer` binds it. Playwright then reports the bind error. Run Stryker again: the runner asks the
+  system for new free ports on each start.
 - Dependency projects, such as a `setup` project that logs in, run on every mutant run with the mutant
   active. Login in `globalSetup` runs once instead.
 - Web workers and service workers never get the active mutant, because the runner sets it with a script
   that runs in pages only. A mutant in code that only a worker runs can never be killed: it is
   NoCoverage, or Survived with `coverageAnalysis: 'off'`. Leave such code out of `mutate`. A mutant in
   code that both a page and a worker run is active in the page only.
-- Coverage is lost across a cross-origin navigation.
+- A page keeps its coverage across a navigation in `sessionStorage`, which belongs to one origin. So the
+  coverage of a page that navigates to another origin is lost unless the page comes back to the first
+  origin, and its mutants can be NoCoverage. Test that code in a test that stays on one origin.
 - Stryker's `ignoreStatic` skips the mutants that only `beforeAll` pages, `beforeAll` and `afterAll`
   hooks, fixtures, or imports reach. A mutant that both such code and a test reach still runs, but only
   with the tests whose own coverage reached it, and the runner keeps it active from the start of the
