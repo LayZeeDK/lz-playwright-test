@@ -26,6 +26,7 @@ export interface ConfigProject {
     readonly timeout: number;
     readonly retries: number;
   };
+  readonly baseURL?: string | undefined;
 }
 
 export interface ConfigWebServer {
@@ -62,6 +63,16 @@ export interface TestRunner {
     params: RunTestsParams,
   ): Promise<{ readonly status: Status }>;
   stopTests(): Promise<void>;
+  moveWebServers(
+    moves: readonly ServerMove[],
+    baseURL: string | undefined,
+  ): void;
+}
+
+export interface ServerMove {
+  readonly index: number;
+  readonly from: number;
+  readonly to: number;
 }
 
 export const testRunnerMethods = [
@@ -236,12 +247,15 @@ export function probeInternals(
         method: 'runGlobalSetup' | 'runTests',
         args: readonly unknown[],
       ) => parseStatus(await call(method, args), method, version);
+      let loaded: unknown;
       const runner: TestRunner = {
         async initialize(params) {
           await call('initialize', [params]);
         },
         async loadConfig() {
-          return parseConfig(await call('loadConfig', []), version);
+          loaded = await call('loadConfig', []);
+
+          return parseConfig(loaded, version);
         },
         async listTests(reporter, params) {
           const result = await call('listTests', [reporter, params]);
@@ -257,6 +271,45 @@ export function probeInternals(
         runTests: (reporter, params) => status('runTests', [reporter, params]),
         async stopTests() {
           await call('stopTests', []);
+        },
+        moveWebServers(moves, baseURL) {
+          const plugins = fieldOf(loaded, 'plugins');
+          const overrides = fieldOf(created, '_configCLIOverrides');
+          const changed = () =>
+            internalsChanged(
+              version,
+              `TestRunner._configCLIOverrides and loadConfig() resolving to plugins[].factory named ${webServerPluginName} with _options`,
+            );
+
+          if (!isRecord(overrides)) {
+            throw changed();
+          }
+
+          const webServers = (Array.isArray(plugins) ? plugins : []).flatMap(
+            (plugin: unknown) => {
+              const factory = fieldOf(plugin, 'factory');
+              const options = fieldOf(factory, '_options');
+
+              return fieldOf(factory, 'name') === webServerPluginName &&
+                isRecord(options)
+                ? [options]
+                : [];
+            },
+          );
+          moves.forEach(({ index, from, to }) => {
+            const options = webServers[index];
+
+            if (!options) {
+              throw changed();
+            }
+
+            moveWebServerOptions(options, from, to);
+          });
+
+          if (baseURL !== undefined) {
+            const use = overrides['use'];
+            overrides['use'] = { ...(isRecord(use) ? use : {}), baseURL };
+          }
         },
       };
       await runner.initialize({});
@@ -323,6 +376,7 @@ function parseConfig(
       const expect = fieldOf(project, 'expect');
       const expectTimeout = fieldOf(expect, 'timeout') ?? undefined;
       const retries = fieldOf(settings, 'retries');
+      const baseURL = fieldOf(fieldOf(settings, 'use'), 'baseURL');
 
       if (
         !isRecord(project) ||
@@ -336,6 +390,10 @@ function parseConfig(
         throw changed();
       }
 
+      if (baseURL !== undefined && typeof baseURL !== 'string') {
+        throw misconfigured('use.baseURL', 'a string', baseURL);
+      }
+
       return {
         default: !!project['default'],
         expect: expect === undefined ? undefined : { timeout: expectTimeout },
@@ -344,6 +402,7 @@ function parseConfig(
           timeout: settings['timeout'],
           retries,
         },
+        ...(typeof baseURL === 'string' ? { baseURL } : {}),
       };
     }),
     webServers: webServers.map((server: unknown): ConfigWebServer => {
@@ -387,6 +446,37 @@ function parseConfig(
       };
     }),
   };
+}
+
+const webServerPluginName = 'playwright:webserver';
+
+export function moveWebServerOptions(
+  options: Record<string, unknown>,
+  from: number,
+  to: number,
+): void {
+  const { url, env, command } = options;
+
+  if (typeof url === 'string') {
+    const moved = new URL(url);
+    moved.port = String(to);
+    options['url'] = moved.href;
+  }
+
+  if (isRecord(env)) {
+    Object.entries(env)
+      .filter(([, value]) => value === String(from))
+      .forEach(([name]) => {
+        env[name] = String(to);
+      });
+  }
+
+  if (typeof command === 'string') {
+    options['command'] = command.replaceAll(
+      new RegExp(`\\b${from}\\b`, 'g'),
+      String(to),
+    );
+  }
 }
 
 /**

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 
@@ -26,6 +27,7 @@ import {
   loadPlaywright,
   noCopyPromptEnv,
   type Playwright,
+  type ServerMove,
   type TestRunner,
 } from './playwright-internals.ts';
 import { readSnapshotDir } from './protocol.ts';
@@ -53,6 +55,7 @@ import {
   projectsThatRun,
   type SerialGroups,
 } from './serial-groups.ts';
+import { moveServersApart, startsMoreRunners } from './server-ports.ts';
 import {
   anyHooked,
   forgetHooked,
@@ -195,16 +198,41 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         this.#log.warn(warning);
       }
 
-      const servers = config.webServers.flatMap((server) =>
+      const mutates = options.webServer.mutate === true;
+      const apart =
+        mutates &&
+        startsMoreRunners(this.#strykerOptions, os.availableParallelism())
+          ? await moveServersApart(config, process.env)
+          : undefined;
+
+      if (apart) {
+        playwright.moveWebServers(apart.moves, apart.baseURL);
+        setEnv(apart.env);
+        this.#log.debug(
+          `Stryker starts more than one test runner process, so this one's webServer moves to a port of its own: ${apart.moves.map(({ from, to }) => `${from} -> ${to}`).join(', ')}.`,
+        );
+      }
+
+      const webServers = apart?.webServers ?? config.webServers;
+      const servers = webServers.flatMap((server) =>
         serverCheck(server, pw.isURLAvailable),
       );
       const server = await serverSide(
-        options.webServer.mutate === true ? { mode: 'header' } : undefined,
+        mutates ? { mode: 'header' } : undefined,
         root,
-        config.webServers,
+        webServers,
         pw.isURLAvailable,
       );
-      await this.#globalSetup(playwright, server, undefined);
+      await this.#globalSetupWatchingConfiguredPorts(
+        playwright,
+        server,
+        apart && {
+          moves: apart.moves,
+          configuredChecks: config.webServers.map((webServer) =>
+            serverCheck(webServer, pw.isURLAvailable),
+          ),
+        },
+      );
       // Every Stryker test runner process needs the groups, and only one of them runs the dry run.
       // Listed after global setup, like Playwright's own CLI, because test files may read what it
       // creates.
@@ -484,6 +512,57 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     await this.#globalSetup(session.playwright, session.server, mutant);
   }
 
+  async #globalSetupWatchingConfiguredPorts(
+    playwright: TestRunner,
+    server: ServerSide | undefined,
+    moved: MovedServers | undefined,
+  ) {
+    if (!moved) {
+      await this.#globalSetup(playwright, server, undefined);
+
+      return;
+    }
+
+    const answering = new Set(await boundMoves(moved));
+    const watched = {
+      ...moved,
+      moves: moved.moves.filter((move) => !answering.has(move)),
+    };
+    const setup = this.#globalSetup(playwright, server, undefined);
+    let watching = true;
+    const watch = async () => {
+      while (watching) {
+        const [bound] = await boundMoves(watched);
+
+        if (bound) {
+          return bound;
+        }
+
+        await setTimeout(boundPollMs);
+      }
+
+      return undefined;
+    };
+
+    let early: ServerMove | undefined;
+
+    try {
+      early = await Promise.race([setup.then(() => undefined), watch()]);
+    } catch (error) {
+      const [late] = await boundMoves(watched);
+
+      throw late ? boundConfiguredPort(late, error) : error;
+    } finally {
+      watching = false;
+    }
+
+    if (early) {
+      setup.catch(() => undefined);
+
+      throw boundConfiguredPort(early, undefined);
+    }
+  }
+
   /** Global teardown runs first, so this also restarts the webServer that global setup started. */
   async #globalSetup(
     playwright: TestRunner,
@@ -516,6 +595,44 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       );
     }
   }
+}
+
+interface MovedServers {
+  readonly moves: readonly ServerMove[];
+  readonly configuredChecks: readonly (readonly ServerCheck[])[];
+}
+
+const boundPollMs = 250;
+
+async function boundMoves({
+  moves,
+  configuredChecks,
+}: MovedServers): Promise<ServerMove[]> {
+  const bound = await Promise.all(
+    moves.map(async (move) => {
+      const up = await Promise.all(
+        (configuredChecks[move.index] ?? []).map((check) => check.isUp()),
+      );
+
+      return up.some(Boolean) ? [move] : [];
+    }),
+  );
+
+  return bound.flat();
+}
+
+function boundConfiguredPort(
+  { index, from, to }: ServerMove,
+  cause: unknown,
+): Error {
+  return new Error(
+    `${mutateOption} is true and Stryker starts more than one test runner process, so each process's webServer ` +
+      `moves to a port of its own, but the command of webServer ${index} bound port ${from} instead of ${to}. ` +
+      "Make the command take its port from PORT, from the webServer's env, or from a --port in the command " +
+      '(the runner moves all three), or derive the port from STRYKER_MUTATOR_WORKER in the Playwright config ' +
+      '(see Configure in the README).',
+    cause === undefined ? undefined : { cause },
+  );
 }
 
 /**

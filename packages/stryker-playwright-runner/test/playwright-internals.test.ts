@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import {
   instrumentationOf,
   isSerialSuite,
+  moveWebServerOptions,
   playwrightVersion,
   probeInternals,
   raiseRetries,
@@ -26,8 +27,15 @@ const noServer = {
 function fakeModules(
   methods: readonly string[] = testRunnerMethods,
   answers: Readonly<Record<string, unknown>> = {},
+  keepsOverrides = true,
 ) {
-  class TestRunner {}
+  class TestRunner {
+    readonly _configCLIOverrides: unknown;
+
+    constructor(_location: unknown, overrides: unknown) {
+      this._configCLIOverrides = keepsOverrides ? overrides : undefined;
+    }
+  }
   Object.assign(
     TestRunner.prototype,
     Object.fromEntries(
@@ -247,6 +255,97 @@ test('the test runner resolves loadConfig to the project and web server fields t
       },
       { ...noServer, url: undefined, port: undefined },
     ],
+  });
+});
+
+test("the test runner reads each project's use.baseURL", async () => {
+  const runner = await testRunnerAnswering({
+    loadConfig: {
+      projects: [
+        {
+          default: true,
+          project: {
+            name: 'a',
+            timeout: 1,
+            retries: 0,
+            use: { baseURL: 'http://localhost:3000', headless: true },
+          },
+        },
+        { default: true, project: { name: 'b', timeout: 1, retries: 0 } },
+      ],
+      webServers: [],
+    },
+  });
+
+  const { projects } = await runner.loadConfig();
+
+  assert.deepEqual(
+    projects.map(({ baseURL }) => baseURL),
+    ['http://localhost:3000', undefined],
+  );
+});
+
+test('moving a webServer rewrites the port of the url it waits for', () => {
+  const options = {
+    url: 'http://localhost:4200/health',
+    reuseExistingServer: true,
+  };
+
+  moveWebServerOptions(options, 4200, 50_010);
+
+  assert.deepEqual(options, {
+    url: 'http://localhost:50010/health',
+    reuseExistingServer: true,
+  });
+});
+
+test("moving a webServer rewrites each env value that is its port, and only those", () => {
+  const options = {
+    env: { PORT: '4200', APP_PORT: '4200', OTHER: '42000', NODE_ENV: 'test' },
+  };
+
+  moveWebServerOptions(options, 4200, 50_010);
+
+  assert.deepEqual(options, {
+    env: { PORT: '50010', APP_PORT: '50010', OTHER: '42000', NODE_ENV: 'test' },
+  });
+});
+
+test('moving a webServer rewrites its port where it stands as a word in the command', () => {
+  const options = {
+    command: 'npm run dev -- --port 4200 --host 0.0.0.0 -p 4200 --id 14200',
+  };
+
+  moveWebServerOptions(options, 4200, 50_010);
+
+  assert.deepEqual(options, {
+    command: 'npm run dev -- --port 50010 --host 0.0.0.0 -p 50010 --id 14200',
+  });
+});
+
+test('moving a webServer leaves a url, env or command that is not what Playwright takes alone', () => {
+  const options = { url: 1, env: 'x', command: 2 };
+
+  moveWebServerOptions(options, 1, 2);
+
+  assert.deepEqual(options, { url: 1, env: 'x', command: 2 });
+});
+
+test('a use.baseURL that is no string is a config mistake', async () => {
+  const runner = await testRunnerAnswering({
+    loadConfig: {
+      projects: [
+        {
+          default: true,
+          project: { name: 'a', timeout: 1, retries: 0, use: { baseURL: 1 } },
+        },
+      ],
+      webServers: [],
+    },
+  });
+
+  await assert.rejects(runner.loadConfig(), {
+    message: "The Playwright config's use.baseURL must be a string, got 1.",
   });
 });
 
@@ -506,6 +605,118 @@ test('the test runner resolves listTests, runGlobalSetup and runTests to their s
         message: `Playwright 1.99.0 changed the internals this runner calls (TestRunner.${method}() resolving to a status of passed, failed, timedout or interrupted).`,
       });
     });
+  });
+});
+
+test('the test runner moves the webServer plugins the last load returned, by their order among the webServer plugins', async () => {
+  const gitCommitInfo = { factory: { name: 'playwright:gitCommitInfo' } };
+  const first = {
+    name: 'playwright:webserver',
+    _options: { url: 'http://localhost:3000/', command: 'serve --port 3000' },
+  };
+  const second = {
+    name: 'playwright:webserver',
+    _options: { port: 3001, command: 'api', env: { PORT: '3001' } },
+  };
+  const runner = await testRunnerAnswering({
+    loadConfig: {
+      projects: [],
+      webServers: [],
+      plugins: [{ factory: first }, gitCommitInfo, { factory: second }],
+    },
+  });
+  await runner.loadConfig();
+
+  runner.moveWebServers(
+    [
+      { index: 0, from: 3000, to: 50_010 },
+      { index: 1, from: 3001, to: 50_011 },
+    ],
+    undefined,
+  );
+
+  assert.deepEqual(first._options, {
+    url: 'http://localhost:50010/',
+    command: 'serve --port 50010',
+  });
+  assert.deepEqual(second._options, {
+    port: 3001,
+    command: 'api',
+    env: { PORT: '50011' },
+  });
+  assert.deepEqual(gitCommitInfo, {
+    factory: { name: 'playwright:gitCommitInfo' },
+  });
+});
+
+const webServerPluginsChanged =
+  'Playwright 1.99.0 changed the internals this runner calls (TestRunner._configCLIOverrides and loadConfig() ' +
+  'resolving to plugins[].factory named playwright:webserver with _options).';
+
+test('a move with no webServer plugin at its index means Playwright changed', async () => {
+  const runner = await testRunnerAnswering({
+    loadConfig: {
+      projects: [],
+      webServers: [],
+      plugins: [
+        { factory: { name: 'playwright:webserver', _options: { port: 1 } } },
+      ],
+    },
+  });
+  await runner.loadConfig();
+
+  assert.throws(
+    () => runner.moveWebServers([{ index: 1, from: 1, to: 2 }], undefined),
+    { message: webServerPluginsChanged },
+  );
+});
+
+test('a move before the first load, or after a load without plugins, means Playwright changed', async () => {
+  const unloaded = await testRunnerAnswering({});
+  const withoutPlugins = await testRunnerAnswering({
+    loadConfig: { projects: [], webServers: [] },
+  });
+  await withoutPlugins.loadConfig();
+
+  [unloaded, withoutPlugins].forEach((runner) => {
+    assert.throws(
+      () => runner.moveWebServers([{ index: 0, from: 1, to: 2 }], undefined),
+      { message: webServerPluginsChanged },
+    );
+  });
+});
+
+test("the test runner moves every project to the baseURL through the CLI overrides Playwright merges over each project's use", async () => {
+  const overrides = { workers: 1, use: { trace: 'off' } };
+  const runner = await probeInternals(
+    '1.99.0',
+    fakeModules(testRunnerMethods, {
+      loadConfig: { projects: [], webServers: [], plugins: [] },
+    }),
+  ).createTestRunner(undefined, overrides);
+  await runner.loadConfig();
+
+  runner.moveWebServers([], 'http://localhost:50030/');
+
+  assert.deepEqual(overrides, {
+    workers: 1,
+    use: { trace: 'off', baseURL: 'http://localhost:50030/' },
+  });
+});
+
+test('a TestRunner that keeps no CLI overrides means Playwright changed', async () => {
+  const runner = await probeInternals(
+    '1.99.0',
+    fakeModules(
+      testRunnerMethods,
+      { loadConfig: { projects: [], webServers: [], plugins: [] } },
+      false,
+    ),
+  ).createTestRunner(undefined, {});
+  await runner.loadConfig();
+
+  assert.throws(() => runner.moveWebServers([], 'http://localhost:50031/'), {
+    message: webServerPluginsChanged,
   });
 });
 

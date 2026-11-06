@@ -114,6 +114,8 @@ export interface WebServerOptions {
 export interface LzPlaywrightRunnerOptionsWithStrykerOptions {
   readonly testFiles?: readonly string[];
   readonly timeoutMS: number;
+  readonly concurrency?: number | string | undefined;
+  readonly checkers?: readonly string[] | undefined;
   readonly lzPlaywright?: unknown;
 }
 

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { type TestContext, test } from 'node:test';
+import { setTimeout } from 'node:timers/promises';
 
 import { DryRunStatus } from '@stryker-mutator/api/test-runner';
 
@@ -31,6 +32,7 @@ import {
   fakePlaywright,
   passAll,
   type Run,
+  type Status,
   stubEnv,
 } from './support/fake-playwright.ts';
 
@@ -93,9 +95,22 @@ function serverFake(
 
   return {
     ...fake,
-    runner: (webServerOptions: { readonly isolate?: boolean } = {}) =>
+    runner: ({
+      isolate,
+      ...strykerOptions
+    }: {
+      readonly isolate?: boolean;
+      readonly concurrency?: number;
+      readonly checkers?: readonly string[];
+    } = {}) =>
       fake.runner({
-        lzPlaywright: { webServer: { mutate: true, ...webServerOptions } },
+        ...strykerOptions,
+        lzPlaywright: {
+          webServer: {
+            mutate: true,
+            ...(isolate === undefined ? {} : { isolate }),
+          },
+        },
       }),
     setups,
     controls,
@@ -633,6 +648,185 @@ test('init starts a reuseExistingServer server that does not answer yet', async 
   await fake.runner().shell.init();
 
   assert.equal(fake.setups.length, 1);
+});
+
+const moved = {
+  projects: [
+    {
+      default: true,
+      project: {
+        name: 'chromium',
+        timeout: 30_000,
+        use: { baseURL: 'http://127.0.0.1:4820' },
+      },
+    },
+  ],
+  webServers: [
+    {
+      url: 'http://127.0.0.1:4820/',
+      command: 'serve --port 4820',
+      env: { PORT: '4820' },
+      reuseExistingServer: true,
+    },
+  ],
+};
+
+function movedPort(fake: { webServerOptions(): { url: string }[] }): number {
+  const [options] = fake.webServerOptions();
+  assert.ok(options);
+  const port = Number(new URL(options.url).port);
+  assert.notEqual(port, 4820);
+
+  return port;
+}
+
+test('at concurrency 2, init moves the webServer to a port of its own before global setup, with the projects baseURL and PORT, though a sibling process answers on the configured one', async (t) => {
+  stubEnv(t, { PORT: undefined, PLAYWRIGHT_TEST_BASE_URL: undefined });
+  const fake = serverFake(t, {
+    ...moved,
+    urlUp: async (url) => url.port === '4820' || fake.setups.length > 0,
+  });
+  const { shell, lines } = fake.runner({ concurrency: 2 });
+
+  await shell.init();
+  await shell.dryRun(dryRunOptions());
+
+  const port = movedPort(fake);
+  assert.deepEqual(fake.webServerOptions(), [
+    {
+      url: `http://127.0.0.1:${port}/`,
+      command: `serve --port ${port}`,
+      env: { PORT: String(port) },
+      reuseExistingServer: true,
+    },
+  ]);
+  assert.deepEqual(fake.overrides()['use'], {
+    screenshot: 'off',
+    trace: 'off',
+    video: 'off',
+    baseURL: `http://127.0.0.1:${port}/`,
+  });
+  assert.equal(process.env['PORT'], String(port));
+  assert.equal(fake.setups.length, 1);
+  assert.deepEqual(fake.runs[0]?.settings.testIdHosts, [`localhost:${port}`]);
+  assert.deepEqual(
+    lines.filter(([, message]) => message.includes(' -> ')),
+    [
+      [
+        'debug',
+        `Stryker starts more than one test runner process, so this one's webServer moves to a port of its own: 4820 -> ${port}.`,
+      ],
+    ],
+  );
+});
+
+test('with a checker, init moves the webServer too', async (t) => {
+  stubEnv(t, { PORT: undefined, PLAYWRIGHT_TEST_BASE_URL: undefined });
+  const fake = serverFake(t, { ...moved, urlUp: async () => false });
+
+  await fake.runner({ checkers: ['typescript'] }).shell.init();
+
+  assert.equal(process.env['PORT'], String(movedPort(fake)));
+});
+
+test('with one process and no checker, init keeps the configured port', async (t) => {
+  stubEnv(t, { PORT: undefined });
+  const fake = serverFake(t, { ...moved, urlUp: async () => false });
+
+  await fake.runner().shell.init();
+
+  assert.equal(fake.webServerOptions()[0]?.url, 'http://127.0.0.1:4820/');
+  assert.deepEqual(fake.overrides()['use'], {
+    screenshot: 'off',
+    trace: 'off',
+    video: 'off',
+  });
+  assert.equal(process.env['PORT'], undefined);
+});
+
+const boundMessage = (fake: { webServerOptions(): { url: string }[] }) =>
+  "lzPlaywright.webServer.mutate is true and Stryker starts more than one test runner process, so each process's " +
+  'webServer moves to a port of its own, but the command of webServer 0 bound port 4820 instead of ' +
+  `${movedPort(fake)}. Make the command take its port from PORT, from the webServer's env, or from a --port in ` +
+  'the command (the runner moves all three), or derive the port from STRYKER_MUTATOR_WORKER in the Playwright ' +
+  'config (see Configure in the README).';
+
+function bindingFake(
+  t: TestContext,
+  globalSetup: NonNullable<Behaviour['globalSetup']>,
+  urlUp: NonNullable<Behaviour['urlUp']>,
+) {
+  stubEnv(t, { PORT: undefined, PLAYWRIGHT_TEST_BASE_URL: undefined });
+  const fake = fakePlaywright(t, { ...moved, urlUp, globalSetup });
+
+  return {
+    fake,
+    init: () =>
+      fake
+        .runner({
+          concurrency: 2,
+          lzPlaywright: { webServer: { mutate: true } },
+        })
+        .shell.init(),
+  };
+}
+
+test('init names the command that bound the configured port while global setup still waits for the moved one', async (t) => {
+  let bound = false;
+  const { fake, init } = bindingFake(
+    t,
+    async (): Promise<Status> => {
+      bound = true;
+      await setTimeout(3000);
+
+      return 'failed';
+    },
+    async (url) => bound && url.port === '4820',
+  );
+  const started = performance.now();
+
+  await assert.rejects(init(), (error) => {
+    assert.ok(error instanceof Error);
+    assert.equal(error.message, boundMessage(fake));
+    assert.equal(error.cause, undefined);
+
+    return true;
+  });
+  assert.ok(
+    performance.now() - started < 2000,
+    'failed before global setup ended',
+  );
+});
+
+test('init names the command that bound the configured port when global setup failed, with the failure as its cause', async (t) => {
+  let bound = false;
+  const { fake, init } = bindingFake(
+    t,
+    () => {
+      bound = true;
+
+      return 'failed';
+    },
+    async (url) => bound && url.port === '4820',
+  );
+
+  await assert.rejects(init(), (error) => {
+    assert.ok(error instanceof Error);
+    assert.equal(error.message, boundMessage(fake));
+    assert.match(String(error.cause), /^Error: Playwright global setup failed/);
+
+    return true;
+  });
+});
+
+test('a server that answered on the configured port before global setup is not blamed for a failed setup', async (t) => {
+  const { init } = bindingFake(
+    t,
+    () => 'failed',
+    async (url) => url.port === '4820',
+  );
+
+  await assert.rejects(init(), { message: /^Playwright global setup failed/ });
 });
 
 test('init fails when no process global setup started loaded the server hook', async (t) => {

@@ -8,6 +8,7 @@ import type { TestContext } from 'node:test';
 import type { FullResult, Reporter } from '@playwright/test/reporter';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
+import { isRecord } from '../../src/is-record.ts';
 import type {
   RunTestsParams,
   TestRunner,
@@ -44,16 +45,22 @@ interface Project {
     readonly name: string;
     readonly timeout: number;
     readonly retries?: number;
+    readonly use?: { readonly baseURL?: string };
   };
 }
 
 interface WebServer {
   readonly url?: string;
   readonly port?: number;
+  readonly command?: string;
   readonly ignoreHTTPSErrors?: boolean;
   readonly reuseExistingServer?: boolean;
   readonly env?: Readonly<Record<string, string>>;
 }
+
+export type WebServerOptions = Record<string, unknown> & {
+  readonly url: string;
+};
 
 /** What one runTests call saw: its params, the run settings and the environment the workers get. */
 export interface Run {
@@ -71,7 +78,7 @@ export interface Behaviour {
   readonly root?: ReportedSuite;
   readonly listed?: readonly ReportedTest[];
   readonly initialize?: () => Promise<void>;
-  readonly globalSetup?: (reporter: Reporter) => Status;
+  readonly globalSetup?: (reporter: Reporter) => Status | Promise<Status>;
   readonly globalTeardown?: () => Promise<void>;
   readonly runTests?: (run: Run) => Promise<Status>;
   readonly urlUp?: (url: URL, ignoreHTTPSErrors: boolean) => Promise<boolean>;
@@ -136,10 +143,27 @@ export function fakePlaywright(
   const calls: Call[] = [];
   const runs: Run[] = [];
   let stopRequested = Promise.withResolvers<void>();
+  // Created once, as Playwright creates its webServer plugins at the first load and keeps them.
+  const plugins = (behaviour.webServers ?? []).map((server) => ({
+    factory: {
+      name: 'playwright:webserver',
+      _options: {
+        ...server,
+        url: server.url ?? `http://localhost:${server.port}`,
+      } satisfies WebServerOptions,
+    },
+  }));
 
   class FakeTestRunner implements TestRunner {
+    readonly _configCLIOverrides: Record<string, unknown>;
+
     constructor(configLocation: unknown, overrides: Record<string, unknown>) {
       calls.push(['new', configLocation, overrides]);
+      this._configCLIOverrides = overrides;
+    }
+
+    moveWebServers(): void {
+      assert.fail('probeInternals moves the webServers, not the TestRunner');
     }
 
     async initialize(params: Record<string, never>) {
@@ -165,6 +189,7 @@ export function fakePlaywright(
           setsNodeOptions: false,
           ...server,
         })),
+        plugins,
       };
     }
 
@@ -187,7 +212,7 @@ export function fakePlaywright(
       assert.ok(reporter);
 
       return {
-        status: behaviour.globalSetup?.(reporter) ?? 'passed',
+        status: (await behaviour.globalSetup?.(reporter)) ?? 'passed',
       };
     }
 
@@ -260,14 +285,31 @@ export function fakePlaywright(
     calls,
     runs,
     names: () => calls.map(([name]) => name),
+    webServerOptions: (): WebServerOptions[] =>
+      plugins.map(({ factory }) => factory._options),
+    overrides: (): Record<string, unknown> => {
+      const overrides = calls.findLast(([name]) => name === 'new')?.[2];
+      assert.ok(isRecord(overrides));
+
+      return overrides;
+    },
     runner: ({
       timeoutMS = 11_000,
+      concurrency = 1,
+      checkers = [],
       lzPlaywright = {},
-    }: { timeoutMS?: number; lzPlaywright?: object } = {}) => {
+    }: {
+      timeoutMS?: number;
+      concurrency?: number | string;
+      checkers?: readonly string[];
+      lzPlaywright?: object;
+    } = {}) => {
       const { log, lines } = logger();
       const shell = new LzPlaywrightTestRunner(
         strykerOptions({
           timeoutMS,
+          concurrency,
+          checkers,
           lzPlaywright: { configFile, ...lzPlaywright },
         }),
         log,
