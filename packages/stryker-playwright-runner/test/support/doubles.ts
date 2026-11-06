@@ -176,6 +176,7 @@ export function runOutput(output: Partial<RunOutput> = {}): RunOutput {
     snapshots: [],
     hookInstalled: true,
     installErrors: [],
+    serverMutants: [],
     ...output,
   };
 }

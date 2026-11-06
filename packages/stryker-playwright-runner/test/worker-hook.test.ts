@@ -174,6 +174,7 @@ test('a worker whose hook fails to install leaves the error for the run and exit
   assert.deepEqual(readSnapshotDir(outDir), {
     snapshots: [],
     hookInstalled: false,
+    serverMutants: [],
     installErrors: [
       'Error: Playwright 1.64.1 changed the internals this runner calls (playwright/test test.info(), which tells the worker hook the test that runs).',
     ],

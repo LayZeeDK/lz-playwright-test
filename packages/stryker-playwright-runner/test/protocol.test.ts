@@ -108,6 +108,29 @@ test("a run folder's server snapshots merge with the workers', but only a worker
   assert.equal(readSnapshotDir(both).snapshots.length, 2);
 });
 
+test('a run folder names each mutant the server snapshots cover once, static or per test, and none a worker covers', (t) => {
+  const line = (mutantCoverage: unknown) =>
+    serializeSnapshot({ mutantCoverage, outlivedItsTest: false }) + '\n';
+  const dir = tempTree(t, 'protocol-dir-', {
+    'server-1-a.ndjson':
+      line({ static: { '1': 1 }, perTest: { a: { '2': 1 } } }) +
+      line({ static: {}, perTest: { b: { '2': 1, '3': 1 } } }),
+    'server-2-b.ndjson':
+      line({ static: { '4': 1 }, perTest: {} }) + line(undefined),
+    'worker-3-c.ndjson': line({
+      static: { '5': 1 },
+      perTest: { a: { '6': 1 } },
+    }),
+  });
+
+  assert.deepEqual([...readSnapshotDir(dir).serverMutants].sort(), [
+    '1',
+    '2',
+    '3',
+    '4',
+  ]);
+});
+
 test('run settings that are not JSON, not an object or have a field of the wrong type are refused', () => {
   [
     '{oops',

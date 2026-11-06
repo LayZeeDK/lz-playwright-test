@@ -1,6 +1,6 @@
 // Server support in the runner's shell, against the fake Playwright install in support/fake-playwright.ts.
 import assert from 'node:assert/strict';
-import { writeFileSync } from 'node:fs';
+import { readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { type TestContext, test } from 'node:test';
 
@@ -8,6 +8,10 @@ import { DryRunStatus } from '@stryker-mutator/api/test-runner';
 
 import { serverSide } from '../src/lz-playwright-test-runner.ts';
 import { serializeSnapshot } from '../src/protocol.ts';
+import {
+  readServerMutantsFile,
+  writeServerMutantsFile,
+} from '../src/server-isolation.ts';
 import {
   hookedPrefix,
   readServerControl,
@@ -40,6 +44,16 @@ interface Setup {
   readonly activeMutant: string | undefined;
 }
 
+/** Stryker starts each test runner process in its sandbox folder. */
+function inSandbox(t: TestContext): string {
+  const cwd = process.cwd();
+  t.after(() => process.chdir(cwd));
+  const sandbox = tempTree(t, 'sandbox-');
+  process.chdir(sandbox);
+
+  return sandbox;
+}
+
 function serverFake(
   t: TestContext,
   {
@@ -48,6 +62,7 @@ function serverFake(
   }: Behaviour & { readonly hooked?: boolean } = {},
 ) {
   stubEnv(t, { NODE_OPTIONS: '--no-warnings' });
+  const sandbox = inSandbox(t);
   const setups: Setup[] = [];
   const controls: (ServerControl | undefined)[] = [];
   const fake = fakePlaywright(t, {
@@ -78,10 +93,13 @@ function serverFake(
 
   return {
     ...fake,
-    runner: () =>
-      fake.runner({ lzPlaywright: { webServer: { mutate: true } } }),
+    runner: (webServerOptions: { readonly isolate?: boolean } = {}) =>
+      fake.runner({
+        lzPlaywright: { webServer: { mutate: true, ...webServerOptions } },
+      }),
     setups,
     controls,
+    sandbox,
   };
 }
 
@@ -240,7 +258,7 @@ test('in arrival mode no test id header is asked for', async (t) => {
 
 test('a static mutant run restarts the webServer with that mutant, and the next runtime run restarts it without', async (t) => {
   const fake = serverFake(t);
-  const { shell } = fake.runner();
+  const { shell } = fake.runner({ isolate: false });
   await shell.init();
   const run = (id: string, mutantActivation: 'static' | 'runtime') =>
     shell.mutantRun(
@@ -279,7 +297,7 @@ test('a webServer restarted after it died keeps the static mutant it runs', asyn
       return answered;
     },
   });
-  const { shell } = fake.runner();
+  const { shell } = fake.runner({ isolate: false });
   await shell.init();
   await shell.mutantRun(mutantRunOptions({ mutantActivation: 'static' }));
   up = false;
@@ -318,6 +336,264 @@ test("the dry run merges the server's snapshots with the workers'", async (t) =>
     perTest: { a: { '1': 1 }, b: { '2': 1 } },
   });
 });
+
+function runtimeRun(id: string) {
+  return mutantRunOptions({
+    activeMutant: { ...mutantRunOptions().activeMutant, id },
+    mutantActivation: 'runtime',
+    testFilter: ['a'],
+  });
+}
+
+function passAllWithDryRunServerMutants(...ids: readonly string[]) {
+  return async (run: Run) => {
+    await passAll(run);
+
+    if (run.settings.perTest) {
+      writeFileSync(
+        path.join(run.settings.outDir, 'server-9-x.ndjson'),
+        serializeSnapshot({
+          mutantCoverage: {
+            static: {},
+            perTest: { a: Object.fromEntries(ids.map((id) => [id, 1])) },
+          },
+          outlivedItsTest: false,
+        }) + '\n',
+      );
+    }
+
+    return 'passed' as const;
+  };
+}
+
+test('the dry run leaves the mutants the server ran in the sandbox, for the processes that did not run it', async (t) => {
+  const fake = serverFake(t, {
+    runTests: passAllWithDryRunServerMutants('2'),
+  });
+  const { shell } = fake.runner();
+  await shell.init();
+
+  await shell.dryRun(dryRunOptions());
+
+  assert.deepEqual(readServerMutantsFile(fake.sandbox), {
+    mutants: new Set(['2']),
+  });
+});
+
+test('a process that did not run the dry run isolates by the server mutants the dry run left in the sandbox', async (t) => {
+  const fake = serverFake(t);
+  writeServerMutantsFile(fake.sandbox, ['2']);
+  const { shell } = fake.runner();
+  await shell.init();
+
+  await shell.mutantRun(runtimeRun('1'));
+  const setupsBeforeServerRun = fake.setups.length;
+  await shell.mutantRun(runtimeRun('2'));
+
+  assert.deepEqual([setupsBeforeServerRun, fake.setups.length], [1, 2]);
+});
+
+test('without the dry run server mutants in the sandbox, every mutant run isolates, after one warning', async (t) => {
+  const fake = serverFake(t);
+  const { shell, lines } = fake.runner();
+  await shell.init();
+
+  await shell.mutantRun(runtimeRun('1'));
+  await shell.mutantRun(runtimeRun('3'));
+
+  assert.equal(fake.setups.length, 3);
+  assert.deepEqual(
+    lines
+      .filter(([level]) => level === 'warn')
+      .map(([, message]) => /\.lz-playwright-server-mutants/.test(message)),
+    [true],
+  );
+});
+
+test('isolate false reads no server mutants: no warning and no restart without them', async (t) => {
+  const fake = serverFake(t);
+  const { shell, lines } = fake.runner({ isolate: false });
+  await shell.init();
+
+  await shell.mutantRun(runtimeRun('1'));
+  await shell.mutantRun(runtimeRun('3'));
+
+  assert.equal(fake.setups.length, 1);
+  assert.deepEqual(
+    lines.filter(([level]) => level === 'warn'),
+    [],
+  );
+});
+
+test('the process that ran the dry run isolates by what it kept, even when the sandbox file is gone', async (t) => {
+  const fake = serverFake(t, {
+    runTests: passAllWithDryRunServerMutants('2'),
+  });
+  const { shell, lines } = fake.runner();
+  await shell.init();
+  await shell.dryRun(dryRunOptions());
+  rmSync(path.join(fake.sandbox, '.lz-playwright-server-mutants'));
+
+  await shell.mutantRun(runtimeRun('1'));
+  const setupsBeforeServerRun = fake.setups.length;
+  await shell.mutantRun(runtimeRun('2'));
+
+  assert.deepEqual([setupsBeforeServerRun, fake.setups.length], [1, 2]);
+  assert.deepEqual(
+    lines.filter(([level]) => level === 'warn'),
+    [],
+  );
+});
+
+test('isolate false leaves no server mutants in the sandbox', async (t) => {
+  const fake = serverFake(t, {
+    runTests: passAllWithDryRunServerMutants('2'),
+  });
+  const { shell } = fake.runner({ isolate: false });
+  await shell.init();
+
+  await shell.dryRun(dryRunOptions());
+
+  assert.deepEqual(readdirSync(fake.sandbox), []);
+});
+
+test('isolate restarts the webServer before the first mutant run when the dry run saw that mutant on the server', async (t) => {
+  const fake = serverFake(t, { runTests: passAllWithDryRunServerMutants('2') });
+  const { shell } = fake.runner();
+  await shell.init();
+  await shell.dryRun(dryRunOptions());
+
+  await shell.mutantRun(runtimeRun('2'));
+
+  assert.deepEqual(
+    fake.setups.map(({ activeMutant }) => activeMutant),
+    [undefined, undefined],
+  );
+});
+
+test('isolate keeps the webServer between runs the server did not run in the dry run', async (t) => {
+  const fake = serverFake(t, { runTests: passAllWithDryRunServerMutants('2') });
+  const { shell } = fake.runner();
+  await shell.init();
+  await shell.dryRun(dryRunOptions());
+
+  await shell.mutantRun(runtimeRun('1'));
+  await shell.mutantRun(runtimeRun('3'));
+
+  assert.equal(fake.setups.length, 1);
+});
+
+test('isolate restarts the webServer after a server run, and around each of two server runs in a row', async (t) => {
+  const fake = serverFake(t, {
+    runTests: passAllWithDryRunServerMutants('2', '4'),
+  });
+  const { shell } = fake.runner();
+  await shell.init();
+  await shell.dryRun(dryRunOptions());
+  const restartsBefore: number[] = [];
+  const run = async (id: string) => {
+    const before = fake.setups.length;
+    await shell.mutantRun(runtimeRun(id));
+    restartsBefore.push(fake.setups.length - before);
+  };
+
+  await run('1');
+  await run('2');
+  await run('4');
+  await run('1');
+  await run('3');
+
+  assert.deepEqual(restartsBefore, [0, 1, 1, 1, 0]);
+});
+
+test('isolate false never restarts the webServer around server runs', async (t) => {
+  const fake = serverFake(t, { runTests: passAllWithDryRunServerMutants('2') });
+  const { shell } = fake.runner({ isolate: false });
+  await shell.init();
+  await shell.dryRun(dryRunOptions());
+
+  await shell.mutantRun(runtimeRun('2'));
+  await shell.mutantRun(runtimeRun('1'));
+
+  assert.equal(fake.setups.length, 1);
+});
+
+for (const isolate of [true, false]) {
+  test(`a static server mutant restarts the webServer once, with that mutant (isolate ${isolate})`, async (t) => {
+    const fake = serverFake(t, {
+      runTests: passAllWithDryRunServerMutants('2'),
+    });
+    const { shell } = fake.runner({ isolate });
+    await shell.init();
+    await shell.dryRun(dryRunOptions());
+
+    await shell.mutantRun(
+      mutantRunOptions({
+        activeMutant: { ...mutantRunOptions().activeMutant, id: '2' },
+        mutantActivation: 'static',
+      }),
+    );
+
+    assert.deepEqual(
+      fake.setups.map(({ activeMutant }) => activeMutant),
+      [undefined, '2'],
+    );
+  });
+}
+
+for (const mutate of [false, 'auto'] as const) {
+  test(`webServer.mutate: ${String(mutate)} never restarts the webServer to isolate a run`, async (t) => {
+    const fake = fakePlaywright(t, {
+      webServers: [webServer],
+      runTests: passAllWithDryRunServerMutants('2'),
+    });
+    const { shell } = fake.runner({
+      lzPlaywright: { webServer: { mutate } },
+    });
+    await shell.init();
+    await shell.dryRun(dryRunOptions());
+
+    await shell.mutantRun(runtimeRun('2'));
+    await shell.mutantRun(runtimeRun('1'));
+
+    assert.equal(
+      fake.names().filter((name) => name === 'runGlobalSetup').length,
+      1,
+    );
+  });
+
+  test(`webServer.mutate: ${String(mutate)} reads no server mutants, so it warns about none`, async (t) => {
+    inSandbox(t);
+    const fake = fakePlaywright(t, { webServers: [webServer] });
+    const { shell, lines } = fake.runner({
+      lzPlaywright: { webServer: { mutate } },
+    });
+    await shell.init();
+
+    await shell.mutantRun(runtimeRun('2'));
+
+    assert.deepEqual(
+      lines.filter(([level]) => level === 'warn'),
+      [],
+    );
+  });
+
+  test(`webServer.mutate: ${String(mutate)} leaves no server mutants in the sandbox`, async (t) => {
+    const sandbox = inSandbox(t);
+    const fake = fakePlaywright(t, {
+      webServers: [webServer],
+      runTests: passAllWithDryRunServerMutants('2'),
+    });
+    const { shell } = fake.runner({
+      lzPlaywright: { webServer: { mutate } },
+    });
+    await shell.init();
+
+    await shell.dryRun(dryRunOptions());
+
+    assert.deepEqual(readdirSync(sandbox), []);
+  });
+}
 
 test('init refuses a webServer whose env sets NODE_OPTIONS', async (t) => {
   const fake = serverFake(t, {

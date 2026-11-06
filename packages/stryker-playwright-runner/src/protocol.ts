@@ -4,6 +4,7 @@ import path from 'node:path';
 import type { MutantCoverage } from '@stryker-mutator/api/core';
 
 import { isRecord } from './is-record.ts';
+import { serverSnapshotPrefix } from './server-protocol.ts';
 
 export const runSettingsEnv = 'LZ_STRYKER_PLAYWRIGHT_RUN';
 
@@ -47,6 +48,7 @@ export interface SnapshotDir {
   readonly snapshots: readonly Snapshot[];
   readonly hookInstalled: boolean;
   readonly installErrors: readonly string[];
+  readonly serverMutants: readonly string[];
 }
 
 export function isHitCount(value: unknown): value is number {
@@ -138,19 +140,39 @@ export function readSnapshotDir(dir: string): SnapshotDir {
   const names = fs.readdirSync(dir);
   const read = (file: string) => fs.readFileSync(path.join(dir, file), 'utf8');
   const files = names.filter((file) => file.endsWith(snapshotSuffix));
-  const snapshots = files
-    .flatMap((file) => read(file).split('\n'))
-    .map(parseSnapshotLine)
-    .filter((snapshot) => snapshot !== undefined);
+  const snapshotsIn = (file: string) =>
+    read(file)
+      .split('\n')
+      .map(parseSnapshotLine)
+      .filter((snapshot) => snapshot !== undefined);
   const installErrors = names
     .filter((file) => file.endsWith(installErrorSuffix))
     .map(read);
 
   return {
-    snapshots,
+    snapshots: files.flatMap(snapshotsIn),
     hookInstalled: files.some((file) => file.startsWith(workerFilePrefix)),
     installErrors,
+    serverMutants: [
+      ...new Set(
+        files
+          .filter((file) => file.startsWith(serverSnapshotPrefix))
+          .flatMap(snapshotsIn)
+          .flatMap(({ coverage }) => coveredMutants(coverage)),
+      ),
+    ],
   };
+}
+
+function coveredMutants(coverage: MutantCoverage | undefined): string[] {
+  if (!coverage) {
+    return [];
+  }
+
+  return [
+    ...Object.keys(coverage.static),
+    ...Object.values(coverage.perTest).flatMap((hits) => Object.keys(hits)),
+  ];
 }
 
 export function readRunSettings(

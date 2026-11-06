@@ -40,6 +40,7 @@ export interface RunOutput {
   readonly snapshots: readonly Snapshot[];
   readonly hookInstalled: boolean;
   readonly installErrors: readonly string[];
+  readonly serverMutants: readonly string[];
 }
 
 export interface CoverageGaps {

@@ -62,6 +62,14 @@ import {
   writeServerControl,
 } from './server-protocol.ts';
 import {
+  readServerMutantsFile,
+  restartsToIsolate,
+  type RunKind,
+  runKind,
+  type ServerMutants,
+  writeServerMutantsFile,
+} from './server-isolation.ts';
+import {
   copySurvivorTraces,
   readTracesTarget,
   type TracesTarget,
@@ -127,9 +135,12 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
   readonly #strykerOptions: LzPlaywrightRunnerOptionsWithStrykerOptions;
   readonly #log: Logger;
   readonly #baseNodeOptions = process.env['NODE_OPTIONS'];
+  readonly #sandbox = process.cwd();
   #session: Session | undefined;
   /** The static mutant the webServer last started with. */
   #serverMutant: string | undefined;
+  #dryRunServerMutants: ServerMutants | undefined;
+  #previousRun: RunKind = 'other';
 
   constructor(
     options: LzPlaywrightRunnerOptionsWithStrykerOptions,
@@ -246,6 +257,12 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     const session = this.#ready();
     const request = dryRunRequest(options);
     const output = await this.#run(session, request);
+    this.#dryRunServerMutants = new Set(output.serverMutants);
+
+    if (session.server && session.options.webServer.isolate) {
+      writeServerMutantsFile(this.#sandbox, output.serverMutants);
+    }
+
     const { result, gaps } = dryRunResult(output, request);
     const flaky = flakyTestNames(output);
 
@@ -318,7 +335,14 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
   }
 
   async #run(session: Session, request: RunRequest): Promise<RunOutput> {
-    await this.#serveMutant(session, serverMutantFor(request));
+    const kind = runKind(request, () => this.#serverMutants(session));
+    const isolate = restartsToIsolate(
+      session.options.webServer.isolate,
+      this.#previousRun,
+      kind,
+    );
+    this.#previousRun = kind;
+    await this.#serveMutant(session, serverMutantFor(request), isolate);
     const deadlineAt =
       request.budget.deadlineMs === undefined
         ? undefined
@@ -424,8 +448,33 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     return true;
   }
 
-  async #serveMutant(session: Session, mutant: string | undefined) {
-    if (!session.server || mutant === this.#serverMutant) {
+  #serverMutants(session: Session): ServerMutants {
+    if (!session.server || !session.options.webServer.isolate) {
+      return new Set();
+    }
+
+    if (this.#dryRunServerMutants === undefined) {
+      const file = readServerMutantsFile(this.#sandbox);
+
+      if ('mutants' in file) {
+        this.#dryRunServerMutants = file.mutants;
+      } else {
+        this.#log.warn(
+          `This process did not run the dry run and cannot read the mutants the webServer ran in it (${file.cause}), so it restarts the webServer around every mutant run.`,
+        );
+        this.#dryRunServerMutants = 'unknown';
+      }
+    }
+
+    return this.#dryRunServerMutants;
+  }
+
+  async #serveMutant(
+    session: Session,
+    mutant: string | undefined,
+    isolate: boolean,
+  ) {
+    if (!session.server || (!isolate && mutant === this.#serverMutant)) {
       return;
     }
 
