@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { isRecord } from './is-record.ts';
+import { fieldOf, isRecord } from './is-record.ts';
 
 export interface LzPlaywrightOptions {
   readonly configFile?: string;
@@ -31,7 +31,7 @@ type OptionSchemas = {
   };
 };
 
-export const optionProperties = {
+const scalarOptionProperties = {
   configFile: {
     type: 'string',
     description:
@@ -68,6 +68,20 @@ export const optionProperties = {
   },
 } satisfies OptionSchemas;
 
+export const optionProperties = {
+  ...scalarOptionProperties,
+  webServer: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      mutate: { enum: [true, false, 'auto'] },
+      isolate: { type: 'boolean' },
+    },
+    description:
+      "Mutants in the code the Playwright config's webServer runs. mutate: true runs them, false (the default) leaves them NoCoverage; isolate (default true) keeps server mutant runs apart.",
+  },
+};
+
 export const strykerValidationSchema = {
   $schema: 'http://json-schema.org/draft-07/schema#',
   type: 'object',
@@ -88,7 +102,13 @@ export interface RunnerOptions {
   readonly retries: number | undefined;
   readonly survivorTraces: string | undefined;
   readonly traceScreenshots: boolean;
+  readonly webServer: WebServerOptions;
   readonly strykerTimeoutMS: number;
+}
+
+export interface WebServerOptions {
+  readonly mutate: boolean | 'auto';
+  readonly isolate: boolean;
 }
 
 export interface LzPlaywrightRunnerOptionsWithStrykerOptions {
@@ -130,6 +150,7 @@ export function readRunnerOptions(
       retries,
       survivorTraces,
       traceScreenshots,
+      webServer,
     } = own;
 
     if (
@@ -157,6 +178,7 @@ export function readRunnerOptions(
           survivorTraces,
           traceScreenshots:
             traceScreenshots ?? optionProperties.traceScreenshots.default,
+          webServer: readWebServer(webServer),
           strykerTimeoutMS: options.timeoutMS,
         };
       }
@@ -166,6 +188,53 @@ export function readRunnerOptions(
   throw new Error(
     `The lzPlaywright options do not match their schema: ${JSON.stringify(own)}`,
   );
+}
+
+function readWebServer(value: unknown): WebServerOptions {
+  const knownKeys = Object.keys(optionProperties.webServer.properties);
+  const knownList = knownKeys.join(' and ');
+
+  if (value !== undefined && (!isRecord(value) || Array.isArray(value))) {
+    throw new Error(
+      `lzPlaywright.webServer must be an object with ${knownList}, got ${JSON.stringify(value)}.`,
+    );
+  }
+
+  const unknownKey = (isRecord(value) ? Object.keys(value) : []).find(
+    (key) => !knownKeys.includes(key),
+  );
+
+  if (unknownKey !== undefined) {
+    throw new Error(
+      `lzPlaywright.webServer has no option ${unknownKey}; it takes ${knownList}.`,
+    );
+  }
+
+  const mutate = fieldOf(value, 'mutate');
+
+  if (
+    mutate !== undefined &&
+    mutate !== true &&
+    mutate !== false &&
+    mutate !== 'auto'
+  ) {
+    throw new Error(
+      `lzPlaywright.webServer.mutate must be true, false or 'auto', got ${JSON.stringify(mutate)}.`,
+    );
+  }
+
+  const isolate = fieldOf(value, 'isolate');
+
+  if (isolate !== undefined && typeof isolate !== 'boolean') {
+    throw new Error(
+      `lzPlaywright.webServer.isolate must be true or false, got ${JSON.stringify(isolate)}.`,
+    );
+  }
+
+  return {
+    mutate: mutate ?? false,
+    isolate: isolate ?? true,
+  };
 }
 
 function isStringArray(value: unknown): value is string[] {

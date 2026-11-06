@@ -4,9 +4,6 @@ import path from 'node:path';
 
 import { isRecord } from './is-record.ts';
 
-// Provisional: Lars rules on these names, on the default (off here) and on the per-test mode after spike B.
-/** Turns server support on: `header` or `arrival` names the per-test mode; unset or `off` leaves it off. */
-export const serverSupportEnv = 'LZ_PLAYWRIGHT_SERVER_TESTS';
 /** Tells the server hook, in the processes global setup starts, the folder that holds its control file. */
 export const serverDirEnv = 'LZ_STRYKER_PLAYWRIGHT_SERVER';
 /** The header the worker hook adds to a test's requests to the webServer. */
@@ -30,24 +27,6 @@ export interface ServerControl {
   readonly perTest: boolean;
   readonly activeMutant?: string | undefined;
   readonly hitLimit?: number | undefined;
-}
-
-export function readServerSupport(
-  env: NodeJS.ProcessEnv,
-): ServerSupport | undefined {
-  const value = env[serverSupportEnv];
-
-  if (value === undefined || value === '' || value === 'off') {
-    return undefined;
-  }
-
-  if (value === 'header' || value === 'arrival') {
-    return { mode: value };
-  }
-
-  throw new Error(
-    `${serverSupportEnv} must be header, arrival or off, got ${value}.`,
-  );
 }
 
 export function parseServerControl(raw: string): ServerControl | undefined {

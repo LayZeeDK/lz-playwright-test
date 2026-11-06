@@ -188,6 +188,10 @@ test('init warns when timeoutMS is below the expect timeout plus the start and s
   assert.deepEqual(enough.lines, []);
 });
 
+function warnings(lines: readonly [string, string][]) {
+  return lines.filter(([level]) => level === 'warn');
+}
+
 function leaveDeadRoots(tmp: string, suffixes: string[]): string[] {
   const dead = spawnSync(process.execPath, ['-e', '']).pid;
 
@@ -704,7 +708,7 @@ test('a webServer that died is restarted through global setup before the run, an
     fake.names().filter((name) => name !== 'isURLAvailable'),
     ['runGlobalSetup', 'runTests'],
   );
-  assert.deepEqual(lines, [
+  assert.deepEqual(warnings(lines), [
     [
       'warn',
       'webServer at http://localhost:1/, http://localhost:3/ stopped answering; rerunning Playwright global setup (global teardown runs first).',
@@ -786,7 +790,7 @@ test('a webServer port is checked by connecting to it, and one without url or po
 
   await shell.dryRun(dryRunOptions());
 
-  assert.deepEqual(lines, []);
+  assert.deepEqual(warnings(lines), []);
   assert.equal(fake.runs.length, 1);
 });
 
@@ -802,7 +806,7 @@ test('a webServer url with a port set next to it, even a falsy one, is checked b
 
   await shell.dryRun(dryRunOptions());
 
-  assert.deepEqual(lines, []);
+  assert.deepEqual(warnings(lines), []);
   assert.deepEqual(
     fake.names().filter((name) => name === 'isURLAvailable'),
     [],
@@ -818,7 +822,7 @@ test('a webServer port that stopped answering is restarted and named by its port
 
   await shell.dryRun(dryRunOptions());
 
-  assert.deepEqual(lines, [
+  assert.deepEqual(warnings(lines), [
     [
       'warn',
       `webServer at port ${port} stopped answering; rerunning Playwright global setup (global teardown runs first).`,

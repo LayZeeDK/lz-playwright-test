@@ -11,28 +11,11 @@ import {
   hostKey,
   parseServerControl,
   readServerControl,
-  readServerSupport,
-  serverSupportEnv,
   untaggedArrival,
   untaggedKey,
   writeServerControl,
 } from '../src/server-protocol.ts';
 import { tempTree } from './support/doubles.ts';
-
-test('server support is off unless the switch names a per-test mode', () => {
-  assert.equal(readServerSupport({}), undefined);
-  assert.equal(readServerSupport({ [serverSupportEnv]: '' }), undefined);
-  assert.equal(readServerSupport({ [serverSupportEnv]: 'off' }), undefined);
-  assert.deepEqual(readServerSupport({ [serverSupportEnv]: 'header' }), {
-    mode: 'header',
-  });
-  assert.deepEqual(readServerSupport({ [serverSupportEnv]: 'arrival' }), {
-    mode: 'arrival',
-  });
-  assert.throws(() => readServerSupport({ [serverSupportEnv]: 'on' }), {
-    message: `${serverSupportEnv} must be header, arrival or off, got on.`,
-  });
-});
 
 test('a control file written by the runner reads back whole, and its temp file is gone', (t) => {
   const dir = tempTree(t, 'server-control-');

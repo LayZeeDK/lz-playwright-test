@@ -139,6 +139,8 @@ exports as `strykerValidationSchema`.
   surviving mutants, such as `reports/lz-playwright-traces`. See Traces of surviving mutants.
 - `traceScreenshots`: add screenshots to the traces that `survivorTraces` records. The default is
   `false`. See Traces of surviving mutants.
+- `webServer`: mutants in the code that the Playwright config's `webServer` runs. `mutate: true` runs
+  them; with `mutate: false`, the default, they stay NoCoverage. `isolate` defaults to `true`.
 
 ## Flaky tests
 

@@ -29,6 +29,7 @@ const defaults = {
   retries: undefined,
   survivorTraces: undefined,
   traceScreenshots: false,
+  webServer: { mutate: false, isolate: true },
   strykerTimeoutMS: 10_000,
 };
 
@@ -94,6 +95,91 @@ test('without lzPlaywright options or with an empty --testFiles the runner takes
   );
 });
 
+test('without a webServer option the runner leaves server mutants alone and isolates server runs', () => {
+  assert.deepEqual(readRunnerOptions(strykerOptions({})).webServer, {
+    mutate: false,
+    isolate: true,
+  });
+});
+
+test('webServer.isolate: false keeps the default for mutate', () => {
+  assert.deepEqual(
+    readRunnerOptions(
+      strykerOptions({ lzPlaywright: { webServer: { isolate: false } } }),
+    ).webServer,
+    { mutate: false, isolate: false },
+  );
+});
+
+test('webServer.mutate: true turns server mutants on', () => {
+  assert.deepEqual(
+    readRunnerOptions(
+      strykerOptions({ lzPlaywright: { webServer: { mutate: true } } }),
+    ).webServer,
+    { mutate: true, isolate: true },
+  );
+});
+
+test("webServer.mutate: 'auto' is kept for the runner to decide", () => {
+  assert.deepEqual(
+    readRunnerOptions(
+      strykerOptions({ lzPlaywright: { webServer: { mutate: 'auto' } } }),
+    ).webServer,
+    { mutate: 'auto', isolate: true },
+  );
+});
+
+test('webServer.mutate refuses any value but true, false or auto, and names them', () => {
+  assert.throws(
+    () =>
+      readRunnerOptions(
+        strykerOptions({ lzPlaywright: { webServer: { mutate: 'on' } } }),
+      ),
+    {
+      message:
+        'lzPlaywright.webServer.mutate must be true, false or \'auto\', got "on".',
+    },
+  );
+});
+
+test('webServer.isolate refuses anything but true or false', () => {
+  assert.throws(
+    () =>
+      readRunnerOptions(
+        strykerOptions({ lzPlaywright: { webServer: { isolate: 'no' } } }),
+      ),
+    {
+      message: 'lzPlaywright.webServer.isolate must be true or false, got "no".',
+    },
+  );
+});
+
+test('webServer refuses anything but an object', () => {
+  [true, 'auto', null, []].forEach((webServer) => {
+    assert.throws(
+      () => readRunnerOptions(strykerOptions({ lzPlaywright: { webServer } })),
+      {
+        message: `lzPlaywright.webServer must be an object with mutate and isolate, got ${JSON.stringify(webServer)}.`,
+      },
+    );
+  });
+});
+
+test('webServer refuses an option it does not have, and names the ones it has', () => {
+  assert.throws(
+    () =>
+      readRunnerOptions(
+        strykerOptions({
+          lzPlaywright: { webServer: { mutate: true, port: 3000 } },
+        }),
+      ),
+    {
+      message:
+        'lzPlaywright.webServer has no option port; it takes mutate and isolate.',
+    },
+  );
+});
+
 // The Ajv settings of Stryker's OptionsValidator (@stryker-mutator/core, src/config/options-validator.ts),
 // which checks a config against the schema a plugin exports.
 function validate(options: object) {
@@ -148,6 +234,29 @@ test("Stryker's check of the options refuses wrong types, workers below 1 and un
   });
 
   assert.equal(validate({ lzPlaywright: [] }).valid, false);
+});
+
+test("Stryker's check of the options takes webServer with mutate true, false or auto and a boolean isolate, and nothing else", () => {
+  [
+    { mutate: true },
+    { mutate: false, isolate: true },
+    { mutate: 'auto', isolate: false },
+  ].forEach((webServer) => {
+    assert.equal(
+      validate({ lzPlaywright: { webServer } }).valid,
+      true,
+      JSON.stringify(webServer),
+    );
+  });
+  [true, [], { mutate: 'on' }, { isolate: 'no' }, { port: 1 }].forEach(
+    (webServer) => {
+      assert.equal(
+        validate({ lzPlaywright: { webServer } }).valid,
+        false,
+        JSON.stringify(webServer),
+      );
+    },
+  );
 });
 
 test('every option says what it is for', () => {

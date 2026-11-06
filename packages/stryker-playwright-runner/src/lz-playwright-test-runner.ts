@@ -57,10 +57,8 @@ import {
   anyHooked,
   forgetHooked,
   hostKey,
-  readServerSupport,
   serverDirEnv,
   type ServerSupport,
-  serverSupportEnv,
   writeServerControl,
 } from './server-protocol.ts';
 import {
@@ -107,6 +105,7 @@ const hookUrl = (name: string) =>
 const workerHookUrl = hookUrl('worker-hook');
 const serverHookUrl = hookUrl('server-hook');
 const hookedWaitMs = 1000;
+const mutateOption = 'lzPlaywright.webServer.mutate';
 
 const runOverrides = ({
   traced,
@@ -146,6 +145,13 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
 
   async init(): Promise<void> {
     const options = readRunnerOptions(this.#strykerOptions);
+
+    if (options.webServer.mutate === 'auto') {
+      this.#log.debug(
+        `${mutateOption}: 'auto' is not built yet; server mutants stay off, as with false.`,
+      );
+    }
+
     const traces = readTracesTarget(options.survivorTraces, process.env);
     const pw = loadPlaywright(options.configFile);
     const root = claimTempRoot((removed) => {
@@ -182,7 +188,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         serverCheck(server, pw.isURLAvailable),
       );
       const server = await serverSide(
-        readServerSupport(process.env),
+        options.webServer.mutate === true ? { mode: 'header' } : undefined,
         root,
         config.webServers,
         pw.isURLAvailable,
@@ -251,6 +257,15 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
 
     if (gaps) {
       logCoverageGaps(this.#log, gaps);
+    }
+
+    if (
+      session.options.webServer.mutate === false &&
+      session.servers.length > 0
+    ) {
+      this.#log.info(
+        `Server-side mutants stay NoCoverage: the code the Playwright webServer runs is mutated only with ${mutateOption}: true.`,
+      );
     }
 
     return result;
@@ -446,7 +461,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
 
     if (!(await hookedWithin(server.dir, hookedWaitMs))) {
       throw new Error(
-        `${serverSupportEnv} is on, but no process that Playwright global setup started loaded the server hook. ` +
+        `${mutateOption} is true, but no process that Playwright global setup started loaded the server hook. ` +
           'A webServer that is not Node.js, a command that sets NODE_OPTIONS itself, or a server that was already ' +
           'running cannot get the active mutant.',
       );
@@ -471,7 +486,7 @@ export async function serverSide(
 
   if (webServers.some((server) => server.setsNodeOptions)) {
     throw new Error(
-      `${serverSupportEnv} is on, but a webServer's env sets NODE_OPTIONS, which replaces the one that loads ` +
+      `${mutateOption} is true, but a webServer's env sets NODE_OPTIONS, which replaces the one that loads ` +
         'the server hook. Set NODE_OPTIONS in the environment that runs Stryker instead.',
     );
   }
@@ -484,7 +499,7 @@ export async function serverSide(
 
   if (shared.length > 0) {
     throw new Error(
-      `${serverSupportEnv} is on, but the webServer at ${shared.map((server) => server.name).join(', ')} ` +
+      `${mutateOption} is true, but the webServer at ${shared.map((server) => server.name).join(', ')} ` +
         'already answers and reuseExistingServer is true. Only the Stryker process that started a server can ' +
         'switch its mutant: give each process its own port from STRYKER_MUTATOR_WORKER, and stop your own server.',
     );
