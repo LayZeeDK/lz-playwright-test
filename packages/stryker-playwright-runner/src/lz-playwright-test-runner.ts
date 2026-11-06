@@ -252,8 +252,8 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         server,
         apart && {
           moves: apart.moves,
-          configuredChecks: config.webServers.map((webServer) =>
-            serverCheck(webServer, pw.isURLAvailable),
+          configuredChecks: config.webServers.map(
+            (webServer) => serverCheck(webServer, pw.isURLAvailable)[0],
           ),
         },
         options.webServer.mutate === 'auto',
@@ -612,6 +612,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
           return bound;
         }
 
+        // Stryker disable next-line NodeTimerDelay: the delay only paces the watch; 1 ms more or less changes no result
         await setTimeout(boundPollMs);
       }
 
@@ -701,7 +702,7 @@ function moveApart(
 
 interface MovedServers {
   readonly moves: readonly ServerMove[];
-  readonly configuredChecks: readonly (readonly ServerCheck[])[];
+  readonly configuredChecks: readonly (ServerCheck | undefined)[];
 }
 
 const boundPollMs = 250;
@@ -711,13 +712,9 @@ async function boundMoves({
   configuredChecks,
 }: MovedServers): Promise<ServerMove[]> {
   const bound = await Promise.all(
-    moves.map(async (move) => {
-      const up = await Promise.all(
-        (configuredChecks[move.index] ?? []).map((check) => check.isUp()),
-      );
-
-      return up.some(Boolean) ? [move] : [];
-    }),
+    moves.map(async (move) =>
+      (await configuredChecks[move.index]?.isUp()) ? [move] : [],
+    ),
   );
 
   return bound.flat();

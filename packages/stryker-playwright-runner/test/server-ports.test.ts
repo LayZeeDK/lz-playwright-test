@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
+import net from 'node:net';
 import { test } from 'node:test';
 
 import { acceptsConnections } from '../src/lz-playwright-test-runner.ts';
@@ -55,6 +57,17 @@ test('a percentage concurrency is that share of the available parallelism', () =
   assert.equal(startsMoreRunners({ concurrency: '50%', checkers: [] }, 8), true);
 });
 
+test('a percentage concurrency rounds its share of the available parallelism', () => {
+  assert.deepEqual(
+    [
+      startsMoreRunners({ concurrency: '10%', checkers: [] }, 8),
+      startsMoreRunners({ concurrency: '100%', checkers: [] }, 2),
+      startsMoreRunners({ concurrency: '100%', checkers: [] }, 1),
+    ],
+    [false, true, false],
+  );
+});
+
 test("without a concurrency, Stryker's default starts more test runner processes on more than one core", () => {
   assert.equal(startsMoreRunners({ checkers: [] }, 2), true);
 });
@@ -64,6 +77,56 @@ test('a free port accepts no connection', async () => {
 
   assert.ok(port > 0);
   assert.equal(await acceptsConnections(port), false);
+});
+
+function fakeListener(address: unknown, error?: Error) {
+  const listened: unknown[] = [];
+  const server = Object.assign(new EventEmitter(), {
+    listen(port: number, host: string, listening: () => void) {
+      listened.push([port, host]);
+
+      if (error) {
+        queueMicrotask(() => server.emit('error', error));
+      } else {
+        listening();
+      }
+
+      return server;
+    },
+    address: () => address,
+    close(closed: () => void) {
+      closed();
+    },
+  });
+
+  return { server, listened };
+}
+
+test('a free port comes from the loopback interface', async (t) => {
+  const { server, listened } = fakeListener({ port: 50_100 });
+  t.mock.method(net, 'createServer', () => server);
+
+  assert.equal(await freePort(), 50_100);
+  assert.deepEqual(listened, [[0, '127.0.0.1']]);
+});
+
+test('a free port that cannot be bound rejects with the bind error', async (t) => {
+  const error = new Error('EACCES');
+  t.mock.method(net, 'createServer', () => fakeListener({}, error).server);
+
+  await assert.rejects(freePort(), error);
+});
+
+test('a free port refuses a listener address that is no port', async (t) => {
+  t.mock.method(
+    net,
+    'createServer',
+    () => fakeListener('\\\\.\\pipe\\probe').server,
+  );
+
+  await assert.rejects(freePort(), {
+    message: 'Port 0 bound to \\\\.\\pipe\\probe.',
+  });
 });
 
 test('nothing moves when no webServer has a port or url', async () => {
@@ -169,6 +232,19 @@ test("a url without a port moves from its scheme's default port", async () => {
   assert.deepEqual(apart.webServers, [
     server({ url: 'https://localhost:50004/api' }),
   ]);
+});
+
+test('an http url without a port moves from port 80', async () => {
+  const apart = await moveServersApart(
+    {
+      projects: [project()],
+      webServers: [server({ url: 'http://localhost/api' })],
+    },
+    {},
+    ports(50_005),
+  );
+
+  assert.deepEqual(apart?.moves, [{ index: 0, from: 80, to: 50_005 }]);
 });
 
 const cannotMove = (reason: string) =>

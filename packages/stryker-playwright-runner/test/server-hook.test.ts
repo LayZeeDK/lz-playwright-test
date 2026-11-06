@@ -46,7 +46,12 @@ const lazyServerSource = serverSourceOf([
   "const { answer } = await import('./app.mjs');",
   ...answerLines,
 ]);
+const withoutTestRunnerHooksAndActiveMutant = {
+  NODE_OPTIONS: undefined,
+  [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: undefined,
+};
 let instrumented = '';
+let appMutantIds: ReadonlySet<string> = new Set();
 
 before(async () => {
   const result = await new Instrumenter(logger().log).instrument(
@@ -69,6 +74,7 @@ before(async () => {
     ],
   );
   instrumented = file.content;
+  appMutantIds = new Set(result.mutants.map(({ id }) => id));
 });
 
 function serverSourceOf(
@@ -111,7 +117,12 @@ async function startServer(
       path.join(dir, 'server.mjs'),
     ],
     {
-      env: { ...process.env, [serverDirEnv]: serverDir, ...env },
+      env: {
+        ...process.env,
+        ...withoutTestRunnerHooksAndActiveMutant,
+        [serverDirEnv]: serverDir,
+        ...env,
+      },
       stdio: ['ignore', 'pipe', 'inherit'],
     },
   );
@@ -147,8 +158,10 @@ function coverageOf(outDir: string) {
   return mergeCoverage(readSnapshotDir(outDir).snapshots);
 }
 
-function idsOf(hits: Record<string, number> | undefined): string[] {
-  return Object.keys(hits ?? {}).sort();
+function appMutantIdsOf(hits: Record<string, number> | undefined): string[] {
+  return Object.keys(hits ?? {})
+    .filter((id) => appMutantIds.has(id))
+    .sort();
 }
 
 test('the hook marks its server hooked once it listens', async (t) => {
@@ -204,12 +217,12 @@ test('coverage goes to the run folder per test id header, with what ran before t
     readdirSync(first).every((file) => file.startsWith(serverSnapshotPrefix)),
   );
   assert.deepEqual(
-    idsOf(coverage.static),
+    appMutantIdsOf(coverage.static),
     ['0', '1', '2', '3', '4', '5', '6'],
     'module scope, and a request before any run, such as a readiness check',
   );
-  assert.deepEqual(idsOf(coverage.perTest['big']), bigRequestIds);
-  assert.deepEqual(idsOf(coverage.perTest['small']), [
+  assert.deepEqual(appMutantIdsOf(coverage.perTest['big']), bigRequestIds);
+  assert.deepEqual(appMutantIdsOf(coverage.perTest['small']), [
     '1',
     '2',
     '3',
@@ -235,8 +248,8 @@ test("module scope evaluated lazily inside a request is static, and the rest of 
 
   const coverage = coverageOf(outDir);
 
-  assert.deepEqual(idsOf(coverage.static), ['0']);
-  assert.deepEqual(idsOf(coverage.perTest['big']), bigRequestIds);
+  assert.deepEqual(appMutantIdsOf(coverage.static), ['0']);
+  assert.deepEqual(appMutantIdsOf(coverage.perTest['big']), bigRequestIds);
 });
 
 test('hits count as static only until the microtask after the first read of the namespace global', async (t) => {
@@ -267,6 +280,44 @@ test('a read of the namespace global inside an open window does not keep it open
   assert.equal(await server.ask(0, 'small'), 'small');
 });
 
+test('a read of the namespace global inside an open window schedules no close that ends a later window early', async (t) => {
+  const server = await startServer(t, {
+    server: serverSourceOf([
+      `queueMicrotask(() => ${namespaceGlobal});`,
+      `const ns = ${namespaceGlobal};`,
+      'const later = await new Promise((resolve) => {',
+      '  queueMicrotask(() => {',
+      '    queueMicrotask(() => resolve(ns.currentTestId));',
+      `    ${namespaceGlobal};`,
+      '  });',
+      '});',
+      'response.end(JSON.stringify([later]));',
+    ]),
+  });
+  server.run({ perTest: true });
+
+  assert.equal(await server.ask(0, 'small'), '[null]');
+});
+
+test('code that runs outside any request names no test', async (t) => {
+  const server = await startServer(t, {
+    server: serverSourceOf(
+      [
+        'const outside = await new Promise((resolve) => waiting.push(resolve));',
+        'response.end(String(outside));',
+      ],
+      [
+        `const ns = ${namespaceGlobal};`,
+        'const waiting = [];',
+        'setInterval(() => waiting.splice(0).forEach((resolve) => resolve(ns.currentTestId)), 5).unref();',
+      ],
+    ),
+  });
+  server.run({ perTest: true });
+
+  assert.equal(await server.ask(0, 'small'), 'undefined');
+});
+
 test('a second copy of the hook leaves lazily evaluated module scope static', async (t) => {
   const server = await startServer(t, {
     server: lazyServerSource,
@@ -277,8 +328,8 @@ test('a second copy of the hook leaves lazily evaluated module scope static', as
 
   const coverage = coverageOf(outDir);
 
-  assert.deepEqual(idsOf(coverage.static), ['0']);
-  assert.deepEqual(idsOf(coverage.perTest['big']), bigRequestIds);
+  assert.deepEqual(appMutantIdsOf(coverage.static), ['0']);
+  assert.deepEqual(appMutantIdsOf(coverage.perTest['big']), bigRequestIds);
 });
 
 test('without per-test coverage lazily evaluated module scope and the request are static', async (t) => {
@@ -289,7 +340,15 @@ test('without per-test coverage lazily evaluated module scope and the request ar
   const coverage = coverageOf(outDir);
 
   assert.deepEqual(Object.keys(coverage.perTest), []);
-  assert.deepEqual(idsOf(coverage.static), ['0', '1', '2', '3', '4', '5', '6']);
+  assert.deepEqual(appMutantIdsOf(coverage.static), [
+    '0',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+  ]);
 });
 
 test('assigning the namespace global is ignored, not a throw', async (t) => {
@@ -324,9 +383,12 @@ test('a request without the header counts under its arrival time', async (t) => 
   assert.equal(keys.length, 1);
   const [key = ''] = keys;
   const arrivedAt = untaggedArrival(key);
+  const crossProcessClockSkewMs = 50;
   assert.ok(
-    arrivedAt !== undefined && sent <= arrivedAt && arrivedAt <= answered,
-    key,
+    arrivedAt !== undefined &&
+      sent - crossProcessClockSkewMs <= arrivedAt &&
+      arrivedAt <= answered + crossProcessClockSkewMs,
+    `${sent} ${key} ${answered}`,
   );
 });
 
@@ -338,7 +400,15 @@ test('without per-test coverage every hit is static, header or not', async (t) =
   const coverage = coverageOf(outDir);
 
   assert.deepEqual(Object.keys(coverage.perTest), []);
-  assert.deepEqual(idsOf(coverage.static), ['0', '1', '2', '3', '4', '5', '7']);
+  assert.deepEqual(appMutantIdsOf(coverage.static), [
+    '0',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '7',
+  ]);
 });
 
 test("a run's hit count counts only the active mutant's hits in that run", async (t) => {

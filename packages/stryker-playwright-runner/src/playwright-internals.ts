@@ -285,6 +285,7 @@ export function probeInternals(
             throw changed();
           }
 
+          // Stryker disable next-line ArrayDeclaration: an entry that is no plugin object adds no webServer, as an empty list does
           const webServers = (Array.isArray(plugins) ? plugins : []).flatMap(
             (plugin: unknown) => {
               const factory = fieldOf(plugin, 'factory');

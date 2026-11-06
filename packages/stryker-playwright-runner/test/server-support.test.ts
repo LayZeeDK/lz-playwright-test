@@ -546,6 +546,29 @@ test("with webServer.mutate: 'auto', a process whose init turned server support 
   });
 });
 
+test("with webServer.mutate: 'auto', a process whose init turned server support off runs mutants when the dry run reached no server mutant", async (t) => {
+  const fake = serverFake(t, { hooked: false });
+  writeServerMutantsFile(fake.sandbox, []);
+  const { shell } = fake.runner({ mutate: 'auto' });
+  await shell.init();
+
+  await shell.mutantRun(runtimeRun('1'));
+
+  assert.equal(fake.runs.length, 1);
+});
+
+test("with webServer.mutate: 'auto', the dry run process follows what its own dry run reached, not a later sandbox file", async (t) => {
+  const fake = serverFake(t, { runTests: passAllWithDryRunServerMutants('2') });
+  const { shell } = fake.runner({ mutate: 'auto' });
+  await shell.init();
+  await shell.dryRun(dryRunOptions());
+  writeServerMutantsFile(fake.sandbox, []);
+
+  await shell.mutantRun(runtimeRun('2'));
+
+  assert.equal(fake.setups.length, 2);
+});
+
 test("with webServer.mutate: 'auto', a process that did not run the dry run follows its on decision and isolates by its server mutants", async (t) => {
   const fake = serverFake(t);
   writeServerMutantsFile(fake.sandbox, ['2']);
@@ -778,6 +801,20 @@ test("with webServer.mutate: 'auto', init turns server support off with one warn
   );
 });
 
+test('init names every reuseExistingServer server that already answers', async (t) => {
+  const fake = serverFake(t, {
+    webServers: [
+      { url: 'http://localhost:4820/', reuseExistingServer: true },
+      { url: 'http://localhost:4821/', reuseExistingServer: true },
+    ],
+  });
+
+  await assert.rejects(fake.runner().shell.init(), {
+    message:
+      /^lzPlaywright\.webServer\.mutate is true, but the webServer at http:\/\/localhost:4820\/, http:\/\/localhost:4821\/ already answers/,
+  });
+});
+
 test('init starts a reuseExistingServer server that does not answer yet', async (t) => {
   const fake = serverFake(t, {
     webServers: [{ url: 'http://localhost:4820/', reuseExistingServer: true }],
@@ -854,6 +891,36 @@ test('at concurrency 2, init moves the webServer to a port of its own before glo
       [
         'debug',
         `Stryker starts more than one test runner process, so this one's webServer moves to a port of its own: 4820 -> ${port}.`,
+      ],
+    ],
+  );
+});
+
+test('at concurrency 2, init moves each webServer and names every move in one debug line', async (t) => {
+  stubEnv(t, { PORT: undefined, PLAYWRIGHT_TEST_BASE_URL: undefined });
+  const fake = serverFake(t, {
+    projects: [
+      { default: true, project: { name: 'chromium', timeout: 30_000 } },
+    ],
+    webServers: [
+      { url: 'http://127.0.0.1:4820/' },
+      { url: 'http://127.0.0.1:4821/' },
+    ],
+    urlUp: async () => false,
+  });
+  const { shell, lines } = fake.runner({ concurrency: 2 });
+
+  await shell.init();
+
+  const [first, second] = fake
+    .webServerOptions()
+    .map(({ url }) => new URL(url).port);
+  assert.deepEqual(
+    lines.filter(([, message]) => message.includes(' -> ')),
+    [
+      [
+        'debug',
+        `Stryker starts more than one test runner process, so this one's webServer moves to a port of its own: 4820 -> ${first}, 4821 -> ${second}.`,
       ],
     ],
   );
@@ -1039,7 +1106,7 @@ test('init names the command that bound the configured port while global setup s
   await assert.rejects(init(), (error) => {
     assert.ok(error instanceof Error);
     assert.equal(error.message, boundMessage('true', setupPorts[0]));
-    assert.equal(error.cause, undefined);
+    assert.equal('cause' in error, false);
 
     return true;
   });

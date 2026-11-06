@@ -609,7 +609,9 @@ test('the test runner resolves listTests, runGlobalSetup and runTests to their s
 });
 
 test('the test runner moves the webServer plugins the last load returned, by their order among the webServer plugins', async () => {
-  const gitCommitInfo = { factory: { name: 'playwright:gitCommitInfo' } };
+  const gitCommitInfo = {
+    factory: { name: 'playwright:gitCommitInfo', _options: { port: 3001 } },
+  };
   const first = {
     name: 'playwright:webserver',
     _options: { url: 'http://localhost:3000/', command: 'serve --port 3000' },
@@ -645,7 +647,7 @@ test('the test runner moves the webServer plugins the last load returned, by the
     env: { PORT: '50011' },
   });
   assert.deepEqual(gitCommitInfo, {
-    factory: { name: 'playwright:gitCommitInfo' },
+    factory: { name: 'playwright:gitCommitInfo', _options: { port: 3001 } },
   });
 });
 
@@ -702,6 +704,21 @@ test("the test runner moves every project to the baseURL through the CLI overrid
     workers: 1,
     use: { trace: 'off', baseURL: 'http://localhost:50030/' },
   });
+});
+
+test('a move without a baseURL leaves the CLI overrides as they were', async () => {
+  const overrides = { workers: 1, use: { trace: 'off' } };
+  const runner = await probeInternals(
+    '1.99.0',
+    fakeModules(testRunnerMethods, {
+      loadConfig: { projects: [], webServers: [], plugins: [] },
+    }),
+  ).createTestRunner(undefined, overrides);
+  await runner.loadConfig();
+
+  runner.moveWebServers([], undefined);
+
+  assert.deepEqual(overrides, { workers: 1, use: { trace: 'off' } });
 });
 
 test('a TestRunner that keeps no CLI overrides means Playwright changed', async () => {

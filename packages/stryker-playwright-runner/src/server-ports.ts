@@ -159,13 +159,9 @@ function concurrencyOf(
   option: number | string | undefined,
   parallelism: number,
 ): number {
-  const percentage =
-    typeof option === 'string'
-      ? /^(100|[1-9]?[0-9])%$/.exec(option)?.[1]
-      : undefined;
-
-  if (percentage !== undefined) {
-    return Math.round((parallelism * Number(percentage)) / 100);
+  // Stryker's options schema admits only whole percentages from 0% to 100% as a string.
+  if (typeof option === 'string') {
+    return Math.round((parallelism * Number.parseInt(option, 10)) / 100);
   }
 
   if (typeof option === 'number') {
