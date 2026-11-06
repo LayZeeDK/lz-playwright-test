@@ -237,6 +237,11 @@ serves every run except those of mutants in start-up code, and except every run 
 A restart costs the server's start and its cold first requests. On the epic-stack app's Vite dev server,
 one measurement put that at about 10 s per restarted run.
 
+When the dry run reached a server-side mutant, the runner restarts the `webServer` once after the dry
+run's tests, so that Stryker's timeout for each mutant run includes one restart. On a slow or loaded
+machine a restart can take longer than that one, so raise `timeoutMS` by about one restart of the
+`webServer`.
+
 Stryker runs the dry run in one test runner process. With `isolate: true` or `mutate: 'auto'`, that
 process writes the server-side mutants it found to `.lz-playwright-server-mutants` in Stryker's sandbox,
 and the other processes read the file at their first mutant run. A process that cannot read it restarts

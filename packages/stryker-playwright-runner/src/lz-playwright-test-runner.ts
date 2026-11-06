@@ -311,6 +311,12 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     const session = this.#ready();
     const request = dryRunRequest(options);
     const output = await this.#run(session, request);
+    // Stryker gives every mutant run the dry run's time beyond its tests, so the dry run pays for one restart.
+    await this.#serveMutant(
+      session,
+      undefined,
+      session.options.webServer.isolate && output.serverMutants.length > 0,
+    );
     this.#dryRunServerMutants = new Set(output.serverMutants);
 
     if (
@@ -436,6 +442,10 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
   }
 
   async #run(session: Session, request: RunRequest): Promise<RunOutput> {
+    const deadlineAt =
+      request.budget.deadlineMs === undefined
+        ? undefined
+        : performance.now() + request.budget.deadlineMs;
     const kind = runKind(request, () => this.#serverMutants(session));
     const isolate = restartsToIsolate(
       session.options.webServer.isolate,
@@ -444,10 +454,6 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     );
     this.#previousRun = kind;
     await this.#serveMutant(session, serverMutantFor(request), isolate);
-    const deadlineAt =
-      request.budget.deadlineMs === undefined
-        ? undefined
-        : performance.now() + request.budget.deadlineMs;
     await this.#restartDeadServers(session);
     let output = await this.#runOnce(session, request, deadlineAt);
 
