@@ -237,7 +237,8 @@ warning and the process runs as with `false`:
 - A `webServer`'s `env` sets `NODE_OPTIONS`, which replaces the one that loads the hook. Set it in the
   environment that runs Stryker instead.
 - A `webServer` has `reuseExistingServer: true` and already answers before global setup. Only the process
-  that started a server can switch its mutant, so stop your own server.
+  that started a server can switch its mutant, so stop the server that answers there, or give the
+  `webServer` a port that no other server uses.
 - The `command` bound the configured port after the runner moved it.
 - The runner cannot move the projects' `baseURL` along with the `webServer`.
 

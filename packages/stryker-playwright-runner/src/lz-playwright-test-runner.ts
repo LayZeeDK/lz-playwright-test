@@ -768,7 +768,7 @@ async function serverSide(
     throw new ServerSupportRefused(
       `, but the webServer at ${shared.map((server) => server.name).join(', ')} ` +
         'already answers and reuseExistingServer is true. Only the Stryker process that started a server can ' +
-        'switch its mutant: give each process its own port from STRYKER_MUTATOR_WORKER, and stop your own server.',
+        'switch its mutant: stop the server that answers there, or give the webServer a port that no other server uses.',
     );
   }
 
