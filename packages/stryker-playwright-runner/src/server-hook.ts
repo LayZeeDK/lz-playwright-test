@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
+import http2 from 'node:http2';
 import https from 'node:https';
 import path from 'node:path';
 
@@ -135,50 +136,66 @@ export function installServerHook(
     fs.writeFileSync(path.join(dir, `${hookedPrefix}${process.pid}`), '');
   }
 
-  [http.Server.prototype, https.Server.prototype].forEach((prototype) => {
-    const emit = prototype.emit;
-    Object.defineProperty(prototype, 'emit', {
-      configurable: true,
-      writable: true,
-      value: function emitWithStryker(
-        this: unknown,
-        event: unknown,
-        ...args: unknown[]
-      ): unknown {
-        const [request, response] = args;
-        const original = (): unknown =>
-          Reflect.apply(emit, this, [event, ...args]);
+  [
+    http.Server.prototype,
+    https.Server.prototype,
+    Reflect.getPrototypeOf(http2.createServer()),
+    Reflect.getPrototypeOf(http2.createSecureServer()),
+  ]
+    .filter((prototype) => prototype !== null)
+    .forEach((prototype) => {
+      const emit: unknown = Reflect.get(prototype, 'emit');
 
-        if (event === 'listening') {
-          markHooked();
-        }
+      if (typeof emit !== 'function') {
+        return;
+      }
 
-        if (
-          event !== 'request' ||
-          !(request instanceof http.IncomingMessage) ||
-          !(response instanceof http.ServerResponse)
-        ) {
-          return original();
-        }
+      Object.defineProperty(prototype, 'emit', {
+        configurable: true,
+        writable: true,
+        value: function emitWithStryker(
+          this: unknown,
+          event: unknown,
+          ...args: unknown[]
+        ): unknown {
+          const [request, response] = args;
+          const original = (): unknown =>
+            Reflect.apply(emit, this, [event, ...args]);
 
-        startRequest();
-        flushBeforeEnd(response, flush);
-        const header = request.headers[testIdHeader];
+          if (event === 'listening') {
+            markHooked();
+          }
 
-        return requests.run(
-          {
-            testId:
-              typeof header === 'string' &&
-              control?.issuedTestIds?.includes(header)
-                ? header
-                : undefined,
-            arrivedAt: now(),
-          },
-          original,
-        );
-      },
+          if (
+            event !== 'request' ||
+            !(
+              (request instanceof http.IncomingMessage &&
+                response instanceof http.ServerResponse) ||
+              (request instanceof http2.Http2ServerRequest &&
+                response instanceof http2.Http2ServerResponse)
+            )
+          ) {
+            return original();
+          }
+
+          startRequest();
+          flushBeforeEnd(response, flush);
+          const header = request.headers[testIdHeader];
+
+          return requests.run(
+            {
+              testId:
+                typeof header === 'string' &&
+                control?.issuedTestIds?.includes(header)
+                  ? header
+                  : undefined,
+              arrivedAt: now(),
+            },
+            original,
+          );
+        },
+      });
     });
-  });
 
   process.on('exit', flush);
 }

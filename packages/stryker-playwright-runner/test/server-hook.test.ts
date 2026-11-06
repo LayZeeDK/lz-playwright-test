@@ -1,11 +1,13 @@
-// The server hook in a real node:http server that serves code Stryker's instrumenter instrumented, started
-// with the hook through NODE_OPTIONS-style --import, as global setup starts a webServer.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdirSync, readdirSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync } from 'node:fs';
+import http from 'node:http';
+import http2 from 'node:http2';
+import https from 'node:https';
 import path from 'node:path';
 import { before, type TestContext, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 import { Instrumenter } from '@stryker-mutator/instrumenter';
@@ -24,6 +26,12 @@ import {
 import { logger, tempTree, withoutPrototypes } from './support/doubles.ts';
 
 const serverHookUrl = new URL('../src/server-hook.ts', import.meta.url).href;
+const tlsKeyPath = fileURLToPath(
+  new URL('support/tls/localhost-key.pem', import.meta.url),
+);
+const tlsCertPath = fileURLToPath(
+  new URL('support/tls/localhost-cert.pem', import.meta.url),
+);
 // Mutant ids the instrumenter gives this source: 0 is 'hi', run once at module scope; 2 makes the condition
 // true; 6 empties ' many'; 7 empties 'one'.
 const source = [
@@ -40,9 +48,8 @@ const answerLines = [
   "const n = Number(new URL(request.url, 'http://x').searchParams.get('n'));",
   'response.end(answer(n));',
 ];
-const serverSource = serverSourceOf(answerLines, [
-  "import { answer } from './app.mjs';",
-]);
+const answerImport = "import { answer } from './app.mjs';";
+const serverSource = serverSourceOf(answerLines, [answerImport]);
 const lazyServerSource = serverSourceOf([
   "const { answer } = await import('./app.mjs');",
   ...answerLines,
@@ -81,11 +88,13 @@ before(async () => {
 function serverSourceOf(
   handler: readonly string[],
   imports: readonly string[] = [],
+  createServerCall = 'http.createServer(',
 ): string {
   return [
     "import http from 'node:http';",
+    "import http2 from 'node:http2';",
     ...imports,
-    'const server = http.createServer(async (request, response) => {',
+    `const server = ${createServerCall}async (request, response) => {`,
     ...handler.map((line) => `  ${line}`),
     '});',
     "server.listen(0, '127.0.0.1', () => process.stdout.write(`${server.address().port}\\n`));",
@@ -137,6 +146,7 @@ async function startServer(
 
   return {
     serverDir,
+    port,
     run(control: Omit<ServerControl, 'outDir'>) {
       const outDir = path.join(dir, 'runs', String(runs++));
       mkdirSync(outDir, { recursive: true });
@@ -156,6 +166,35 @@ async function startServer(
       return response.text();
     },
   };
+}
+
+function secureHttp2ServerSource(options: string): string {
+  return serverSourceOf(
+    answerLines,
+    ["import { readFileSync } from 'node:fs';", answerImport],
+    `http2.createSecureServer({ ...${options}, key: readFileSync(${JSON.stringify(tlsKeyPath)}), cert: readFileSync(${JSON.stringify(tlsCertPath)}) }, `,
+  );
+}
+
+async function askHttp2(
+  origin: string,
+  n: number,
+  options: http2.SecureClientSessionOptions = {},
+  headers: http2.OutgoingHttpHeaders = {},
+): Promise<string> {
+  const session = http2.connect(origin, options);
+
+  try {
+    const stream = session.request({ ':path': `/?n=${n}`, ...headers });
+    stream.setEncoding('utf8');
+    const chunks: string[] = [];
+    stream.on('data', (chunk: string) => chunks.push(chunk));
+    await once(stream, 'end');
+
+    return chunks.join('');
+  } finally {
+    session.close();
+  }
 }
 
 function coverageOf(outDir: string) {
@@ -191,6 +230,71 @@ test('the active mutant switches per request from the control file, without a re
   server.run({ perTest: false });
 
   assert.equal(await server.ask(0), 'one');
+});
+
+test('an http2 server switches the active mutant per request too', async (t) => {
+  const server = await startServer(t, {
+    server: serverSourceOf(answerLines, [answerImport], 'http2.createServer('),
+  });
+  server.run({ perTest: false, activeMutant: '2' });
+
+  assert.equal(await askHttp2(`http://127.0.0.1:${server.port}`, 0), 'hi many');
+});
+
+test('an http2 server is marked hooked once it listens', async (t) => {
+  const server = await startServer(t, {
+    server: serverSourceOf(answerLines, [answerImport], 'http2.createServer('),
+  });
+
+  assert.equal(anyHooked(server.serverDir), true);
+});
+
+test('an http2 server collects coverage per test id header', async (t) => {
+  const server = await startServer(t, {
+    server: serverSourceOf(answerLines, [answerImport], 'http2.createServer('),
+  });
+  const outDir = server.run({ perTest: true });
+  await askHttp2(
+    `http://127.0.0.1:${server.port}`,
+    2,
+    {},
+    { [testIdHeader]: 'big' },
+  );
+
+  assert.deepEqual(
+    appMutantIdsOf(coverageOf(outDir).perTest['big']),
+    bigRequestIds,
+  );
+});
+
+test('a secure http2 server switches the active mutant per request too', async (t) => {
+  const server = await startServer(t, {
+    server: secureHttp2ServerSource('{}'),
+  });
+  server.run({ perTest: false, activeMutant: '2' });
+
+  assert.equal(
+    await askHttp2(`https://127.0.0.1:${server.port}`, 0, {
+      ca: readFileSync(tlsCertPath),
+    }),
+    'hi many',
+  );
+});
+
+test('a secure http2 server that allows HTTP/1 switches the active mutant for an HTTP/1 request too', async (t) => {
+  const server = await startServer(t, {
+    server: secureHttp2ServerSource('{ allowHTTP1: true }'),
+  });
+  server.run({ perTest: false, activeMutant: '2' });
+  const request = https.get(`https://127.0.0.1:${server.port}/?n=0`, {
+    ca: readFileSync(tlsCertPath),
+  });
+  const responded: unknown[] = await once(request, 'response');
+  const [response] = responded;
+  assert.ok(response instanceof http.IncomingMessage);
+  response.setEncoding('utf8');
+
+  assert.equal((await response.toArray()).join(''), 'hi many');
 });
 
 test('a mutant run once at module scope is active only in a server started with it', async (t) => {
