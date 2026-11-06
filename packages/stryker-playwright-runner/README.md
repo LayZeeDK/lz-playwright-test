@@ -206,8 +206,11 @@ the run's mutant to a file that the hook reads at the start of each request.
 In the dry run with `coverageAnalysis: 'perTest'`, the runner adds an `x-lz-stryker-test` header with
 the test's id to the requests that a test sends to the `webServer`. Mutant runs send no such header.
 The header goes on the page requests to the `webServer`'s host and port, and on the requests of a
-Playwright `APIRequestContext`, such as the `request` fixture. The hook counts the code that a request runs for that
-test, so Stryker runs each server-side mutant against the tests whose requests reached it. The hook takes
+Playwright `APIRequestContext`, such as the `request` fixture. The header holds the id of the test that runs
+when the request is sent. So a context that a worker fixture or a `beforeAll` hook opens tags each test's
+requests with that test's own id. A request sent while no test runs gets no header, such as one from a
+`beforeAll` or `afterAll` hook, or from a worker fixture's teardown after the worker's last test. The hook
+counts the code that a request runs for that test, so Stryker runs each server-side mutant against the tests whose requests reached it. The hook takes
 only the ids of the tests the runner listed at startup. A request whose header holds any other value counts
 as a request without the header (see [Limits](#limits)).
 
@@ -606,7 +609,7 @@ otherwise:
   each process its own store from `STRYKER_MUTATOR_WORKER`.
 - A request to the `webServer` without the test id header counts for every test that ran when it arrived.
   When no test ran then, it counts as reached outside any test, so Stryker runs every test for its
-  mutants. Such requests include one from a page that a `beforeAll` hook opened, and one that the test
+  mutants. Such requests include one sent while a `beforeAll` or `afterAll` hook runs, and one that the test
   routes itself with `page.route(...)` and `route.continue()` or `route.fulfill()`. They also include a
   request that the server sends to itself in a way the hook does not see: from an `http2` client session,
   with headers given as an array, without an `http.Agent` (a `createConnection` option and no agent), or
@@ -625,8 +628,9 @@ otherwise:
   the browser fetches every resource in full, and never sends a conditional request. So the `webServer`
   serves full responses where it would otherwise answer 304 Not Modified. Code that only a 304 or an ETag
   match reaches can then get no coverage in the dry run, and its mutants count as NoCoverage. Each test
-  gets a new browser context with an empty cache, so this affects only a resource that one test loads
-  more than once.
+  gets a new browser context with an empty cache, so this affects a resource that one test loads more
+  than once. It also affects a resource that several tests load through one context that a worker
+  fixture or a `beforeAll` hook opened.
 - When the runner moves a `webServer` to a free port, another process can take that port before the
   `webServer` binds it. Playwright then reports the bind error. Run Stryker again: the runner asks the
   system for new free ports on each start.

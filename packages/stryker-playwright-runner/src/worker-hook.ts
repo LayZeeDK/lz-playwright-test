@@ -197,7 +197,7 @@ export function install(
     ];
     const outlivedItsTest =
       perTest &&
-      (state.testId === undefined || state.testId !== contextTestId(test));
+      (state.testId === undefined || state.testId !== owningTestId(test));
     const lines = snapshots.map((snapshot) =>
       serializeSnapshot({ ...snapshot, outlivedItsTest }),
     );
@@ -234,7 +234,7 @@ export function install(
 
   instrumentation.addListener({
     async runAfterCreateBrowserContext(context) {
-      const state = new ContextState(perTest ? contextTestId(test) : undefined);
+      const state = new ContextState(perTest ? owningTestId(test) : undefined);
       contexts.set(context, state);
       collectBeforeBrowserCloses(context.browser());
       context.on('page', (page) => collectBeforePageCloses(state, page));
@@ -245,16 +245,14 @@ export function install(
         hitLimit,
       } satisfies PageSettings);
 
-      if (tagHosts !== undefined && state.testId !== undefined) {
-        await tagPageRequests(context, state.testId, tagHosts);
+      if (tagHosts !== undefined) {
+        await tagPageRequests(context, () => owningTestId(test), tagHosts);
       }
     },
     runBeforeCloseBrowserContext: collect,
     async runAfterCreateRequestContext(context) {
-      const testId = contextTestId(test);
-
-      if (tagHosts !== undefined && testId !== undefined) {
-        tagFetches(context, testId);
+      if (tagHosts !== undefined) {
+        tagFetches(context, () => owningTestId(test));
       }
     },
   });
@@ -267,15 +265,22 @@ export function install(
  */
 function tagPageRequests(
   context: HookedContext,
-  testId: string,
+  currentTestId: () => string | undefined,
   hosts: readonly string[],
 ) {
   return context.route(
     (url) => hosts.includes(hostKey(url)),
-    (route) =>
-      route.fallback({
+    (route) => {
+      const testId = currentTestId();
+
+      if (testId === undefined) {
+        return route.fallback();
+      }
+
+      return route.fallback({
         headers: { ...route.request().headers(), [testIdHeader]: testId },
-      }),
+      });
+    },
   );
 }
 
@@ -284,10 +289,19 @@ function tagPageRequests(
  * context's options only where they are unset, after this hook's listener (playwright 1.64.1
  * lib/index.js:128), so setting extraHTTPHeaders at creation would drop the test's own.
  */
-function tagFetches(context: HookedRequestContext, testId: string) {
+function tagFetches(
+  context: HookedRequestContext,
+  currentTestId: () => string | undefined,
+) {
   const fetch = context.fetch.bind(context);
-  const tagged: HookedRequestContext['fetch'] = (target, options = {}) =>
-    fetch(target, {
+  const tagged: HookedRequestContext['fetch'] = (target, options = {}) => {
+    const testId = currentTestId();
+
+    if (testId === undefined) {
+      return fetch(target, options);
+    }
+
+    return fetch(target, {
       ...options,
       headers: {
         ...(options.headers ??
@@ -295,6 +309,7 @@ function tagFetches(context: HookedRequestContext, testId: string) {
         [testIdHeader]: testId,
       },
     });
+  };
   Object.defineProperty(context, 'fetch', {
     configurable: true,
     writable: true,
@@ -389,11 +404,7 @@ function nodeTestId(test: CurrentTest): string | undefined {
     : undefined;
 }
 
-/**
- * The test a context opened or closed now belongs to: none in a beforeAll or afterAll hook. A fixture's
- * context, a worker fixture's too, gets the current test until it outlives that test.
- */
-function contextTestId(test: CurrentTest): string | undefined {
+function owningTestId(test: CurrentTest): string | undefined {
   const running = test();
   const type = running?.slot?.type;
 

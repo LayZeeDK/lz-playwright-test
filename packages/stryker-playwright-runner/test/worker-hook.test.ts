@@ -812,21 +812,30 @@ function requestContext() {
   return { context, calls };
 }
 
-test("a test's page requests to a webServer host carry its test id, on top of their own headers", async (t) => {
-  const hooked = installed(t, { perTest: true, testIdHosts: webServerHosts });
-  hooked.setTest('t1');
-  const created = await hooked.context();
+async function routed(
+  created: Awaited<ReturnType<ReturnType<typeof installed>['context']>>,
+  headers: Record<string, string> = {},
+) {
   const [route, ...more] = created.routes;
   assert.ok(route && more.length === 0, 'one route');
-  const [matches, handler] = route;
   const fallbacks: unknown[] = [];
 
-  await handler({
-    request: () => ({ headers: () => ({ accept: 'text/html' }) }),
+  await route[1]({
+    request: () => ({ headers: () => headers }),
     fallback: async (options) => {
       fallbacks.push(options);
     },
   });
+
+  return fallbacks;
+}
+
+test("a test's page requests to a webServer host carry its test id, on top of their own headers", async (t) => {
+  const hooked = installed(t, { perTest: true, testIdHosts: webServerHosts });
+  hooked.setTest('t1');
+  const created = await hooked.context();
+  const [matches] = created.routes[0] ?? [];
+  assert.ok(matches);
 
   assert.deepEqual(
     [
@@ -838,12 +847,23 @@ test("a test's page requests to a webServer host carry its test id, on top of th
     ].map((url) => matches(new URL(url))),
     [true, true, true, false, false],
   );
-  assert.deepEqual(fallbacks, [
+  assert.deepEqual(await routed(created, { accept: 'text/html' }), [
     { headers: { accept: 'text/html', [testIdHeader]: 't1' } },
   ]);
 });
 
-test('page requests carry no test id without per-test coverage, without webServer hosts, or outside a test', async (t) => {
+test('a page request carries the id of the test running when it is sent, though its context outlived the test that opened it', async (t) => {
+  const hooked = installed(t, { perTest: true, testIdHosts: webServerHosts });
+  hooked.setTest('t1');
+  const created = await hooked.context();
+  hooked.setTest('t2');
+
+  assert.deepEqual(await routed(created), [
+    { headers: { [testIdHeader]: 't2' } },
+  ]);
+});
+
+test('page requests carry no test id without per-test coverage or without webServer hosts', async (t) => {
   const contexts = [
     installed(t, { perTest: false, testIdHosts: webServerHosts }),
     installed(t, { perTest: true }),
@@ -852,14 +872,41 @@ test('page requests carry no test id without per-test coverage, without webServe
 
     return hooked.context();
   });
-  const outside = installed(t, { perTest: true, testIdHosts: webServerHosts });
-  outside.setTest('t1', { type: 'beforeAll' });
-  contexts.push(outside.context());
 
   assert.deepEqual(
     (await Promise.all(contexts)).map((created) => created.routes.length),
-    [0, 0, 0],
+    [0, 0],
   );
+});
+
+const outsideTests: Parameters<ReturnType<typeof installed>['setTest']>[] = [
+  ['t1', { type: 'beforeAll' }],
+  [undefined],
+];
+
+test('a context opened in a beforeAll hook, or before any test, tags the page requests of the test running, and leaves those outside a test as they are', async (t) => {
+  const sent = await Promise.all(
+    outsideTests.map(async (opening) => {
+      const hooked = installed(t, {
+        perTest: true,
+        testIdHosts: webServerHosts,
+      });
+      hooked.setTest(...opening);
+      const created = await hooked.context();
+      hooked.setTest('t1');
+      const inTest = await routed(created, { accept: 'text/html' });
+      hooked.setTest('t1', { type: 'afterAll' });
+      const outside = await routed(created, { accept: 'text/html' });
+
+      return [...inTest, ...outside];
+    }),
+  );
+
+  const tagged = { headers: { accept: 'text/html', [testIdHeader]: 't1' } };
+  assert.deepEqual(sent, [
+    [tagged, undefined],
+    [tagged, undefined],
+  ]);
 });
 
 test("a test's request fixture sends its test id with every fetch, keeping the headers it was given", async (t) => {
@@ -882,6 +929,54 @@ test("a test's request fixture sends its test id with every fetch, keeping the h
   assert.deepEqual(calls[2]?.[1], {
     headers: { b: '2', [testIdHeader]: 't1' },
   });
+});
+
+test('a request context that outlives its test sends the id of the test running at each fetch', async (t) => {
+  const hooked = installed(t, { perTest: true, testIdHosts: webServerHosts });
+  hooked.setTest('t1');
+  const { context, calls } = requestContext();
+  await hooked.hooks.runAfterCreateRequestContext?.(context);
+  hooked.setTest('t2');
+
+  await context.fetch('/api');
+
+  assert.deepEqual(calls, [['/api', { headers: { [testIdHeader]: 't2' } }]]);
+});
+
+test('a request context opened in a beforeAll hook, or before any test, sends the id of the test running at each fetch', async (t) => {
+  const sent = await Promise.all(
+    outsideTests.map(async (opening) => {
+      const hooked = installed(t, {
+        perTest: true,
+        testIdHosts: webServerHosts,
+      });
+      hooked.setTest(...opening);
+      const { context, calls } = requestContext();
+      await hooked.hooks.runAfterCreateRequestContext?.(context);
+      hooked.setTest('t1');
+
+      await context.fetch('/api');
+
+      return calls;
+    }),
+  );
+
+  assert.deepEqual(sent, [
+    [['/api', { headers: { [testIdHeader]: 't1' } }]],
+    [['/api', { headers: { [testIdHeader]: 't1' } }]],
+  ]);
+});
+
+test('a request context sends no test id with a fetch after its test ended, and keeps the options it was given', async (t) => {
+  const hooked = installed(t, { perTest: true, testIdHosts: webServerHosts });
+  hooked.setTest('t1');
+  const { context, calls } = requestContext();
+  await hooked.hooks.runAfterCreateRequestContext?.(context);
+  hooked.setTest(undefined);
+
+  await context.fetch('/teardown', { headers: { a: '1' } });
+
+  assert.deepEqual(calls, [['/teardown', { headers: { a: '1' } }]]);
 });
 
 test('a request context sends no test id without per-test coverage, without webServer hosts, or in a beforeAll hook', async (t) => {

@@ -142,7 +142,7 @@ export interface HookedContext {
 
 export interface HookedRoute {
   request(): { headers(): Record<string, string> };
-  fallback(options: {
+  fallback(options?: {
     readonly headers: Readonly<Record<string, string>>;
   }): Promise<void>;
 }
