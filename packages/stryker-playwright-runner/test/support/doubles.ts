@@ -91,6 +91,25 @@ export function addAttempt(
   };
 }
 
+export function timedAttempt(
+  status: TestResult['status'],
+  startTime: Date,
+  duration: number,
+): ReportedAttempt {
+  return { status, startTime, duration, attachments: [] };
+}
+
+export function withAttempt(
+  id: string,
+  startTime: Date,
+  duration: number,
+): ReportedTest {
+  return {
+    ...fakeTestCase(id),
+    results: [timedAttempt('passed', startTime, duration)],
+  };
+}
+
 export function finishedTest(
   id: string,
   status: TestResult['status'],

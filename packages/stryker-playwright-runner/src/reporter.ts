@@ -32,6 +32,12 @@ export interface ReportedSuite {
   allTests(): readonly ReportedTest[];
 }
 
+export interface TestWindow {
+  readonly testId: string;
+  readonly start: number;
+  readonly end: number;
+}
+
 export class LzPlaywrightCollectingReporter {
   readonly errors: string[] = [];
   retriesNotRaised: string | undefined;
@@ -39,11 +45,17 @@ export class LzPlaywrightCollectingReporter {
   outputTail = '';
   // Playwright reports each attempt of a retried test with the same TestCase, which holds them all.
   readonly testCases = new Map<string, ReportedTest>();
+  readonly windows: TestWindow[] = [];
   readonly #retriesByProject: ReadonlyMap<string, number>;
+  readonly #now: () => number;
   #suite: ReportedSuite | undefined;
 
-  constructor(retriesByProject: ReadonlyMap<string, number> = new Map()) {
+  constructor(
+    retriesByProject: ReadonlyMap<string, number> = new Map(),
+    now: () => number = Date.now,
+  ) {
     this.#retriesByProject = retriesByProject;
+    this.#now = now;
   }
 
   printsToStdio() {
@@ -72,6 +84,15 @@ export class LzPlaywrightCollectingReporter {
 
   onTestEnd(test: ReportedTest) {
     this.testCases.set(test.id, test);
+    const startTime = test.results.at(-1)?.startTime;
+
+    if (startTime !== undefined) {
+      this.windows.push({
+        testId: test.id,
+        start: startTime.getTime(),
+        end: this.#now(),
+      });
+    }
   }
 
   onStdOut(chunk: string | Buffer) {

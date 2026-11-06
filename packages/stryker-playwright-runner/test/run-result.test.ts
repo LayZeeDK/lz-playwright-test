@@ -32,7 +32,6 @@ import {
   type RunOutput,
   type RunStatus,
   arrivalSlackMs,
-  testWindows,
   toRunResult,
 } from '../src/run-result.ts';
 import { untaggedKey } from '../src/server-protocol.ts';
@@ -45,6 +44,8 @@ import {
   withoutPrototypes,
   runOutput,
   selected,
+  timedAttempt,
+  withAttempt,
 } from './support/doubles.ts';
 
 // A snapshot as the runner reads it from a line the hook wrote.
@@ -420,33 +421,24 @@ test('a dry run merges the coverage of every snapshot exactly and reports the ga
   assert.deepEqual(gaps, { lostFrames: 1, sharedFrames: 1 });
 });
 
-function timedAttempt(
-  status: 'passed' | 'failed',
-  startTime: Date,
-  duration: number,
-) {
-  return { status, startTime, duration, attachments: [] };
-}
-
-function withAttempt(id: string, startTime: Date, duration: number) {
-  return {
-    ...fakeTestCase(id),
-    results: [timedAttempt('passed', startTime, duration)],
-  };
-}
-
 test('a server request without a test id counts for every test that ran when it arrived, once each, and as static when none ran', () => {
-  const windows = testWindows([
-    withAttempt('a', new Date(1000), 100),
-    {
-      ...withAttempt('b', new Date(1050), 100),
-      results: [
-        timedAttempt('failed', new Date(1050), 100),
-        timedAttempt('passed', new Date(1060), 100),
-      ],
-    },
-    fakeTestCase('never-started'),
-  ]);
+  const endsSeen = [1100, 1150, 1160];
+  const reporter = new LzPlaywrightCollectingReporter(
+    new Map(),
+    () => endsSeen.shift() ?? Number.NaN,
+  );
+  const firstAttemptOfB = withAttempt('b', new Date(1050), 100);
+  reporter.onTestEnd(withAttempt('a', new Date(1000), 100));
+  reporter.onTestEnd(firstAttemptOfB);
+  reporter.onTestEnd({
+    ...firstAttemptOfB,
+    results: [
+      ...firstAttemptOfB.results,
+      timedAttempt('passed', new Date(1060), 100),
+    ],
+  });
+  reporter.onTestEnd(fakeTestCase('never-started'));
+  const { windows } = reporter;
 
   assert.deepEqual(windows, [
     { testId: 'a', start: 1000, end: 1100 },
@@ -482,8 +474,12 @@ test('a server request without a test id counts for every test that ran when it 
   });
 });
 
-test('a dry run attributes a server request without a test id by the times its reporter saw', () => {
-  const reporter = new LzPlaywrightCollectingReporter();
+test('a dry run attributes a server request without a test id by the times its reporter saw, past the duration Playwright reports', () => {
+  const endsSeen = [5300, 9300];
+  const reporter = new LzPlaywrightCollectingReporter(
+    new Map(),
+    () => endsSeen.shift() ?? Number.NaN,
+  );
   reporter.onTestEnd(withAttempt('a', new Date(5000), 200));
   reporter.onTestEnd(withAttempt('b', new Date(9000), 200));
 
@@ -494,7 +490,10 @@ test('a dry run attributes a server request without a test id by the times its r
         parsed({
           mutantCoverage: {
             static: {},
-            perTest: { [untaggedKey(9100)]: { '8': 2 } },
+            perTest: {
+              [untaggedKey(5200 + arrivalSlackMs + 1)]: { '7': 1 },
+              [untaggedKey(9100)]: { '8': 2 },
+            },
           },
         }),
       ],
@@ -504,7 +503,7 @@ test('a dry run attributes a server request without a test id by the times its r
 
   assert.deepEqual(withoutPrototypes(completed(result).mutantCoverage), {
     static: {},
-    perTest: { b: { '8': 2 } },
+    perTest: { a: { '7': 1 }, b: { '8': 2 } },
   });
 });
 

@@ -17,6 +17,7 @@ import {
   type LzPlaywrightCollectingReporter,
   errorText,
   type ReportedTest,
+  type TestWindow,
 } from './reporter.ts';
 import type {
   DryRunRequest,
@@ -228,30 +229,7 @@ export function missingCoverageError(
   return 'No page loaded instrumented code. Is the webServer serving the Stryker sandbox? A server that was already running (reuseExistingServer) serves the original sources.';
 }
 
-/** When one attempt of a test ran, in ms since the epoch. */
-export interface TestWindow {
-  readonly testId: string;
-  readonly start: number;
-  readonly end: number;
-}
-
 export const arrivalSlackMs = 50;
-
-export function testWindows(testCases: Iterable<ReportedTest>): TestWindow[] {
-  return [...testCases].flatMap((test) =>
-    test.results.flatMap(({ startTime, duration }) =>
-      startTime === undefined
-        ? []
-        : [
-            {
-              testId: test.id,
-              start: startTime.getTime(),
-              end: startTime.getTime() + duration,
-            },
-          ],
-    ),
-  );
-}
 
 /**
  * A server request that came without a test id counts for every test that ran when it arrived, and as
@@ -354,10 +332,7 @@ export function dryRunResult(
     result: {
       status,
       tests,
-      mutantCoverage: mergeCoverage(
-        snapshots,
-        testWindows(output.reporter.testCases.values()),
-      ),
+      mutantCoverage: mergeCoverage(snapshots, output.reporter.windows),
     },
     gaps: coverageGaps(snapshots),
   };
