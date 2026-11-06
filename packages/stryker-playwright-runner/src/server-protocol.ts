@@ -15,6 +15,21 @@ export const serverSnapshotPrefix = 'server-';
 /** A per-test coverage key for a request that came without a test id header, followed by its arrival time. */
 export const untaggedPrefix = 'lz-stryker-untagged@';
 
+export const mutateOption = 'lzPlaywright.webServer.mutate';
+
+export function refusalMessage(mutate: string, reason: string): string {
+  return `${mutateOption} is ${mutate}${reason}`;
+}
+
+export class ServerSupportRefused extends Error {
+  readonly reason: string;
+
+  constructor(reason: string, options?: ErrorOptions) {
+    super(refusalMessage('true', reason), options);
+    this.reason = reason;
+  }
+}
+
 export type PerTestMode = 'header' | 'arrival';
 
 export interface ServerSupport {

@@ -5,7 +5,7 @@ import type {
   ConfigWebServer,
   ServerMove,
 } from './playwright-internals.ts';
-import { hostKey } from './server-protocol.ts';
+import { hostKey, ServerSupportRefused } from './server-protocol.ts';
 
 export interface ServersApart {
   readonly moves: readonly ServerMove[];
@@ -109,9 +109,9 @@ async function planMove(
   };
 }
 
-function cannotMove(reason: string): Error {
-  return new Error(
-    'lzPlaywright.webServer.mutate is true and Stryker starts more than one test runner process, so each process ' +
+function cannotMove(reason: string): ServerSupportRefused {
+  return new ServerSupportRefused(
+    ' and Stryker starts more than one test runner process, so each process ' +
       `needs a webServer port of its own, but the runner cannot move the projects' baseURL along: ${reason}. ` +
       'Derive the port from STRYKER_MUTATOR_WORKER in the Playwright config instead (see Configure in the README).',
   );

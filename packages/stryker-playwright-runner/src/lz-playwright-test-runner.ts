@@ -55,13 +55,20 @@ import {
   projectsThatRun,
   type SerialGroups,
 } from './serial-groups.ts';
-import { moveServersApart, startsMoreRunners } from './server-ports.ts';
+import {
+  moveServersApart,
+  type ServersApart,
+  startsMoreRunners,
+} from './server-ports.ts';
 import {
   anyHooked,
   forgetHooked,
   hostKey,
+  mutateOption,
+  refusalMessage,
   serverDirEnv,
   type ServerSupport,
+  ServerSupportRefused,
   writeServerControl,
 } from './server-protocol.ts';
 import {
@@ -116,7 +123,6 @@ const hookUrl = (name: string) =>
 const workerHookUrl = hookUrl('worker-hook');
 const serverHookUrl = hookUrl('server-hook');
 const hookedWaitMs = 1000;
-const mutateOption = 'lzPlaywright.webServer.mutate';
 
 const runOverrides = ({
   traced,
@@ -160,12 +166,31 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
   async init(): Promise<void> {
     const options = readRunnerOptions(this.#strykerOptions);
 
-    if (options.webServer.mutate === 'auto') {
-      this.#log.debug(
-        `${mutateOption}: 'auto' is not built yet; server mutants stay off, as with false.`,
-      );
+    if (options.webServer.mutate !== 'auto') {
+      await this.#start(options, options.webServer.mutate ? 'on' : 'off');
+
+      return;
     }
 
+    try {
+      await this.#start(options, 'on');
+    } catch (error) {
+      if (!(error instanceof ServerSupportRefused)) {
+        throw error;
+      }
+
+      this.#log.warn(
+        `${refusalMessage("'auto'", error.reason)} Server-side mutants stay NoCoverage in this run; ${mutateOption}: true makes this an error instead.`,
+      );
+      await this.#start(options, 'off after refusal');
+    }
+  }
+
+  async #start(
+    options: RunnerOptions,
+    serverSupport: 'on' | 'off' | 'off after refusal',
+  ): Promise<void> {
+    const mutates = serverSupport === 'on';
     const traces = readTracesTarget(options.survivorTraces, process.env);
     const pw = loadPlaywright(options.configFile);
     const root = claimTempRoot((removed) => {
@@ -176,6 +201,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       }
     });
     let playwright: TestRunner | undefined;
+    let undoMove: (() => void) | undefined;
 
     try {
       playwright = await pw.createTestRunner(options.configFile, {
@@ -194,11 +220,10 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         Math.max(0, ...retriesByProject.values()),
       );
 
-      if (warning) {
+      if (warning && serverSupport !== 'off after refusal') {
         this.#log.warn(warning);
       }
 
-      const mutates = options.webServer.mutate === true;
       const apart =
         mutates &&
         startsMoreRunners(this.#strykerOptions, os.availableParallelism())
@@ -206,8 +231,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
           : undefined;
 
       if (apart) {
-        playwright.moveWebServers(apart.moves, apart.baseURL);
-        setEnv(apart.env);
+        undoMove = moveApart(playwright, apart).undo;
         this.#log.debug(
           `Stryker starts more than one test runner process, so this one's webServer moves to a port of its own: ${apart.moves.map(({ from, to }) => `${from} -> ${to}`).join(', ')}.`,
         );
@@ -232,6 +256,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
             serverCheck(webServer, pw.isURLAvailable),
           ),
         },
+        options.webServer.mutate === 'auto',
       );
       // Every Stryker test runner process needs the groups, and only one of them runs the dry run.
       // Listed after global setup, like Playwright's own CLI, because test files may read what it
@@ -254,6 +279,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       };
     } catch (error) {
       await playwright?.runGlobalTeardown().catch(() => undefined);
+      undoMove?.();
 
       try {
         root.remove();
@@ -287,7 +313,10 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     const output = await this.#run(session, request);
     this.#dryRunServerMutants = new Set(output.serverMutants);
 
-    if (session.server && session.options.webServer.isolate) {
+    if (
+      session.options.webServer.mutate === 'auto' ||
+      (session.server && session.options.webServer.isolate)
+    ) {
       writeServerMutantsFile(this.#sandbox, output.serverMutants);
     }
 
@@ -305,6 +334,17 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     }
 
     if (
+      session.options.webServer.mutate === 'auto' &&
+      session.server &&
+      output.serverMutants.length === 0
+    ) {
+      this.#session = { ...session, server: undefined };
+      this.#log.info(
+        `Server-side mutants stay NoCoverage: with ${mutateOption}: 'auto', the dry run reached no mutant in the code the Playwright webServer runs, so server support stays off.`,
+      );
+    }
+
+    if (
       session.options.webServer.mutate === false &&
       session.servers.length > 0
     ) {
@@ -317,7 +357,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
   }
 
   async mutantRun(options: MutantRunOptions): Promise<MutantRunResult> {
-    const session = this.#ready();
+    const session = this.#adoptDryRunDecision(this.#ready());
     const request = mutantRunRequest(options, session);
     const output = await this.#run(session, request);
     const { result, hitCount } = mutantRunResult(output, request);
@@ -350,6 +390,39 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         `Mutant ${mutant.id}: could not copy its traces: ${String(error)}`,
       );
     }
+  }
+
+  #adoptDryRunDecision(session: Session): Session {
+    if (
+      session.options.webServer.mutate !== 'auto' ||
+      this.#dryRunServerMutants !== undefined
+    ) {
+      return session;
+    }
+
+    const file = readServerMutantsFile(this.#sandbox);
+
+    if (!('mutants' in file)) {
+      return session;
+    }
+
+    if (file.mutants.size > 0 && !session.server) {
+      throw new Error(
+        `${mutateOption} is 'auto' and the dry run reached server-side mutants, but this process turned server ` +
+          `support off at init (see its warning), so it cannot run them. Set ${mutateOption}: true to see the ` +
+          'cause as an error.',
+      );
+    }
+
+    this.#dryRunServerMutants = file.mutants;
+
+    if (file.mutants.size > 0) {
+      return session;
+    }
+
+    this.#session = { ...session, server: undefined };
+
+    return this.#session;
   }
 
   #ready(): Session {
@@ -516,6 +589,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     playwright: TestRunner,
     server: ServerSide | undefined,
     moved: MovedServers | undefined,
+    startsAgainOnRefusal: boolean,
   ) {
     if (!moved) {
       await this.#globalSetup(playwright, server, undefined);
@@ -557,7 +631,11 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     }
 
     if (early) {
-      setup.catch(() => undefined);
+      const settled = setup.catch(() => undefined);
+
+      if (startsAgainOnRefusal) {
+        await settled;
+      }
 
       throw boundConfiguredPort(early, undefined);
     }
@@ -588,13 +666,37 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     this.#serverMutant = mutant;
 
     if (!(await hookedWithin(server.dir, hookedWaitMs))) {
-      throw new Error(
-        `${mutateOption} is true, but no process that Playwright global setup started loaded the server hook. ` +
+      throw new ServerSupportRefused(
+        ', but no process that Playwright global setup started loaded the server hook. ' +
           'A webServer that is not Node.js, a command that sets NODE_OPTIONS itself, or a server that was already ' +
           'running cannot get the active mutant.',
       );
     }
   }
+}
+
+function moveApart(
+  playwright: TestRunner,
+  apart: ServersApart,
+): { readonly undo: () => void } {
+  const previousEnv = envOf(Object.keys(apart.env));
+  playwright.moveWebServers(apart.moves, apart.baseURL);
+  setEnv(apart.env);
+
+  return {
+    // The webServer env object belongs to the cached config module, so a later TestRunner would see the move.
+    undo: () => {
+      playwright.moveWebServers(
+        apart.moves.map(({ index, from, to }) => ({
+          index,
+          from: to,
+          to: from,
+        })),
+        undefined,
+      );
+      setEnv(previousEnv);
+    },
+  };
 }
 
 interface MovedServers {
@@ -624,9 +726,9 @@ async function boundMoves({
 function boundConfiguredPort(
   { index, from, to }: ServerMove,
   cause: unknown,
-): Error {
-  return new Error(
-    `${mutateOption} is true and Stryker starts more than one test runner process, so each process's webServer ` +
+): ServerSupportRefused {
+  return new ServerSupportRefused(
+    " and Stryker starts more than one test runner process, so each process's webServer " +
       `moves to a port of its own, but the command of webServer ${index} bound port ${from} instead of ${to}. ` +
       "Make the command take its port from PORT, from the webServer's env, or from a --port in the command " +
       '(the runner moves all three), or derive the port from STRYKER_MUTATOR_WORKER in the Playwright config ' +
@@ -651,8 +753,8 @@ export async function serverSide(
   }
 
   if (webServers.some((server) => server.setsNodeOptions)) {
-    throw new Error(
-      `${mutateOption} is true, but a webServer's env sets NODE_OPTIONS, which replaces the one that loads ` +
+    throw new ServerSupportRefused(
+      ", but a webServer's env sets NODE_OPTIONS, which replaces the one that loads " +
         'the server hook. Set NODE_OPTIONS in the environment that runs Stryker instead.',
     );
   }
@@ -664,8 +766,8 @@ export async function serverSide(
   const shared = reused.filter((_, index) => up[index]);
 
   if (shared.length > 0) {
-    throw new Error(
-      `${mutateOption} is true, but the webServer at ${shared.map((server) => server.name).join(', ')} ` +
+    throw new ServerSupportRefused(
+      `, but the webServer at ${shared.map((server) => server.name).join(', ')} ` +
         'already answers and reuseExistingServer is true. Only the Stryker process that started a server can ' +
         'switch its mutant: give each process its own port from STRYKER_MUTATOR_WORKER, and stop your own server.',
     );
@@ -709,13 +811,15 @@ async function hookedWithin(dir: string, waitMs: number): Promise<boolean> {
   return true;
 }
 
+function envOf(names: readonly string[]): Record<string, string | undefined> {
+  return Object.fromEntries(names.map((name) => [name, process.env[name]]));
+}
+
 export async function withEnv<T>(
   values: Readonly<Record<string, string | undefined>>,
   fn: () => Promise<T>,
 ): Promise<T> {
-  const previous = Object.fromEntries(
-    Object.keys(values).map((name) => [name, process.env[name]]),
-  );
+  const previous = envOf(Object.keys(values));
   setEnv(values);
 
   try {

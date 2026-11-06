@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { type TestContext, test } from 'node:test';
-import { setTimeout } from 'node:timers/promises';
+import { setImmediate, setTimeout } from 'node:timers/promises';
 
 import { DryRunStatus } from '@stryker-mutator/api/test-runner';
 
@@ -86,8 +86,9 @@ function serverFake(
     },
     runTests: async (run: Run) => {
       const serverDir = setups.at(-1)?.serverDir;
-      assert.ok(serverDir);
-      controls.push(readServerControl(serverDir));
+      controls.push(
+        serverDir === undefined ? undefined : readServerControl(serverDir),
+      );
 
       return (behaviour.runTests ?? passAll)(run);
     },
@@ -97,9 +98,12 @@ function serverFake(
     ...fake,
     runner: ({
       isolate,
+      mutate = true,
       ...strykerOptions
     }: {
       readonly isolate?: boolean;
+      readonly mutate?: true | 'auto';
+      readonly timeoutMS?: number;
       readonly concurrency?: number;
       readonly checkers?: readonly string[];
     } = {}) =>
@@ -107,7 +111,7 @@ function serverFake(
         ...strykerOptions,
         lzPlaywright: {
           webServer: {
-            mutate: true,
+            mutate,
             ...(isolate === undefined ? {} : { isolate }),
           },
         },
@@ -177,32 +181,18 @@ test('with webServer.mutate: true, the dry run gives no hint', async (t) => {
   );
 });
 
-test("webServer.mutate: 'auto' leaves server mutants off for now and says so in one debug line", async (t) => {
-  const setups: (string | undefined)[] = [];
-  const fake = fakePlaywright(t, {
-    webServers: [webServer],
-    globalSetup: () => {
-      setups.push(process.env[serverDirEnv]);
-
-      return 'passed';
-    },
-  });
-  const { shell, lines } = fake.runner({
-    lzPlaywright: { webServer: { mutate: 'auto' } },
-  });
+test("webServer.mutate: 'auto' gives global setup the server hook and tags the dry run requests, like true", async (t) => {
+  const fake = serverFake(t);
+  const { shell } = fake.runner({ mutate: 'auto' });
 
   await shell.init();
+  await shell.dryRun(dryRunOptions());
 
-  assert.deepEqual(setups, [undefined]);
-  assert.deepEqual(
-    lines.filter(([, message]) => /'auto'/.test(message)),
-    [
-      [
-        'debug',
-        "lzPlaywright.webServer.mutate: 'auto' is not built yet; server mutants stay off, as with false.",
-      ],
-    ],
+  assert.equal(
+    fake.setups[0]?.nodeOptions,
+    `--import "${serverHookUrl}" --no-warnings`,
   );
+  assert.deepEqual(fake.runs[0]?.settings.testIdHosts, ['localhost:4820']);
 });
 
 test('global setup starts the webServer with the server hook before the base NODE_OPTIONS, and no mutant', async (t) => {
@@ -486,6 +476,117 @@ test('isolate restarts the webServer before the first mutant run when the dry ru
   );
 });
 
+test("webServer.mutate: 'auto' with server coverage in the dry run isolates a server mutant run, like true", async (t) => {
+  const fake = serverFake(t, { runTests: passAllWithDryRunServerMutants('2') });
+  const { shell } = fake.runner({ mutate: 'auto' });
+  await shell.init();
+  await shell.dryRun(dryRunOptions());
+
+  await shell.mutantRun(runtimeRun('2'));
+
+  assert.equal(fake.setups.length, 2);
+});
+
+test("webServer.mutate: 'auto' whose dry run reached no server mutant turns server support off with one info line, so a static mutant run keeps the webServer", async (t) => {
+  const fake = serverFake(t);
+  const { shell, lines } = fake.runner({ mutate: 'auto' });
+  await shell.init();
+  await shell.dryRun(dryRunOptions());
+
+  await shell.mutantRun(mutantRunOptions({ mutantActivation: 'static' }));
+
+  assert.equal(fake.setups.length, 1);
+  assert.deepEqual(
+    lines.filter(([, message]) => message.includes("'auto'")),
+    [
+      [
+        'info',
+        "Server-side mutants stay NoCoverage: with lzPlaywright.webServer.mutate: 'auto', the dry run reached no mutant " +
+          'in the code the Playwright webServer runs, so server support stays off.',
+      ],
+    ],
+  );
+});
+
+test("with webServer.mutate: 'auto', the dry run process whose init turned server support off leaves that decision in the sandbox", async (t) => {
+  const fake = serverFake(t, { hooked: false });
+  const { shell } = fake.runner({ mutate: 'auto' });
+  await shell.init();
+
+  await shell.dryRun(dryRunOptions());
+
+  assert.deepEqual(readServerMutantsFile(fake.sandbox), {
+    mutants: new Set(),
+  });
+});
+
+test("with webServer.mutate: 'auto' and isolate false, the dry run process leaves the server mutants it reached in the sandbox", async (t) => {
+  const fake = serverFake(t, { runTests: passAllWithDryRunServerMutants('2') });
+  const { shell } = fake.runner({ mutate: 'auto', isolate: false });
+  await shell.init();
+
+  await shell.dryRun(dryRunOptions());
+
+  assert.deepEqual(readServerMutantsFile(fake.sandbox), {
+    mutants: new Set(['2']),
+  });
+});
+
+test("with webServer.mutate: 'auto', a process whose init turned server support off refuses to run mutants when the dry run turned it on", async (t) => {
+  const fake = serverFake(t, { hooked: false });
+  writeServerMutantsFile(fake.sandbox, ['2']);
+  const { shell } = fake.runner({ mutate: 'auto' });
+  await shell.init();
+
+  await assert.rejects(shell.mutantRun(runtimeRun('1')), {
+    message:
+      "lzPlaywright.webServer.mutate is 'auto' and the dry run reached server-side mutants, but this process turned " +
+      'server support off at init (see its warning), so it cannot run them. Set lzPlaywright.webServer.mutate: true ' +
+      'to see the cause as an error.',
+  });
+});
+
+test("with webServer.mutate: 'auto', a process that did not run the dry run follows its on decision and isolates by its server mutants", async (t) => {
+  const fake = serverFake(t);
+  writeServerMutantsFile(fake.sandbox, ['2']);
+  const { shell } = fake.runner({ mutate: 'auto' });
+  await shell.init();
+
+  await shell.mutantRun(runtimeRun('1'));
+  const setupsBeforeServerRun = fake.setups.length;
+  await shell.mutantRun(runtimeRun('2'));
+
+  assert.deepEqual([setupsBeforeServerRun, fake.setups.length], [1, 2]);
+});
+
+test("with webServer.mutate: 'auto', a process that finds no decision in the sandbox keeps server support and isolates every run, after one warning", async (t) => {
+  const fake = serverFake(t);
+  const { shell, lines } = fake.runner({ mutate: 'auto' });
+  await shell.init();
+
+  await shell.mutantRun(runtimeRun('1'));
+  await shell.mutantRun(runtimeRun('3'));
+
+  assert.equal(fake.setups.length, 3);
+  assert.deepEqual(
+    warnings(lines).map((message) =>
+      message.includes('.lz-playwright-server-mutants'),
+    ),
+    [true],
+  );
+});
+
+test("with webServer.mutate: 'auto', a process that did not run the dry run follows its off decision, even with isolate false", async (t) => {
+  const fake = serverFake(t);
+  writeServerMutantsFile(fake.sandbox, []);
+  const { shell } = fake.runner({ mutate: 'auto', isolate: false });
+  await shell.init();
+
+  await shell.mutantRun(mutantRunOptions({ mutantActivation: 'static' }));
+
+  assert.equal(fake.setups.length, 1);
+});
+
 test('isolate keeps the webServer between runs the server did not run in the dry run', async (t) => {
   const fake = serverFake(t, { runTests: passAllWithDryRunServerMutants('2') });
   const { shell } = fake.runner();
@@ -556,59 +657,57 @@ for (const isolate of [true, false]) {
   });
 }
 
-for (const mutate of [false, 'auto'] as const) {
-  test(`webServer.mutate: ${String(mutate)} never restarts the webServer to isolate a run`, async (t) => {
-    const fake = fakePlaywright(t, {
-      webServers: [webServer],
-      runTests: passAllWithDryRunServerMutants('2'),
-    });
-    const { shell } = fake.runner({
-      lzPlaywright: { webServer: { mutate } },
-    });
-    await shell.init();
-    await shell.dryRun(dryRunOptions());
-
-    await shell.mutantRun(runtimeRun('2'));
-    await shell.mutantRun(runtimeRun('1'));
-
-    assert.equal(
-      fake.names().filter((name) => name === 'runGlobalSetup').length,
-      1,
-    );
+test('webServer.mutate: false never restarts the webServer to isolate a run', async (t) => {
+  const fake = fakePlaywright(t, {
+    webServers: [webServer],
+    runTests: passAllWithDryRunServerMutants('2'),
   });
-
-  test(`webServer.mutate: ${String(mutate)} reads no server mutants, so it warns about none`, async (t) => {
-    inSandbox(t);
-    const fake = fakePlaywright(t, { webServers: [webServer] });
-    const { shell, lines } = fake.runner({
-      lzPlaywright: { webServer: { mutate } },
-    });
-    await shell.init();
-
-    await shell.mutantRun(runtimeRun('2'));
-
-    assert.deepEqual(
-      lines.filter(([level]) => level === 'warn'),
-      [],
-    );
+  const { shell } = fake.runner({
+    lzPlaywright: { webServer: { mutate: false } },
   });
+  await shell.init();
+  await shell.dryRun(dryRunOptions());
 
-  test(`webServer.mutate: ${String(mutate)} leaves no server mutants in the sandbox`, async (t) => {
-    const sandbox = inSandbox(t);
-    const fake = fakePlaywright(t, {
-      webServers: [webServer],
-      runTests: passAllWithDryRunServerMutants('2'),
-    });
-    const { shell } = fake.runner({
-      lzPlaywright: { webServer: { mutate } },
-    });
-    await shell.init();
+  await shell.mutantRun(runtimeRun('2'));
+  await shell.mutantRun(runtimeRun('1'));
 
-    await shell.dryRun(dryRunOptions());
+  assert.equal(
+    fake.names().filter((name) => name === 'runGlobalSetup').length,
+    1,
+  );
+});
 
-    assert.deepEqual(readdirSync(sandbox), []);
+test('webServer.mutate: false reads no server mutants, so it warns about none', async (t) => {
+  inSandbox(t);
+  const fake = fakePlaywright(t, { webServers: [webServer] });
+  const { shell, lines } = fake.runner({
+    lzPlaywright: { webServer: { mutate: false } },
   });
-}
+  await shell.init();
+
+  await shell.mutantRun(runtimeRun('2'));
+
+  assert.deepEqual(
+    lines.filter(([level]) => level === 'warn'),
+    [],
+  );
+});
+
+test('webServer.mutate: false leaves no server mutants in the sandbox', async (t) => {
+  const sandbox = inSandbox(t);
+  const fake = fakePlaywright(t, {
+    webServers: [webServer],
+    runTests: passAllWithDryRunServerMutants('2'),
+  });
+  const { shell } = fake.runner({
+    lzPlaywright: { webServer: { mutate: false } },
+  });
+  await shell.init();
+
+  await shell.dryRun(dryRunOptions());
+
+  assert.deepEqual(readdirSync(sandbox), []);
+});
 
 test('init refuses a webServer whose env sets NODE_OPTIONS', async (t) => {
   const fake = serverFake(t, {
@@ -620,6 +719,25 @@ test('init refuses a webServer whose env sets NODE_OPTIONS', async (t) => {
     message: `lzPlaywright.webServer.mutate is true, but a webServer's env sets NODE_OPTIONS, which replaces the one that loads the server hook. Set NODE_OPTIONS in the environment that runs Stryker instead.`,
   });
   assert.deepEqual(fake.setups, []);
+});
+
+test("with webServer.mutate: 'auto', init turns server support off with one warning when a webServer's env sets NODE_OPTIONS", async (t) => {
+  const fake = serverFake(t, {
+    webServers: [{ ...webServer, env: { NODE_OPTIONS: '--inspect' } }],
+  });
+  const { shell, lines } = fake.runner({ mutate: 'auto' });
+
+  await shell.init();
+
+  assert.deepEqual(warnings(lines), [
+    "lzPlaywright.webServer.mutate is 'auto', but a webServer's env sets NODE_OPTIONS, which replaces the one that " +
+      'loads the server hook. Set NODE_OPTIONS in the environment that runs Stryker instead.' +
+      autoOff,
+  ]);
+  assert.deepEqual(
+    fake.setups.map(({ serverDir }) => serverDir),
+    [undefined],
+  );
 });
 
 test('init refuses a reuseExistingServer server that already answers, and starts one that does not', async (t) => {
@@ -637,6 +755,27 @@ test('init refuses a reuseExistingServer server that already answers, and starts
     return true;
   });
   assert.deepEqual(shared.setups, []);
+});
+
+test("with webServer.mutate: 'auto', init turns server support off with one warning when a reuseExistingServer server already answers", async (t) => {
+  const fake = serverFake(t, {
+    webServers: [{ url: 'http://localhost:4820/', reuseExistingServer: true }],
+  });
+  const { shell, lines } = fake.runner({ mutate: 'auto' });
+
+  await shell.init();
+
+  const [warning, ...more] = warnings(lines);
+  assert.equal(more.length, 0);
+  assert.match(
+    warning ?? '',
+    /^lzPlaywright\.webServer\.mutate is 'auto', but the webServer at http:\/\/localhost:4820\/ already answers and reuseExistingServer is true\./,
+  );
+  assert.ok(warning?.endsWith(autoOff));
+  assert.deepEqual(
+    fake.setups.map(({ serverDir }) => serverDir),
+    [undefined],
+  );
 });
 
 test('init starts a reuseExistingServer server that does not answer yet', async (t) => {
@@ -729,6 +868,40 @@ test('with a checker, init moves the webServer too', async (t) => {
   assert.equal(process.env['PORT'], String(movedPort(fake)));
 });
 
+test("with webServer.mutate: 'auto', init turns server support off with one warning, and moves no webServer, when the move refuses the projects' baseURL", async (t) => {
+  stubEnv(t, { PORT: undefined, PLAYWRIGHT_TEST_BASE_URL: undefined });
+  const fake = serverFake(t, {
+    ...moved,
+    projects: [
+      {
+        default: true,
+        project: {
+          name: 'chromium',
+          timeout: 30_000,
+          use: { baseURL: 'http://127.0.0.1:9999' },
+        },
+      },
+    ],
+    urlUp: async () => false,
+  });
+  const { shell, lines } = fake.runner({ mutate: 'auto', concurrency: 2 });
+
+  await shell.init();
+
+  assert.deepEqual(warnings(lines), [
+    "lzPlaywright.webServer.mutate is 'auto' and Stryker starts more than one test runner process, so each process " +
+      "needs a webServer port of its own, but the runner cannot move the projects' baseURL along: the baseURL " +
+      'http://127.0.0.1:9999 points at no webServer. Derive the port from STRYKER_MUTATOR_WORKER in the Playwright ' +
+      'config instead (see Configure in the README).' +
+      autoOff,
+  ]);
+  assert.deepEqual(fake.webServerOptions(), moved.webServers);
+  assert.deepEqual(
+    fake.setups.map(({ serverDir }) => serverDir),
+    [undefined],
+  );
+});
+
 test('with one process and no checker, init keeps the configured port', async (t) => {
   stubEnv(t, { PORT: undefined });
   const fake = serverFake(t, { ...moved, urlUp: async () => false });
@@ -744,10 +917,10 @@ test('with one process and no checker, init keeps the configured port', async (t
   assert.equal(process.env['PORT'], undefined);
 });
 
-const boundMessage = (fake: { webServerOptions(): { url: string }[] }) =>
-  "lzPlaywright.webServer.mutate is true and Stryker starts more than one test runner process, so each process's " +
+const boundMessage = (mutate: string, port: string | undefined) =>
+  `lzPlaywright.webServer.mutate is ${mutate} and Stryker starts more than one test runner process, so each process's ` +
   'webServer moves to a port of its own, but the command of webServer 0 bound port 4820 instead of ' +
-  `${movedPort(fake)}. Make the command take its port from PORT, from the webServer's env, or from a --port in ` +
+  `${port}. Make the command take its port from PORT, from the webServer's env, or from a --port in ` +
   'the command (the runner moves all three), or derive the port from STRYKER_MUTATOR_WORKER in the Playwright ' +
   'config (see Configure in the README).';
 
@@ -755,29 +928,107 @@ function bindingFake(
   t: TestContext,
   globalSetup: NonNullable<Behaviour['globalSetup']>,
   urlUp: NonNullable<Behaviour['urlUp']>,
+  mutate: true | 'auto' = true,
 ) {
   stubEnv(t, { PORT: undefined, PLAYWRIGHT_TEST_BASE_URL: undefined });
-  const fake = fakePlaywright(t, { ...moved, urlUp, globalSetup });
+  const setupPorts: string[] = [];
+  const fake = fakePlaywright(t, {
+    ...moved,
+    urlUp,
+    globalSetup: (reporter) => {
+      setupPorts.push(new URL(fake.webServerOptions()[0]?.url ?? '').port);
+
+      return globalSetup(reporter);
+    },
+  });
+  const runner = fake.runner({
+    concurrency: 2,
+    lzPlaywright: { webServer: { mutate } },
+  });
 
   return {
     fake,
-    init: () =>
-      fake
-        .runner({
-          concurrency: 2,
-          lzPlaywright: { webServer: { mutate: true } },
-        })
-        .shell.init(),
+    setupPorts,
+    lines: runner.lines,
+    init: () => runner.shell.init(),
   };
 }
 
-test('init names the command that bound the configured port while global setup still waits for the moved one', async (t) => {
+function awaitSetupLeftRunning(t: TestContext): () => void {
+  const done = Promise.withResolvers<void>();
+  t.after(async () => {
+    await done.promise;
+    await setImmediate();
+  });
+
+  return () => done.resolve();
+}
+
+test('init that fails after moving the webServer puts its options and the environment back', async (t) => {
   let bound = false;
   const { fake, init } = bindingFake(
+    t,
+    () => {
+      bound = true;
+
+      return 'failed';
+    },
+    async (url) => bound && url.port === '4820',
+  );
+
+  await assert.rejects(init());
+
+  assert.deepEqual(fake.webServerOptions(), moved.webServers);
+  assert.equal(process.env['PORT'], undefined);
+});
+
+test("with webServer.mutate: 'auto', init turns server support off with one warning, and moves no webServer, when the command binds the configured port", async (t) => {
+  let bound = false;
+  const serverDirs: (string | undefined)[] = [];
+  const setupDone = awaitSetupLeftRunning(t);
+  const { fake, setupPorts, lines, init } = bindingFake(
+    t,
+    async (): Promise<Status> => {
+      serverDirs.push(process.env[serverDirEnv]);
+
+      if (process.env[serverDirEnv] === undefined) {
+        return 'passed';
+      }
+
+      bound = true;
+      await setTimeout(500);
+      setupDone();
+
+      return 'failed';
+    },
+    async (url) => bound && url.port === '4820',
+    'auto',
+  );
+
+  await init();
+
+  assert.deepEqual(warnings(lines), [
+    boundMessage("'auto'", setupPorts[0]) + autoOff,
+  ]);
+  assert.equal(serverDirs.at(-1), undefined);
+  assert.deepEqual(fake.webServerOptions(), moved.webServers);
+  assert.deepEqual(fake.overrides()['use'], {
+    screenshot: 'off',
+    trace: 'off',
+    video: 'off',
+  });
+  assert.equal(process.env['PORT'], undefined);
+});
+
+test('init names the command that bound the configured port while global setup still waits for the moved one', async (t) => {
+  let bound = false;
+  const setupDone = awaitSetupLeftRunning(t);
+  const { setupPorts, init } = bindingFake(
     t,
     async (): Promise<Status> => {
       bound = true;
       await setTimeout(3000);
+      setupDone();
 
       return 'failed';
     },
@@ -787,7 +1038,7 @@ test('init names the command that bound the configured port while global setup s
 
   await assert.rejects(init(), (error) => {
     assert.ok(error instanceof Error);
-    assert.equal(error.message, boundMessage(fake));
+    assert.equal(error.message, boundMessage('true', setupPorts[0]));
     assert.equal(error.cause, undefined);
 
     return true;
@@ -800,7 +1051,7 @@ test('init names the command that bound the configured port while global setup s
 
 test('init names the command that bound the configured port when global setup failed, with the failure as its cause', async (t) => {
   let bound = false;
-  const { fake, init } = bindingFake(
+  const { setupPorts, init } = bindingFake(
     t,
     () => {
       bound = true;
@@ -812,7 +1063,7 @@ test('init names the command that bound the configured port when global setup fa
 
   await assert.rejects(init(), (error) => {
     assert.ok(error instanceof Error);
-    assert.equal(error.message, boundMessage(fake));
+    assert.equal(error.message, boundMessage('true', setupPorts[0]));
     assert.match(String(error.cause), /^Error: Playwright global setup failed/);
 
     return true;
@@ -827,6 +1078,44 @@ test('a server that answered on the configured port before global setup is not b
   );
 
   await assert.rejects(init(), { message: /^Playwright global setup failed/ });
+});
+
+const autoOff =
+  ' Server-side mutants stay NoCoverage in this run; lzPlaywright.webServer.mutate: true makes this an error instead.';
+
+function warnings(lines: readonly (readonly [string, string])[]): string[] {
+  return lines
+    .filter(([level]) => level === 'warn')
+    .map(([, message]) => message);
+}
+
+test("with webServer.mutate: 'auto', init turns server support off with one warning when no process global setup started loaded the server hook", async (t) => {
+  const fake = serverFake(t, { hooked: false });
+  const { shell, lines } = fake.runner({ mutate: 'auto' });
+
+  await shell.init();
+  await shell.dryRun(dryRunOptions());
+
+  assert.deepEqual(warnings(lines), [
+    "lzPlaywright.webServer.mutate is 'auto', but no process that Playwright global setup started loaded the server hook. " +
+      'A webServer that is not Node.js, a command that sets NODE_OPTIONS itself, or a server that was already running ' +
+      'cannot get the active mutant.' +
+      autoOff,
+  ]);
+  assert.equal(fake.setups.at(-1)?.serverDir, undefined);
+  assert.equal(fake.runs[0]?.settings.testIdHosts, undefined);
+});
+
+test("with webServer.mutate: 'auto', turning server support off at init repeats no warning init gave before", async (t) => {
+  const fake = serverFake(t, { hooked: false });
+  const { shell, lines } = fake.runner({ mutate: 'auto', timeoutMS: 100 });
+
+  await shell.init();
+
+  const [timeoutWarning, autoWarning, ...more] = warnings(lines);
+  assert.match(timeoutWarning ?? '', /timeout/i);
+  assert.ok(autoWarning?.endsWith(autoOff));
+  assert.deepEqual(more, []);
 });
 
 test('init fails when no process global setup started loaded the server hook', async (t) => {
