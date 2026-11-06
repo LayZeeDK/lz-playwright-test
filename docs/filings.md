@@ -838,3 +838,31 @@ v5.1.0, `packages/browser/src/node/project.ts:104-108` already adds the provider
 then passes (4 tests).
 
 **Evidence.** Logs and configs kept outside this repository, in the probe project of this project's Storybook spike.
+
+## stryker-mutator/stryker-js: a test runner that fails `init()` after the dry run started crashes or hangs Stryker
+
+Status: draft, not filed (2026-11-06).
+
+**Versions.** StrykerJS 10.1.1, Node 24.22.0, Windows 11 arm64.
+
+**What happens.** Stryker starts more than one test runner process when a checker is configured (each checker's
+token becomes a test runner when checking ends, `freeCheckers()` in `concurrency-token-provider.ts`) or when
+`concurrency` is 2 or more (the extra runners initialize while the dry run is still running). When one of those
+later runners rejects `init()`, `concurrent/pool.ts:147,193` errors the resource stream and rejects the queued work,
+the first runner's run in flight is killed, and its `RetryRejectedDecorator` recovers it with a new process anyway.
+Measured with a Playwright test runner plugin whose later processes failed `init()`:
+
+- With a checker at `concurrency: 1`, Stryker logged "Unexpected error occurred while running Stryker", started a
+  replacement worker, then exited on `triggerUncaughtException` with the init error.
+- At `concurrency: 2` without a checker, it started a replacement, retried the dry run on it, and never exited
+  (stopped by hand after 6 minutes).
+
+**Expected.** One error naming the failed init, every process disposed, and a non-zero exit.
+
+**Reproduction.** Not yet reduced: a test runner plugin whose `init()` throws when `STRYKER_MUTATOR_WORKER` is not
+`0`, run with `--concurrency 2` or with any checker, should show both outcomes (inferred from the cause above).
+
+**Workaround.** Make the first process's `init()` fail instead, before any later runner starts.
+
+**Evidence.** The `concurrency: 2` debug log is kept in this repository's spike folder, `spikes/server-d/out/`
+(untracked). The checker run's log was removed in a cleanup; its outcome is recorded in the spike's report.
