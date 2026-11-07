@@ -121,15 +121,15 @@ test("with webServer.mutate: 'auto', init turns server support off with one warn
   assert.equal(fake.runs[0]?.settings.testIdHosts, undefined);
 });
 
-test("with webServer.mutate: 'auto', turning server support off at init repeats no warning init gave before", async (t) => {
+test("with webServer.mutate: 'auto', init that turns server support off gives the timeout warning once, after the warning that turns it off", async (t) => {
   const fake = serverFake(t, { hooked: false });
   const { shell, lines } = fake.runner({ mutate: 'auto', timeoutMS: 100 });
 
   await shell.init();
 
-  const [timeoutWarning, autoWarning, ...more] = warnings(lines);
-  assert.match(timeoutWarning ?? '', /timeout/i);
+  const [autoWarning, timeoutWarning, ...more] = warnings(lines);
   assert.ok(autoWarning?.endsWith(autoOff));
+  assert.match(timeoutWarning ?? '', /timeout/i);
   assert.deepEqual(more, []);
 });
 

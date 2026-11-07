@@ -15,24 +15,6 @@ export const serverSnapshotPrefix = 'server-';
 /** A per-test coverage key for a request that came without a test id header, followed by its arrival time. */
 export const untaggedPrefix = 'lz-stryker-untagged@';
 
-export const mutateOption = 'lzPlaywright.webServer.mutate';
-
-export function refusalMessage(mutate: string, reason: string): string {
-  return `${mutateOption} is ${mutate}${reason}`;
-}
-
-export class ServerSupportRefused extends Error {
-  readonly reason: string;
-
-  constructor(
-    reason: string,
-    { mutate = 'true', ...options }: ErrorOptions & { mutate?: string } = {},
-  ) {
-    super(refusalMessage(mutate, reason), options);
-    this.reason = reason;
-  }
-}
-
 /** What one run tells the server hook, read again on every request. */
 export interface ServerControl {
   readonly outDir: string;

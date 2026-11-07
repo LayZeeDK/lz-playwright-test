@@ -137,6 +137,7 @@ test('nothing moves when no webServer has a port or url', async () => {
   const apart = await moveServersApart(
     { projects: [project()], webServers: [server({})] },
     {},
+    true,
     ports(),
   );
 
@@ -150,6 +151,7 @@ test('a url webServer moves to a free port, and PORT names it', async () => {
       webServers: [server({ url: 'http://127.0.0.1:4830/health' })],
     },
     {},
+    true,
     ports(50_001),
   );
 
@@ -171,6 +173,7 @@ test("the projects' baseURL moves with the webServer it names, in the first proj
       webServers: [server({ url: 'http://127.0.0.1:4830/health' })],
     },
     {},
+    true,
     ports(50_001),
   );
 
@@ -181,6 +184,7 @@ test('a port webServer moves to a free port', async () => {
   const apart = await moveServersApart(
     { projects: [project()], webServers: [server({ port: 3313 })] },
     {},
+    true,
     ports(50_002),
   );
 
@@ -203,6 +207,7 @@ test('two webServers each move, and PORT is left alone since it could name only 
       ],
     },
     {},
+    true,
     ports(50_003, 50_004),
   );
 
@@ -228,6 +233,7 @@ test("a url without a port moves from its scheme's default port", async () => {
       webServers: [server({ url: 'https://localhost/api' })],
     },
     {},
+    true,
     ports(50_004),
   );
 
@@ -245,6 +251,7 @@ test('an http url without a port moves from port 80', async () => {
       webServers: [server({ url: 'http://localhost/api' })],
     },
     {},
+    true,
     ports(50_005),
   );
 
@@ -252,7 +259,7 @@ test('an http url without a port moves from port 80', async () => {
 });
 
 const cannotMove = (reason: string) =>
-  "lzPlaywright.webServer.mutate is true and Stryker starts more than one test runner process, so each process needs a webServer port of its own, but the runner cannot move the projects' baseURL along: " +
+  "lzPlaywright.webServer.mutate is true, but Stryker starts more than one test runner process, so each process needs a webServer port of its own, and the runner cannot move the projects' baseURL along: " +
   `${reason}. Point every project's baseURL at the url or port of the same webServer, or leave it unset, ` +
   'or run Stryker with concurrency 1 and no checker (see More than one Stryker process in the README).';
 
@@ -264,6 +271,7 @@ test('a baseURL that points at no webServer cannot be moved along', async () => 
         webServers: [server({ port: 3000 })],
       },
       {},
+      true,
       ports(50_005),
     ),
     {
@@ -286,6 +294,7 @@ test("every project's baseURL must name a moved webServer, and the refusal names
         webServers: [server({ port: 3000 })],
       },
       {},
+      true,
       ports(50_005),
     ),
     {
@@ -307,6 +316,7 @@ test('projects whose baseURLs name different webServers cannot share the one bas
         webServers: [server({ port: 3000 }), server({ port: 3001 })],
       },
       {},
+      true,
       ports(50_006, 50_007),
     ),
     {
@@ -367,6 +377,7 @@ test('PLAYWRIGHT_TEST_BASE_URL, which Playwright sets from a port webServer, mov
   const apart = await moveServersApart(
     { projects: [project()], webServers: [server({ port: 3313 })] },
     { PLAYWRIGHT_TEST_BASE_URL: 'http://localhost:3313' },
+    true,
     ports(50_002),
   );
 

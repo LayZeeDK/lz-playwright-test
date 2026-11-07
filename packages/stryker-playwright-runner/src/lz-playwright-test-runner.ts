@@ -71,12 +71,14 @@ import {
   anyHooked,
   forgetHooked,
   hostKey,
-  mutateOption,
-  refusalMessage,
   serverDirEnv,
-  ServerSupportRefused,
   writeServerControl,
 } from './server-protocol.ts';
+import {
+  mutateOption,
+  type ServerMutate,
+  ServerSupportRefused,
+} from './server-refusal.ts';
 import {
   readServerMutantsFile,
   restartsToIsolate,
@@ -102,6 +104,7 @@ import {
 
 /** The webServer side of a session, when server support is on. */
 interface ServerSide {
+  readonly mutate: ServerMutate;
   /** Holds the control file and the hooked marks of the processes global setup starts. */
   readonly dir: string;
   readonly testIdHosts: readonly string[];
@@ -169,32 +172,34 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
 
   async init(): Promise<void> {
     const options = readRunnerOptions(this.#strykerOptions);
-
-    if (options.webServer.mutate !== 'auto') {
-      await this.#start(options, options.webServer.mutate ? 'on' : 'off');
-
-      return;
-    }
-
-    try {
-      await this.#start(options, 'on');
-    } catch (error) {
-      if (!(error instanceof ServerSupportRefused)) {
+    const { mutate } = options.webServer;
+    await this.#start(options, mutate || undefined).catch((error: unknown) => {
+      if (mutate !== 'auto' || !(error instanceof ServerSupportRefused)) {
         throw error;
       }
 
       this.#log.warn(
-        `${refusalMessage("'auto'", error.reason)} Server-side mutants stay NoCoverage in this run; ${mutateOption}: true makes this an error instead.`,
+        `${error.message} Server-side mutants stay NoCoverage in this run; ${mutateOption}: true makes this an error instead.`,
       );
-      await this.#start(options, 'off after refusal');
+
+      return this.#start(options, undefined);
+    });
+    const { timeouts, retriesByProject } = this.#ready();
+    const warning = assertionTimeoutWarning(
+      timeouts,
+      options.strykerTimeoutMS,
+      Math.max(0, ...retriesByProject.values()),
+    );
+
+    if (warning) {
+      this.#log.warn(warning);
     }
   }
 
   async #start(
     options: RunnerOptions,
-    serverSupport: 'on' | 'off' | 'off after refusal',
+    mutate: ServerMutate | undefined,
   ): Promise<void> {
-    const mutates = serverSupport === 'on';
     const traces = readTracesTarget(options.survivorTraces, process.env);
     const pw = loadPlaywright(options.configFile);
     const root = claimTempRoot((removed) => {
@@ -219,20 +224,10 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       const config = await playwright.loadConfig();
       const timeouts = configTimeouts(config.projects);
       const retriesByProject = configRetries(config.projects, options.retries);
-      const warning = assertionTimeoutWarning(
-        timeouts,
-        options.strykerTimeoutMS,
-        Math.max(0, ...retriesByProject.values()),
-      );
-
-      if (warning && serverSupport !== 'off after refusal') {
-        this.#log.warn(warning);
-      }
-
       const apart =
-        mutates &&
+        mutate &&
         startsMoreRunners(this.#strykerOptions, os.availableParallelism())
-          ? await moveServersApart(config, process.env)
+          ? await moveServersApart(config, process.env, mutate)
           : undefined;
 
       if (apart) {
@@ -246,11 +241,11 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       const servers = webServers.flatMap(
         (server) => serverCheck(server, pw.isURLAvailable) ?? [],
       );
-      const server = mutates
-        ? await serverSide(root, webServers, pw.isURLAvailable)
+      const server = mutate
+        ? await serverSide(mutate, root, webServers, pw.isURLAvailable)
         : undefined;
       const setup = () => this.#globalSetup(created, server, undefined);
-      await (apart
+      await (mutate && apart
         ? globalSetupWatchingConfiguredPorts(
             setup,
             {
@@ -259,7 +254,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
                 serverCheck(webServer, pw.isURLAvailable),
               ),
             },
-            options.webServer.mutate === 'auto',
+            mutate,
           )
         : setup());
       // Every Stryker test runner process needs the groups, and only one of them runs the dry run.
@@ -630,15 +625,10 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
 
     if (!(await hookedWithin(server.dir, hookedWaitMs))) {
       throw new ServerSupportRefused(
-        ', but no process that Playwright global setup started loaded the server hook. ' +
+        server.mutate,
+        'no process that Playwright global setup started loaded the server hook. ' +
           'A webServer that is not Node.js, a command that sets NODE_OPTIONS itself, or a server that was already ' +
           'running cannot get the active mutant.',
-        {
-          mutate:
-            this.#session?.options.webServer.mutate === 'auto'
-              ? "'auto'"
-              : 'true',
-        },
       );
     }
   }
@@ -650,13 +640,15 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
  * this runner cannot switch to its mutant.
  */
 async function serverSide(
+  mutate: ServerMutate,
   root: Pick<TempRoot, 'dir'>,
   webServers: readonly ConfigWebServer[],
   isURLAvailable: Playwright['isURLAvailable'],
 ): Promise<ServerSide> {
   if (webServers.some((server) => server.setsNodeOptions)) {
     throw new ServerSupportRefused(
-      ", but a webServer's env sets NODE_OPTIONS, which replaces the one that loads " +
+      mutate,
+      "a webServer's env sets NODE_OPTIONS, which replaces the one that loads " +
         'the server hook. Set NODE_OPTIONS in the environment that runs Stryker instead.',
     );
   }
@@ -669,7 +661,8 @@ async function serverSide(
 
   if (shared.length > 0) {
     throw new ServerSupportRefused(
-      `, but the webServer at ${shared.map((server) => server.name).join(', ')} ` +
+      mutate,
+      `the webServer at ${shared.map((server) => server.name).join(', ')} ` +
         'already answers and reuseExistingServer is true. Only the Stryker process that started a server can ' +
         'switch its mutant: stop the server that answers there, or give the webServer a port that no other server uses.',
     );
@@ -679,6 +672,7 @@ async function serverSide(
   fs.mkdirSync(dir, { recursive: true });
 
   return {
+    mutate,
     dir,
     testIdHosts: webServers.flatMap((server) => serverHost(server) ?? []),
   };

@@ -288,6 +288,9 @@ warning and the process runs as with `false`:
   that started a server can switch its mutant, so stop the server that answers there, or give the
   `webServer` a port that no other server uses.
 - The `command` bound the configured port after the runner moved it.
+- Global setup failed while another server answered on a moved `webServer`'s configured port, such as
+  the `webServer` of another process that runs as with `false`. With `mutate: true`, the error is
+  global setup's own.
 - The runner cannot move the projects' `baseURL` along with the `webServer`.
 
 Under `'auto'`, the process that runs the dry run decides for every process. When the dry run reached

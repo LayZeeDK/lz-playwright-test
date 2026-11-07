@@ -142,8 +142,8 @@ test("with webServer.mutate: 'auto', init turns server support off with one warn
   await shell.init();
 
   assert.deepEqual(warnings(lines), [
-    "lzPlaywright.webServer.mutate is 'auto' and Stryker starts more than one test runner process, so each process " +
-      "needs a webServer port of its own, but the runner cannot move the projects' baseURL along: the baseURL " +
+    "lzPlaywright.webServer.mutate is 'auto', but Stryker starts more than one test runner process, so each process " +
+      "needs a webServer port of its own, and the runner cannot move the projects' baseURL along: the baseURL " +
       "http://127.0.0.1:9999 points at no webServer. Point every project's baseURL at the url or port of the same " +
       'webServer, or leave it unset, or run Stryker with concurrency 1 and no checker (see More than one Stryker ' +
       'process in the README).' +
@@ -172,8 +172,8 @@ test('with one process and no checker, init keeps the configured port', async (t
 });
 
 const boundMessage = (mutate: string, port: string | undefined) =>
-  `lzPlaywright.webServer.mutate is ${mutate} and Stryker starts more than one test runner process, so each process's ` +
-  'webServer moves to a port of its own, but the command of webServer 0 bound port 4820 instead of ' +
+  `lzPlaywright.webServer.mutate is ${mutate}, but Stryker starts more than one test runner process, so each process's ` +
+  'webServer moves to a port of its own, and the command of webServer 0 bound port 4820 instead of ' +
   `${port}. Make the command take its port from PORT, from the webServer's env, or from a --port in ` +
   'the command (the runner moves all three), or run Stryker with concurrency 1 and no checker (see More than ' +
   'one Stryker process in the README).';
@@ -322,6 +322,34 @@ test('init names the command that bound the configured port when global setup fa
 
     return true;
   });
+});
+
+test("with webServer.mutate: 'auto', init turns server support off with one warning that names the configured port when global setup fails while another server answered there from the start", async (t) => {
+  const serverDirs: (string | undefined)[] = [];
+  const { fake, lines, init } = bindingFake(
+    t,
+    () => {
+      serverDirs.push(process.env[serverDirEnv]);
+
+      return process.env[serverDirEnv] === undefined ? 'passed' : 'failed';
+    },
+    async (url) => url.port === '4820',
+    'auto',
+  );
+
+  await init();
+
+  assert.deepEqual(warnings(lines), [
+    "lzPlaywright.webServer.mutate is 'auto', but Stryker starts more than one test runner process, so each " +
+      "process's webServer moves to a port of its own, and global setup failed while another server answered on " +
+      'port 4820, the configured port of webServer 0, such as the webServer of a process that turned server ' +
+      "support off. Make the command take its port from PORT, from the webServer's env, or from a --port in the " +
+      'command (the runner moves all three), or run Stryker with concurrency 1 and no checker (see More than one ' +
+      'Stryker process in the README).' +
+      autoOff,
+  ]);
+  assert.equal(serverDirs.at(-1), undefined);
+  assert.deepEqual(fake.webServerOptions(), moved.webServers);
 });
 
 test('a server that answered on the configured port before global setup is not blamed for a failed setup', async (t) => {

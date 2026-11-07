@@ -7,7 +7,8 @@ import type {
   ConfigWebServer,
 } from './playwright-internals.ts';
 import { envOf, setEnv } from './process-env.ts';
-import { hostKey, ServerSupportRefused } from './server-protocol.ts';
+import { hostKey } from './server-protocol.ts';
+import { type ServerMutate, ServerSupportRefused } from './server-refusal.ts';
 
 export interface ServerMove {
   readonly index: number;
@@ -30,6 +31,7 @@ export async function moveServersApart(
     readonly webServers: readonly ConfigWebServer[];
   },
   env: NodeJS.ProcessEnv,
+  mutate: ServerMutate,
   nextPort: () => Promise<number> = freePort,
 ): Promise<ServersApart | undefined> {
   const planned = await Promise.all(
@@ -56,12 +58,14 @@ export async function moveServersApart(
 
   if (unmoved.length > 0) {
     throw cannotMove(
+      mutate,
       `the baseURL ${unmoved.join(', ')} points at no webServer`,
     );
   }
 
   if (new Set(baseUrls.map((url) => hostKey(new URL(url)))).size > 1) {
     throw cannotMove(
+      mutate,
       `the projects' baseURLs point at different webServers (${baseUrls.join(', ')})`,
     );
   }
@@ -115,10 +119,14 @@ async function planMove(
   };
 }
 
-function cannotMove(reason: string): ServerSupportRefused {
+function cannotMove(
+  mutate: ServerMutate,
+  reason: string,
+): ServerSupportRefused {
   return new ServerSupportRefused(
-    ' and Stryker starts more than one test runner process, so each process ' +
-      `needs a webServer port of its own, but the runner cannot move the projects' baseURL along: ${reason}. ` +
+    mutate,
+    'Stryker starts more than one test runner process, so each process ' +
+      `needs a webServer port of its own, and the runner cannot move the projects' baseURL along: ${reason}. ` +
       "Point every project's baseURL at the url or port of the same webServer, or leave it unset, " +
       'or run Stryker with concurrency 1 and no checker (see More than one Stryker process in the README).',
   );
