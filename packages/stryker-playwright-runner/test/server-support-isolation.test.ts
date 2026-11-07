@@ -87,6 +87,33 @@ test('isolate false reads no server mutants: no warning and no restart without t
   );
 });
 
+test('isolate false without the dry run server mutants in the sandbox restarts the webServer for every static mutant, after one warning', async (t) => {
+  const fake = serverFake(t);
+  const { shell, lines } = fake.runner({ isolate: false });
+  await shell.init();
+  const staticRun = (id: string) =>
+    shell.mutantRun(
+      mutantRunOptions({
+        activeMutant: { ...mutantRunOptions().activeMutant, id },
+        mutantActivation: 'static',
+      }),
+    );
+
+  await staticRun('1');
+  await staticRun('3');
+
+  assert.deepEqual(
+    fake.setups.map(({ activeMutant }) => activeMutant),
+    [undefined, '1', '3'],
+  );
+  assert.deepEqual(
+    warnings(lines).map((message) =>
+      message.endsWith('so it restarts the webServer for every static mutant.'),
+    ),
+    [true],
+  );
+});
+
 test('the process that ran the dry run isolates by what it kept, even when the sandbox file is gone', async (t) => {
   const fake = serverFake(t, {
     runTests: passAllWithDryRunServerMutants('2'),
@@ -107,7 +134,7 @@ test('the process that ran the dry run isolates by what it kept, even when the s
   );
 });
 
-test('isolate false leaves no server mutants in the sandbox', async (t) => {
+test('isolate false also leaves the mutants the server ran in the sandbox, for the static mutant runs of the other processes', async (t) => {
   const fake = serverFake(t, {
     runTests: passAllWithDryRunServerMutants('2'),
   });
@@ -116,7 +143,9 @@ test('isolate false leaves no server mutants in the sandbox', async (t) => {
 
   await shell.dryRun(dryRunOptions());
 
-  assert.deepEqual(readdirSync(fake.sandbox), []);
+  assert.deepEqual(readServerMutantsFile(fake.sandbox), {
+    mutants: new Set(['2']),
+  });
 });
 
 test('isolate restarts the webServer once after the dry run tests when the dry run reached a server mutant', async (t) => {

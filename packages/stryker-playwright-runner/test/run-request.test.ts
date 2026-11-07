@@ -8,7 +8,6 @@ import {
   dryRunRequest,
   mutantRunRequest,
   runPlan,
-  serverMutantFor,
 } from '../src/run-request.ts';
 import {
   dryRequest,
@@ -154,22 +153,6 @@ test('a run plan names the webServer hosts to the webServer only when it collect
   assert.ok(
     !('testIdHosts' in runPlan(mutantRequest(), 'out', hosts, []).control),
   );
-});
-
-test('the webServer starts with the mutant of a statically activated mutant run, and with none otherwise', () => {
-  assert.equal(
-    serverMutantFor(
-      mutantRequest({ activeMutant: '7', mutantActivation: 'static' }),
-    ),
-    '7',
-  );
-  assert.equal(
-    serverMutantFor(
-      mutantRequest({ activeMutant: '7', mutantActivation: 'runtime' }),
-    ),
-    undefined,
-  );
-  assert.equal(serverMutantFor(dryRequest()), undefined);
 });
 
 test('a run plan stops at the first failure unless bail is disabled', () => {

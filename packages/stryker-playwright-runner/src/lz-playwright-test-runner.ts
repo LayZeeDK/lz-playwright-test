@@ -42,7 +42,6 @@ import {
   mutantRunRequest,
   runPlan,
   type RunRequest,
-  serverMutantFor,
 } from './run-request.ts';
 import {
   type CoverageGaps,
@@ -85,6 +84,7 @@ import {
   restartsToIsolate,
   type RunKind,
   runKind,
+  startupMutantFor,
   type ServerMutants,
   type ServerMutantsFile,
   writeServerMutantsFile,
@@ -337,10 +337,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     );
     this.#dryRunServerMutants = new Set(output.serverMutants);
 
-    if (
-      session.options.webServer.mutate === 'auto' ||
-      (session.server && session.options.webServer.isolate)
-    ) {
+    if (session.options.webServer.mutate) {
       writeServerMutantsFile(this.#sandbox, output.serverMutants);
     }
 
@@ -487,14 +484,17 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       request.budget.deadlineMs === undefined
         ? undefined
         : performance.now() + request.budget.deadlineMs;
-    const kind = runKind(request, () => this.#serverMutants(session));
+    const serverMutants = () => this.#serverMutants(session);
+    const kind = session.options.webServer.isolate
+      ? runKind(request, serverMutants)
+      : 'other';
     const isolate = restartsToIsolate(
       session.options.webServer.isolate,
       this.#previousRun,
       kind,
     );
     this.#previousRun = kind;
-    const mutant = serverMutantFor(request);
+    const mutant = startupMutantFor(request, serverMutants);
     await this.#serveMutant(session, mutant, isolate).catch(
       (error: unknown) => {
         throw mutant === undefined || error instanceof ServerSupportRefused
@@ -605,7 +605,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
   }
 
   #serverMutants(session: Session): ServerMutants {
-    if (!session.server || !session.options.webServer.isolate) {
+    if (!session.server) {
       return new Set();
     }
 
@@ -616,7 +616,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         this.#dryRunServerMutants = file.mutants;
       } else {
         this.#log.warn(
-          `This process did not run the dry run and cannot read the mutants the webServer ran in it (${file.cause}), so it restarts the webServer around every mutant run.`,
+          `This process did not run the dry run and cannot read the mutants the webServer ran in it (${file.cause}), so it restarts the webServer ${session.options.webServer.isolate ? 'around every mutant run' : 'for every static mutant'}.`,
         );
         this.#dryRunServerMutants = 'unknown';
       }

@@ -5,9 +5,40 @@ import { test } from 'node:test';
 import {
   readServerMutantsFile,
   restartsToIsolate,
+  startupMutantFor,
   writeServerMutantsFile,
 } from '../src/server-isolation.ts';
-import { tempTree } from './support/doubles.ts';
+import { dryRequest, mutantRequest, tempTree } from './support/doubles.ts';
+
+test('the webServer starts with the mutant of a statically activated mutant run, and with none otherwise', () => {
+  const unknown = () => 'unknown' as const;
+
+  assert.equal(
+    startupMutantFor(
+      mutantRequest({ activeMutant: '7', mutantActivation: 'static' }),
+      unknown,
+    ),
+    '7',
+  );
+  assert.equal(
+    startupMutantFor(
+      mutantRequest({ activeMutant: '7', mutantActivation: 'runtime' }),
+      unknown,
+    ),
+    undefined,
+  );
+  assert.equal(startupMutantFor(dryRequest(), unknown), undefined);
+});
+
+test('the webServer starts with a static mutant only when the dry run saw the server reach it', () => {
+  const run = (activeMutant: string) =>
+    startupMutantFor(
+      mutantRequest({ activeMutant, mutantActivation: 'static' }),
+      () => new Set(['2']),
+    );
+
+  assert.deepEqual([run('2'), run('3')], ['2', undefined]);
+});
 
 test('a run that is not a server run, after another such run, keeps the webServer', () => {
   assert.equal(restartsToIsolate(true, 'other', 'other'), false);

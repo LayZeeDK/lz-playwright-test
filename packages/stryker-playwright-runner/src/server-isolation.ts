@@ -16,11 +16,28 @@ export function runKind(
     return 'other';
   }
 
-  const mutants = dryRunServerMutants();
-
-  return mutants === 'unknown' || mutants.has(request.activeMutant)
+  return serverRan(dryRunServerMutants(), request.activeMutant)
     ? 'server'
     : 'other';
+}
+
+/**
+ * Stryker asks for static activation of every run without a test filter
+ * (@stryker-mutator/core 10.1.1 mutant-test-planner.js:148).
+ */
+export function startupMutantFor(
+  request: RunRequest,
+  dryRunServerMutants: () => ServerMutants,
+): string | undefined {
+  return request.kind === 'mutant' &&
+    request.mutantActivation === 'static' &&
+    serverRan(dryRunServerMutants(), request.activeMutant)
+    ? request.activeMutant
+    : undefined;
+}
+
+function serverRan(mutants: ServerMutants, mutant: string): boolean {
+  return mutants === 'unknown' || mutants.has(mutant);
 }
 
 export function restartsToIsolate(

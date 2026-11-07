@@ -24,6 +24,7 @@ import {
   passAll,
 } from './support/fake-playwright.ts';
 import {
+  passAllWithDryRunServerMutants,
   runtimeRun,
   serverFake,
   serverHookUrl,
@@ -182,6 +183,49 @@ test('a static mutant run restarts the webServer with that mutant, and the next 
   assert.equal(
     fake.names().filter((name) => name === 'runGlobalSetup').length,
     4,
+  );
+});
+
+for (const isolate of [false, true]) {
+  test(`a static mutant that the webServer did not reach in the dry run keeps the webServer (isolate ${isolate})`, async (t) => {
+    const fake = serverFake(t, {
+      runTests: passAllWithDryRunServerMutants('2'),
+    });
+    const { shell } = fake.runner({ isolate });
+    await shell.init();
+    await shell.dryRun(dryRunOptions());
+    const setupsBefore = fake.setups.length;
+
+    await shell.mutantRun(
+      mutantRunOptions({
+        activeMutant: { ...mutantRunOptions().activeMutant, id: '3' },
+        mutantActivation: 'static',
+      }),
+    );
+
+    assert.equal(fake.setups.length, setupsBefore);
+  });
+}
+
+test('a static mutant the webServer did not reach restarts it without the static mutant it ran before', async (t) => {
+  const fake = serverFake(t, { runTests: passAllWithDryRunServerMutants('2') });
+  const { shell } = fake.runner({ isolate: false });
+  await shell.init();
+  await shell.dryRun(dryRunOptions());
+  const staticRun = (id: string) =>
+    shell.mutantRun(
+      mutantRunOptions({
+        activeMutant: { ...mutantRunOptions().activeMutant, id },
+        mutantActivation: 'static',
+      }),
+    );
+
+  await staticRun('2');
+  await staticRun('3');
+
+  assert.deepEqual(
+    fake.setups.map(({ activeMutant }) => activeMutant),
+    [undefined, '2', undefined],
   );
 });
 

@@ -226,9 +226,10 @@ ended, such as one from a timer that the handler set, still counts for that test
 
 Code that runs once when the server starts, such as module scope, cannot switch mutants per request. A
 module that the server loads at its first request counts as such code too. Stryker runs a mutant in that
-code against every test, and the runner restarts the `webServer` with the mutant in its environment for
-that run, and restarts it again for the next run. When global setup fails with the mutant, such as a server
-that exits at start, Stryker counts the mutant as killed by no test, with the setup error as its message.
+code against every test. When the server reached the mutant in the dry run, the runner restarts the
+`webServer` with the mutant in its environment for that run, and restarts it again for the next run. When
+global setup fails with the mutant, such as a server that exits at start, Stryker counts the mutant as killed
+by no test, with the setup error as its message.
 
 ### Isolate server-side mutants
 
@@ -236,8 +237,8 @@ A mutant run can leave state behind in the server, such as a cache filled with i
 next run then reads it. A server-side mutant is one that the server reached in the dry run. With
 `isolate: true`, the default, the runner restarts the `webServer` before a mutant run when that run or
 the one before it in the same process tests a server-side mutant. With `isolate: false`, one server
-serves every run except those of mutants in start-up code, and except every run under
-`coverageAnalysis: 'off'` or `'all'`. Set it for a server that keeps no state between requests.
+serves every run except those of server-side mutants in start-up code, and except those of every
+server-side mutant under `coverageAnalysis: 'off'` or `'all'`. Set it for a server that keeps no state between requests.
 
 A restart costs the server's start and its cold first requests. On the epic-stack app's Vite dev server,
 one measurement put that at about 10 s per restarted run.
@@ -248,10 +249,10 @@ slow or loaded machine a restart can take longer than that one, so raise `timeou
 restart of the `webServer`. With `isolate: false`, the timeout includes no restart, so raise `timeoutMS`
 by one restart when the report shows Timeouts for mutants in start-up code.
 
-Stryker runs the dry run in one test runner process. With `isolate: true` or `mutate: 'auto'`, that
+Stryker runs the dry run in one test runner process. With `mutate: true` or `'auto'`, that
 process writes the server-side mutants it found to `.lz-playwright-server-mutants` in Stryker's sandbox,
-and the other processes read the file at their first mutant run. A process that cannot read it restarts
-the `webServer` around every mutant run and logs one warning. With Stryker's `inPlace: true`, the sandbox
+and the other processes read the file when a mutant run needs it. A process that cannot read it restarts
+the `webServer` around every mutant run, with `isolate: false` for every static mutant, and logs one warning. With Stryker's `inPlace: true`, the sandbox
 is the project, so add `.lz-playwright-server-mutants` to `.gitignore`.
 
 ### More than one Stryker process

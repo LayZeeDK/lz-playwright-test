@@ -119,14 +119,3 @@ export function runPlan(
     },
   };
 }
-
-/**
- * The mutant the webServer must start with: code it runs once at start, such as module scope, never
- * sees a mutant switched per request. Stryker asks for static activation of every run without a test
- * filter (@stryker-mutator/core 10.1.1 mutant-test-planner.js:148).
- */
-export function serverMutantFor(request: RunRequest): string | undefined {
-  return request.kind === 'mutant' && request.mutantActivation === 'static'
-    ? request.activeMutant
-    : undefined;
-}
