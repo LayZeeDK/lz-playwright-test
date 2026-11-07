@@ -67,8 +67,13 @@ test('without the dry run server mutants in the sandbox, every mutant run isolat
   assert.deepEqual(
     lines
       .filter(([level]) => level === 'warn')
-      .map(([, message]) => /\.lz-playwright-server-mutants/.test(message)),
-    [true],
+      .map(([, message]) => [
+        /\.lz-playwright-server-mutants/.test(message),
+        message.endsWith(
+          'so it restarts the webServer around every mutant run.',
+        ),
+      ]),
+    [[true, true]],
   );
 });
 
