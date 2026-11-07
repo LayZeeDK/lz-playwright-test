@@ -410,6 +410,27 @@ fail against the unbounded loop. It hung. The worker shaped the double to stop a
 `Missing expected rejection`. Step 5 asks that the red has run and failed, and says nothing on a test that cannot
 end. Evidence: the same notes.
 
+**O44 (lz-tpp fit). Splitting text at a marker has no transformation.** A green that cut an instrumented file at the
+first probe statement (`slice(0, search(...))`) mapped to no entry cleanly. Logged as `(expression -> function)`,
+it then tripped the impasse check, which asked for a simpler test that did not exist. The list's examples are numbers
+and collections, and string processing falls between them. Evidence: W9 `notes.md`, cycle 3 (session scratchpad,
+local); commit `83f4081`.
+
+**O45 (lz-tpp fit). O34 held again for a boundary adapter.** A green that resolves a module, imports it, constructs
+a class, calls it and parses the result is one `(expression -> function)` bundle. Its three parse guards (no export,
+no method, no file) came in with it and no red drove them; the worker left them to the mutation run. Passing a value
+through existing plumbing (a parameter into a settings literal, then init to session to run plan) was logged as
+`(nil -> scalar)` twice: the label fits and decides nothing. Evidence: W9 `notes.md`, cycles 5, 9 and 11.
+
+**O46. `lz-red` does not say whether a filtered red run counts.** The runner's test file takes about 40 s, so the
+worker ran each red with `--test-name-pattern` and the full file only at green. The skill asks that every earlier
+test passes and does not say when to check that. Evidence: W9 `notes.md`, cycle 11.
+
+O19 and O22 held again: the worker applied Replace Magic Literal for a probe name although step 4's count said
+DECLINE (removes 1 duplicate, adds 1 constant), because the gain is drift risk, which the count does not see; and it
+declined Introduce Parameter Object for a five-parameter function on churn (about a dozen test calls), which the count
+does not see either. Evidence: W9 `notes.md`, cycles 5 and 9.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -553,6 +574,12 @@ loop, ahead of the priority order, because an unbounded wait hangs the suite ins
 
 **S39 (from O43).** In `lz-red` step 5, say how to make a red that would hang end as a failure: bound the double or
 the test, so the red is an assertion and not a timeout.
+
+**S40 (from O44, O45).** Give `lz-tpp` a short case for text processing and for boundary adapters: say the choice is
+the split or parse step itself, and that guards a boundary needs get their own reds or a named mutation check.
+
+**S41 (from O46).** In `lz-red` step 5, allow a filtered run for the red when the file is slow, with the full file
+run at green, and say so in the cycle log.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
