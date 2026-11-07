@@ -4,11 +4,9 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import type { NodePath, types } from '@babel/core';
 import type { Ignorer } from '@stryker-mutator/api/ignore';
 
 import { fieldOf, isRecord } from './is-record.ts';
-import { packageName } from './package-name.ts';
 
 const coreBin = /[\\/]@stryker-mutator[\\/]core[\\/]bin[\\/]stryker\.js$/;
 const nothing = (): undefined => undefined;
@@ -47,9 +45,10 @@ export interface MutatorList extends ReadonlyArray<ListedMutator> {
   ): ListedMutator[];
 }
 
+/** Babel's `NodePath` and `types.Node` in the instrumenter; this package does not depend on Babel. */
 export interface ExpressionPlacerMethods {
-  canPlace(path: NodePath): boolean;
-  place(path: NodePath, appliedMutants: Map<unknown, types.Node>): void;
+  canPlace(path: unknown): boolean;
+  place(path: unknown, appliedMutants: Map<unknown, unknown>): void;
 }
 
 export interface Instrumenter<TTypes> {
@@ -93,7 +92,9 @@ export function corePackageJson(
     : resolveHere('@stryker-mutator/core/package.json');
 }
 
+/** `packageName` starts every error message, so the user sees which mutator package failed. */
 export async function resolveInstrumenter<TTypes>(
+  packageName: string,
   assertTypes: AssertTypes<TTypes>,
   corePackage: string,
 ): Promise<Instrumenter<TTypes>> {
@@ -112,7 +113,7 @@ export async function resolveInstrumenter<TTypes>(
   const allMutators = fieldOf(mutate, 'allMutators');
   const allMutantPlacers = fieldOf(placers, 'allMutantPlacers');
   const types = fieldOf(babel, 'types');
-  const missing = hasNo({ dir, version });
+  const missing = hasNo({ packageName, dir, version });
 
   if (!Array.isArray(allMutators) || !allMutators.every(isListedMutator)) {
     throw missing('allMutators');
@@ -122,7 +123,7 @@ export async function resolveInstrumenter<TTypes>(
     throw missing('allMutantPlacers');
   }
 
-  const instrument = await coreInstrument({ dir, version });
+  const instrument = await coreInstrument({ packageName, dir, version });
 
   assertTypes(types, missing);
 
@@ -183,12 +184,17 @@ export async function resolveInstrumenter<TTypes>(
   };
 }
 
-interface Located {
+export interface Located {
+  readonly packageName: string;
   readonly dir: string;
   readonly version: string;
 }
 
-function hasNo({ dir, version }: Located): (name: string) => Error {
+function hasNo({
+  packageName,
+  dir,
+  version,
+}: Located): (name: string) => Error {
   return (name) =>
     new Error(
       `${packageName}: the instrumenter ${version} in ${dir} has no ${name}.`,

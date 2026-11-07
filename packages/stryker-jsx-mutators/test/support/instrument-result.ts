@@ -7,6 +7,7 @@ import {
   type SourceFile,
 } from '../../src/install.ts';
 import { fieldOf } from '../../src/is-record.ts';
+import { packageName } from '../../src/package-name.ts';
 
 export interface InstrumentedMutant {
   readonly id: string;
@@ -43,7 +44,7 @@ export async function instrumentFully(
   excludedMutations: readonly string[] = [],
   ignorers: readonly Ignorer[] = [],
 ): Promise<InstrumentResult> {
-  const instrument = await coreInstrument(instrumenter);
+  const instrument = await coreInstrument({ packageName, ...instrumenter });
   const result = await instrument(files, excludedMutations, ignorers);
   const fileList = fieldOf(result, 'files');
   const mutants = fieldOf(result, 'mutants');

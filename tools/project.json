@@ -20,6 +20,7 @@
         "{workspaceRoot}/stryker.*.ts",
         "{workspaceRoot}/packages/stryker-playwright-runner/src/**/*.ts",
         "{workspaceRoot}/packages/stryker-jsx-mutators/src/**/*.ts",
+        "{workspaceRoot}/packages/stryker-mutator-install/src/**/*.ts",
         "{workspaceRoot}/tsconfig.tools.json",
         "{workspaceRoot}/tsconfig.node.json",
         "{workspaceRoot}/tsconfig.base.json"
