@@ -135,8 +135,8 @@ export interface HookedContext {
   browser(): HookedBrowser | null;
   on(event: 'page', handler: (page: HookedPage) => void): unknown;
   addInitScript(
-    script: (settings: PageSettings) => void,
-    settings: PageSettings,
+    script: ((settings: PageSettings) => void) | { readonly content: string },
+    settings?: PageSettings,
   ): Promise<unknown>;
   route(
     url: (url: URL) => boolean,

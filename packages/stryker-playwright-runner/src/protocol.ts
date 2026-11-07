@@ -22,6 +22,7 @@ export interface RunSettings {
   readonly hitLimit?: number | undefined;
   /** The webServer hosts (see hostKey) whose requests from a test's page carry the test id header. */
   readonly testIdHosts?: readonly string[] | undefined;
+  readonly pageHelpers?: string | undefined;
 }
 
 export interface PageSettings extends Pick<RunSettings, 'hitLimit'> {
@@ -194,19 +195,21 @@ export function readRunSettings(
   }
 
   if (isRecord(settings)) {
-    const { outDir, perTest, hitLimit, testIdHosts } = settings;
+    const { outDir, perTest, hitLimit, testIdHosts, pageHelpers } = settings;
 
     if (
       typeof outDir === 'string' &&
       typeof perTest === 'boolean' &&
       (hitLimit === undefined || typeof hitLimit === 'number') &&
-      (testIdHosts === undefined || isStringArray(testIdHosts))
+      (testIdHosts === undefined || isStringArray(testIdHosts)) &&
+      (pageHelpers === undefined || typeof pageHelpers === 'string')
     ) {
       return {
         outDir,
         perTest,
         ...(hitLimit === undefined ? {} : { hitLimit }),
         ...(testIdHosts === undefined ? {} : { testIdHosts }),
+        ...(pageHelpers === undefined ? {} : { pageHelpers }),
       };
     }
   }

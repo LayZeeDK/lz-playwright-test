@@ -537,6 +537,17 @@ test('without per-test coverage the init script names no test, and no mutant out
   ]);
 });
 
+test("every new context also gets Stryker's page helpers, after the init script", async (t) => {
+  const hooked = installed(t, { perTest: false, pageHelpers: 'h();' });
+
+  const { scripts } = await hooked.context();
+
+  assert.deepEqual(
+    scripts.map(([script]) => script),
+    [hook.initPage, { content: 'h();' }],
+  );
+});
+
 test('a closing context writes what each frame of each page holds, as one line per frame', async (t) => {
   const hooked = installed(t, { perTest: true });
   hooked.setTest('t1');
@@ -649,7 +660,7 @@ test('a context a beforeAll or afterAll hook opens and closes counts as shared, 
 
   assert.deepEqual(
     created.map(({ scripts }) =>
-      scripts.map(([, settings]) => settings.testId),
+      scripts.map(([, settings]) => settings?.testId),
     ),
     [[undefined], [undefined]],
   );
@@ -668,7 +679,7 @@ test("a context a test's own fixture opens belongs to that test", async (t) => {
   await opened.close();
 
   assert.deepEqual(
-    opened.scripts.map(([, settings]) => settings.testId),
+    opened.scripts.map(([, settings]) => settings?.testId),
     ['t1'],
   );
   assert.deepEqual(

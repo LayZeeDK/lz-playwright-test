@@ -88,6 +88,15 @@ test('the run settings are read from the environment, with a hit limit only when
   );
 });
 
+test("the run settings carry the init script with Stryker's page helpers", () => {
+  assert.deepEqual(
+    readRunSettings({
+      [runSettingsEnv]: '{"outDir":"out","perTest":true,"pageHelpers":"h();"}',
+    }),
+    { outDir: 'out', perTest: true, pageHelpers: 'h();' },
+  );
+});
+
 test("a run folder's server snapshots merge with the workers', but only a worker file shows the worker hook installed", (t) => {
   const line = (testId: string) =>
     serializeSnapshot({
@@ -142,6 +151,7 @@ test('run settings that are not JSON, not an object or have a field of the wrong
     '{"outDir":"out","perTest":true,"hitLimit":"5"}',
     '{"outDir":"out","perTest":true,"testIdHosts":"localhost:1"}',
     '{"outDir":"out","perTest":true,"testIdHosts":[1]}',
+    '{"outDir":"out","perTest":true,"pageHelpers":1}',
   ].forEach((raw) => {
     assert.throws(() => readRunSettings({ [runSettingsEnv]: raw }), {
       message: `${runSettingsEnv} holds no valid run settings: ${raw}`,

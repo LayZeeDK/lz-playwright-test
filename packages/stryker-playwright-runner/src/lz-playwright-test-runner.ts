@@ -21,6 +21,7 @@ import {
   type RunnerOptions,
   type LzPlaywrightRunnerOptionsWithStrykerOptions,
 } from './lz-playwright-runner-options-with-stryker-options.ts';
+import { loadPageHelpers } from './page-helpers.ts';
 import {
   type ConfigHandles,
   type ConfigWebServer,
@@ -123,6 +124,7 @@ interface Session {
   readonly timeouts: ConfigTimeouts;
   readonly retriesByProject: ReadonlyMap<string, number>;
   readonly traces: TracesTarget | undefined;
+  readonly pageHelpers: string;
 }
 
 const hookUrl = (name: string) =>
@@ -201,17 +203,20 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
   async init(): Promise<void> {
     const options = readRunnerOptions(this.#strykerOptions);
     const { mutate } = options.webServer;
-    await this.#start(options, mutate || undefined).catch((error: unknown) => {
-      if (mutate !== 'auto' || !(error instanceof ServerSupportRefused)) {
-        throw error;
-      }
+    const pageHelpers = await loadPageHelpers();
+    await this.#start(options, mutate || undefined, pageHelpers).catch(
+      (error: unknown) => {
+        if (mutate !== 'auto' || !(error instanceof ServerSupportRefused)) {
+          throw error;
+        }
 
-      this.#log.warn(
-        `${error.message} Server-side mutants stay NoCoverage in this run; ${mutateOption}: true makes this an error instead.`,
-      );
+        this.#log.warn(
+          `${error.message} Server-side mutants stay NoCoverage in this run; ${mutateOption}: true makes this an error instead.`,
+        );
 
-      return this.#start(options, undefined);
-    });
+        return this.#start(options, undefined, pageHelpers);
+      },
+    );
     const { timeouts, retriesByProject } = this.#ready();
     const warning = assertionTimeoutWarning(
       timeouts,
@@ -227,6 +232,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
   async #start(
     options: RunnerOptions,
     mutate: ServerMutate | undefined,
+    pageHelpers: string,
   ): Promise<void> {
     const traces = readTracesTarget(options.survivorTraces, process.env);
     const pw = loadPlaywright(options.configFile);
@@ -310,6 +316,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         timeouts,
         retriesByProject,
         traces,
+        pageHelpers,
       };
     } catch (error) {
       await playwright?.runGlobalTeardown().catch(() => undefined);
@@ -544,6 +551,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         outDir,
         session.server?.testIdHosts,
         session.listedTestIds,
+        session.pageHelpers,
       );
 
       if (session.server) {

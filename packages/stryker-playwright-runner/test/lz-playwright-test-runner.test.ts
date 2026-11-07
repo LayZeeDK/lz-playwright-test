@@ -18,6 +18,7 @@ import {
 import { strykerPlugins, strykerValidationSchema } from '../src/index.ts';
 import { optionProperties } from '../src/lz-playwright-runner-options-with-stryker-options.ts';
 import { fieldOf } from '../src/is-record.ts';
+import { loadPageHelpers } from '../src/page-helpers.ts';
 import { installErrorSuffix } from '../src/protocol.ts';
 import { LzPlaywrightTestRunner } from '../src/lz-playwright-test-runner.ts';
 import { withEnv } from '../src/process-env.ts';
@@ -355,6 +356,21 @@ test('dispose removes the run folders and output before it waits for the workers
   assert.deepEqual(seen, [ownerFile]);
 });
 
+test("every run gives the workers Stryker's page helpers from the installed instrumenter", async (t) => {
+  const fake = fakePlaywright(t);
+  const { shell } = fake.runner();
+  await shell.init();
+
+  await shell.dryRun(dryRunOptions());
+  await shell.mutantRun(mutantRunOptions());
+
+  const helpers = await loadPageHelpers();
+  assert.deepEqual(
+    fake.runs.map((run) => run.settings.pageHelpers),
+    [helpers, helpers],
+  );
+});
+
 test('a dry run runs every test with the hook and the run settings in the workers environment', async (t) => {
   const fake = fakePlaywright(t);
   const { shell } = fake.runner({
@@ -379,6 +395,7 @@ test('a dry run runs every test with the hook and the run settings in the worker
   assert.deepEqual(run.settings, {
     outDir: run.settings.outDir,
     perTest: true,
+    pageHelpers: run.settings.pageHelpers,
   });
   assert.equal(run.env[activeMutantEnv], undefined);
   assert.equal(run.env['PLAYWRIGHT_NO_COPY_PROMPT'], '1');
@@ -508,6 +525,7 @@ test('a mutant run activates the mutant and runs its tests with their serial gro
     outDir: run.settings.outDir,
     perTest: false,
     hitLimit: 5,
+    pageHelpers: run.settings.pageHelpers,
   });
   assert.deepEqual(run.params.testIds, ['s1', 's2']);
   assert.equal(run.params.maxFailures, 1);

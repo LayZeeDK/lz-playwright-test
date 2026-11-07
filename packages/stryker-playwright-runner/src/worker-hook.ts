@@ -147,7 +147,7 @@ if (
 
 export function install(
   playwrightRequire: (id: string) => unknown,
-  { outDir, perTest, hitLimit, testIdHosts }: RunSettings,
+  { outDir, perTest, hitLimit, testIdHosts, pageHelpers }: RunSettings,
   ns: string = INSTRUMENTER_CONSTANTS.NAMESPACE,
 ): void {
   const tagHosts = perTest ? testIdHosts : undefined;
@@ -244,6 +244,10 @@ export function install(
         testId: state.testId,
         hitLimit,
       } satisfies PageSettings);
+
+      if (pageHelpers !== undefined) {
+        await context.addInitScript({ content: pageHelpers });
+      }
 
       if (tagHosts !== undefined) {
         await tagPageRequests(context, owningTest, tagHosts);

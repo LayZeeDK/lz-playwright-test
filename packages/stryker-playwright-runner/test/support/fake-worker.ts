@@ -164,7 +164,7 @@ export function fakeInstall(
   async function context(owner: ReturnType<typeof browser> | null = null) {
     const pages: HookedPage[] = [];
     const onPage: ((page: HookedPage) => void)[] = [];
-    const scripts: [unknown, PageSettings][] = [];
+    const scripts: [unknown, PageSettings | undefined][] = [];
     const events: string[] = [];
     const routes: Parameters<HookedContext['route']>[] = [];
     const created: HookedContext = {

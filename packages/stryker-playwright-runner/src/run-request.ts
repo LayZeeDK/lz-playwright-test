@@ -88,6 +88,7 @@ export function runPlan(
   outDir: string,
   testIdHosts?: readonly string[],
   issuedTestIds?: readonly string[],
+  pageHelpers?: string,
 ): RunPlan {
   const mutant = request.kind === 'mutant' ? request : undefined;
   const perTest =
@@ -97,6 +98,7 @@ export function runPlan(
     perTest,
     hitLimit: mutant?.hitLimit,
     testIdHosts: perTest ? testIdHosts : undefined,
+    pageHelpers,
   };
 
   return {

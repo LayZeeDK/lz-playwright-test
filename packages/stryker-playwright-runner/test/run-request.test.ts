@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
+import { isRecord } from '../src/is-record.ts';
 import { runSettingsEnv } from '../src/protocol.ts';
 import {
   dryRunRequest,
@@ -117,6 +118,16 @@ test('a run plan names the webServer hosts for the test id header only when it c
     runPlan(mutantRequest(), 'out', hosts).env[runSettingsEnv],
     '{"outDir":"out","perTest":false}',
   );
+});
+
+test("every run plan gives the workers the init script with Stryker's page helpers", () => {
+  [dryRequest(), mutantRequest()].forEach((request) => {
+    const raw = runPlan(request, 'out', [], [], 'h();').env[runSettingsEnv];
+    const settings: unknown = JSON.parse(raw ?? 'null');
+
+    assert.ok(isRecord(settings));
+    assert.equal(settings['pageHelpers'], 'h();', request.kind);
+  });
 });
 
 test('a run plan issues the test ids to the webServer only when it collects per-test coverage', () => {
