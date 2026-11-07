@@ -130,6 +130,7 @@ export async function startServer(
     },
   );
   const exited = once(child, 'exit');
+  exited.catch(() => undefined);
   t.after(async () => {
     child.kill();
     await exited;
