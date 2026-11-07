@@ -51,6 +51,7 @@ describe('lz-console', () => {
     "report(console.log('saved', on ? 'a' : 'b'));",
     "new console.log('saved', on ? 'a' : 'b');",
     "console['log']('saved', on ? 'a' : 'b');",
+    "console[log]('saved', on ? 'a' : 'b');",
     "export const view = <p>{console.log('saved', on ? 'a' : 'b')}</p>;",
   ].forEach((code) => {
     it(`keeps the mutants of a console call used as an expression or not a plain call: ${code}`, async () => {
