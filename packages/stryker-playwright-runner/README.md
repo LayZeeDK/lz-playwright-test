@@ -236,10 +236,13 @@ code against every test. When the server reached the mutant in the dry run, the 
 global setup fails with the mutant, such as a server that exits at start, the runner starts it again without
 the mutant. If that start fails too, the mutant run fails with the first setup error, so a cause that is not
 the mutant, such as a database that is down, does not count as a kill. If it succeeds, the runner starts the
-`webServer` with the mutant once more. When that start fails as well, the runner starts the `webServer`
-without the mutant for the runs that follow, and the mutant counts as Killed with no test named and that setup
-error as its message; when it succeeds, the run goes on with the mutant, so a global
-setup that fails once at random does not count as a kill either.
+`webServer` with the mutant once more. When that start succeeds, the run goes on with the mutant, so a global
+setup that fails once at random does not count as a kill either. When that start fails as well, the runner
+starts the `webServer` without the mutant for the runs that follow, and the mutant counts as Killed with no
+test named and that setup error in its message. If that last start without the mutant fails, the mutant run
+fails with its error, and Stryker retries the run in a new test runner process. The extra starts count against
+Stryker's timeout for the mutant run, so on a `webServer` that starts slowly, a run that recovers can end as a
+Timeout. Raise `timeoutMS` by about two starts of the `webServer` to cover them.
 
 ### Isolate server-side mutants
 
@@ -259,7 +262,10 @@ once after the dry run's tests, so that Stryker's timeout for each mutant run in
 slow or loaded machine a restart can take longer than that one, so raise `timeoutMS` by about one
 restart of the `webServer`. With `isolate: false`, the timeout includes no restart, so raise `timeoutMS`
 by one restart when the report shows Timeouts for server-side mutants that Stryker ran against every
-test.
+test. When global setup fails with a static mutant, the runner starts the `webServer` up to three more times
+in the same mutant run, as [How a mutant reaches the server](#how-a-mutant-reaches-the-server) describes, and those starts count
+against the same timeout. Raise `timeoutMS` by about two more starts to cover a start that fails once at
+random.
 
 Stryker runs the dry run in one test runner process. With `mutate: true` or `'auto'`, that
 process writes the server-side mutants it found to `.lz-playwright-server-mutants` in Stryker's sandbox,
