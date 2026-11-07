@@ -50,6 +50,7 @@ type ServerProgram =
   | 'answer-continue'
   | 'answer-http2'
   | 'answer-secure-http2'
+  | 'answer-then-exit'
   | 'assign-namespace'
   | 'fails-to-listen'
   | 'lazy-answer'
@@ -156,6 +157,7 @@ export async function startServer(
   return {
     serverDir,
     port,
+    exited,
     run(control: Omit<ServerControl, 'outDir'>) {
       const outDir = path.join(dir, 'runs', String(runs++));
       mkdirSync(outDir, { recursive: true });

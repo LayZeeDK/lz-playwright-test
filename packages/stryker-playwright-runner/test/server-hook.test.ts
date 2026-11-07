@@ -248,6 +248,23 @@ test('coverage goes to the run folder per test id header, with what ran before t
   );
 });
 
+test('hits a request makes after its response ended reach the run folder when the server exits', async (t) => {
+  const server = await startServer(t, { server: 'answer-then-exit' });
+  const outDir = server.run({ perTest: true });
+  await server.ask({ n: 0, testId: 'small' });
+  await server.exited;
+
+  assert.deepEqual(appMutantIdsOf(coverageOf(outDir).perTest['small']), [
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+  ]);
+});
+
 test("module scope evaluated lazily inside a request is static, and the rest of that request is its test's", async (t) => {
   const server = await startServer(t, { server: 'lazy-answer' });
   const outDir = server.run({ perTest: true });
