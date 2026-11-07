@@ -475,6 +475,13 @@ commits after it.
 Stryker disable comment, not a transformation. This is not an lz-tpp misfit, since the skill was never asked to
 pick.
 
+**O53. `lz-refactor` has no route for a refactoring driven by packaging, not by a smell.** Moving the instrumenter
+access into its own module, so another package can copy it byte for byte, answers no smell, so steps 2 to 4 gave no
+guidance. The step that mattered, keeping `resolveFromCore` async so that a throwing default still rejects instead
+of throwing, is not one its checklist prompts for. The mandatory loop audit then cost a read with nothing to audit,
+since no loop moved. Evidence: step 6 chunk 0, commit "refactor(stryker-jsx-mutators): move instrumenter access into
+instrumenter.ts", `step6-chunk0-notes.md`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -639,6 +646,10 @@ no-op control that must stay green, and the test is green against the unmutated 
 
 **S46 (from O52).** When the next test needs a seam the code lacks, have `lz-red` hand off to `lz-refactor` for the
 seam and come back for the red.
+
+**S47 (from O53).** Give `lz-refactor` an entry for a structural need with no smell (a module split for packaging
+or reuse) that asks what callers observe, such as sync against async failure, and skip the loop audit when the
+change moves no loop.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
