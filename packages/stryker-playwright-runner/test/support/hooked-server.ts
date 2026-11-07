@@ -147,7 +147,7 @@ export async function startServer(
     );
   });
   exitedFirst.catch(() => undefined);
-  const listened = await Promise.race([
+  const listened: unknown[] = await Promise.race([
     once(child.stdout, 'data'),
     exitedFirst,
   ]);
