@@ -192,7 +192,8 @@ screenshots, against the repo's own e2e tests on its Vite dev server (`pnpm dev`
    own. `pnpm dev` binds port 5420 from the Vite config and has no port in its command for the runner to
    move. With `webServer.mutate: true`, the runner refuses this at startup and names both ports. With
    `LZ_CORPUS_WEBSERVER_MUTATE=auto`, every process falls back to running without server support, and
-   `reuseExistingServer: true` lets the second process use the first one's server. The canvas config
+   `reuseExistingServer: true` lets the second process use the first one's server. The first process
+   waits out the `webServer` timeout, 300 s here, before it falls back. The canvas config
    runs one process at `concurrency: 1` and keeps port 5420.
 5. Let an in-place run finish. Stryker puts the original files back only when the run ends, and a
    stopped run leaves thousands of files instrumented; restore them from `.stryker-tmp/backup-*`. The
