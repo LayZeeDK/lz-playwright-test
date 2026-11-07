@@ -176,6 +176,67 @@ test('coverage before the first run goes to the first run, and each run gets onl
   );
 });
 
+test('a valid control file, a changed one and a removed one warn nothing', (t) => {
+  const { dir, run, write } = switched(t);
+  const emitWarning = t.mock.method(process, 'emitWarning', () => undefined);
+  write({ perTest: false, activeMutant: '2' });
+  run.startRequest();
+  write({ perTest: false, activeMutant: '3' });
+  run.startRequest();
+  rmSync(path.join(dir, controlFile));
+  run.startRequest();
+
+  assert.equal(emitWarning.mock.callCount(), 0);
+});
+
+test('a run without a hit limit counts no hits', (t) => {
+  const { namespace, run, write } = switched(t);
+  write({ perTest: false, activeMutant: '7', hitLimit: 10 });
+  run.startRequest();
+  write({ perTest: false, activeMutant: '7' });
+  run.startRequest();
+
+  assert.deepEqual(
+    [namespace.hitLimit, namespace.hitCount],
+    [undefined, undefined],
+  );
+});
+
+test('a flush writes only what was hit since the last one, and nothing when nothing was', (t) => {
+  const { namespace, run, write } = switched(t);
+  const coverage: {
+    readonly static: Record<string, number>;
+    readonly perTest: Record<string, Record<string, number>>;
+  } = { static: {}, perTest: {} };
+  namespace.mutantCoverage = coverage;
+  const outDir = write({ perTest: true });
+  run.startRequest();
+  run.flush();
+  coverage.perTest['small'] = { '7': 1 };
+  run.flush();
+  run.flush();
+
+  assert.deepEqual(
+    readSnapshotDir(outDir).snapshots.map(({ coverage }) =>
+      withoutPrototypes(coverage),
+    ),
+    [{ static: {}, perTest: { small: { '7': 1 } } }],
+  );
+});
+
+test('a flush writes static coverage without per-test coverage', (t) => {
+  const { namespace, run, write } = switched(t);
+  namespace.mutantCoverage = { static: { '0': 1 }, perTest: {} };
+  const outDir = write({ perTest: true });
+  run.startRequest();
+  run.flush();
+
+  assert.deepEqual(
+    withoutPrototypes(mergeCoverage(readSnapshotDir(outDir).snapshots)),
+    { static: { '0': 1 }, perTest: {} },
+  );
+});
+
 test('a run folder that is gone drops the coverage without a throw', (t) => {
   const { dir, namespace, run } = switched(t);
   writeServerControl(dir, { outDir: path.join(dir, 'gone'), perTest: true });
