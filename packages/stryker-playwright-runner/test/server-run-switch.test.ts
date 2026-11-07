@@ -65,6 +65,19 @@ test('a request activates the mutant of the control file, and none before there 
   assert.equal(namespace.activeMutant, undefined);
 });
 
+test('the issued test ids are those of the current control file only', (t) => {
+  const { run, write } = switched(t);
+  write({ perTest: true, issuedTestIds: ['big', 'small'] });
+  run.startRequest();
+  write({ perTest: true, issuedTestIds: ['small', 'tall'] });
+  run.startRequest();
+
+  assert.deepEqual(
+    ['big', 'small', 'tall'].map((testId) => run.isIssued(testId)),
+    [false, true, true],
+  );
+});
+
 test('a control file that is gone leaves no control, not the previous run', (t) => {
   const { dir, namespace, run, write } = switched(t);
   write({ perTest: false, activeMutant: '2' });
