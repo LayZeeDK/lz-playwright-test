@@ -370,14 +370,20 @@ test('init names the command that bound the configured port when global setup fa
   });
 });
 
-test("with webServer.mutate: 'auto', init turns server support off with one warning that names the configured port when global setup fails while another server answered there from the start", async (t) => {
+test("with webServer.mutate: 'auto', init turns server support off with one warning that names the configured port and the setup error when global setup fails while another server answered there from the start", async (t) => {
   const serverDirs: (string | undefined)[] = [];
   const { fake, lines, init } = bindingFake(
     t,
-    () => {
+    (reporter) => {
       serverDirs.push(process.env[serverDirEnv]);
 
-      return process.env[serverDirEnv] === undefined ? 'passed' : 'failed';
+      if (process.env[serverDirEnv] === undefined) {
+        return 'passed';
+      }
+
+      reporter.onError?.({ message: 'listen EADDRINUSE' });
+
+      return 'failed';
     },
     async (url) => url.port === '4820',
     'auto',
@@ -387,8 +393,8 @@ test("with webServer.mutate: 'auto', init turns server support off with one warn
 
   assert.deepEqual(warnings(lines), [
     "lzPlaywright.webServer.mutate is 'auto', but Stryker starts more than one test runner process, so each " +
-      "process's webServer moves to a port of its own, and global setup failed while another server answered on " +
-      'port 4820, the configured port of webServer 0, such as the webServer of a process that turned server ' +
+      "process's webServer moves to a port of its own, and global setup failed (Playwright global setup failed:\n" +
+      'listen EADDRINUSE) while another server answered on port 4820, the configured port of webServer 0, such as the webServer of a process that turned server ' +
       "support off. Make the command take its port from PORT, from the webServer's env, or from a --port in the " +
       'command (the runner moves all three), or run Stryker with concurrency 1 and no checker (see More than one ' +
       'Stryker process in the README).' +

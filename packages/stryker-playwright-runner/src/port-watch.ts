@@ -102,10 +102,13 @@ function heldConfiguredPort(
   { index, from }: ServerMove,
   cause: unknown,
 ): ServerSupportRefused {
+  const setupError =
+    cause instanceof Error ? cause.message.trim() : String(cause);
+
   return movedPortRefusal(
     'auto',
-    `global setup failed while another server answered on port ${from}, the configured port of webServer ` +
-      `${index}, such as the webServer of a process that turned server support off`,
+    `global setup failed (${setupError}) while another server answered on port ${from}, the configured ` +
+      `port of webServer ${index}, such as the webServer of a process that turned server support off`,
     cause,
   );
 }
