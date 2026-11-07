@@ -22,6 +22,7 @@ import {
   activeMutantEnv,
   fakePlaywright,
   passAll,
+  stubEnv,
 } from './support/fake-playwright.ts';
 import {
   passAllWithDryRunServerMutants,
@@ -116,6 +117,19 @@ test('global setup starts the webServer with the server hook before the base NOD
   assert.equal(path.basename(setup.serverDir ?? ''), 'server');
   assert.equal(setup.activeMutant, undefined);
   assert.equal(process.env[serverDirEnv], undefined, 'restored after setup');
+});
+
+test('without base NODE_OPTIONS, global setup starts the webServer with only the server hook', async (t) => {
+  const fake = serverFake(t);
+  stubEnv(t, { NODE_OPTIONS: undefined });
+  const { shell } = fake.runner();
+
+  await shell.init();
+
+  assert.deepEqual(
+    fake.setups.map((setup) => setup.nodeOptions),
+    [`--import "${serverHookUrl}"`],
+  );
 });
 
 test('each run writes the control file before its tests run, and a per-test dry run names the webServer hosts and issues the listed test ids', async (t) => {
