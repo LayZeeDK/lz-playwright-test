@@ -110,7 +110,7 @@ Coverage from the browser pages counts for the test that opened the page. Covera
 Playwright worker itself imports counts for the test whose body or `beforeEach` and `afterEach` hooks ran
 it. Code that a `beforeAll` or `afterAll` hook, a fixture, or the import itself ran is reached outside
 any test. With `lzPlaywright.webServer.mutate` on, keep `perTest`: with `off` or `all`, the runner
-restarts the `webServer` before every mutant run, as
+restarts the `webServer` around the run of every server-side mutant, as
 [Before you turn it on](#before-you-turn-it-on) says.
 
 The runner runs more than the tests Stryker selects: the whole `describe.serial` group that a selected
@@ -168,9 +168,12 @@ lzPlaywright: { webServer: { mutate: true } },
   startup with an error that names the cause.
 - `mutate: 'auto'` starts as `true`. When the setup cannot work, the runner logs one warning with the
   cause and runs as with `false`. When the dry run reaches no mutant in the code the `webServer` runs, the
-  runner turns server support off too, with one info line. The fallback applies only at startup. When a
-  later restart of the `webServer` loads no hook, that mutant run fails with the same cause, and Stryker
-  reports the mutant as RuntimeError.
+  runner turns server support off too, with one info line. The fallback applies only when a test runner
+  process starts. When a later restart of the `webServer` loads no hook, that mutant run fails. Stryker
+  then replaces the test runner process with a new one, which repeats the startup check, and runs the
+  mutant again. When the new process falls back, Stryker reports that mutant and every later mutant of the
+  process as RuntimeError. When the mutant run fails twice, Stryker reports the mutant as RuntimeError
+  with the cause.
 
 Start with `true`, so that a setup that cannot work stops with its cause. Use `'auto'` in a config that
 several projects share when some of them have no Node.js `webServer`. No log line says that server
@@ -184,10 +187,10 @@ code.
 - The `webServer` is a Node.js server that serves with `node:http`, `node:https`, or the `node:http2`
   compatibility API, which emits the `'request'` event.
 - `coverageAnalysis` is `'perTest'`, Stryker's default. With `off`, Stryker gives no mutant a test
-  filter, so the runner starts the `webServer` with each run's mutant already active. The runner then
-  restarts the `webServer` before every mutant run, client-side mutants and `isolate: false` included.
-  With `all`, every mutant that a test reached counts as reached outside any test, with the same
-  restarts. Each restart costs what [Isolate server-side mutants](#isolate-server-side-mutants) measures.
+  filter, so every server-side mutant counts as start-up code: the runner restarts the `webServer` with
+  that mutant active before its run, and again before the next run, `isolate: false` included. With
+  `all`, every mutant that a test reached counts as reached outside any test, with the same restarts.
+  Each restart costs what [Isolate server-side mutants](#isolate-server-side-mutants) measures.
 - With a checker, or with `concurrency` above 1, the `command` takes its port from `PORT`, from its
   `env`, or from a port in the `command` itself. See
   [More than one Stryker process](#more-than-one-stryker-process).
@@ -237,8 +240,9 @@ A mutant run can leave state behind in the server, such as a cache filled with i
 next run then reads it. A server-side mutant is one that the server reached in the dry run. With
 `isolate: true`, the default, the runner restarts the `webServer` before a mutant run when that run or
 the one before it in the same process tests a server-side mutant. With `isolate: false`, one server
-serves every run except those of server-side mutants in start-up code, and except those of every
-server-side mutant under `coverageAnalysis: 'off'` or `'all'`. Set it for a server that keeps no state between requests.
+serves every run except those of server-side mutants that Stryker runs against every test, such as
+mutants in start-up code. Under `coverageAnalysis: 'off'` or `'all'`, that is every server-side mutant.
+Set it for a server that keeps no state between requests.
 
 A restart costs the server's start and its cold first requests. On the epic-stack app's Vite dev server,
 one measurement put that at about 10 s per restarted run.
@@ -247,13 +251,16 @@ With `isolate: true`, when the dry run reached a server-side mutant, the runner 
 once after the dry run's tests, so that Stryker's timeout for each mutant run includes one restart. On a
 slow or loaded machine a restart can take longer than that one, so raise `timeoutMS` by about one
 restart of the `webServer`. With `isolate: false`, the timeout includes no restart, so raise `timeoutMS`
-by one restart when the report shows Timeouts for mutants in start-up code.
+by one restart when the report shows Timeouts for server-side mutants that Stryker ran against every
+test.
 
 Stryker runs the dry run in one test runner process. With `mutate: true` or `'auto'`, that
 process writes the server-side mutants it found to `.lz-playwright-server-mutants` in Stryker's sandbox,
-and the other processes read the file when a mutant run needs it. A process that cannot read it restarts
-the `webServer` around every mutant run, with `isolate: false` for every static mutant, and logs one warning. With Stryker's `inPlace: true`, the sandbox
-is the project, so add `.lz-playwright-server-mutants` to `.gitignore`.
+and the other processes read the file when a mutant run needs it. A process that cannot read it logs one
+warning and treats every mutant as server-side. With `isolate: true`, it restarts the `webServer` around
+every mutant run. With `isolate: false`, it restarts the `webServer` around the run of every mutant that
+Stryker runs against every test. With Stryker's `inPlace: true`, the sandbox is the project, so add
+`.lz-playwright-server-mutants` to `.gitignore`.
 
 ### More than one Stryker process
 
@@ -273,17 +280,19 @@ it. The runner moves:
 So the `command` must take its port from one of these. Nothing else moves: another `webServer`'s `env`,
 a `test.use({ baseURL })`, and a URL that a test writes out in full keep the configured port. They reach
 no server, or a server that runs without the mutant, such as a dev server of your own. Reach the
-`webServer` through `PORT`, `baseURL`, or `PLAYWRIGHT_TEST_BASE_URL` instead. A `command` that binds
-the configured port anyway fails the startup as soon as that port answers. The error names both ports.
+`webServer` through `PORT`, `baseURL`, or `PLAYWRIGHT_TEST_BASE_URL` instead. With `mutate: true`, a
+`command` that binds the configured port anyway fails the startup as soon as that port answers, and the
+error names both ports. For `'auto'`, see [When the setup cannot work](#when-the-setup-cannot-work).
 Among the projects that run (see the `projects` option), the runner also refuses a `baseURL` that
 points at no `webServer`, `baseURL`s that point at different `webServer`s, and `baseURL`s that differ
 in anything but the loopback host name, such as their path: Playwright takes one moved `baseURL` for
 every project. Point the `baseURL` of every project that runs at the `url` or `port` of the same
-`webServer`, or leave it unset. Projects whose `baseURL`s differ only in the loopback host name, such as `localhost` and
-`127.0.0.1`, all get the first one's host name. Cookies and a saved `storageState` belong to one host
-name, so a project whose `storageState` was saved for another host name starts logged out. Deriving the
-port from `STRYKER_MUTATOR_WORKER` does not help here, because the runner moves the port either way.
-Only one test runner process, `concurrency` 1 with no checker, keeps the configured port.
+`webServer`, or leave it unset. Projects whose `baseURL`s differ only in the loopback host name, such as
+`localhost` and `127.0.0.1`, all get the first one's host name. Cookies and a saved `storageState`
+belong to one host name, so a project whose `storageState` was saved for another host name starts
+logged out. Deriving the port from `STRYKER_MUTATOR_WORKER` does not help here, because the runner
+moves the port either way. Only one test runner process, `concurrency` 1 with no checker, keeps the
+configured port.
 
 ### When the setup cannot work
 
@@ -304,11 +313,12 @@ warning and the process runs as with `false`:
   global setup's own.
 - The runner cannot move the projects' `baseURL` along with the `webServer`.
 
-Under `'auto'`, the two cases about the configured port cost time or need more setup. When the `command`
-binds the configured port, the process waits until global setup fails, which takes the `webServer`'s
-`timeout`, 60 s by default, before it falls back. When another server answers on the configured port,
-the process falls back to sharing that server, which needs `reuseExistingServer: true`. Otherwise
-Playwright stops the start because the port is already used.
+Under `'auto'`, two of these cases cost time or need more setup: a `command` that binds the configured
+port, and another server that answers on it. When the `command` binds the configured port, the process
+waits until global setup fails, which takes the `webServer`'s `timeout`, 60 s by default, before it
+falls back. When another server answers on the configured port, the process falls back to sharing that
+server, which needs `reuseExistingServer: true`. Otherwise Playwright stops the start because the port
+is already used.
 
 Under `'auto'`, the process that runs the dry run decides for every process. When the dry run reached
 server-side mutants and another process ran as with `false`, that process runs none of its mutants, and
