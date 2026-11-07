@@ -44,6 +44,8 @@ interface Project {
     readonly timeout: number;
     readonly retries?: number;
     readonly use?: { readonly baseURL?: string };
+    readonly dependencies?: readonly string[];
+    readonly teardown?: string;
   };
 }
 

@@ -283,7 +283,8 @@ no server, or a server that runs without the mutant, such as a dev server of you
 `webServer` through `PORT`, `baseURL`, or `PLAYWRIGHT_TEST_BASE_URL` instead. With `mutate: true`, a
 `command` that binds the configured port anyway fails the startup as soon as that port answers, and the
 error names both ports. For `'auto'`, see [When the setup cannot work](#when-the-setup-cannot-work).
-Among the projects that run (see the `projects` option), the runner also refuses a `baseURL` that
+Among the projects that run (see the `projects` option) and their `dependencies` and `teardown` projects,
+the runner also refuses a `baseURL` that
 points at no `webServer`, `baseURL`s that point at different `webServer`s, and `baseURL`s that differ
 in anything but the loopback host name, such as their path: Playwright takes one moved `baseURL` for
 every project. Point the `baseURL` of every project that runs at the `url` or `port` of the same

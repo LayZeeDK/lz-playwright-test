@@ -10,6 +10,7 @@ import type {
 } from '../src/reporter.ts';
 import {
   listTests,
+  projectsPlaywrightRuns,
   projectsThatRun,
   serialGroups,
   withSerialGroups,
@@ -88,6 +89,37 @@ test('without a projects option, listing covers the default projects, which are 
   assert.deepEqual(projectsThatRun(undefined, projects), ['chromium', 'setup']);
   assert.deepEqual(projectsThatRun([], projects), ['chromium', 'setup']);
   assert.deepEqual(projectsThatRun(['smoke'], projects), ['smoke']);
+});
+
+test('the projects a run runs match their names as Playwright matches --project: in any case, with * wildcards', () => {
+  const chromium = { default: true, project: { name: 'chromium' } };
+  const firefox = { default: true, project: { name: 'firefox' } };
+
+  assert.deepEqual(projectsPlaywrightRuns(['Chrom*'], [chromium, firefox]), [
+    chromium,
+  ]);
+});
+
+test('the projects a run runs include the dependencies and teardown of each project it selects, and theirs, as Playwright runs them', () => {
+  const seed = { default: false, project: { name: 'seed' } };
+  const cleanup = { default: false, project: { name: 'cleanup' } };
+  const setup = {
+    default: false,
+    project: { name: 'setup', dependencies: ['seed'], teardown: 'cleanup' },
+  };
+  const chromium = {
+    default: true,
+    project: { name: 'chromium', dependencies: ['setup'] },
+  };
+  const firefox = { default: true, project: { name: 'firefox' } };
+
+  assert.deepEqual(
+    projectsPlaywrightRuns(
+      ['chromium'],
+      [seed, cleanup, setup, chromium, firefox],
+    ),
+    [seed, cleanup, setup, chromium],
+  );
 });
 
 test('listing passes the projects to Playwright and groups the describe.serial tests it lists', async () => {

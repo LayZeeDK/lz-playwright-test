@@ -3,7 +3,7 @@ import { inspect } from 'node:util';
 
 import type { FullResult, Reporter } from '@playwright/test/reporter';
 
-import { fieldOf, isRecord } from './is-record.ts';
+import { fieldOf, isRecord, isStringArray } from './is-record.ts';
 import type { PageSettings } from './protocol.ts';
 
 type Status = FullResult['status'];
@@ -25,6 +25,8 @@ export interface ConfigProject {
     readonly name: string;
     readonly timeout: number;
     readonly retries: number;
+    readonly dependencies?: readonly string[] | undefined;
+    readonly teardown?: string | undefined;
   };
   readonly baseURL?: string | undefined;
 }
@@ -358,8 +360,8 @@ function parseConfig(
   const changed = () =>
     internalsChanged(
       version,
-      'TestRunner.loadConfig() resolving to projects[].default, project.name, project.timeout, project.retries and ' +
-        'expect.timeout, and webServers[].url, port and ignoreHTTPSErrors',
+      'TestRunner.loadConfig() resolving to projects[].default, project.name, project.timeout, project.retries, ' +
+        'project.dependencies, project.teardown and expect.timeout, and webServers[].url, port and ignoreHTTPSErrors',
     );
   const projects = fieldOf(value, 'projects');
   const webServers = fieldOf(value, 'webServers');
@@ -375,6 +377,8 @@ function parseConfig(
       const expectTimeout = fieldOf(expect, 'timeout') ?? undefined;
       const retries = fieldOf(settings, 'retries');
       const baseURL = fieldOf(fieldOf(settings, 'use'), 'baseURL');
+      const dependencies = fieldOf(settings, 'dependencies') ?? [];
+      const teardown = fieldOf(settings, 'teardown');
 
       if (
         !isRecord(project) ||
@@ -382,6 +386,8 @@ function parseConfig(
         typeof settings['name'] !== 'string' ||
         typeof settings['timeout'] !== 'number' ||
         typeof retries !== 'number' ||
+        !isStringArray(dependencies) ||
+        (teardown !== undefined && typeof teardown !== 'string') ||
         (expect !== undefined && !isRecord(expect)) ||
         (expectTimeout !== undefined && typeof expectTimeout !== 'number')
       ) {
@@ -395,6 +401,8 @@ function parseConfig(
           name: settings['name'],
           timeout: settings['timeout'],
           retries,
+          dependencies,
+          teardown,
         },
         ...(typeof baseURL === 'string' ? { baseURL } : {}),
       };

@@ -202,6 +202,38 @@ test('at concurrency 2, init moves the webServer though a project that lzPlaywri
   assert.equal(process.env['PORT'], String(movedPort(fake)));
 });
 
+test('at concurrency 2, init refuses the move when a project that lzPlaywright.projects selects, in another case, depends on a project with its baseURL elsewhere', async (t) => {
+  stubEnv(t, { PORT: undefined, PLAYWRIGHT_TEST_BASE_URL: undefined });
+  const [chromium] = moved.projects;
+  assert.ok(chromium);
+  const fake = serverFake(t, {
+    ...moved,
+    projects: [
+      {
+        ...chromium,
+        project: { ...chromium.project, dependencies: ['auth'] },
+      },
+      {
+        default: false,
+        project: {
+          name: 'auth',
+          timeout: 30_000,
+          use: { baseURL: 'https://auth.example.com' },
+        },
+      },
+    ],
+    urlUp: async () => false,
+  });
+
+  await assert.rejects(
+    fake.runner({ concurrency: 2, projects: ['Chromium'] }).shell.init(),
+    {
+      message:
+        /the baseURL https:\/\/auth\.example\.com points at no webServer/,
+    },
+  );
+});
+
 test('with one process and no checker, init keeps the configured port', async (t) => {
   stubEnv(t, { PORT: undefined });
   const fake = serverFake(t, { ...moved, urlUp: async () => false });

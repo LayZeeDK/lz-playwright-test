@@ -22,6 +22,52 @@ export function projectsThatRun(
         .map(({ project }) => project.name);
 }
 
+interface RunnableProject {
+  readonly project: {
+    readonly name: string;
+    readonly dependencies?: readonly string[] | undefined;
+    readonly teardown?: string | undefined;
+  };
+}
+
+export function projectsPlaywrightRuns<TProject extends RunnableProject>(
+  names: readonly string[],
+  projects: readonly TProject[],
+): readonly TProject[] {
+  const patterns = names.map(playwrightProjectPattern);
+  const running = new Set<TProject>();
+  const visitWithDependenciesAndTeardown = (selected: TProject) => {
+    if (running.has(selected)) {
+      return;
+    }
+
+    running.add(selected);
+    const { dependencies = [], teardown } = selected.project;
+    const needed = new Set([...dependencies, teardown]);
+    projects
+      .filter(({ project }) => needed.has(project.name))
+      .forEach(visitWithDependenciesAndTeardown);
+  };
+  projects
+    .filter(({ project }) =>
+      patterns.some((pattern) =>
+        pattern.test(project.name.toLocaleLowerCase()),
+      ),
+    )
+    .forEach(visitWithDependenciesAndTeardown);
+
+  return projects.filter((project) => running.has(project));
+}
+
+function playwrightProjectPattern(name: string): RegExp {
+  const parts = name
+    .toLocaleLowerCase()
+    .split('*')
+    .map((part) => part.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+
+  return new RegExp(`^${parts.join('.*')}$`);
+}
+
 export async function listTests(
   playwright: Pick<TestRunner, 'listTests'>,
   projects: readonly string[],

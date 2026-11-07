@@ -23,6 +23,7 @@ const noServer = {
   reuseExistingServer: false,
   setsNodeOptions: false,
 };
+const noDependencies = { dependencies: [], teardown: undefined };
 
 function fakeModules(
   methods: readonly string[] = testRunnerMethods,
@@ -202,7 +203,13 @@ test('the test runner resolves loadConfig to the project and web server fields t
         {
           default: true,
           expect: { timeout: 5, toPass: {} },
-          project: { name: 'a', timeout: 1, retries: 2 },
+          project: {
+            name: 'a',
+            timeout: 1,
+            retries: 2,
+            dependencies: ['b'],
+            teardown: 'c',
+          },
           deps: [],
         },
         {
@@ -232,17 +239,23 @@ test('the test runner resolves loadConfig to the project and web server fields t
       {
         default: true,
         expect: { timeout: 5 },
-        project: { name: 'a', timeout: 1, retries: 2 },
+        project: {
+          name: 'a',
+          timeout: 1,
+          retries: 2,
+          dependencies: ['b'],
+          teardown: 'c',
+        },
       },
       {
         default: false,
         expect: { timeout: undefined },
-        project: { name: 'b', timeout: 0, retries: 0 },
+        project: { name: 'b', timeout: 0, retries: 0, ...noDependencies },
       },
       {
         default: true,
         expect: undefined,
-        project: { name: 'c', timeout: 2, retries: 0 },
+        project: { name: 'c', timeout: 2, retries: 0, ...noDependencies },
       },
     ],
     webServers: [
@@ -335,12 +348,12 @@ test('the test runner reads loaded config values the way Playwright does: a nume
       {
         default: true,
         expect: undefined,
-        project: { name: 'a', timeout: 1, retries: 0 },
+        project: { name: 'a', timeout: 1, retries: 0, ...noDependencies },
       },
       {
         default: false,
         expect: undefined,
-        project: { name: 'b', timeout: 1, retries: 0 },
+        project: { name: 'b', timeout: 1, retries: 0, ...noDependencies },
       },
     ],
     webServers: [
@@ -383,7 +396,7 @@ test('the test runner reads what Playwright runs though its types refuse it: a f
       {
         default: true,
         expect: { timeout: undefined },
-        project: { name: 'a', timeout: 1, retries: 0 },
+        project: { name: 'a', timeout: 1, retries: 0, ...noDependencies },
       },
     ],
     webServers: [
@@ -433,6 +446,30 @@ const refusedConfigs = [
     {
       projects: [
         { ...validProject, project: { name: 'a', timeout: '1', retries: 0 } },
+      ],
+      webServers: [],
+    },
+  ],
+  [
+    'has a project whose project.dependencies are not all strings',
+    {
+      projects: [
+        {
+          ...validProject,
+          project: { ...validProject.project, dependencies: ['a', 1] },
+        },
+      ],
+      webServers: [],
+    },
+  ],
+  [
+    'has a project with a project.teardown that is no string',
+    {
+      projects: [
+        {
+          ...validProject,
+          project: { ...validProject.project, teardown: ['a'] },
+        },
       ],
       webServers: [],
     },
@@ -522,7 +559,8 @@ refusedConfigs.forEach(([title, config]) => {
     await assert.rejects(runner.loadConfig(), {
       message:
         'Playwright 1.99.0 changed the internals this runner calls (TestRunner.loadConfig() resolving to projects[].default, ' +
-        'project.name, project.timeout, project.retries and expect.timeout, and webServers[].url, port and ignoreHTTPSErrors).',
+        'project.name, project.timeout, project.retries, project.dependencies, project.teardown and expect.timeout, and ' +
+        'webServers[].url, port and ignoreHTTPSErrors).',
     });
   });
 });
