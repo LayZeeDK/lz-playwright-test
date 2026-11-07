@@ -1,0 +1,67 @@
+{
+  "name": "@layzee/stryker-mutator-install",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Installs custom mutators into StrykerJS for the @layzee mutator packages",
+  "keywords": [
+    "stryker",
+    "mutation testing",
+    "mutators"
+  ],
+  "homepage": "https://github.com/LayZeeDK/lz-playwright-test/tree/main/packages/stryker-mutator-install#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LayZeeDK/lz-playwright-test.git",
+    "directory": "packages/stryker-mutator-install"
+  },
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "@layzee/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "peerDependencies": {
+    "@stryker-mutator/core": "~10.1.0"
+  },
+  "nx": {
+    "tags": [
+      "type:lib"
+    ],
+    "targets": {
+      "build": {
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "typecheck": {
+        "dependsOn": [
+          "build",
+          "^typecheck"
+        ]
+      },
+      "lint": {
+        "inputs": [
+          "...",
+          "{workspaceRoot}/tsconfig.base.json"
+        ]
+      }
+    }
+  },
+  "scripts": {
+    "test": "node --conditions=@layzee/source --test test/*.test.ts"
+  }
+}

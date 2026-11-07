@@ -14,6 +14,9 @@
     },
     {
       "path": "./packages/stryker-jsx-mutators"
+    },
+    {
+      "path": "./packages/stryker-mutator-install"
     }
   ]
 }
