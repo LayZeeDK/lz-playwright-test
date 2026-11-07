@@ -166,6 +166,90 @@ them back; only leaving the ignorer out does.
 Leave it out, or add the class to `visibilityClasses`, when your own CSS hides an element through a class
 the list above does not name.
 
+## Hide telemetry mutants with lz-telemetry
+
+Analytics and error-monitoring calls send data that a DOM test does not see, so the mutants in their
+arguments survive. The opt-in `lz-telemetry` ignorer reports them as Ignored, with a reason.
+
+It hides every mutant of a statement that only calls one of these callees:
+
+- Analytics: `gtag`, `window.gtag`, `fbq`, `ttq.track`, `dataLayer.push`, `window.dataLayer.push`,
+  `analytics.track`, `analytics.page`, `analytics.identify`, `analytics.group`, `analytics.alias`,
+  `analytics.screen`, `posthog.capture`, `posthog.identify`, `posthog.group`, `posthog.alias`,
+  `posthog.register`, `posthog.reset`, `mixpanel.track`, `mixpanel.identify`, `mixpanel.register`,
+  `mixpanel.people.set`, `plausible`, `window.plausible`, `umami.track`, `amplitude.track`,
+  `amplitude.logEvent`, and `amplitude.identify`. Reason: "lz-telemetry: analytics call; DOM tests do not
+  observe what it sends".
+- Error monitoring: `Sentry.captureException`, `Sentry.captureMessage`, `Sentry.addBreadcrumb`,
+  `Sentry.setUser`, `Sentry.setTag`, `Sentry.setTags`, `Sentry.setContext`, `Sentry.setExtra`, and
+  `Sentry.flush`. A bare `captureException` or `captureMessage` counts when the file imports it under that
+  name from a `@sentry/` package. Reason: "lz-telemetry: error-monitoring call; DOM tests do not observe
+  what it reports".
+
+The statement can be an optional call, such as `window.gtag?.('event', name)`, and can sit under `await` or
+`void`, such as `await Sentry.flush(2000)`.
+
+The ignorer keeps the mutants in every other case:
+
+- The code uses the call's result, such as `const id = analytics.track('signup')` or `return gtag(...)`.
+- The callee is computed, such as `analytics['track'](...)`, or longer than the listed name, such as
+  `lib.analytics.track(...)`.
+- The callee is `Sentry.init`. Its options, such as `beforeSend`, decide what the app reports, and a unit
+  test can check them.
+
+Add your project's own callees with `lzTelemetry.calls`. They add to the lists above. Reason:
+"lz-telemetry: telemetry call from lzTelemetry.calls; DOM tests do not observe what it sends".
+
+```ts
+appendPlugins: ['@layzee/stryker-playwright-runner', '@layzee/stryker-jsx-mutators'],
+ignorers: ['lz-telemetry'],
+lzTelemetry: {
+  calls: ['track', 'telemetry.send'],
+},
+```
+
+Each entry in `calls` must be an identifier or a dotted chain of identifiers, such as `track` or
+`analytics.track`. Stryker checks it against the schema the plugin exports, and the ignorer throws when it
+is created with any other value.
+
+Leave `lz-telemetry` out when your tests check what the app sends, for example by intercepting the
+analytics request with `page.route`.
+
+## Hide console mutants with lz-console
+
+Console output does not reach the DOM, so the mutants in a `console.log` call's arguments survive. The
+opt-in `lz-console` ignorer hides every mutant of a statement that only calls one of the listed `console`
+methods. Reason: "lz-console: console output; DOM tests do not observe it".
+
+By default it hides `console.log`, `console.debug`, `console.info`, and `console.trace`. It keeps the
+mutants of `console.warn` and `console.error` unless you list them. Set `lzConsole.methods` to choose the
+methods. Your list replaces the default list:
+
+```ts
+appendPlugins: ['@layzee/stryker-playwright-runner', '@layzee/stryker-jsx-mutators'],
+ignorers: ['lz-console'],
+lzConsole: {
+  methods: ['log', 'debug', 'info', 'trace', 'warn'],
+},
+```
+
+`methods` takes the names of the `console` methods: `assert`, `clear`, `count`, `countReset`, `debug`,
+`dir`, `dirxml`, `error`, `group`, `groupCollapsed`, `groupEnd`, `info`, `log`, `table`, `time`,
+`timeEnd`, `timeLog`, `trace`, and `warn`. Stryker checks it against the schema the plugin exports, and the
+ignorer throws when it is created with any other value, such as the typo `lgo`.
+
+As with `lz-telemetry`, the statement can sit under `await` or `void`. The ignorer keeps the mutants of a
+console call whose result the code uses, such as `ok || console.log(message)`, and of a computed callee,
+such as `console['log'](message)`.
+
+## Use several ignorers
+
+List each ignorer you want, after the plugin in `appendPlugins` or `plugins`:
+
+```ts
+ignorers: ['lz-jsx-styling', 'lz-telemetry', 'lz-console'],
+```
+
 ## Turn a mutator off
 
 For the whole project, list the mutator in `mutator.excludedMutations`. The names are case sensitive,
