@@ -453,6 +453,28 @@ worked: in cycle 8 the highest-priority move (two bare names added to the table)
 only when cycle 9's triangulating test asked for it, as the priority order intends. Evidence: W8 `notes.md`, cycles 3,
 8, 9 and 12.
 
+**O50. `lz-red` has no "red against a mutant".** A mutation pass writes tests that kill surviving mutants. Against
+the unmutated source each is green on its first run, which step 5 calls a false green unless it is a
+characterization test, and these are neither. The worker checked the right reason outside the skill: it applied
+each mutant by hand and ran a no-op edit as a control that had to stay Survived. Evidence: mutation pass 4
+`step5-mutation4-notes.md` and `step5-mutation4-cycles.log`.
+
+**O51. `lz-red`'s test-selection moves do not name "one more row".** Both packages register data-driven tables
+(`[...].forEach((x) => it(...))`) under `node:test`, and the best move for most survivors was one more row in an
+existing table. The worked example and the mechanics leaf are Vitest-only. Evidence: mutation pass 4, the lz-console
+and lz-telemetry rows.
+
+**O52. `lz-red` does not hand off to `lz-refactor` when the test needs a seam first.** Three guards in
+`loadPageHelpers` could not be reached because the function imported the installed instrumenter itself. The seams
+leaf points the right way, but reaching a seam needs a behaviour-preserving Extract Function first, and step 1 only
+routes away from `lz-red`, not to `lz-refactor` and back. The refactor went in as its own commit before the reds.
+Evidence: commits "refactor(runner): build the page helpers from a given instrumenter module" and the two test
+commits after it.
+
+`lz-tpp` had nothing to choose in this pass: a test-after pass has no green step, and an equivalent mutant ends in a
+Stryker disable comment, not a transformation. This is not an lz-tpp misfit, since the skill was never asked to
+pick.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -608,6 +630,15 @@ when one behaviour change is pinned by a fixture several tests share.
 
 **S43 (from O49).** Give step 4 a "deferred: file busy" outcome that names what it waits for, beside APPLY and
 DECLINE.
+
+**S44 (from O50).** Add a mutation-testing route to `lz-red` step 5: the red is against the applied mutant, with a
+no-op control that must stay green, and the test is green against the unmutated source by design.
+
+**S45 (from O51).** Name "add a row to an existing table" as a test-selection move, and give the mechanics leaf a
+`node:test` with `assert` variant beside Vitest.
+
+**S46 (from O52).** When the next test needs a seam the code lacks, have `lz-red` hand off to `lz-refactor` for the
+seam and come back for the red.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
