@@ -252,6 +252,35 @@ test('a webServer restarted after it died keeps the static mutant it runs', asyn
   );
 });
 
+test('a static mutant whose dead webServer starts again only without the mutant is killed', async (t) => {
+  let up = true;
+  let failsWithMutant = false;
+  const fake = serverFake(t, {
+    webServers: [{ url: 'http://localhost:4820/' }],
+    globalSetup: () =>
+      failsWithMutant && process.env[activeMutantEnv] !== undefined
+        ? 'failed'
+        : 'passed',
+    urlUp: async () => {
+      const answered = up;
+      up = true;
+
+      return answered;
+    },
+  });
+  const { shell } = fake.runner({ isolate: false });
+  await shell.init();
+  await shell.mutantRun(mutantRunOptions({ mutantActivation: 'static' }));
+  up = false;
+  failsWithMutant = true;
+
+  const result = await shell.mutantRun(
+    mutantRunOptions({ mutantActivation: 'static' }),
+  );
+
+  assert.equal(result.status, MutantRunStatus.Killed);
+});
+
 test('a static mutant that keeps the webServer from starting is killed, with the mutant and the setup error as its message', async (t) => {
   const fake = serverFake(t, {
     globalSetup: (reporter) => {
@@ -280,7 +309,32 @@ test('a static mutant that keeps the webServer from starting is killed, with the
   });
 });
 
-test('after a static mutant kept the webServer from starting, the next run starts it without a mutant', async (t) => {
+test('a static mutant run whose webServer starts neither with the mutant nor without it rejects with the setup error, so Stryker retries it', async (t) => {
+  let broken = false;
+  const fake = serverFake(t, {
+    globalSetup: (reporter) => {
+      if (!broken) {
+        return 'passed';
+      }
+
+      reporter.onError?.({ message: 'seed database unreachable' });
+
+      return 'failed';
+    },
+  });
+  const { shell } = fake.runner({ isolate: false });
+  await shell.init();
+  broken = true;
+
+  await assert.rejects(
+    shell.mutantRun(mutantRunOptions({ mutantActivation: 'static' })),
+    {
+      message: 'Playwright global setup failed:\nseed database unreachable\n',
+    },
+  );
+});
+
+test('a static mutant run whose webServer did not start with the mutant starts it without one, which the next run keeps', async (t) => {
   let up = true;
   const fake = serverFake(t, {
     globalSetup: () => {

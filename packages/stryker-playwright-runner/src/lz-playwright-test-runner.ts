@@ -494,13 +494,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     );
     this.#previousRun = kind;
     const mutant = startupMutantFor(request, serverMutants);
-    await this.#serveMutant(session, mutant, isolate).catch(
-      (error: unknown) => {
-        throw mutant === undefined || error instanceof ServerSupportRefused
-          ? error
-          : new StaticMutantStopsServer(mutant, error);
-      },
-    );
+    await this.#serveMutant(session, mutant, isolate);
     await this.#restartDeadServers(session);
     let output = await this.#runOnce(session, request, deadlineAt);
 
@@ -658,15 +652,29 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     }
 
     forgetHooked(server.dir);
-    await withEnv(
-      {
-        NODE_OPTIONS:
-          `--import "${serverHookUrl}" ${this.#baseNodeOptions ?? ''}`.trim(),
-        [serverDirEnv]: server.dir,
-        [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: mutant,
-      },
-      () => runGlobalSetup(playwright),
-    );
+
+    try {
+      await withEnv(
+        {
+          NODE_OPTIONS:
+            `--import "${serverHookUrl}" ${this.#baseNodeOptions ?? ''}`.trim(),
+          [serverDirEnv]: server.dir,
+          [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: mutant,
+        },
+        () => runGlobalSetup(playwright),
+      );
+    } catch (error) {
+      if (mutant === undefined) {
+        throw error;
+      }
+
+      await this.#globalSetup(playwright, server, undefined).catch(() => {
+        throw error;
+      });
+
+      throw new StaticMutantStopsServer(mutant, error);
+    }
+
     this.#serverMutant = mutant;
 
     if (!(await hookedWithin(server.dir, hookedWaitMs))) {

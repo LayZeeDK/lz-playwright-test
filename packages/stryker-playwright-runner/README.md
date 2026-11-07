@@ -231,8 +231,10 @@ Code that runs once when the server starts, such as module scope, cannot switch 
 module that the server loads at its first request counts as such code too. Stryker runs a mutant in that
 code against every test. When the server reached the mutant in the dry run, the runner restarts the
 `webServer` with the mutant in its environment for that run, and restarts it again for the next run. When
-global setup fails with the mutant, such as a server that exits at start, Stryker counts the mutant as killed
-by no test, with the setup error as its message.
+global setup fails with the mutant, such as a server that exits at start, the runner starts it again without
+the mutant. If that start succeeds, the mutant counts as Killed with no test named and the setup error as its
+message. If it fails too, the mutant run fails with the setup error, so a cause that is not the mutant, such
+as a flaky global setup, does not count as a kill.
 
 ### Isolate server-side mutants
 
