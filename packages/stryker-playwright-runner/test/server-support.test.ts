@@ -410,7 +410,7 @@ test('a static mutant run whose webServer starts neither with the mutant nor wit
   );
 });
 
-test('a static mutant whose webServer did not start with it twice is killed, and the next run starts the webServer without it', async (t) => {
+test('a static mutant whose webServer did not start with it twice is killed, and the next run needs no restart', async (t) => {
   let up = true;
   const fake = serverFake(t, {
     globalSetup: () => {
@@ -434,6 +434,25 @@ test('a static mutant whose webServer did not start with it twice is killed, and
     [undefined, '7', undefined, '7', undefined],
   );
   assert.equal(fake.runs.length, 1);
+});
+
+test('a killed static mutant leaves the webServer started without it', async (t) => {
+  const fake = serverFake(t, {
+    globalSetup: () =>
+      process.env[activeMutantEnv] === undefined ? 'passed' : 'failed',
+  });
+  const { shell } = fake.runner({ isolate: false });
+  await shell.init();
+
+  const killed = await shell.mutantRun(
+    mutantRunOptions({ mutantActivation: 'static' }),
+  );
+
+  assert.equal(killed.status, MutantRunStatus.Killed);
+  assert.deepEqual(
+    fake.setups.map(({ activeMutant }) => activeMutant),
+    [undefined, '7', undefined, '7', undefined],
+  );
 });
 
 test("the dry run merges the server's snapshots with the workers'", async (t) => {

@@ -236,8 +236,9 @@ code against every test. When the server reached the mutant in the dry run, the 
 global setup fails with the mutant, such as a server that exits at start, the runner starts it again without
 the mutant. If that start fails too, the mutant run fails with the first setup error, so a cause that is not
 the mutant, such as a database that is down, does not count as a kill. If it succeeds, the runner starts the
-`webServer` with the mutant once more. When that start fails as well, the mutant counts as Killed with no test
-named and that setup error as its message; when it succeeds, the run goes on with the mutant, so a global
+`webServer` with the mutant once more. When that start fails as well, the runner starts the `webServer`
+without the mutant for the runs that follow, and the mutant counts as Killed with no test named and that setup
+error as its message; when it succeeds, the run goes on with the mutant, so a global
 setup that fails once at random does not count as a kill either.
 
 ### Isolate server-side mutants

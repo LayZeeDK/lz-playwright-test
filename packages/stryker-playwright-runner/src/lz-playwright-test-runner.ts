@@ -651,10 +651,14 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
           : error;
       });
 
-      await start(mutant).catch((retryError: unknown) => {
-        throw retryError instanceof ServerSupportRefused
-          ? retryError
-          : new StaticMutantStopsServer(mutant, retryError);
+      await start(mutant).catch(async (retryError: unknown) => {
+        if (retryError instanceof ServerSupportRefused) {
+          throw retryError;
+        }
+
+        await start(undefined);
+
+        throw new StaticMutantStopsServer(mutant, retryError);
       });
     }
   }
