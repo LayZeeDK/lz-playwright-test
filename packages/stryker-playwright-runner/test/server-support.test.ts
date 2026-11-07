@@ -429,6 +429,38 @@ test('a static mutant run whose webServer starts neither with the mutant nor wit
   );
 });
 
+test('a static mutant run whose webServer fails its last start without the mutant rejects with that error, so Stryker retries it', async (t) => {
+  let startsWithout = 0;
+  const fake = serverFake(t, {
+    globalSetup: (reporter) => {
+      if (process.env[activeMutantEnv] !== undefined) {
+        return 'failed';
+      }
+
+      startsWithout += 1;
+
+      if (startsWithout < 3) {
+        return 'passed';
+      }
+
+      reporter.onError?.({ message: 'seed database unreachable' });
+
+      return 'failed';
+    },
+  });
+  const { shell } = fake.runner({ isolate: false });
+  await shell.init();
+
+  await assert.rejects(
+    shell.mutantRun(mutantRunOptions({ mutantActivation: 'static' })),
+    { message: 'Playwright global setup failed:\nseed database unreachable\n' },
+  );
+  assert.deepEqual(
+    fake.setups.map(({ activeMutant }) => activeMutant),
+    [undefined, '7', undefined, '7', undefined],
+  );
+});
+
 test('a static mutant whose webServer did not start with it twice is killed and leaves the webServer started without it, so the next run needs no restart', async (t) => {
   let up = true;
   const fake = serverFake(t, {
