@@ -1,7 +1,7 @@
 import type { Ignorer } from '@stryker-mutator/api/ignore';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
-import { fieldOf, isRecord } from './is-record.ts';
+import { fieldOf, isRecord, typeOf } from './is-record.ts';
 import { packageName } from './package-name.ts';
 
 const classNamePattern = /^\S+$/;
@@ -213,8 +213,4 @@ function classTexts(node: unknown): string[] {
   ].filter((text) => typeof text === 'string');
 
   return [...own, ...Object.values(node).flatMap(classTexts)];
-}
-
-function typeOf(node: unknown): unknown {
-  return fieldOf(node, 'type');
 }

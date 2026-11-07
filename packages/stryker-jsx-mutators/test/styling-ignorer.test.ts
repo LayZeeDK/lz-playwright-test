@@ -1,18 +1,14 @@
 // The lz-jsx-styling ignorer, through StrykerJS's own instrumenter with only its built-in mutators.
 import assert from 'node:assert/strict';
-import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
-import { pathToFileURL } from 'node:url';
 
-import { strykerCoreSchema } from '@stryker-mutator/api/core';
-
-import { corePackageJson, resolveFromCore } from '../src/install.ts';
+import { resolveFromCore } from '../src/install.ts';
 import {
   strykerValidationSchema,
   stylingIgnorer,
 } from '../src/styling-ignorer.ts';
-import { exportedFunction } from './support/exports.ts';
 import { instrumentFully } from './support/instrument-result.ts';
+import { validateOptions } from './support/validate-options.ts';
 
 const classReason =
   'lz-jsx-styling: class names only style the element; DOM tests do not observe them';
@@ -319,7 +315,10 @@ describe('lz-jsx-styling', () => {
   [
     ['a spread', "{{ ...base, color: on ? 'red' : 'blue' }}"],
     ['a computed key', "{{ [prop]: on ? 'red' : 'blue' }}"],
-    ['a computed key named like a paint key', "{{ [color]: on ? 'red' : 'blue' }}"],
+    [
+      'a computed key named like a paint key',
+      "{{ [color]: on ? 'red' : 'blue' }}",
+    ],
     ['a value that is not an object literal', "{styleOf(on ? 'red' : 'blue')}"],
   ].forEach(([title, value]) => {
     it(`keeps the mutants of a style with ${title}`, async () => {
@@ -390,53 +389,6 @@ describe('lz-jsx-styling', () => {
 });
 
 describe('strykerValidationSchema', () => {
-  /** Stryker's own option check: the core schema merged with `contributions`, as core does after loading plugins. */
-  async function validate(options: object, contributions: readonly object[]) {
-    const config: unknown = await import(
-      pathToFileURL(
-        join(dirname(corePackageJson()), 'dist', 'src', 'config', 'index.js'),
-      ).href
-    );
-    const log: string[] = [];
-    const record = (level: string) => (message: unknown) => {
-      log.push(`${level} ${String(message)}`);
-    };
-    const logger = {
-      debug: () => undefined,
-      info: () => undefined,
-      warn: record('warn'),
-      error: record('error'),
-      trace: () => undefined,
-      fatal: () => undefined,
-      isDebugEnabled: () => false,
-      isTraceEnabled: () => false,
-    };
-    const builder: unknown = Reflect.construct(
-      exportedFunction(config, 'MetaSchemaBuilder'),
-      [strykerCoreSchema, logger],
-    );
-    const schema: unknown = Reflect.apply(
-      exportedFunction(builder, 'buildMetaSchema'),
-      builder,
-      [contributions],
-    );
-    const validator: unknown = Reflect.construct(
-      exportedFunction(config, 'OptionsValidator'),
-      [schema, logger],
-    );
-
-    try {
-      Reflect.apply(exportedFunction(validator, 'validate'), validator, [
-        structuredClone(options),
-        true,
-      ]);
-
-      return { valid: true, log };
-    } catch {
-      return { valid: false, log };
-    }
-  }
-
   const unknownOption = /^warn Unknown stryker config option "lzJsxStyling"/;
 
   it('describes lzJsxStyling.visibilityClasses as a list of class names', () => {
@@ -464,8 +416,10 @@ describe('strykerValidationSchema', () => {
 
   it('lets core accept lzJsxStyling without the unknown-option warning it gives when the schema is missing', async () => {
     const options = { lzJsxStyling: { visibilityClasses: ['closed'] } };
-    const without = await validate(options, []);
-    const withSchema = await validate(options, [strykerValidationSchema]);
+    const without = await validateOptions(options, []);
+    const withSchema = await validateOptions(options, [
+      strykerValidationSchema,
+    ]);
 
     assert.equal(without.valid, true);
     assert.ok(without.log.some((line) => unknownOption.test(line)));
@@ -482,7 +436,7 @@ describe('strykerValidationSchema', () => {
     'closed',
   ].forEach((lzJsxStyling) => {
     it(`lets core refuse lzJsxStyling ${JSON.stringify(lzJsxStyling)}`, async () => {
-      const { valid, log } = await validate({ lzJsxStyling }, [
+      const { valid, log } = await validateOptions({ lzJsxStyling }, [
         strykerValidationSchema,
       ]);
 

@@ -6,9 +6,22 @@ import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
 import { lzJsxMutators } from '../src/index.ts';
+import { strykerValidationSchema as stylingSchema } from '../src/styling-ignorer.ts';
+import { strykerValidationSchema as telemetrySchema } from '../src/telemetry-ignorer.ts';
 import { mutatorNames } from './support/installed.ts';
 
 const entryPath = join(import.meta.dirname, 'fixture', 'entry.ts');
+const ignorers = [
+  'Ignore lz-jsx-styling undefined',
+  'Ignore lz-telemetry undefined',
+];
+const schema = {
+  ...stylingSchema,
+  properties: {
+    ...stylingSchema.properties,
+    ...telemetrySchema.properties,
+  },
+};
 const noOptions =
   '@layzee/stryker-jsx-mutators: the package has no opt-in or experimental mutators yet, so lzJsxMutators() takes ' +
   'no options. Turn a mutator off with mutator.excludedMutations.';
@@ -26,15 +39,15 @@ async function callWith(options: unknown): Promise<void> {
 }
 
 describe('index.ts', () => {
-  it('installs nothing on import, and exports lz-jsx-styling and the options schema', () => {
+  it('installs nothing on import, and exports the ignorers and one options schema for them all', () => {
     const { status, stdout, stderr } = runEntry('import');
 
     assert.equal(status, 0, stderr);
     assert.deepEqual(JSON.parse(stdout), {
       registered: [],
       placerWrapped: false,
-      ignorers: ['Ignore lz-jsx-styling undefined'],
-      schema: true,
+      ignorers,
+      schema,
     });
   });
 
@@ -45,8 +58,8 @@ describe('index.ts', () => {
     assert.deepEqual(JSON.parse(stdout), {
       registered: mutatorNames,
       placerWrapped: true,
-      ignorers: ['Ignore lz-jsx-styling undefined'],
-      schema: true,
+      ignorers,
+      schema,
     });
   });
 
@@ -82,8 +95,8 @@ describe('index.ts', () => {
     assert.deepEqual(JSON.parse(stdout), {
       registered: mutatorNames,
       placerWrapped: true,
-      ignorers: ['Ignore lz-jsx-styling undefined'],
-      schema: true,
+      ignorers,
+      schema,
     });
   });
 });

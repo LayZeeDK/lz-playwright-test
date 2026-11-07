@@ -5,9 +5,23 @@ import { install } from './install.ts';
 import { isRecord } from './is-record.ts';
 import { mutatorsFor } from './mutators.ts';
 import { packageName } from './package-name.ts';
-import { stylingIgnorer } from './styling-ignorer.ts';
+import {
+  strykerValidationSchema as stylingSchema,
+  stylingIgnorer,
+} from './styling-ignorer.ts';
+import {
+  telemetryIgnorer,
+  strykerValidationSchema as telemetrySchema,
+} from './telemetry-ignorer.ts';
 
-export { strykerValidationSchema } from './styling-ignorer.ts';
+/** Stryker reads one schema per plugin module, so it names the options of every ignorer here. */
+export const strykerValidationSchema = {
+  ...stylingSchema,
+  properties: {
+    ...stylingSchema.properties,
+    ...telemetrySchema.properties,
+  },
+};
 
 /** This package has no opt-in or experimental mutators yet, so the options name none. */
 export type LzJsxMutatorOptions = Readonly<Record<string, never>>;
@@ -42,4 +56,5 @@ function assertNoOptions(options: unknown): void {
 
 export const strykerPlugins = [
   declareFactoryPlugin(PluginKind.Ignore, 'lz-jsx-styling', stylingIgnorer),
+  declareFactoryPlugin(PluginKind.Ignore, 'lz-telemetry', telemetryIgnorer),
 ];

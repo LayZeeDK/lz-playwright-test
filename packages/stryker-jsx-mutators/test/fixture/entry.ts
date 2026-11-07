@@ -1,8 +1,4 @@
-// Prints one JSON line: the names this package registered, whether the placer is wrapped, each ignorer's outcome,
-// and whether the entry exports the options schema. With `install`, `taken` or `undefined-option` it first awaits
-// lzJsxMutators().
 import { resolveFromCore } from '../../src/install.ts';
-import { strykerValidationSchema } from '../../src/styling-ignorer.ts';
 import { exportedFunction } from '../support/exports.ts';
 
 const mode = process.argv[2];
@@ -44,6 +40,6 @@ console.log(
       .map(({ name }) => name),
     placerWrapped: own in instrumenter.expressionPlacer.target,
     ignorers,
-    schema: entry.strykerValidationSchema === strykerValidationSchema,
+    schema: entry.strykerValidationSchema,
   }),
 );
