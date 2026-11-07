@@ -4,6 +4,7 @@ import vm from 'node:vm';
 
 import {
   loadPageHelpers,
+  pageHelpersFrom,
   pageHelpersScript,
   StrykerHelpersChanged,
 } from '../src/page-helpers.ts';
@@ -74,6 +75,33 @@ test('an instrumented probe without its probe statement refuses to start', () =>
       error instanceof StrykerHelpersChanged &&
       /no probe statement/.test(error.message),
   );
+});
+
+[
+  { instrumenterModule: {}, refusal: 'it exports no Instrumenter class' },
+  {
+    instrumenterModule: { Instrumenter: class {} },
+    refusal: 'its Instrumenter has no instrument method',
+  },
+  {
+    instrumenterModule: {
+      Instrumenter: class {
+        instrument() {
+          return { files: [] };
+        }
+      },
+    },
+    refusal: 'its Instrumenter returned no instrumented file',
+  },
+].forEach(({ instrumenterModule, refusal }) => {
+  test(`an instrumenter module where ${refusal} refuses to start, saying so`, async () => {
+    await assert.rejects(
+      pageHelpersFrom(instrumenterModule),
+      (error) =>
+        error instanceof StrykerHelpersChanged &&
+        error.message.includes(`(${refusal})`),
+    );
+  });
 });
 
 test('a header that declares no function refuses to start', () => {
