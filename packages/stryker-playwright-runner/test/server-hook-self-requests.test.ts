@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { once } from 'node:events';
+import net from 'node:net';
 import { before, test } from 'node:test';
 
 import { untaggedArrival } from '../src/server-protocol.ts';
@@ -15,6 +17,21 @@ import {
 } from './support/hooked-server.ts';
 
 const server = 'self-request';
+
+async function canListenOn(host: string): Promise<boolean> {
+  const probe = net.createServer().listen(0, host);
+
+  try {
+    await once(probe, 'listening');
+    probe.close();
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const ipv6Loopback = await canListenOn('::1');
 
 before(instrumentApp);
 
@@ -225,21 +242,30 @@ test('a request the server sends itself with fetch and the test id header name a
   );
 });
 
-test('a request the server sends with http.get to an IPv6 loopback host of the run carries the test id', async (t) => {
-  const echoPort = await startHeaderEcho(t, '::1');
-  const selfRequesting = await startServer(t, { server });
-  selfRequesting.run({ perTest: true, testIdHosts: [`localhost:${echoPort}`] });
+test(
+  'a request the server sends with http.get to an IPv6 loopback host of the run carries the test id',
+  {
+    skip: ipv6Loopback ? false : '::1 is not available',
+  },
+  async (t) => {
+    const echoPort = await startHeaderEcho(t, '::1');
+    const selfRequesting = await startServer(t, { server });
+    selfRequesting.run({
+      perTest: true,
+      testIdHosts: [`localhost:${echoPort}`],
+    });
 
-  assert.equal(
-    await selfRequesting.ask({
-      n: 2,
-      testId: 'big',
-      via: 'http-get-url',
-      query: { host: '[::1]', port: String(echoPort) },
-    }),
-    'big',
-  );
-});
+    assert.equal(
+      await selfRequesting.ask({
+        n: 2,
+        testId: 'big',
+        via: 'http-get-url',
+        query: { host: '[::1]', port: String(echoPort) },
+      }),
+      'big',
+    );
+  },
+);
 
 test('a request the server sends to another host gets no test id header', async (t) => {
   const otherPort = await startHeaderEcho(t);
