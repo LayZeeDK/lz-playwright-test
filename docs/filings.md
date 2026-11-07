@@ -431,6 +431,28 @@ DECLINE (removes 1 duplicate, adds 1 constant), because the gain is drift risk, 
 declined Introduce Parameter Object for a five-parameter function on churn (about a dozen test calls), which the count
 does not see either. Evidence: W9 `notes.md`, cycles 5 and 9.
 
+**O47 (lz-tpp fit). A table lookup needs two transformations at once.** The `lz-telemetry` ignorer's first vendor
+test looks a dotted callee name up in a table. Its green needed `(constant -> scalar)` for the name and `(scalar ->
+array)` for the table together, and reading `a.b.c` took recursion, which the TypeScript overlay ranks below a loop.
+A single-member test first would have produced code thrown away one cycle later. The worker took the recursive form
+the sibling styling ignorer already uses. The overlay's tail-call concern does not apply at AST depth (three levels
+here). Evidence: W8 `notes.md`, cycles 3 and 9 (session scratchpad, local); commit `31d7180`.
+
+**O48. One behaviour change can turn existing tests red, not one new test.** The package entry's three install tests
+share one expected schema, so adding an ignorer's option turned all three red. The test-first rule "exactly one new
+test fails" has no case for a changed shared expectation. Evidence: W8 `notes.md`, cycle 13 and console C7.
+
+**O49. `lz-refactor` has no "right refactoring, file busy" outcome.** Two APPLY refactorings had to wait because a
+comment reviewer was still working on the same files (one writer per file). The worker logged them as deferred and
+applied them after the earlier commit. Evidence: W8 `notes.md`, console C1 and C2.
+
+O2 and O18 held again: the package's house idiom registers one `it` per table entry, so one vendor-table test went
+red as 27 cases at once, and the worker logged it as one cycle. O12 held again: a helper had to move into test
+support before the next red could use it, and the cycle shape had no slot for that preparatory refactoring. What
+worked: in cycle 8 the highest-priority move (two bare names added to the table) passed, and the import check came
+only when cycle 9's triangulating test asked for it, as the priority order intends. Evidence: W8 `notes.md`, cycles 3,
+8, 9 and 12.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -580,6 +602,12 @@ the split or parse step itself, and that guards a boundary needs get their own r
 
 **S41 (from O46).** In `lz-red` step 5, allow a filtered run for the red when the file is slow, with the full file
 run at green, and say so in the cycle log.
+
+**S42 (from O48).** Let a cycle's red be a changed shared expectation in existing tests, named as such in the log,
+when one behaviour change is pinned by a fixture several tests share.
+
+**S43 (from O49).** Give step 4 a "deferred: file busy" outcome that names what it waits for, beside APPLY and
+DECLINE.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
