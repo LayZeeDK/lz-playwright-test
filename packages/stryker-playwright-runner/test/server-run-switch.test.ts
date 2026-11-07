@@ -76,6 +76,25 @@ test('a control file that is gone leaves no control, not the previous run', (t) 
   assert.equal(namespace.activeMutant, undefined);
 });
 
+test('a control file that cannot be read keeps the previous control, and warns once', (t) => {
+  const { dir, namespace, run, write } = switched(t);
+  const emitWarning = t.mock.method(process, 'emitWarning', () => undefined);
+  write({ perTest: false, activeMutant: '2' });
+  run.startRequest();
+  rmSync(path.join(dir, controlFile));
+  mkdirSync(path.join(dir, controlFile));
+  run.startRequest();
+  run.startRequest();
+
+  assert.equal(namespace.activeMutant, '2');
+  assert.equal(run.control()?.activeMutant, '2');
+  assert.equal(emitWarning.mock.callCount(), 1);
+  assert.match(
+    String(emitWarning.mock.calls[0]?.arguments[0]),
+    /control\.json/,
+  );
+});
+
 test('an invalid control file leaves no control, not the previous run, and warns once', (t) => {
   const { dir, namespace, run, write } = switched(t);
   const emitWarning = t.mock.method(process, 'emitWarning', () => undefined);

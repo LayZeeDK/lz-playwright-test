@@ -27,9 +27,23 @@ export function runSwitch(
   let text: string | undefined;
   let issued: ReadonlySet<string> = new Set();
   let writtenHits = 0;
+  let warnedRead = false;
 
   function currentControl(): ServerControl | undefined {
-    const read = readServerControlText(dir);
+    let read: string | undefined;
+
+    try {
+      read = readServerControlText(dir);
+    } catch (error) {
+      if (!warnedRead) {
+        warnedRead = true;
+        process.emitWarning(
+          `${path.join(dir, controlFile)} cannot be read (${String(error)}), so requests keep the run they had until it can`,
+        );
+      }
+
+      return control;
+    }
 
     if (read === text) {
       return control;

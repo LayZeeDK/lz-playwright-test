@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { isRecord, isStringArray } from './is-record.ts';
+import { fieldOf, isRecord, isStringArray } from './is-record.ts';
 import type { RunSettings } from './protocol.ts';
 
 /** Tells the server hook, in the processes global setup starts, the folder that holds its control file. */
@@ -77,8 +77,12 @@ export function writeServerControl(dir: string, control: ServerControl) {
 export function readServerControlText(dir: string): string | undefined {
   try {
     return fs.readFileSync(path.join(dir, controlFile), 'utf8');
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (fieldOf(error, 'code') === 'ENOENT') {
+      return undefined;
+    }
+
+    throw error;
   }
 }
 
