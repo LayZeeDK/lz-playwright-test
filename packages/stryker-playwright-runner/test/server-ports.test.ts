@@ -431,7 +431,6 @@ const handles = (...webServers: Record<string, unknown>[]): ConfigHandles => ({
     return options;
   },
   cliOverrides: () => ({}),
-  projectsRun: () => [],
 });
 const apartBy = (...moves: ServerMove[]): ServersApart => ({
   moves,

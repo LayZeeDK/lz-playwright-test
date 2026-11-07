@@ -73,6 +73,9 @@ export interface ConfigHandles {
   webServerOptions(index: number): Record<string, unknown>;
   /** The CLI overrides Playwright merges over each project's use. */
   cliOverrides(): Record<string, unknown>;
+}
+
+export interface ProjectSelection {
   projectsRun(names: readonly string[] | undefined): readonly ConfigProject[];
 }
 
@@ -173,7 +176,7 @@ export interface Playwright {
   createTestRunner(
     configFile: string | undefined,
     overrides: Record<string, unknown>,
-  ): Promise<TestRunner & ConfigHandles>;
+  ): Promise<TestRunner & ConfigHandles & ProjectSelection>;
   readonly isURLAvailable: CoreBundleModule['utils']['isURLAvailable'];
 }
 
@@ -259,7 +262,7 @@ export function probeInternals(
           version,
           `TestRunner._configCLIOverrides and loadConfig() resolving to plugins[].factory named ${webServerPluginName} with _options`,
         );
-      const runner: TestRunner & ConfigHandles = {
+      const runner: TestRunner & ConfigHandles & ProjectSelection = {
         async initialize(params) {
           await call('initialize', [params]);
         },
@@ -319,7 +322,9 @@ export function probeInternals(
           const projects = fieldOf(loaded, 'projects');
 
           if (!Array.isArray(projects)) {
-            throw changed();
+            throw new Error(
+              'The runner asked for the projects a run runs before it loaded the Playwright config.',
+            );
           }
 
           // Like runTests, no names for an empty list: Playwright 1.63 then runs every project, 1.64 the default ones.
@@ -338,9 +343,9 @@ export function probeInternals(
             throw changed();
           }
 
-          return parseConfig(loaded, version).projects.filter((_, index) =>
-            closure.has(projects[index]),
-          );
+          return projects
+            .filter((project: unknown) => closure.has(project))
+            .map((project: unknown) => parseProject(project, version));
         },
       };
       await runner.initialize({});
@@ -384,54 +389,28 @@ function parseStatus(
   return { status: known };
 }
 
+const configChanged = (version: string) =>
+  internalsChanged(
+    version,
+    'TestRunner.loadConfig() resolving to projects[].default, project.name, project.timeout, project.retries and ' +
+      'expect.timeout, and webServers[].url, port and ignoreHTTPSErrors',
+  );
+
 function parseConfig(
   value: unknown,
   version: string,
 ): Awaited<ReturnType<TestRunner['loadConfig']>> {
-  const changed = () =>
-    internalsChanged(
-      version,
-      'TestRunner.loadConfig() resolving to projects[].default, project.name, project.timeout, project.retries and ' +
-        'expect.timeout, and webServers[].url, port and ignoreHTTPSErrors',
-    );
   const projects = fieldOf(value, 'projects');
   const webServers = fieldOf(value, 'webServers');
 
   if (!Array.isArray(projects) || !Array.isArray(webServers)) {
-    throw changed();
+    throw configChanged(version);
   }
 
   return {
-    projects: projects.map((project: unknown): ConfigProject => {
-      const settings = fieldOf(project, 'project');
-      const expect = fieldOf(project, 'expect');
-      const expectTimeout = fieldOf(expect, 'timeout') ?? undefined;
-      const retries = fieldOf(settings, 'retries');
-      const baseURL = fieldOf(fieldOf(settings, 'use'), 'baseURL');
-
-      if (
-        !isRecord(project) ||
-        !isRecord(settings) ||
-        typeof settings['name'] !== 'string' ||
-        typeof settings['timeout'] !== 'number' ||
-        typeof retries !== 'number' ||
-        (expect !== undefined && !isRecord(expect)) ||
-        (expectTimeout !== undefined && typeof expectTimeout !== 'number')
-      ) {
-        throw changed();
-      }
-
-      return {
-        default: !!project['default'],
-        expect: expect === undefined ? undefined : { timeout: expectTimeout },
-        project: {
-          name: settings['name'],
-          timeout: settings['timeout'],
-          retries,
-        },
-        ...(typeof baseURL === 'string' ? { baseURL } : {}),
-      };
-    }),
+    projects: projects.map((project: unknown) =>
+      parseProject(project, version),
+    ),
     webServers: webServers.map((server: unknown): ConfigWebServer => {
       const configUrl = fieldOf(server, 'url') || undefined;
       const url = configUrl instanceof URL ? configUrl.href : configUrl;
@@ -472,6 +451,37 @@ function parseConfig(
         setsNodeOptions: isRecord(env) && env['NODE_OPTIONS'] !== undefined,
       };
     }),
+  };
+}
+
+function parseProject(project: unknown, version: string): ConfigProject {
+  const settings = fieldOf(project, 'project');
+  const expect = fieldOf(project, 'expect');
+  const expectTimeout = fieldOf(expect, 'timeout') ?? undefined;
+  const retries = fieldOf(settings, 'retries');
+  const baseURL = fieldOf(fieldOf(settings, 'use'), 'baseURL');
+
+  if (
+    !isRecord(project) ||
+    !isRecord(settings) ||
+    typeof settings['name'] !== 'string' ||
+    typeof settings['timeout'] !== 'number' ||
+    typeof retries !== 'number' ||
+    (expect !== undefined && !isRecord(expect)) ||
+    (expectTimeout !== undefined && typeof expectTimeout !== 'number')
+  ) {
+    throw configChanged(version);
+  }
+
+  return {
+    default: !!project['default'],
+    expect: expect === undefined ? undefined : { timeout: expectTimeout },
+    project: {
+      name: settings['name'],
+      timeout: settings['timeout'],
+      retries,
+    },
+    ...(typeof baseURL === 'string' ? { baseURL } : {}),
   };
 }
 

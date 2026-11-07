@@ -496,7 +496,10 @@ test('the projects a run runs fail loudly before a loaded config, and when build
       /^Playwright 1\.99\.0 changed the internals this runner calls \(playwright\/lib\/runner TestRunner with .*projectUtils filterProjects and buildProjectsClosure;/,
   };
 
-  assert.throws(() => runner.projectsRun(undefined), changed);
+  assert.throws(() => runner.projectsRun(undefined), {
+    message:
+      'The runner asked for the projects a run runs before it loaded the Playwright config.',
+  });
   assert.deepEqual(selected, []);
   await runner.loadConfig();
   assert.throws(() => runner.projectsRun(undefined), changed);

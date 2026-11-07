@@ -28,6 +28,7 @@ import {
   loadPlaywright,
   noCopyPromptEnv,
   type Playwright,
+  type ProjectSelection,
   type TestRunner,
 } from './playwright-internals.ts';
 import { globalSetupWatchingConfiguredPorts } from './port-watch.ts';
@@ -140,6 +141,22 @@ class StaticMutantStopsServer extends Error {
   }
 }
 
+async function startError(
+  start: () => Promise<void>,
+): Promise<{ readonly error: unknown } | undefined> {
+  try {
+    await start();
+  } catch (error) {
+    if (error instanceof ServerSupportRefused) {
+      throw error;
+    }
+
+    return { error };
+  }
+
+  return undefined;
+}
+
 const runOverrides = ({
   traced,
   screenshots,
@@ -219,7 +236,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         );
       }
     });
-    let playwright: (TestRunner & ConfigHandles) | undefined;
+    let playwright: (TestRunner & ConfigHandles & ProjectSelection) | undefined;
     let undoMove: (() => void) | undefined;
 
     try {
@@ -587,7 +604,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     this.#log.warn(
       `webServer at ${names} stopped answering; rerunning Playwright global setup (global teardown runs first).`,
     );
-    await this.#startWithStaticMutant(session, this.#serverMutant);
+    await this.#startServer(session, this.#serverMutant);
 
     return true;
   }
@@ -631,35 +648,33 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     this.#log.debug(
       `Restarting the webServer ${mutant === undefined ? 'without a mutant' : `with static mutant ${mutant}`}.`,
     );
-    await this.#startWithStaticMutant(session, mutant);
+    await this.#startServer(session, mutant);
   }
 
-  async #startWithStaticMutant(session: Session, mutant: string | undefined) {
-    const start = (startMutant: string | undefined) =>
+  async #startServer(session: Session, mutant: string | undefined) {
+    const start = (startMutant: string | undefined) => () =>
       this.#globalSetup(session.playwright, session.server, startMutant);
 
-    try {
-      await start(mutant);
-    } catch (error) {
-      if (mutant === undefined || error instanceof ServerSupportRefused) {
-        throw error;
-      }
+    if (mutant === undefined) {
+      return start(undefined)();
+    }
 
-      await start(undefined).catch((fallbackError: unknown) => {
-        throw fallbackError instanceof ServerSupportRefused
-          ? fallbackError
-          : error;
-      });
+    const first = await startError(start(mutant));
 
-      await start(mutant).catch(async (retryError: unknown) => {
-        if (retryError instanceof ServerSupportRefused) {
-          throw retryError;
-        }
+    if (!first) {
+      return;
+    }
 
-        await start(undefined);
+    if (await startError(start(undefined))) {
+      throw first.error;
+    }
 
-        throw new StaticMutantStopsServer(mutant, retryError);
-      });
+    const second = await startError(start(mutant));
+
+    if (second) {
+      await start(undefined)();
+
+      throw new StaticMutantStopsServer(mutant, second.error);
     }
   }
 
