@@ -104,6 +104,15 @@ test('an instrumented probe without its probe statement refuses to start', () =>
   });
 });
 
+test('a probe statement with no header before it refuses to start for the missing helpers', () => {
+  assert.throws(
+    () => pageHelpersScript('lzStrykerProbe = 1 + 1;\n'),
+    (error) =>
+      error instanceof StrykerHelpersChanged &&
+      /declares no helper function/.test(error.message),
+  );
+});
+
 test('a header that declares no function refuses to start', () => {
   assert.throws(
     () => pageHelpersScript('ns();\nlzStrykerProbe = 1 + 1;\n'),
