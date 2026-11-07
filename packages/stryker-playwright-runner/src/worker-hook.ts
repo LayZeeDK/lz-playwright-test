@@ -153,6 +153,7 @@ export function install(
   const tagHosts = perTest ? testIdHosts : undefined;
   const version = playwrightVersion(playwrightRequire);
   const test = currentTestOf(playwrightRequire('playwright/test'), version);
+  const owningTest = () => owningTestId(test);
   const instrumentation = instrumentationOf(
     playwrightRequire('playwright-core'),
     version,
@@ -196,8 +197,7 @@ export function install(
       ...(await readOnce(context.pages())),
     ];
     const outlivedItsTest =
-      perTest &&
-      (state.testId === undefined || state.testId !== owningTestId(test));
+      perTest && (state.testId === undefined || state.testId !== owningTest());
     const lines = snapshots.map((snapshot) =>
       serializeSnapshot({ ...snapshot, outlivedItsTest }),
     );
@@ -234,7 +234,7 @@ export function install(
 
   instrumentation.addListener({
     async runAfterCreateBrowserContext(context) {
-      const state = new ContextState(perTest ? owningTestId(test) : undefined);
+      const state = new ContextState(perTest ? owningTest() : undefined);
       contexts.set(context, state);
       collectBeforeBrowserCloses(context.browser());
       context.on('page', (page) => collectBeforePageCloses(state, page));
@@ -246,13 +246,13 @@ export function install(
       } satisfies PageSettings);
 
       if (tagHosts !== undefined) {
-        await tagPageRequests(context, () => owningTestId(test), tagHosts);
+        await tagPageRequests(context, owningTest, tagHosts);
       }
     },
     runBeforeCloseBrowserContext: collect,
     async runAfterCreateRequestContext(context) {
       if (tagHosts !== undefined) {
-        tagFetches(context, () => owningTestId(test));
+        tagFetches(context, owningTest);
       }
     },
   });
@@ -404,6 +404,11 @@ function nodeTestId(test: CurrentTest): string | undefined {
     : undefined;
 }
 
+/**
+ * The test that a browser context, or a request it sends, belongs to now: none in a beforeAll or afterAll
+ * hook. Unlike nodeTestId, a fixture, a worker fixture included, counts for the current test; collect checks
+ * at close whether the context outlived that test.
+ */
 function owningTestId(test: CurrentTest): string | undefined {
   const running = test();
   const type = running?.slot?.type;
