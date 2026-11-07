@@ -309,6 +309,79 @@ test('a static mutant that keeps the webServer from starting is killed, with the
   });
 });
 
+test('a static mutant whose webServer fails to start once with it, but starts with it again after a start without it, runs its tests', async (t) => {
+  let failures = 1;
+  const fake = serverFake(t, {
+    globalSetup: () => {
+      if (process.env[activeMutantEnv] === undefined || failures === 0) {
+        return 'passed';
+      }
+
+      failures -= 1;
+
+      return 'failed';
+    },
+  });
+  const { shell } = fake.runner({ isolate: false });
+  await shell.init();
+
+  const result = await shell.mutantRun(
+    mutantRunOptions({ mutantActivation: 'static' }),
+  );
+
+  assert.equal(result.status, MutantRunStatus.Survived);
+  assert.deepEqual(
+    fake.setups.map(({ activeMutant }) => activeMutant),
+    [undefined, '7', undefined, '7'],
+  );
+});
+
+test('a static mutant run whose webServer, started without the mutant after it failed with it, loads no server hook rejects with that refusal', async (t) => {
+  let hookLoads = true;
+  const fake = serverFake(t, {
+    hooked: () => hookLoads,
+    globalSetup: () =>
+      process.env[activeMutantEnv] === undefined ? 'passed' : 'failed',
+  });
+  const { shell } = fake.runner({ isolate: false });
+  await shell.init();
+  hookLoads = false;
+
+  await assert.rejects(
+    shell.mutantRun(mutantRunOptions({ mutantActivation: 'static' })),
+    {
+      message:
+        /^lzPlaywright\.webServer\.mutate is true, but no process that Playwright global setup started loaded the server hook\./,
+    },
+  );
+});
+
+test('a static mutant run whose webServer, started with the mutant again after a start without it, loads no server hook rejects with that refusal', async (t) => {
+  let failures = 1;
+  const fake = serverFake(t, {
+    hooked: () => process.env[activeMutantEnv] === undefined,
+    globalSetup: () => {
+      if (process.env[activeMutantEnv] === undefined || failures === 0) {
+        return 'passed';
+      }
+
+      failures -= 1;
+
+      return 'failed';
+    },
+  });
+  const { shell } = fake.runner({ isolate: false });
+  await shell.init();
+
+  await assert.rejects(
+    shell.mutantRun(mutantRunOptions({ mutantActivation: 'static' })),
+    {
+      message:
+        /^lzPlaywright\.webServer\.mutate is true, but no process that Playwright global setup started loaded the server hook\./,
+    },
+  );
+});
+
 test('a static mutant run whose webServer starts neither with the mutant nor without it rejects with the setup error, so Stryker retries it', async (t) => {
   let broken = false;
   const fake = serverFake(t, {
@@ -317,7 +390,9 @@ test('a static mutant run whose webServer starts neither with the mutant nor wit
         return 'passed';
       }
 
-      reporter.onError?.({ message: 'seed database unreachable' });
+      reporter.onError?.({
+        message: `seed database unreachable (mutant ${process.env[activeMutantEnv]})`,
+      });
 
       return 'failed';
     },
@@ -329,12 +404,13 @@ test('a static mutant run whose webServer starts neither with the mutant nor wit
   await assert.rejects(
     shell.mutantRun(mutantRunOptions({ mutantActivation: 'static' })),
     {
-      message: 'Playwright global setup failed:\nseed database unreachable\n',
+      message:
+        'Playwright global setup failed:\nseed database unreachable (mutant 7)\n',
     },
   );
 });
 
-test('a static mutant run whose webServer did not start with the mutant starts it without one, which the next run keeps', async (t) => {
+test('a static mutant whose webServer did not start with it twice is killed, and the next run starts the webServer without it', async (t) => {
   let up = true;
   const fake = serverFake(t, {
     globalSetup: () => {
@@ -346,13 +422,16 @@ test('a static mutant run whose webServer did not start with the mutant starts i
   });
   const { shell } = fake.runner({ isolate: false });
   await shell.init();
-  await shell.mutantRun(mutantRunOptions({ mutantActivation: 'static' }));
+  const killed = await shell.mutantRun(
+    mutantRunOptions({ mutantActivation: 'static' }),
+  );
 
   await shell.mutantRun(runtimeRun('8'));
 
+  assert.equal(killed.status, MutantRunStatus.Killed);
   assert.deepEqual(
     fake.setups.map(({ activeMutant }) => activeMutant),
-    [undefined, '7', undefined],
+    [undefined, '7', undefined, '7', undefined],
   );
   assert.equal(fake.runs.length, 1);
 });

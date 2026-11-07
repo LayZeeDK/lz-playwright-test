@@ -587,11 +587,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     this.#log.warn(
       `webServer at ${names} stopped answering; rerunning Playwright global setup (global teardown runs first).`,
     );
-    await this.#globalSetup(
-      session.playwright,
-      session.server,
-      this.#serverMutant,
-    );
+    await this.#startWithStaticMutant(session, this.#serverMutant);
 
     return true;
   }
@@ -635,7 +631,32 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     this.#log.debug(
       `Restarting the webServer ${mutant === undefined ? 'without a mutant' : `with static mutant ${mutant}`}.`,
     );
-    await this.#globalSetup(session.playwright, session.server, mutant);
+    await this.#startWithStaticMutant(session, mutant);
+  }
+
+  async #startWithStaticMutant(session: Session, mutant: string | undefined) {
+    const start = (startMutant: string | undefined) =>
+      this.#globalSetup(session.playwright, session.server, startMutant);
+
+    try {
+      await start(mutant);
+    } catch (error) {
+      if (mutant === undefined || error instanceof ServerSupportRefused) {
+        throw error;
+      }
+
+      await start(undefined).catch((fallbackError: unknown) => {
+        throw fallbackError instanceof ServerSupportRefused
+          ? fallbackError
+          : error;
+      });
+
+      await start(mutant).catch((retryError: unknown) => {
+        throw retryError instanceof ServerSupportRefused
+          ? retryError
+          : new StaticMutantStopsServer(mutant, retryError);
+      });
+    }
   }
 
   /** Global teardown runs first, so this also restarts the webServer that global setup started. */
@@ -651,29 +672,15 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     }
 
     forgetHooked(server.dir);
-
-    try {
-      await withEnv(
-        {
-          NODE_OPTIONS:
-            `--import "${serverHookUrl}" ${this.#baseNodeOptions ?? ''}`.trim(),
-          [serverDirEnv]: server.dir,
-          [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: mutant,
-        },
-        () => runGlobalSetup(playwright),
-      );
-    } catch (error) {
-      if (mutant === undefined) {
-        throw error;
-      }
-
-      await this.#globalSetup(playwright, server, undefined).catch(() => {
-        throw error;
-      });
-
-      throw new StaticMutantStopsServer(mutant, error);
-    }
-
+    await withEnv(
+      {
+        NODE_OPTIONS:
+          `--import "${serverHookUrl}" ${this.#baseNodeOptions ?? ''}`.trim(),
+        [serverDirEnv]: server.dir,
+        [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: mutant,
+      },
+      () => runGlobalSetup(playwright),
+    );
     this.#serverMutant = mutant;
 
     if (!(await hookedWithin(server.dir, hookedWaitMs))) {

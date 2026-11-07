@@ -234,9 +234,11 @@ module that the server loads at its first request counts as such code too. Stryk
 code against every test. When the server reached the mutant in the dry run, the runner restarts the
 `webServer` with the mutant in its environment for that run, and restarts it again for the next run. When
 global setup fails with the mutant, such as a server that exits at start, the runner starts it again without
-the mutant. If that start succeeds, the mutant counts as Killed with no test named and the setup error as its
-message. If it fails too, the mutant run fails with the setup error, so a cause that is not the mutant, such
-as a flaky global setup, does not count as a kill.
+the mutant. If that start fails too, the mutant run fails with the first setup error, so a cause that is not
+the mutant, such as a database that is down, does not count as a kill. If it succeeds, the runner starts the
+`webServer` with the mutant once more. When that start fails as well, the mutant counts as Killed with no test
+named and that setup error as its message; when it succeeds, the run goes on with the mutant, so a global
+setup that fails once at random does not count as a kill either.
 
 ### Isolate server-side mutants
 
