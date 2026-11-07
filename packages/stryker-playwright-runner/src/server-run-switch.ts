@@ -4,7 +4,11 @@ import path from 'node:path';
 import { isRecord } from './is-record.ts';
 import type { StrykerNamespace } from './namespace.ts';
 import { serializeSnapshot } from './protocol.ts';
-import { readServerControl, type ServerControl } from './server-protocol.ts';
+import {
+  discardedCoverageKey,
+  readServerControl,
+  type ServerControl,
+} from './server-protocol.ts';
 
 export interface RunSwitch {
   readonly control: () => ServerControl | undefined;
@@ -81,6 +85,7 @@ function takeCoverage(namespace: StrykerNamespace): unknown {
   }
 
   const { static: hits, perTest } = coverage;
+  delete perTest[discardedCoverageKey];
 
   if (Object.keys(hits).length === 0 && Object.keys(perTest).length === 0) {
     return undefined;
