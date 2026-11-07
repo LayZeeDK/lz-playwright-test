@@ -129,9 +129,10 @@ export async function startServer(
       stdio: ['ignore', 'pipe', 'inherit'],
     },
   );
+  const exited = once(child, 'exit');
   t.after(async () => {
     child.kill();
-    await once(child, 'exit');
+    await exited;
   });
   const listened: unknown[] = await once(child.stdout, 'data');
   const port = Number(String(listened[0]).trim());
