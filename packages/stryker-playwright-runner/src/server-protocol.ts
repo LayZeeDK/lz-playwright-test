@@ -15,7 +15,6 @@ export const hookedPrefix = 'hooked-';
 export const serverSnapshotPrefix = 'server-';
 /** A per-test coverage key for a request that came without a test id header, followed by its arrival time. */
 export const untaggedPrefix = 'lz-stryker-untagged@';
-export const discardedCoverageKey = 'lz-stryker-discarded';
 
 export interface ServerControl extends RunSettings {
   readonly activeMutant?: string | undefined;

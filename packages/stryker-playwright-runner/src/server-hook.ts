@@ -15,7 +15,6 @@ import { snapshotSuffix } from './protocol.ts';
 import {
   hookedPrefix,
   hostKey,
-  discardedCoverageKey,
   serverDirEnv,
   serverSnapshotPrefix,
   testIdHeader,
@@ -26,7 +25,6 @@ import { runSwitch } from './server-run-switch.ts';
 interface RequestTag {
   readonly testId: string | undefined;
   readonly arrivedAt: number;
-  readonly inRun: boolean;
 }
 
 const serverDir = process.env[serverDirEnv];
@@ -83,15 +81,7 @@ export function installServerHook(
     get: () => {
       const tag = requests.getStore();
 
-      if (moduleScopeRunning || tag === undefined) {
-        return undefined;
-      }
-
-      if (!tag.inRun) {
-        return discardedCoverageKey;
-      }
-
-      if (!run.control()?.perTest) {
+      if (moduleScopeRunning || !run.control()?.perTest || tag === undefined) {
         return undefined;
       }
 
@@ -160,7 +150,6 @@ export function installServerHook(
                   ? header
                   : undefined,
               arrivedAt: now(),
-              inRun: run.control() !== undefined,
             },
             original,
           );

@@ -6,7 +6,6 @@ import type { StrykerNamespace } from './namespace.ts';
 import { serializeSnapshot } from './protocol.ts';
 import {
   controlFile,
-  discardedCoverageKey,
   parseServerControl,
   readServerControlText,
   type ServerControl,
@@ -111,7 +110,6 @@ function takeCoverage(namespace: StrykerNamespace): unknown {
   }
 
   const { static: hits, perTest } = coverage;
-  delete perTest[discardedCoverageKey];
 
   if (Object.keys(hits).length === 0 && Object.keys(perTest).length === 0) {
     return undefined;

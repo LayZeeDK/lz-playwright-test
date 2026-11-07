@@ -8,7 +8,6 @@ import { readSnapshotDir, snapshotSuffix } from '../src/protocol.ts';
 import { mergeCoverage } from '../src/run-result.ts';
 import {
   controlFile,
-  discardedCoverageKey,
   type ServerControl,
   serverSnapshotPrefix,
   writeServerControl,
@@ -143,20 +142,6 @@ test('coverage before the first run goes to the first run, and each run gets onl
     withoutPrototypes(mergeCoverage(readSnapshotDir(second).snapshots)),
     { static: {}, perTest: { small: { '7': 1 } } },
   );
-});
-
-test('hits of a request that arrived before any run are dropped, not written', (t) => {
-  const { namespace, run, write } = switched(t);
-  namespace.mutantCoverage = {
-    static: {},
-    perTest: { [discardedCoverageKey]: { '7': 1 } },
-  };
-  const outDir = write({ perTest: true });
-  run.startRequest();
-  run.flush();
-
-  assert.deepEqual(readSnapshotDir(outDir).snapshots, []);
-  assert.deepEqual(namespace.mutantCoverage, { static: {}, perTest: {} });
 });
 
 test('a run folder that is gone drops the coverage without a throw', (t) => {

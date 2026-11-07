@@ -214,7 +214,7 @@ test('code the server runs in a vm realm reports no coverage and gets only the m
   );
 });
 
-test('coverage goes to the run folder per test id header, and a request before the first run counts for nothing', async (t) => {
+test('coverage goes to the run folder per test id header, with what ran before the first run as static', async (t) => {
   const server = await startServer(t);
   await server.ask({ n: 2, testId: 'before-any-run' });
   const first = server.run({ perTest: true });
@@ -232,8 +232,8 @@ test('coverage goes to the run folder per test id header, and a request before t
   );
   assert.deepEqual(
     appMutantIdsOf(coverage.static),
-    ['0'],
-    'module scope only, not a request before any run, such as a readiness check',
+    moduleScopeAndBigRequestIds,
+    'module scope, and a request before any run, such as a readiness check',
   );
   assert.deepEqual(appMutantIdsOf(coverage.perTest['big']), bigRequestIds);
   assert.deepEqual(appMutantIdsOf(coverage.perTest['small']), smallRequestIds);
@@ -257,18 +257,6 @@ test("module scope evaluated lazily inside a request is static, and the rest of 
 
   assert.deepEqual(appMutantIdsOf(coverage.static), ['0']);
   assert.deepEqual(appMutantIdsOf(coverage.perTest['big']), bigRequestIds);
-});
-
-test('module scope evaluated lazily inside a request before the first run stays static, and the rest of that request counts for nothing', async (t) => {
-  const server = await startServer(t, { server: 'lazy-answer' });
-  await server.ask({ n: 2, testId: 'big' });
-  const outDir = server.run({ perTest: true });
-  await server.ask({ n: 0, testId: 'small' });
-
-  const coverage = coverageOf(outDir);
-
-  assert.deepEqual(appMutantIdsOf(coverage.static), ['0']);
-  assert.deepEqual(Object.keys(coverage.perTest), ['small']);
 });
 
 test('hits count as static only until the microtask after the first read of the namespace global', async (t) => {
