@@ -92,6 +92,13 @@ describe('lz-telemetry', () => {
     });
   });
 
+  it('ignores every mutant of a captureException call statement when its @sentry import also names other functions', async () => {
+    await assertEvery(
+      "import { captureException, captureMessage } from '@sentry/node';\ncaptureException(on ? 'a' : 'b');",
+      errorReason,
+    );
+  });
+
   [
     '',
     "import { captureException } from './errors';\n",
