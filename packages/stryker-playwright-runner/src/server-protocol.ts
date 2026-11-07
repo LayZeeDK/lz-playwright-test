@@ -103,9 +103,10 @@ const loopbackHosts: ReadonlySet<string> = new Set([
   'localhost',
   '127.0.0.1',
   '[::1]',
+  '0.0.0.0',
+  '[::]',
 ]);
 
-/** Host and port, with every loopback name as localhost, so the webServer's url matches what a page asks for. */
 export function hostKey(url: URL): string {
   const host = loopbackHosts.has(url.hostname) ? 'localhost' : url.hostname;
   const port = url.port || (url.protocol === 'https:' ? '443' : '80');

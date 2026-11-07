@@ -84,6 +84,11 @@ test('a host key names every loopback host as localhost and fills in the default
   assert.equal(hostKey(new URL('https://app.test/x')), 'app.test:443');
 });
 
+test('a host key names the any-addresses 0.0.0.0 and [::] as localhost, like the loopback hosts', () => {
+  assert.equal(hostKey(new URL('http://0.0.0.0:4820/a')), 'localhost:4820');
+  assert.equal(hostKey(new URL('http://[::]:4820/a')), 'localhost:4820');
+});
+
 test('an untagged key carries its arrival time, and no other key reads as untagged', () => {
   assert.equal(untaggedArrival(untaggedKey(1700000000123)), 1700000000123);
   assert.equal(untaggedArrival('a1b2-c3'), undefined);
