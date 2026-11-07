@@ -388,10 +388,6 @@ function parseConfig(
         throw changed();
       }
 
-      if (baseURL !== undefined && typeof baseURL !== 'string') {
-        throw misconfigured('use.baseURL', 'a string', baseURL);
-      }
-
       return {
         default: !!project['default'],
         expect: expect === undefined ? undefined : { timeout: expectTimeout },

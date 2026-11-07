@@ -285,22 +285,30 @@ test("the test runner reads each project's use.baseURL", async () => {
   );
 });
 
-test('a use.baseURL that is no string is a config mistake', async () => {
+test('a use.baseURL that is no string counts as unset', async () => {
   const runner = await testRunnerAnswering({
     loadConfig: {
       projects: [
         {
           default: true,
-          project: { name: 'a', timeout: 1, retries: 0, use: { baseURL: 1 } },
+          project: {
+            name: 'a',
+            timeout: 1,
+            retries: 0,
+            use: { baseURL: null },
+          },
         },
       ],
       webServers: [],
     },
   });
 
-  await assert.rejects(runner.loadConfig(), {
-    message: "The Playwright config's use.baseURL must be a string, got 1.",
-  });
+  const { projects } = await runner.loadConfig();
+
+  assert.deepEqual(
+    projects.map(({ baseURL }) => baseURL),
+    [undefined],
+  );
 });
 
 test('the test runner reads loaded config values the way Playwright does: a numeric string port, and default and ignoreHTTPSErrors by truthiness', async () => {

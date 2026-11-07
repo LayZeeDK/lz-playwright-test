@@ -144,8 +144,8 @@ test("with webServer.mutate: 'auto', init turns server support off with one warn
   assert.deepEqual(warnings(lines), [
     "lzPlaywright.webServer.mutate is 'auto', but Stryker starts more than one test runner process, so each process " +
       "needs a webServer port of its own, and the runner cannot move the projects' baseURL along: the baseURL " +
-      "http://127.0.0.1:9999 points at no webServer. Point every project's baseURL at the url or port of the same " +
-      'webServer, or leave it unset, or run Stryker with concurrency 1 and no checker (see More than one Stryker ' +
+      'http://127.0.0.1:9999 points at no webServer. Point the baseURL of every project that runs at the url or port ' +
+      'of the same webServer, or leave it unset, or run Stryker with concurrency 1 and no checker (see More than one Stryker ' +
       'process in the README).' +
       autoOff,
   ]);
@@ -154,6 +154,52 @@ test("with webServer.mutate: 'auto', init turns server support off with one warn
     fake.setups.map(({ serverDir }) => serverDir),
     [undefined],
   );
+});
+
+test('at concurrency 2, init moves the webServer though a project that never runs has its baseURL elsewhere', async (t) => {
+  stubEnv(t, { PORT: undefined, PLAYWRIGHT_TEST_BASE_URL: undefined });
+  const fake = serverFake(t, {
+    ...moved,
+    projects: [
+      ...moved.projects,
+      {
+        default: false,
+        project: {
+          name: 'staging',
+          timeout: 30_000,
+          use: { baseURL: 'https://staging.example.com' },
+        },
+      },
+    ],
+    urlUp: async () => false,
+  });
+
+  await fake.runner({ concurrency: 2 }).shell.init();
+
+  assert.equal(process.env['PORT'], String(movedPort(fake)));
+});
+
+test('at concurrency 2, init moves the webServer though a project that lzPlaywright.projects leaves out has its baseURL elsewhere', async (t) => {
+  stubEnv(t, { PORT: undefined, PLAYWRIGHT_TEST_BASE_URL: undefined });
+  const fake = serverFake(t, {
+    ...moved,
+    projects: [
+      ...moved.projects,
+      {
+        default: true,
+        project: {
+          name: 'staging',
+          timeout: 30_000,
+          use: { baseURL: 'https://staging.example.com' },
+        },
+      },
+    ],
+    urlUp: async () => false,
+  });
+
+  await fake.runner({ concurrency: 2, projects: ['chromium'] }).shell.init();
+
+  assert.equal(process.env['PORT'], String(movedPort(fake)));
 });
 
 test('with one process and no checker, init keeps the configured port', async (t) => {

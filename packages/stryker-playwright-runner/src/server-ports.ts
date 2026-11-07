@@ -134,7 +134,7 @@ function cannotMove(
     mutate,
     'Stryker starts more than one test runner process, so each process ' +
       `needs a webServer port of its own, and the runner cannot move the projects' baseURL along: ${reason}. ` +
-      "Point every project's baseURL at the url or port of the same webServer, or leave it unset, " +
+      'Point the baseURL of every project that runs at the url or port of the same webServer, or leave it unset, ' +
       'or run Stryker with concurrency 1 and no checker (see More than one Stryker process in the README).',
   );
 }

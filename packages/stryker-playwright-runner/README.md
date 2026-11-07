@@ -267,11 +267,12 @@ it. The runner moves:
 - the projects' `baseURL`.
 
 So the `command` must take its port from one of these. A `command` that binds the configured port anyway
-fails the startup as soon as that port answers. The error names both ports. The runner also refuses a
-project `baseURL` that points at no `webServer`, projects whose `baseURL`s point at different
-`webServer`s, and projects whose `baseURL`s differ in anything but the loopback host name, such as
-their path: Playwright takes one moved `baseURL` for every project. Point every project's `baseURL`
-at the `url` or `port` of the same `webServer`, or leave it unset. Deriving the port from
+fails the startup as soon as that port answers. The error names both ports. Among the projects that
+run (see the `projects` option), the runner also refuses a `baseURL` that points at no `webServer`,
+`baseURL`s that point at different `webServer`s, and `baseURL`s that differ in anything but the
+loopback host name, such as their path: Playwright takes one moved `baseURL` for every project. Point
+the `baseURL` of every project that runs at the `url` or `port` of the same `webServer`, or leave it
+unset. Deriving the port from
 `STRYKER_MUTATOR_WORKER` does not help here, because the runner moves the port either way. Only one
 test runner process, `concurrency` 1 with no checker, keeps the configured port.
 

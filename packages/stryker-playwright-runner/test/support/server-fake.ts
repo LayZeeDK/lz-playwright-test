@@ -90,10 +90,12 @@ export function serverFake(
     runner: ({
       isolate,
       mutate = true,
+      projects,
       ...strykerOptions
     }: {
       readonly isolate?: boolean;
       readonly mutate?: true | 'auto';
+      readonly projects?: readonly string[];
       readonly timeoutMS?: number;
       readonly concurrency?: number;
       readonly checkers?: readonly string[];
@@ -101,6 +103,7 @@ export function serverFake(
       fake.runner({
         ...strykerOptions,
         lzPlaywright: {
+          ...(projects === undefined ? {} : { projects }),
           webServer: {
             mutate,
             ...(isolate === undefined ? {} : { isolate }),

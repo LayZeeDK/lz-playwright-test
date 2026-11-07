@@ -224,10 +224,20 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       const config = await playwright.loadConfig();
       const timeouts = configTimeouts(config.projects);
       const retriesByProject = configRetries(config.projects, options.retries);
+      const running = projectsThatRun(options.projects, config.projects);
       const apart =
         mutate &&
         startsMoreRunners(this.#strykerOptions, os.availableParallelism())
-          ? await moveServersApart(config, process.env, mutate)
+          ? await moveServersApart(
+              {
+                ...config,
+                projects: config.projects.filter(({ project }) =>
+                  running.includes(project.name),
+                ),
+              },
+              process.env,
+              mutate,
+            )
           : undefined;
 
       if (apart) {
@@ -260,10 +270,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       // Every Stryker test runner process needs the groups, and only one of them runs the dry run.
       // Listed after global setup, like Playwright's own CLI, because test files may read what it
       // creates.
-      const listed = await listTests(
-        playwright,
-        projectsThatRun(options.projects, config.projects),
-      );
+      const listed = await listTests(playwright, running);
       this.#session = {
         options,
         playwright,
