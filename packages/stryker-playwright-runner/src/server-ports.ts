@@ -204,7 +204,7 @@ export function moveWebServerOptions(
 
   if (isRecord(env)) {
     Object.entries(env)
-      .filter(([, value]) => value === String(from))
+      .filter(([, value]) => value === from || value === String(from))
       .forEach(([name]) => {
         env[name] = String(to);
       });

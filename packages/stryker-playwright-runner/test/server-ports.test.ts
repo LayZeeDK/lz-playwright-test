@@ -375,6 +375,14 @@ test('moving a webServer rewrites each env value that is its port, and only thos
   });
 });
 
+test('moving a webServer rewrites an env value that is its port as a number, to a string', () => {
+  const options = { env: { PORT: 4200, OTHER: 42_000 } };
+
+  moveWebServerOptions(options, 4200, 50_010);
+
+  assert.deepEqual(options, { env: { PORT: '50010', OTHER: 42_000 } });
+});
+
 test('moving a webServer rewrites its port where it stands as a word in the command', () => {
   const options = {
     command: 'npm run dev -- --port 4200 --host 0.0.0.0 -p 4200 --id 14200',
