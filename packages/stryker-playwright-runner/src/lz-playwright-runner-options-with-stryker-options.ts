@@ -78,7 +78,7 @@ export const optionProperties = {
       isolate: { type: 'boolean' },
     },
     description:
-      "Mutants in the code the Playwright config's webServer runs. mutate: true runs them, false (the default) leaves them NoCoverage; isolate (default true) keeps server mutant runs apart.",
+      "Mutants in the code the Playwright config's webServer runs. mutate: false (the default) leaves them NoCoverage, true runs them, 'auto' runs them when the setup allows; isolate (default true) keeps server mutant runs apart.",
   },
 };
 
