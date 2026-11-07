@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { type TestContext, test } from 'node:test';
 
@@ -7,6 +7,7 @@ import type { StrykerNamespace } from '../src/namespace.ts';
 import { readSnapshotDir, snapshotSuffix } from '../src/protocol.ts';
 import { mergeCoverage } from '../src/run-result.ts';
 import {
+  controlFile,
   discardedCoverageKey,
   type ServerControl,
   serverSnapshotPrefix,
@@ -63,6 +64,35 @@ test('a request activates the mutant of the control file, and none before there 
   run.startRequest();
 
   assert.equal(namespace.activeMutant, undefined);
+});
+
+test('a control file that is gone leaves no control, not the previous run', (t) => {
+  const { dir, namespace, run, write } = switched(t);
+  write({ perTest: false, activeMutant: '2' });
+  run.startRequest();
+  rmSync(path.join(dir, controlFile));
+  run.startRequest();
+
+  assert.equal(run.control(), undefined);
+  assert.equal(namespace.activeMutant, undefined);
+});
+
+test('an invalid control file leaves no control, not the previous run, and warns once', (t) => {
+  const { dir, namespace, run, write } = switched(t);
+  const emitWarning = t.mock.method(process, 'emitWarning', () => undefined);
+  write({ perTest: false, activeMutant: '2' });
+  run.startRequest();
+  writeFileSync(path.join(dir, controlFile), '{"outDir":');
+  run.startRequest();
+  run.startRequest();
+
+  assert.equal(run.control(), undefined);
+  assert.equal(namespace.activeMutant, undefined);
+  assert.equal(emitWarning.mock.callCount(), 1);
+  assert.match(
+    String(emitWarning.mock.calls[0]?.arguments[0]),
+    /control\.json/,
+  );
 });
 
 test("a run's hit count counts only the hits in that run", (t) => {

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { isRecord, isStringArray } from './is-record.ts';
+import type { RunSettings } from './protocol.ts';
 
 /** Tells the server hook, in the processes global setup starts, the folder that holds its control file. */
 export const serverDirEnv = 'LZ_STRYKER_PLAYWRIGHT_SERVER';
@@ -16,14 +17,9 @@ export const serverSnapshotPrefix = 'server-';
 export const untaggedPrefix = 'lz-stryker-untagged@';
 export const discardedCoverageKey = 'lz-stryker-discarded';
 
-/** What one run tells the server hook, read again on every request. */
-export interface ServerControl {
-  readonly outDir: string;
-  readonly perTest: boolean;
+export interface ServerControl extends RunSettings {
   readonly activeMutant?: string | undefined;
-  readonly hitLimit?: number | undefined;
   readonly issuedTestIds?: readonly string[];
-  readonly testIdHosts?: readonly string[];
 }
 
 export function parseServerControl(raw: string): ServerControl | undefined {
@@ -79,14 +75,18 @@ export function writeServerControl(dir: string, control: ServerControl) {
   writeFileAtomic(dir, controlFile, JSON.stringify(control));
 }
 
-export function readServerControl(dir: string): ServerControl | undefined {
+export function readServerControlText(dir: string): string | undefined {
   try {
-    return parseServerControl(
-      fs.readFileSync(path.join(dir, controlFile), 'utf8'),
-    );
+    return fs.readFileSync(path.join(dir, controlFile), 'utf8');
   } catch {
     return undefined;
   }
+}
+
+export function readServerControl(dir: string): ServerControl | undefined {
+  const text = readServerControlText(dir);
+
+  return text === undefined ? undefined : parseServerControl(text);
 }
 
 export function anyHooked(dir: string): boolean {

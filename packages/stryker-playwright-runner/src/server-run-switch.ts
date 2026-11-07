@@ -5,13 +5,16 @@ import { isRecord } from './is-record.ts';
 import type { StrykerNamespace } from './namespace.ts';
 import { serializeSnapshot } from './protocol.ts';
 import {
+  controlFile,
   discardedCoverageKey,
-  readServerControl,
+  parseServerControl,
+  readServerControlText,
   type ServerControl,
 } from './server-protocol.ts';
 
 export interface RunSwitch {
   readonly control: () => ServerControl | undefined;
+  readonly isIssued: (testId: string) => boolean;
   readonly startRequest: () => void;
   readonly flush: () => void;
 }
@@ -22,12 +25,35 @@ export function runSwitch(
   fileName: string,
 ): RunSwitch {
   let control: ServerControl | undefined;
+  let text: string | undefined;
+  let issued: ReadonlySet<string> = new Set();
   let writtenHits = 0;
+
+  function currentControl(): ServerControl | undefined {
+    const read = readServerControlText(dir);
+
+    if (read === text) {
+      return control;
+    }
+
+    text = read;
+    const next = read === undefined ? undefined : parseServerControl(read);
+    issued = new Set(next?.issuedTestIds);
+
+    if (read !== undefined && next === undefined) {
+      process.emitWarning(
+        `${path.join(dir, controlFile)} holds no valid server control, so requests switch no mutant and count for no run until the runner writes a valid one`,
+      );
+    }
+
+    return next;
+  }
 
   return {
     control: () => control,
+    isIssued: (testId) => issued.has(testId),
     startRequest: () => {
-      const next = readServerControl(dir) ?? control;
+      const next = currentControl();
 
       if (next?.outDir !== control?.outDir) {
         namespace.hitLimit = next?.hitLimit;

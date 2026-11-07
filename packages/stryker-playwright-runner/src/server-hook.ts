@@ -156,8 +156,7 @@ export function installServerHook(
           return requests.run(
             {
               testId:
-                typeof header === 'string' &&
-                run.control()?.issuedTestIds?.includes(header)
+                typeof header === 'string' && run.isIssued(header)
                   ? header
                   : undefined,
               arrivedAt: now(),
