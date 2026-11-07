@@ -5,7 +5,10 @@ nothing in this file has been filed.
 
 ## LayZeeDK/lz-engineering-claude-plugins: lz-tdd findings from first real use
 
-Status: open ledger, nothing filed (started 2026-10-26, last updated 2026-10-27). Plugin: `lz-tdd` 0.0.3
+Status: open ledger, nothing filed (started 2026-10-26, last updated 2026-11-07). The plugin is a prerelease.
+Lars, 2026-11-07: it "failed to verify its lz-refactor worth with evals in the PR branch we're currently running
+as the lz-tdd plugin"; he asked that its use go on and that this ledger record experiences and issues, including
+cases where `lz-tpp` is not a good fit for the green step. Plugin: `lz-tdd` 0.0.3
 (`lz-red`, `lz-tpp`, `lz-refactor`), in its first real use outside its evals: the production hardening of
 `@layzee/stryker-playwright-runner` and `@layzee/stryker-ui-mutators` by four agent workers (Opus 5.5), each
 following an implementation brief. Workers record findings in their progress files
@@ -335,6 +338,65 @@ source, which depends on the build graph. Round 3 added a constant returned from
 O26 held again. A round-2 fix judged its public-API pause by `src/index.ts` and not by module exports. The skill
 does not say to do that. Evidence: `fixU2-A-notes.md`.
 
+The entries from O33 on come from the server support work (2026-11-04 to 2026-11-07): about 100 cycles by
+workers and by Claude, each logged as red, green and refactor in a cycle log (`step5-u*-cycles.log`,
+`step5-mutation*-cycles.log`, `bug-arrival-cycles.log` in the session scratchpad, local). O33 to O38 are cases
+where `lz-tpp` did not fit the green step.
+
+**O33 (lz-tpp fit). The green step picked a platform hook, not a code shape.** Tagging a server's outgoing requests
+with the test id went through three mechanisms: a `globalThis.fetch` wrapper, then a `diagnostics_channel`
+subscriber on `undici:request:create`, then a patch of `http.Agent.prototype.addRequest`. Each swap came from
+`lz-tpp`'s impasse check, which ended in "the low-priority swap" because no simpler test existed. What decided each
+step was which Node.js hook sees every redirect hop and every port, a fact settled by running the test, and the
+list has no entry for swapping one hook for another. Evidence: `step5-u9-cycles.log`, cycles 3 and 7.
+
+**O34 (lz-tpp fit). Behaviour about how, not what.** An atomic write (temp file plus rename) was the behaviour
+under test, so the worker skipped `(nil -> constant)` and wrote the statements whole, and logged that as a
+deviation. Picking a free port by binding port 0 was labelled `(expression -> function)` with "OS behaviour, no
+simpler transformation passes". The list ranks ways to compute a value; when the test pins a side effect's
+mechanism, the first and only passing change is the mechanism. Evidence: `step5-u3-cycles.log`;
+`step5-u4-cycles.log`.
+
+**O35 (lz-tpp fit). Timing and order have no transformation.** A 250 ms poll of ports raced against Playwright's
+global setup was logged as `(if -> while)`, though the loop waits for time to pass and does not iterate toward a
+result. A window that a getter opens and `queueMicrotask` closes was logged as `(unconditional -> if)` plus
+`(variable -> assignment)`. One fix only moved a statement earlier (a deadline computed before the server start)
+and was logged as "statement reorder (no construct added; closest (statement -> statements))". Evidence:
+`step5-u4-cycles.log`; `step5-u1-cycles.log`, cycle 1; `step5-u11-cycles.log`.
+
+**O36 (lz-tpp fit). Literal-only changes got an invented label.** New advice text in an error message and new
+entries in a list of patched prototypes were logged as `(constant -> constant')` five times, a label that is not on
+the canonical list. Changing a message is neither more nor less generic. Evidence: `step5-u6-cycles.log`,
+`step5-u8-cycles.log`.
+
+**O37 (lz-tpp fit). Removing a condition has no entry.** Three greens dropped a clause from a guard so it covered
+more cases, logged as `(specific -> generic)` or "constant -> generic condition". That is the most common way
+code gets more generic, and the list names only additions. Evidence: `step5-u12-cycles.log`, cycles 2 and 4;
+`step5-mutation2-cycles.log`.
+
+**O38 (lz-tpp fit). O15 held again for option parsing.** Thirteen cycles built the `webServer` option and its
+checks, and eight of their greens were `(unconditional -> if)`: one guard per bad input. Across the logs, 56 of 106
+greens name `(unconditional -> if)`. The label was right each time and never changed the choice.
+Evidence: `step5-u2-cycles.log`, `step5-u4-cycles.log`.
+
+**O39. What worked in `lz-tpp`.** The impasse check worked as written three times. Twice it backtracked: the test
+needed several parts at once, so the worker skipped it and passed a simpler test first. Once it routed to a
+refactoring with the test skipped, then a small green. Choosing by priority also caught two wrong first attempts.
+An unconditional `(nil -> constant)` turned seven other tests red and was undone to `(unconditional -> if)`. An
+unconditional extra start failed ten tests and was undone to `(constant -> scalar)`. Evidence:
+`bug-arrival-cycles.log`, cycle 1; `step5-u5-cycles.log`, cycles 2 and 5; `step5-u6-cycles.log`, last cycle;
+`step5-u2-cycles.log`; `step5-u11-cycles.log`.
+
+**O40. Nothing marks an `lz-tpp` call made after the code.** In one cycle the source edit came before the `lz-tpp`
+call, and the worker noted the order itself. The procedure has no check that the transformation was chosen before
+the edit, so a log can name a transformation picked after the fact. Evidence: `step5-u12-cycles.log`, line 4.
+
+**O41. Step 4's DECLINE often rested on reasons outside the count.** Workers declined or deferred refactorings
+because the next cycle would reshape the code, because another worker was editing the same file, or because a
+module may import only from a guarded list. Step 4 counts structure only and has no outcome for "defer to cycle
+N", which workers then tracked by hand and closed in a later cycle. Evidence: `step5-u4-cycles.log`;
+`step5-u3-cycles.log`; `step5-u5-cycles.log`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -453,6 +515,25 @@ exists.
 
 **S31 (from O32).** Let step 4 record that a duplicate is weaker than its original, for example a dropped assert, and
 treat restoring the lost check as reason enough to apply.
+
+**S32 (from O33, O34).** Give `lz-tpp` a case for a green step whose test pins a mechanism: a platform hook, an
+atomic write, an OS call. Say that the choice is between mechanisms, made by running the test against each, and
+that the transformation label adds nothing there.
+
+**S33 (from O35).** Add a note on timing and order: a poll loop is not `(if -> while)` iteration, and moving a
+statement is a valid green with no transformation. Say how to log both.
+
+**S34 (from O36, O37).** Either add entries for changing a literal's text and for removing a condition, or say
+that these are outside the list and how to log them.
+
+**S35 (from O38, O15).** Let `lz-tpp` skip the naming step for a run of guards at a boundary, logged once, so
+the name is given where it can change the choice.
+
+**S36 (from O40).** Ask the cycle log to record the transformation before the green edit, and say what to do when
+the edit came first.
+
+**S37 (from O41).** Give step 4 a "defer" outcome that names the cycle or change that will settle it, and count
+an edit conflict with a parallel worker or a module import rule as a stated reason.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
