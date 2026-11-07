@@ -695,6 +695,14 @@ otherwise:
   system for new free ports on each start.
 - Dependency projects, such as a `setup` project that logs in, run on every mutant run with the mutant
   active. Login in `globalSetup` runs once instead.
+- Playwright sends the source text of a callback to the browser for `evaluate`, `evaluateHandle`, `$eval`,
+  `$$eval`, `evaluateAll`, `waitForFunction`, and `addInitScript`. When `mutate` includes a spec file,
+  Stryker puts calls to its helper functions in that text. The runner defines those helpers in every page
+  and frame of every browser context with an init script, so a mutant in such a callback gets coverage and
+  can be killed. Init scripts do not reach web workers, service workers, or Electron's main process. In a
+  callback for `worker.evaluate` or `electronApplication.evaluate`, the first helper call throws a
+  `ReferenceError`, so the test fails, in the dry run too. Turn off the mutants in such a callback with a
+  `// Stryker disable` comment, or leave that spec file out of `mutate`.
 - Web workers and service workers never get the active mutant, because the runner sets it with a script
   that runs in pages only. A mutant in code that only a worker runs can never be killed: it is
   NoCoverage, or Survived with `coverageAnalysis: 'off'`. Leave such code out of `mutate`. A mutant in
