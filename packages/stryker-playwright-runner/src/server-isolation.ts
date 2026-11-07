@@ -1,8 +1,8 @@
-import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
 import type { RunRequest } from './run-request.ts';
+import { writeFileAtomic } from './server-protocol.ts';
 
 export type RunKind = 'server' | 'other';
 
@@ -41,9 +41,7 @@ export function writeServerMutantsFile(
   dir: string,
   mutants: Iterable<string>,
 ): void {
-  const temp = path.join(dir, `${serverMutantsFile}.${randomUUID()}`);
-  fs.writeFileSync(temp, [...mutants].join('\n'));
-  fs.renameSync(temp, path.join(dir, serverMutantsFile));
+  writeFileAtomic(dir, serverMutantsFile, [...mutants].join('\n'));
 }
 
 export function readServerMutantsFile(dir: string): ServerMutantsFile {

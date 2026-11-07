@@ -86,11 +86,14 @@ export function parseServerControl(raw: string): ServerControl | undefined {
   };
 }
 
-/** Replaces the file in one rename, so a server that reads it mid-write sees the old run or the new one. */
+export function writeFileAtomic(dir: string, name: string, text: string) {
+  const temp = path.join(dir, `${name}.${randomUUID()}`);
+  fs.writeFileSync(temp, text);
+  fs.renameSync(temp, path.join(dir, name));
+}
+
 export function writeServerControl(dir: string, control: ServerControl) {
-  const temp = path.join(dir, `${controlFile}.${randomUUID()}`);
-  fs.writeFileSync(temp, JSON.stringify(control));
-  fs.renameSync(temp, path.join(dir, controlFile));
+  writeFileAtomic(dir, controlFile, JSON.stringify(control));
 }
 
 export function readServerControl(dir: string): ServerControl | undefined {

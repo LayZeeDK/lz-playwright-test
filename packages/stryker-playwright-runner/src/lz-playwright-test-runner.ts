@@ -83,6 +83,7 @@ import {
   type RunKind,
   runKind,
   type ServerMutants,
+  type ServerMutantsFile,
   writeServerMutantsFile,
 } from './server-isolation.ts';
 import {
@@ -151,6 +152,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
   /** The static mutant the webServer last started with. */
   #serverMutant: string | undefined;
   #dryRunServerMutants: ServerMutants | undefined;
+  #serverMutantsFile: ServerMutantsFile | undefined;
   #previousRun: RunKind = 'other';
 
   constructor(
@@ -410,7 +412,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       return session;
     }
 
-    const file = readServerMutantsFile(this.#sandbox);
+    const file = this.#readServerMutantsFile();
 
     if (!('mutants' in file)) {
       return session;
@@ -566,7 +568,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     }
 
     if (this.#dryRunServerMutants === undefined) {
-      const file = readServerMutantsFile(this.#sandbox);
+      const file = this.#readServerMutantsFile();
 
       if ('mutants' in file) {
         this.#dryRunServerMutants = file.mutants;
@@ -579,6 +581,12 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     }
 
     return this.#dryRunServerMutants;
+  }
+
+  #readServerMutantsFile(): ServerMutantsFile {
+    this.#serverMutantsFile ??= readServerMutantsFile(this.#sandbox);
+
+    return this.#serverMutantsFile;
   }
 
   async #serveMutant(
