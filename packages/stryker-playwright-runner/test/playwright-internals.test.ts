@@ -23,7 +23,6 @@ const noServer = {
   reuseExistingServer: false,
   setsNodeOptions: false,
 };
-const noDependencies = { dependencies: [], teardown: undefined };
 
 function fakeModules(
   methods: readonly string[] = testRunnerMethods,
@@ -45,7 +44,13 @@ function fakeModules(
   );
 
   return {
-    runner: { testRunner: { TestRunner } },
+    runner: {
+      testRunner: { TestRunner },
+      projectUtils: {
+        filterProjects: () => [],
+        buildProjectsClosure: () => new Map(),
+      },
+    },
     common: {
       configLoader: { resolveConfigLocation: () => ({}) },
     },
@@ -123,15 +128,31 @@ test('the probe names every internal when one is missing', () => {
     coreBundle: { utils: {} },
   };
   const missingRunner = { ...fakeModules(), runner: {} };
+  const missingProjectUtil = (name: string) => {
+    const modules = fakeModules();
 
-  [missingMethod, missingLoader, missingUtil, missingRunner].forEach(
-    (modules) => {
-      assert.throws(() => probeInternals('1.99.0', modules), {
-        message:
-          /^Playwright 1\.99\.0 changed the internals this runner calls \(playwright\/lib\/runner TestRunner with initialize, .*stopTests; playwright\/lib\/common configLoader; playwright-core coreBundle isURLAvailable\)\.$/,
-      });
-    },
-  );
+    return {
+      ...modules,
+      runner: {
+        ...modules.runner,
+        projectUtils: { ...modules.runner.projectUtils, [name]: undefined },
+      },
+    };
+  };
+
+  [
+    missingMethod,
+    missingLoader,
+    missingUtil,
+    missingRunner,
+    missingProjectUtil('filterProjects'),
+    missingProjectUtil('buildProjectsClosure'),
+  ].forEach((modules) => {
+    assert.throws(() => probeInternals('1.99.0', modules), {
+      message:
+        /^Playwright 1\.99\.0 changed the internals this runner calls \(playwright\/lib\/runner TestRunner with initialize, .*stopTests, and projectUtils filterProjects and buildProjectsClosure; playwright\/lib\/common configLoader; playwright-core coreBundle isURLAvailable\)\.$/,
+    });
+  });
 });
 
 test('the probe names every internal when a module or a step on the path to an internal is not an object', () => {
@@ -203,13 +224,7 @@ test('the test runner resolves loadConfig to the project and web server fields t
         {
           default: true,
           expect: { timeout: 5, toPass: {} },
-          project: {
-            name: 'a',
-            timeout: 1,
-            retries: 2,
-            dependencies: ['b'],
-            teardown: 'c',
-          },
+          project: { name: 'a', timeout: 1, retries: 2 },
           deps: [],
         },
         {
@@ -239,23 +254,17 @@ test('the test runner resolves loadConfig to the project and web server fields t
       {
         default: true,
         expect: { timeout: 5 },
-        project: {
-          name: 'a',
-          timeout: 1,
-          retries: 2,
-          dependencies: ['b'],
-          teardown: 'c',
-        },
+        project: { name: 'a', timeout: 1, retries: 2 },
       },
       {
         default: false,
         expect: { timeout: undefined },
-        project: { name: 'b', timeout: 0, retries: 0, ...noDependencies },
+        project: { name: 'b', timeout: 0, retries: 0 },
       },
       {
         default: true,
         expect: undefined,
-        project: { name: 'c', timeout: 2, retries: 0, ...noDependencies },
+        project: { name: 'c', timeout: 2, retries: 0 },
       },
     ],
     webServers: [
@@ -348,12 +357,12 @@ test('the test runner reads loaded config values the way Playwright does: a nume
       {
         default: true,
         expect: undefined,
-        project: { name: 'a', timeout: 1, retries: 0, ...noDependencies },
+        project: { name: 'a', timeout: 1, retries: 0 },
       },
       {
         default: false,
         expect: undefined,
-        project: { name: 'b', timeout: 1, retries: 0, ...noDependencies },
+        project: { name: 'b', timeout: 1, retries: 0 },
       },
     ],
     webServers: [
@@ -396,7 +405,7 @@ test('the test runner reads what Playwright runs though its types refuse it: a f
       {
         default: true,
         expect: { timeout: undefined },
-        project: { name: 'a', timeout: 1, retries: 0, ...noDependencies },
+        project: { name: 'a', timeout: 1, retries: 0 },
       },
     ],
     webServers: [
@@ -410,6 +419,87 @@ test('the test runner reads what Playwright runs though its types refuse it: a f
       { ...noServer, url: 'http://localhost/health', port: 0 },
     ],
   });
+});
+
+function testRunnerSelecting(
+  projectUtils: Readonly<Record<string, (...args: unknown[]) => unknown>>,
+  projects: readonly unknown[],
+) {
+  const modules = fakeModules(testRunnerMethods, {
+    loadConfig: { projects, webServers: [] },
+  });
+
+  return probeInternals('1.99.0', {
+    ...modules,
+    runner: { ...modules.runner, projectUtils },
+  }).createTestRunner(undefined, {});
+}
+
+test("the projects a run runs are the loaded projects in Playwright's closure of its filterProjects, given no names for an empty list as runTests gives it", async () => {
+  const projects = ['a', 'b', 'c'].map((name) => ({
+    default: true,
+    project: { name, timeout: 1, retries: 0 },
+  }));
+  const [a, , c] = projects;
+  const calls: unknown[][] = [];
+  const runner = await testRunnerSelecting(
+    {
+      filterProjects: (...args) => {
+        calls.push(['filterProjects', ...args]);
+
+        return ['selected'];
+      },
+      buildProjectsClosure: (...args) => {
+        calls.push(['buildProjectsClosure', ...args]);
+
+        return new Map([
+          [c, 'dependency'],
+          [a, 'top-level'],
+        ]);
+      },
+    },
+    projects,
+  );
+  await runner.loadConfig();
+
+  assert.deepEqual(
+    runner.projectsRun(['A*']).map(({ project }) => project.name),
+    ['a', 'c'],
+  );
+  runner.projectsRun([]);
+  runner.projectsRun(undefined);
+  assert.deepEqual(calls, [
+    ['filterProjects', projects, ['A*']],
+    ['buildProjectsClosure', ['selected']],
+    ['filterProjects', projects, undefined],
+    ['buildProjectsClosure', ['selected']],
+    ['filterProjects', projects, undefined],
+    ['buildProjectsClosure', ['selected']],
+  ]);
+});
+
+test('the projects a run runs fail loudly before a loaded config, and when buildProjectsClosure resolves to no Map', async () => {
+  const selected: unknown[] = [];
+  const runner = await testRunnerSelecting(
+    {
+      filterProjects: (...args) => {
+        selected.push(args);
+
+        return [];
+      },
+      buildProjectsClosure: () => [],
+    },
+    [],
+  );
+  const changed = {
+    message:
+      /^Playwright 1\.99\.0 changed the internals this runner calls \(playwright\/lib\/runner TestRunner with .*projectUtils filterProjects and buildProjectsClosure;/,
+  };
+
+  assert.throws(() => runner.projectsRun(undefined), changed);
+  assert.deepEqual(selected, []);
+  await runner.loadConfig();
+  assert.throws(() => runner.projectsRun(undefined), changed);
 });
 
 const validProject = {
@@ -446,30 +536,6 @@ const refusedConfigs = [
     {
       projects: [
         { ...validProject, project: { name: 'a', timeout: '1', retries: 0 } },
-      ],
-      webServers: [],
-    },
-  ],
-  [
-    'has a project whose project.dependencies are not all strings',
-    {
-      projects: [
-        {
-          ...validProject,
-          project: { ...validProject.project, dependencies: ['a', 1] },
-        },
-      ],
-      webServers: [],
-    },
-  ],
-  [
-    'has a project with a project.teardown that is no string',
-    {
-      projects: [
-        {
-          ...validProject,
-          project: { ...validProject.project, teardown: ['a'] },
-        },
       ],
       webServers: [],
     },
@@ -559,8 +625,7 @@ refusedConfigs.forEach(([title, config]) => {
     await assert.rejects(runner.loadConfig(), {
       message:
         'Playwright 1.99.0 changed the internals this runner calls (TestRunner.loadConfig() resolving to projects[].default, ' +
-        'project.name, project.timeout, project.retries, project.dependencies, project.teardown and expect.timeout, and ' +
-        'webServers[].url, port and ignoreHTTPSErrors).',
+        'project.name, project.timeout, project.retries and expect.timeout, and webServers[].url, port and ignoreHTTPSErrors).',
     });
   });
 });
@@ -762,10 +827,11 @@ test('the test runner calls each method on the instance Playwright constructed, 
   });
 
   const reporter = {};
+  const modules = fakeModules();
   const runner = await probeInternals('1.99.0', {
-    ...fakeModules(),
+    ...modules,
     common: { configLoader: { resolveConfigLocation: () => 'location' } },
-    runner: { testRunner: { TestRunner } },
+    runner: { ...modules.runner, testRunner: { TestRunner } },
   }).createTestRunner('playwright.config.ts', { workers: 1 });
   await runner.loadConfig();
   await runner.listTests(reporter, { projects: ['a'] });

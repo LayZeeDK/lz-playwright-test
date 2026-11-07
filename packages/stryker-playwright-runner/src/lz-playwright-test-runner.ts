@@ -53,7 +53,6 @@ import {
 } from './run-result.ts';
 import {
   listTests,
-  projectsPlaywrightRuns,
   projectsThatRun,
   type SerialGroups,
   serialGroups,
@@ -242,7 +241,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
           ? await moveServersApart(
               {
                 ...config,
-                projects: projectsPlaywrightRuns(running, config.projects),
+                projects: playwright.projectsRun(options.projects),
               },
               process.env,
               mutate,

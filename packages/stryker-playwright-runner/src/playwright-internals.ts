@@ -3,7 +3,7 @@ import { inspect } from 'node:util';
 
 import type { FullResult, Reporter } from '@playwright/test/reporter';
 
-import { fieldOf, isRecord, isStringArray } from './is-record.ts';
+import { fieldOf, isRecord } from './is-record.ts';
 import type { PageSettings } from './protocol.ts';
 
 type Status = FullResult['status'];
@@ -25,8 +25,6 @@ export interface ConfigProject {
     readonly name: string;
     readonly timeout: number;
     readonly retries: number;
-    readonly dependencies?: readonly string[] | undefined;
-    readonly teardown?: string | undefined;
   };
   readonly baseURL?: string | undefined;
 }
@@ -75,6 +73,7 @@ export interface ConfigHandles {
   webServerOptions(index: number): Record<string, unknown>;
   /** The CLI overrides Playwright merges over each project's use. */
   cliOverrides(): Record<string, unknown>;
+  projectsRun(names: readonly string[] | undefined): readonly ConfigProject[];
 }
 
 export const testRunnerMethods = [
@@ -194,6 +193,9 @@ export function probeInternals(
 ): Playwright {
   const { runner, common, coreBundle } = modules;
   const TestRunner = fieldOf(fieldOf(runner, 'testRunner'), 'TestRunner');
+  const projectUtils = fieldOf(runner, 'projectUtils');
+  const filterProjects = fieldOf(projectUtils, 'filterProjects');
+  const buildProjectsClosure = fieldOf(projectUtils, 'buildProjectsClosure');
   const configLoader = fieldOf(common, 'configLoader');
   const resolveConfigLocation = fieldOf(configLoader, 'resolveConfigLocation');
   const isURLAvailable = fieldOf(
@@ -204,11 +206,13 @@ export function probeInternals(
   const changed = () =>
     internalsChanged(
       version,
-      `playwright/lib/runner TestRunner with ${testRunnerMethods.join(', ')}; playwright/lib/common configLoader; playwright-core coreBundle isURLAvailable`,
+      `playwright/lib/runner TestRunner with ${testRunnerMethods.join(', ')}, and projectUtils filterProjects and buildProjectsClosure; playwright/lib/common configLoader; playwright-core coreBundle isURLAvailable`,
     );
 
   if (
     typeof TestRunner !== 'function' ||
+    typeof filterProjects !== 'function' ||
+    typeof buildProjectsClosure !== 'function' ||
     typeof resolveConfigLocation !== 'function' ||
     typeof isURLAvailable !== 'function'
   ) {
@@ -311,6 +315,33 @@ export function probeInternals(
 
           return overrides;
         },
+        projectsRun(names) {
+          const projects = fieldOf(loaded, 'projects');
+
+          if (!Array.isArray(projects)) {
+            throw changed();
+          }
+
+          // Like runTests, no names for an empty list: Playwright 1.63 then runs every project, 1.64 the default ones.
+          const selected: unknown = Reflect.apply(
+            filterProjects,
+            projectUtils,
+            [projects, names?.length ? names : undefined],
+          );
+          const closure: unknown = Reflect.apply(
+            buildProjectsClosure,
+            projectUtils,
+            [selected],
+          );
+
+          if (!(closure instanceof Map)) {
+            throw changed();
+          }
+
+          return parseConfig(loaded, version).projects.filter((_, index) =>
+            closure.has(projects[index]),
+          );
+        },
       };
       await runner.initialize({});
 
@@ -360,8 +391,8 @@ function parseConfig(
   const changed = () =>
     internalsChanged(
       version,
-      'TestRunner.loadConfig() resolving to projects[].default, project.name, project.timeout, project.retries, ' +
-        'project.dependencies, project.teardown and expect.timeout, and webServers[].url, port and ignoreHTTPSErrors',
+      'TestRunner.loadConfig() resolving to projects[].default, project.name, project.timeout, project.retries and ' +
+        'expect.timeout, and webServers[].url, port and ignoreHTTPSErrors',
     );
   const projects = fieldOf(value, 'projects');
   const webServers = fieldOf(value, 'webServers');
@@ -377,8 +408,6 @@ function parseConfig(
       const expectTimeout = fieldOf(expect, 'timeout') ?? undefined;
       const retries = fieldOf(settings, 'retries');
       const baseURL = fieldOf(fieldOf(settings, 'use'), 'baseURL');
-      const dependencies = fieldOf(settings, 'dependencies') ?? [];
-      const teardown = fieldOf(settings, 'teardown');
 
       if (
         !isRecord(project) ||
@@ -386,8 +415,6 @@ function parseConfig(
         typeof settings['name'] !== 'string' ||
         typeof settings['timeout'] !== 'number' ||
         typeof retries !== 'number' ||
-        !isStringArray(dependencies) ||
-        (teardown !== undefined && typeof teardown !== 'string') ||
         (expect !== undefined && !isRecord(expect)) ||
         (expectTimeout !== undefined && typeof expectTimeout !== 'number')
       ) {
@@ -401,8 +428,6 @@ function parseConfig(
           name: settings['name'],
           timeout: settings['timeout'],
           retries,
-          dependencies,
-          teardown,
         },
         ...(typeof baseURL === 'string' ? { baseURL } : {}),
       };

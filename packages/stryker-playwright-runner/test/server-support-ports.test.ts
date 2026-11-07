@@ -234,6 +234,21 @@ test('at concurrency 2, init refuses the move when a project that lzPlaywright.p
   );
 });
 
+test("at concurrency 2, init refuses a lzPlaywright.projects name that matches no project with Playwright's own error, before it moves the webServer", async (t) => {
+  stubEnv(t, { PORT: undefined, PLAYWRIGHT_TEST_BASE_URL: undefined });
+  const fake = serverFake(t, { ...moved, urlUp: async () => false });
+
+  await assert.rejects(
+    fake.runner({ concurrency: 2, projects: ['chromiun'] }).shell.init(),
+    {
+      message:
+        'Project(s) "chromiun" not found. Available projects: "chromium"',
+    },
+  );
+  assert.deepEqual(fake.webServerOptions(), moved.webServers);
+  assert.deepEqual(fake.setups, []);
+});
+
 test('with one process and no checker, init keeps the configured port', async (t) => {
   stubEnv(t, { PORT: undefined });
   const fake = serverFake(t, { ...moved, urlUp: async () => false });

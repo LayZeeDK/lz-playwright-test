@@ -134,8 +134,10 @@ exports as `strykerValidationSchema`.
 
 - `configFile`: the Playwright config file, relative to the folder you run Stryker from, not to an Nx
   project's folder. Without it, Playwright looks for `playwright.config.*` in that folder.
-- `projects`: the Playwright projects to run. Without it, the runner runs the projects that Playwright
-  runs without `--project`, so not those with `default: false`.
+- `projects`: the Playwright projects to run, matched as `--project` matches them. Without it, the
+  runner runs the projects that Playwright runs without `--project`, so not those with
+  `default: false`. Names that stop Playwright, such as a name without `*` that matches no project,
+  stop the runner too.
 - `workers`: the Playwright workers per Stryker test runner process. The default is 1. The `workers`
   value in the Playwright config has no effect. The dry run runs the whole suite on these workers, and
   Stryker fails the run when the dry run takes longer than `dryRunTimeoutMinutes`, 5 by default. A suite

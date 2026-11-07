@@ -2,13 +2,14 @@
 // one, with a fake TestRunner that plays what Playwright and the worker hook do.
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import type { TestContext } from 'node:test';
 
 import type { FullResult, Reporter } from '@playwright/test/reporter';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
-import { isRecord } from '../../src/is-record.ts';
+import { fieldOf, isRecord } from '../../src/is-record.ts';
 import type {
   RunTestsParams,
   TestRunner,
@@ -34,6 +35,10 @@ export type Status = FullResult['status'];
 export const activeMutantEnv =
   INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE;
 const fakeGlobal = '__fakePlaywright__';
+const projectUtils = fieldOf(
+  createRequire(import.meta.url)('playwright/lib/runner'),
+  'projectUtils',
+);
 const noProjects = { allTests: () => [], suites: [] };
 
 interface Project {
@@ -47,6 +52,12 @@ interface Project {
     readonly dependencies?: readonly string[];
     readonly teardown?: string;
   };
+}
+
+interface LoadedProject extends Project {
+  readonly project: Project['project'] & { readonly retries: number };
+  readonly deps: readonly LoadedProject[];
+  readonly teardown: LoadedProject | undefined;
 }
 
 interface WebServer {
@@ -169,16 +180,27 @@ export function fakePlaywright(
 
     async loadConfig() {
       calls.push(['loadConfig']);
+      const projects: readonly LoadedProject[] = (
+        behaviour.projects ?? [
+          { default: true, project: { name: 'chromium', timeout: 30_000 } },
+        ]
+      ).map((project) => ({
+        ...project,
+        project: { retries: 0, ...project.project },
+        get deps() {
+          return projects.filter(({ project: { name } }) =>
+            project.project.dependencies?.includes(name),
+          );
+        },
+        get teardown() {
+          return projects.find(
+            ({ project: { name } }) => name === project.project.teardown,
+          );
+        },
+      }));
 
       return {
-        projects: (
-          behaviour.projects ?? [
-            { default: true, project: { name: 'chromium', timeout: 30_000 } },
-          ]
-        ).map((project) => ({
-          ...project,
-          project: { retries: 0, ...project.project },
-        })),
+        projects,
         webServers: (behaviour.webServers ?? []).map((server) => ({
           ignoreHTTPSErrors: false,
           reuseExistingServer: false,
@@ -252,7 +274,7 @@ export function fakePlaywright(
   }
 
   const fake = {
-    runner: { testRunner: { TestRunner: FakeTestRunner } },
+    runner: { testRunner: { TestRunner: FakeTestRunner }, projectUtils },
     common: {
       configLoader: {
         resolveConfigLocation: (file: string | undefined) => ({
