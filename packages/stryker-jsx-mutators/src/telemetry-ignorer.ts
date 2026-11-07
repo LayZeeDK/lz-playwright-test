@@ -114,6 +114,7 @@ function ownCalls(options: object): readonly unknown[] {
   const own = fieldOf(fieldOf(options, 'lzTelemetry'), 'calls');
 
   if (own === undefined) {
+    // Stryker disable next-line ArrayDeclaration: a callee is a dotted name, never "Stryker was here" with its spaces
     return [];
   }
 
