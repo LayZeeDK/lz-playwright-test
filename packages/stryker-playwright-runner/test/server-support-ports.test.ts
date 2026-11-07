@@ -436,6 +436,23 @@ test("with webServer.mutate: 'auto', init turns server support off with one warn
   assert.deepEqual(fake.webServerOptions(), moved.webServers);
 });
 
+test("with webServer.mutate: 'auto', a server that answered on the configured port before global setup but no longer does is not blamed for a failed setup", async (t) => {
+  let setupStarted = false;
+  const { lines, init } = bindingFake(
+    t,
+    () => {
+      setupStarted = true;
+
+      return 'failed';
+    },
+    async (url) => !setupStarted && url.port === '4820',
+    'auto',
+  );
+
+  await assert.rejects(init(), { message: /^Playwright global setup failed/ });
+  assert.deepEqual(warnings(lines), []);
+});
+
 test('a server that answered on the configured port before global setup is not blamed for a failed setup', async (t) => {
   const { init } = bindingFake(
     t,
