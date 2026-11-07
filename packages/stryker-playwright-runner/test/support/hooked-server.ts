@@ -126,16 +126,30 @@ export async function startServer(
         [serverDirEnv]: serverDir,
         ...env,
       },
-      stdio: ['ignore', 'pipe', 'inherit'],
+      stdio: ['ignore', 'pipe', 'pipe'],
     },
   );
+  let stderr = '';
+  child.stderr.on('data', (chunk: Buffer) => {
+    stderr += String(chunk);
+    process.stderr.write(chunk);
+  });
   const exited = once(child, 'exit');
   exited.catch(() => undefined);
   t.after(async () => {
     child.kill();
     await exited;
   });
-  const listened: unknown[] = await once(child.stdout, 'data');
+  const exitedFirst = exited.then(([code]) => {
+    throw new Error(
+      `The server exited with code ${String(code)} before it listened:\n${stderr}`,
+    );
+  });
+  exitedFirst.catch(() => undefined);
+  const listened = await Promise.race([
+    once(child.stdout, 'data'),
+    exitedFirst,
+  ]);
   const port = Number(String(listened[0]).trim());
   let runs = 0;
 
