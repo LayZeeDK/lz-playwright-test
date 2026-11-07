@@ -397,6 +397,19 @@ module may import only from a guarded list. Step 4 counts structure only and has
 N", which workers then tracked by hand and closed in a later cycle. Evidence: `step5-u4-cycles.log`;
 `step5-u3-cycles.log`; `step5-u5-cycles.log`.
 
+**O42 (lz-tpp fit). The simplest transformation was an unbounded loop over I/O.** A fix that waits for a stopped
+server's port to close took `(if -> while)` first, leaving its bound for the next test, as the priority order asks.
+The loop made the new test green and hung three existing tests, whose doubles answered "up" forever. `node:test`'s
+timeout could not stop the dangling loop, and the run hung past 10 minutes. `lz-tpp`'s advice for a red spec is to
+undo and ask again, but the transformation was right and the old doubles were wrong about Playwright. For a loop
+over I/O, a hang costs more than a red, so the bound belongs in the first green. Evidence: W7 `notes.md`, "lz-tdd
+friction" (session scratchpad, local); commit `ca165ff`.
+
+**O43. `lz-red` has nothing on a red that would hang.** The next test, a server that never stops answering, did not
+fail against the unbounded loop. It hung. The worker shaped the double to stop after 200 probes, so the red became
+`Missing expected rejection`. Step 5 asks that the red has run and failed, and says nothing on a test that cannot
+end. Evidence: the same notes.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -534,6 +547,12 @@ the edit came first.
 
 **S37 (from O41).** Give step 4 a "defer" outcome that names the cycle or change that will settle it, and count
 an edit conflict with a parallel worker or a module import rule as a stated reason.
+
+**S38 (from O42).** In `lz-tpp`, say that a loop that waits on I/O or time gets its bound in the same green as the
+loop, ahead of the priority order, because an unbounded wait hangs the suite instead of failing a test.
+
+**S39 (from O43).** In `lz-red` step 5, say how to make a red that would hang end as a failure: bound the double or
+the test, so the red is an assertion and not a timeout.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
