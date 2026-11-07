@@ -42,6 +42,7 @@ test("with webServer.mutate: 'auto', init turns server support off with one warn
 test('init refuses a reuseExistingServer server that already answers, and starts one that does not', async (t) => {
   const shared = serverFake(t, {
     webServers: [{ url: 'http://localhost:4820/', reuseExistingServer: true }],
+    urlUp: async () => true,
   });
 
   await assert.rejects(shared.runner().shell.init(), (error) => {
@@ -61,6 +62,7 @@ test('init refuses a reuseExistingServer server that already answers, and starts
 test("with webServer.mutate: 'auto', init turns server support off with one warning when a reuseExistingServer server already answers", async (t) => {
   const fake = serverFake(t, {
     webServers: [{ url: 'http://localhost:4820/', reuseExistingServer: true }],
+    urlUp: async () => true,
   });
   const { shell, lines } = fake.runner({ mutate: 'auto' });
 
@@ -85,6 +87,7 @@ test('init names every reuseExistingServer server that already answers', async (
       { url: 'http://localhost:4820/', reuseExistingServer: true },
       { url: 'http://localhost:4821/', reuseExistingServer: true },
     ],
+    urlUp: async () => true,
   });
 
   await assert.rejects(fake.runner().shell.init(), {

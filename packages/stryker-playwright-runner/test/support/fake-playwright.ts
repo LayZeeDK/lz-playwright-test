@@ -165,6 +165,7 @@ export function fakePlaywright(
       },
     }));
   let lastPlugins = webServerPlugins();
+  let serversUp = false;
 
   class FakeTestRunner implements TestRunner {
     readonly _configCLIOverrides: Record<string, unknown>;
@@ -231,14 +232,15 @@ export function fakePlaywright(
     async runGlobalSetup([reporter]: Reporter[]): Promise<{ status: Status }> {
       calls.push(['runGlobalSetup']);
       assert.ok(reporter);
+      const status = (await behaviour.globalSetup?.(reporter)) ?? 'passed';
+      serversUp = status === 'passed';
 
-      return {
-        status: (await behaviour.globalSetup?.(reporter)) ?? 'passed',
-      };
+      return { status };
     }
 
     async runGlobalTeardown() {
       calls.push(['runGlobalTeardown']);
+      serversUp = false;
       await behaviour.globalTeardown?.();
     }
 
@@ -290,7 +292,7 @@ export function fakePlaywright(
         isURLAvailable: async (url: URL, ignoreHTTPSErrors: boolean) => {
           calls.push(['isURLAvailable', url, ignoreHTTPSErrors]);
 
-          return (await behaviour.urlUp?.(url, ignoreHTTPSErrors)) ?? true;
+          return (await behaviour.urlUp?.(url, ignoreHTTPSErrors)) ?? serversUp;
         },
       },
     },

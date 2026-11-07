@@ -248,6 +248,9 @@ test('a webServer restarted after it died keeps the static mutant it runs', asyn
   let up = true;
   const fake = serverFake(t, {
     webServers: [{ url: 'http://localhost:4820/' }],
+    globalTeardown: async () => {
+      up = false;
+    },
     urlUp: async () => {
       const answered = up;
       up = true;
@@ -267,6 +270,74 @@ test('a webServer restarted after it died keeps the static mutant it runs', asyn
   );
 });
 
+function lingeringWebServer(lingeringProbes: number) {
+  let up = false;
+  let lingering = 0;
+
+  return {
+    hooked: () => !up && lingering === 0,
+    globalSetup: () => {
+      up = true;
+
+      return 'passed' as const;
+    },
+    globalTeardown: async () => {
+      lingering = up ? lingeringProbes : 0;
+      up = false;
+    },
+    urlUp: async () => {
+      if (lingering > 0) {
+        lingering -= 1;
+
+        return true;
+      }
+
+      return up;
+    },
+  };
+}
+
+test('a webServer restart waits after global teardown until the stopped server no longer answers, then runs global setup', async (t) => {
+  const fake = serverFake(t, lingeringWebServer(3));
+  const { shell } = fake.runner({ isolate: false });
+  await shell.init();
+  fake.calls.length = 0;
+
+  const result = await shell.mutantRun(
+    mutantRunOptions({ mutantActivation: 'static' }),
+  );
+
+  assert.equal(result.status, MutantRunStatus.Survived);
+  assert.deepEqual(fake.names(), [
+    'runGlobalTeardown',
+    'isURLAvailable',
+    'isURLAvailable',
+    'isURLAvailable',
+    'isURLAvailable',
+    'runGlobalSetup',
+    'isURLAvailable',
+    'runTests',
+  ]);
+});
+
+test('a webServer restart whose stopped server keeps answering stops waiting after 2 s and rejects with the hook refusal', async (t) => {
+  const stoppedWaitMs = 2000;
+  const hookedWaitMs = 1000;
+  const fake = serverFake(t, lingeringWebServer(200));
+  const { shell } = fake.runner({ isolate: false });
+  await shell.init();
+  const startedAt = performance.now();
+
+  await assert.rejects(
+    shell.mutantRun(mutantRunOptions({ mutantActivation: 'static' })),
+    {
+      message:
+        /^lzPlaywright\.webServer\.mutate is true, but no process that Playwright global setup started loaded the server hook\./,
+    },
+  );
+  assert.ok(performance.now() - startedAt < stoppedWaitMs + hookedWaitMs + 500);
+});
+
 test('a static mutant whose dead webServer starts again only without the mutant is killed', async (t) => {
   let up = true;
   let failsWithMutant = false;
@@ -276,6 +347,9 @@ test('a static mutant whose dead webServer starts again only without the mutant 
       failsWithMutant && process.env[activeMutantEnv] !== undefined
         ? 'failed'
         : 'passed',
+    globalTeardown: async () => {
+      up = false;
+    },
     urlUp: async () => {
       const answered = up;
       up = true;
@@ -468,6 +542,9 @@ test('a static mutant whose webServer did not start with it twice is killed and 
       up = process.env[activeMutantEnv] === undefined;
 
       return up ? 'passed' : 'failed';
+    },
+    globalTeardown: async () => {
+      up = false;
     },
     urlUp: async () => up,
   });

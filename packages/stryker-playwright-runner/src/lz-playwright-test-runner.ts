@@ -131,6 +131,7 @@ const hookUrl = (name: string) =>
 const workerHookUrl = hookUrl('worker-hook');
 const serverHookUrl = hookUrl('server-hook');
 const hookedWaitMs = 1000;
+const stoppedWaitMs = 2000;
 
 class StaticMutantStopsServer extends Error {
   constructor(mutant: string, cause: unknown) {
@@ -653,7 +654,12 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
 
   async #startServer(session: Session, mutant: string | undefined) {
     const start = (startMutant: string | undefined) => () =>
-      this.#globalSetup(session.playwright, session.server, startMutant);
+      this.#globalSetup(
+        session.playwright,
+        session.server,
+        startMutant,
+        session.servers,
+      );
 
     if (mutant === undefined) {
       return start(undefined)();
@@ -683,6 +689,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     playwright: TestRunner,
     server: ServerSide | undefined,
     mutant: string | undefined,
+    running: readonly ServerCheck[] = [],
   ) {
     if (!server) {
       await runGlobalSetup(playwright);
@@ -690,6 +697,8 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       return;
     }
 
+    await playwright.runGlobalTeardown();
+    await waitUntilStopped(running, stoppedWaitMs);
     forgetHooked(server.dir);
     await withEnv(
       {
@@ -781,6 +790,27 @@ async function hookedWithin(dir: string, waitMs: number): Promise<boolean> {
   }
 
   return true;
+}
+
+/**
+ * Playwright reuses a webServer whose port answers, or refuses to start it, and on Windows the port of a server
+ * that global teardown stopped answers for a while.
+ */
+async function waitUntilStopped(
+  servers: readonly ServerCheck[],
+  waitMs: number,
+): Promise<void> {
+  const until = performance.now() + waitMs;
+
+  while (performance.now() < until) {
+    const up = await Promise.all(servers.map((server) => server.isUp()));
+
+    if (!up.includes(true)) {
+      return;
+    }
+
+    await setTimeout(50);
+  }
 }
 
 async function runGlobalSetup(playwright: TestRunner) {
