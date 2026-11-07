@@ -16,6 +16,7 @@ import {
   fakeTestCase,
   finishedTest,
   mutantRunOptions,
+  warnings,
   withoutPrototypes,
 } from './support/doubles.ts';
 import {
@@ -295,14 +296,18 @@ test('a static mutant whose dead webServer starts again only without the mutant 
   assert.equal(result.status, MutantRunStatus.Killed);
 });
 
-test('a static mutant that keeps the webServer from starting is killed, with the mutant and the setup error as its message', async (t) => {
+test('a static mutant that keeps the webServer from starting is killed, with the mutant and the second setup error as its message', async (t) => {
+  let startsWithMutant = 0;
   const fake = serverFake(t, {
     globalSetup: (reporter) => {
       if (process.env[activeMutantEnv] === undefined) {
         return 'passed';
       }
 
-      reporter.onError?.({ message: 'listen EADDRINUSE' });
+      startsWithMutant += 1;
+      reporter.onError?.({
+        message: `listen EADDRINUSE (start ${startsWithMutant})`,
+      });
 
       return 'failed';
     },
@@ -318,7 +323,7 @@ test('a static mutant that keeps the webServer from starting is killed, with the
     status: MutantRunStatus.Killed,
     killedBy: [],
     failureMessage:
-      'The webServer did not start with static mutant 7: Error: Playwright global setup failed:\nlisten EADDRINUSE\n',
+      'The webServer did not start with static mutant 7: Error: Playwright global setup failed:\nlisten EADDRINUSE (start 2)\n',
     nrOfTests: 0,
   });
 });
@@ -424,7 +429,7 @@ test('a static mutant run whose webServer starts neither with the mutant nor wit
   );
 });
 
-test('a static mutant whose webServer did not start with it twice is killed, and the next run needs no restart', async (t) => {
+test('a static mutant whose webServer did not start with it twice is killed and leaves the webServer started without it, so the next run needs no restart', async (t) => {
   let up = true;
   const fake = serverFake(t, {
     globalSetup: () => {
@@ -434,39 +439,26 @@ test('a static mutant whose webServer did not start with it twice is killed, and
     },
     urlUp: async () => up,
   });
-  const { shell } = fake.runner({ isolate: false });
+  const { shell, lines } = fake.runner({ isolate: false });
   await shell.init();
+  const setupMutants = () =>
+    fake.setups.map(({ activeMutant }) => activeMutant);
+
   const killed = await shell.mutantRun(
     mutantRunOptions({ mutantActivation: 'static' }),
   );
+
+  assert.equal(killed.status, MutantRunStatus.Killed);
+  assert.deepEqual(setupMutants(), [undefined, '7', undefined, '7', undefined]);
 
   await shell.mutantRun(runtimeRun('8'));
 
-  assert.equal(killed.status, MutantRunStatus.Killed);
+  assert.deepEqual(setupMutants(), [undefined, '7', undefined, '7', undefined]);
   assert.deepEqual(
-    fake.setups.map(({ activeMutant }) => activeMutant),
-    [undefined, '7', undefined, '7', undefined],
+    warnings(lines).filter((warning) => warning.includes('stopped answering')),
+    [],
   );
   assert.equal(fake.runs.length, 1);
-});
-
-test('a killed static mutant leaves the webServer started without it', async (t) => {
-  const fake = serverFake(t, {
-    globalSetup: () =>
-      process.env[activeMutantEnv] === undefined ? 'passed' : 'failed',
-  });
-  const { shell } = fake.runner({ isolate: false });
-  await shell.init();
-
-  const killed = await shell.mutantRun(
-    mutantRunOptions({ mutantActivation: 'static' }),
-  );
-
-  assert.equal(killed.status, MutantRunStatus.Killed);
-  assert.deepEqual(
-    fake.setups.map(({ activeMutant }) => activeMutant),
-    [undefined, '7', undefined, '7', undefined],
-  );
 });
 
 test("the dry run merges the server's snapshots with the workers'", async (t) => {
