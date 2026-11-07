@@ -1,5 +1,9 @@
 import { declareFactoryPlugin, PluginKind } from '@stryker-mutator/api/plugin';
 
+import {
+  consoleIgnorer,
+  strykerValidationSchema as consoleSchema,
+} from './console-ignorer.ts';
 import { implicitRoles } from './implicit-roles.ts';
 import { install } from './install.ts';
 import { isRecord } from './is-record.ts';
@@ -20,6 +24,7 @@ export const strykerValidationSchema = {
   properties: {
     ...stylingSchema.properties,
     ...telemetrySchema.properties,
+    ...consoleSchema.properties,
   },
 };
 
@@ -57,4 +62,5 @@ function assertNoOptions(options: unknown): void {
 export const strykerPlugins = [
   declareFactoryPlugin(PluginKind.Ignore, 'lz-jsx-styling', stylingIgnorer),
   declareFactoryPlugin(PluginKind.Ignore, 'lz-telemetry', telemetryIgnorer),
+  declareFactoryPlugin(PluginKind.Ignore, 'lz-console', consoleIgnorer),
 ];

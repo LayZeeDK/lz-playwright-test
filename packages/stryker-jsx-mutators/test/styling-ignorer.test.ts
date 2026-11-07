@@ -2,12 +2,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { resolveFromCore } from '../src/install.ts';
 import {
   strykerValidationSchema,
   stylingIgnorer,
 } from '../src/styling-ignorer.ts';
-import { instrumentFully } from './support/instrument-result.ts';
+import {
+  assertEveryOutcome,
+  ignorerOutcomes,
+} from './support/ignorer-outcomes.ts';
 import { validateOptions } from './support/validate-options.ts';
 
 const classReason =
@@ -17,32 +19,9 @@ const styleReason =
 const builderReason =
   'lz-jsx-styling: class-name builder call; DOM tests do not observe class names';
 
-const instrumenter = resolveFromCore();
-
-/** One entry per mutant: its ignore reason, or `placed`. */
-async function outcomes(code: string, options: object = {}): Promise<string[]> {
-  const { mutants } = await instrumentFully(
-    await instrumenter,
-    [{ name: 'a.tsx', content: code }],
-    [],
-    [stylingIgnorer(options)],
-  );
-
-  return mutants.map(({ status, statusReason }) =>
-    status === 'Ignored' ? (statusReason ?? 'Ignored') : 'placed',
-  );
-}
-
-async function assertEvery(
-  code: string,
-  outcome: string,
-  options: object = {},
-): Promise<void> {
-  const found = await outcomes(code, options);
-
-  assert.ok(found.length > 0, `no mutants in ${code}`);
-  assert.deepEqual(new Set(found), new Set([outcome]), code);
-}
+const outcomes = (code: string) => ignorerOutcomes(stylingIgnorer({}), code);
+const assertEvery = (code: string, outcome: string, options: object = {}) =>
+  assertEveryOutcome(stylingIgnorer(options), code, outcome);
 
 describe('lz-jsx-styling', () => {
   it('ignores every mutant in a className expression, with the class reason', async () => {

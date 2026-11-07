@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { resolveFromCore } from '../src/install.ts';
 import {
   strykerValidationSchema,
   telemetryIgnorer,
 } from '../src/telemetry-ignorer.ts';
-import { instrumentFully } from './support/instrument-result.ts';
+import { assertEveryOutcome } from './support/ignorer-outcomes.ts';
 import { validateOptions } from './support/validate-options.ts';
 
 const analyticsReason =
@@ -16,31 +15,8 @@ const callsReason =
 const errorReason =
   'lz-telemetry: error-monitoring call; DOM tests do not observe what it reports';
 
-const instrumenter = resolveFromCore();
-
-async function outcomes(code: string, options: object = {}): Promise<string[]> {
-  const { mutants } = await instrumentFully(
-    await instrumenter,
-    [{ name: 'a.ts', content: code }],
-    [],
-    [telemetryIgnorer(options)],
-  );
-
-  return mutants.map(({ status, statusReason }) =>
-    status === 'Ignored' ? (statusReason ?? 'Ignored') : 'placed',
-  );
-}
-
-async function assertEvery(
-  code: string,
-  outcome: string,
-  options: object = {},
-): Promise<void> {
-  const found = await outcomes(code, options);
-
-  assert.ok(found.length > 0, `no mutants in ${code}`);
-  assert.deepEqual(new Set(found), new Set([outcome]), code);
-}
+const assertEvery = (code: string, outcome: string, options: object = {}) =>
+  assertEveryOutcome(telemetryIgnorer(options), code, outcome);
 
 describe('lz-telemetry', () => {
   it('ignores every mutant of a gtag call statement, with the analytics reason', async () => {

@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
 
+import { strykerValidationSchema as consoleSchema } from '../src/console-ignorer.ts';
 import { lzJsxMutators } from '../src/index.ts';
 import { strykerValidationSchema as stylingSchema } from '../src/styling-ignorer.ts';
 import { strykerValidationSchema as telemetrySchema } from '../src/telemetry-ignorer.ts';
@@ -14,12 +15,14 @@ const entryPath = join(import.meta.dirname, 'fixture', 'entry.ts');
 const ignorers = [
   'Ignore lz-jsx-styling undefined',
   'Ignore lz-telemetry undefined',
+  'Ignore lz-console undefined',
 ];
 const schema = {
   ...stylingSchema,
   properties: {
     ...stylingSchema.properties,
     ...telemetrySchema.properties,
+    ...consoleSchema.properties,
   },
 };
 const noOptions =

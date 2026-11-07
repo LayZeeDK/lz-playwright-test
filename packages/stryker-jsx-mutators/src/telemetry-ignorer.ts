@@ -3,6 +3,7 @@ import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
 import { fieldOf, typeOf } from './is-record.ts';
 import { packageName } from './package-name.ts';
+import { statementCallee } from './statement-call.ts';
 
 const calleePattern = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/;
 
@@ -79,14 +80,6 @@ const sentryImportedFunctions: readonly unknown[] = [
 
 const callsReason =
   'lz-telemetry: telemetry call from lzTelemetry.calls; DOM tests do not observe what it sends';
-const callTypes: readonly unknown[] = [
-  'CallExpression',
-  'OptionalCallExpression',
-];
-const memberTypes: readonly unknown[] = [
-  'MemberExpression',
-  'OptionalMemberExpression',
-];
 
 export function telemetryIgnorer(options: object): Ignorer {
   const calls = ownCalls(options);
@@ -116,25 +109,6 @@ export function telemetryIgnorer(options: object): Ignorer {
   };
 }
 telemetryIgnorer.inject = tokens(commonTokens.options);
-
-function statementCallee(node: unknown): string | undefined {
-  if (typeOf(node) !== 'ExpressionStatement') {
-    return undefined;
-  }
-
-  const expression = fieldOf(node, 'expression');
-  const call =
-    typeOf(expression) === 'AwaitExpression' ||
-    fieldOf(expression, 'operator') === 'void'
-      ? fieldOf(expression, 'argument')
-      : expression;
-
-  if (!callTypes.includes(typeOf(call))) {
-    return undefined;
-  }
-
-  return dottedName(fieldOf(call, 'callee'));
-}
 
 function ownCalls(options: object): readonly unknown[] {
   const own = fieldOf(fieldOf(options, 'lzTelemetry'), 'calls');
@@ -191,20 +165,4 @@ function programOf(path: unknown): unknown {
   return typeOf(node) === 'Program'
     ? node
     : programOf(fieldOf(path, 'parentPath'));
-}
-
-function dottedName(node: unknown): string | undefined {
-  if (typeOf(node) === 'Identifier') {
-    return String(fieldOf(node, 'name'));
-  }
-
-  if (!memberTypes.includes(typeOf(node)) || fieldOf(node, 'computed')) {
-    return undefined;
-  }
-
-  const object = dottedName(fieldOf(node, 'object'));
-
-  return (
-    object && `${object}.${String(fieldOf(fieldOf(node, 'property'), 'name'))}`
-  );
 }
