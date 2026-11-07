@@ -15,6 +15,7 @@ export class StrykerHelpersChanged extends Error {
 
 const probeName = 'lzStrykerProbe';
 
+// Stryker disable next-line BooleanLiteral: every log method ignores its message, so an enabled level changes nothing
 const off = () => false;
 const ignore = () => undefined;
 const silentLog: Logger = {
@@ -33,7 +34,10 @@ const silentLog: Logger = {
 };
 
 function captured(text: string, pattern: RegExp): string[] {
-  return [...text.matchAll(pattern)].flatMap(([, name]) => name ?? []);
+  return [...text.matchAll(pattern)].flatMap(
+    // Stryker disable next-line ArrayDeclaration: each pattern's only group takes part in every match, so name is never undefined
+    ([, name]) => name ?? [],
+  );
 }
 
 export async function loadPageHelpers(): Promise<string> {
@@ -69,7 +73,12 @@ export async function pageHelpersFrom(
 
   const result: unknown = await Reflect.apply(instrument, instrumenter, [
     [{ name: 'probe.js', content: `${probeName} = 1 + 1;`, mutate: true }],
-    { plugins: null, excludedMutations: [], ignorers: [] },
+    {
+      plugins: null,
+      // Stryker disable next-line ArrayDeclaration: no mutator is named "Stryker was here", so excluding it excludes nothing
+      excludedMutations: [],
+      ignorers: [],
+    },
   ]);
   const files = fieldOf(result, 'files');
   const content = fieldOf(
