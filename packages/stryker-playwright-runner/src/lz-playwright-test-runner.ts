@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { setTimeout } from 'node:timers/promises';
@@ -31,7 +30,7 @@ import {
   type TestRunner,
 } from './playwright-internals.ts';
 import { globalSetupWatchingConfiguredPorts } from './port-watch.ts';
-import { envOf, setEnv } from './process-env.ts';
+import { withEnv } from './process-env.ts';
 import { readSnapshotDir } from './protocol.ts';
 import {
   LzPlaywrightCollectingReporter,
@@ -58,6 +57,11 @@ import {
   type SerialGroups,
   serialGroups,
 } from './serial-groups.ts';
+import {
+  type ServerCheck,
+  serverCheck,
+  serverTarget,
+} from './server-checks.ts';
 import {
   moveApart,
   moveServersApart,
@@ -94,11 +98,6 @@ import {
   type ConfigTimeouts,
   configTimeouts,
 } from './timeouts.ts';
-
-interface ServerCheck {
-  readonly name: string;
-  isUp(): Promise<boolean>;
-}
 
 /** The webServer side of a session, when server support is on. */
 interface ServerSide {
@@ -242,8 +241,8 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       }
 
       const webServers = apart?.webServers ?? config.webServers;
-      const servers = webServers.flatMap((server) =>
-        serverCheck(server, pw.isURLAvailable),
+      const servers = webServers.flatMap(
+        (server) => serverCheck(server, pw.isURLAvailable) ?? [],
       );
       const server = mutates
         ? await serverSide(root, webServers, pw.isURLAvailable)
@@ -254,8 +253,8 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
             setup,
             {
               moves: apart.moves,
-              configuredChecks: config.webServers.map(
-                (webServer) => serverCheck(webServer, pw.isURLAvailable)[0],
+              configuredChecks: config.webServers.map((webServer) =>
+                serverCheck(webServer, pw.isURLAvailable),
               ),
             },
             options.webServer.mutate === 'auto',
@@ -656,7 +655,7 @@ async function serverSide(
 
   const reused = webServers
     .filter((server) => server.reuseExistingServer)
-    .flatMap((server) => serverCheck(server, isURLAvailable));
+    .flatMap((server) => serverCheck(server, isURLAvailable) ?? []);
   const up = await Promise.all(reused.map((server) => server.isUp()));
   const shared = reused.filter((_, index) => up[index]);
 
@@ -673,22 +672,20 @@ async function serverSide(
 
   return {
     dir,
-    testIdHosts: webServers.flatMap(serverHosts),
+    testIdHosts: webServers.flatMap((server) => serverHost(server) ?? []),
   };
 }
 
-function serverHosts(server: ConfigWebServer): string[] {
+function serverHost(server: ConfigWebServer): string | undefined {
   const target = serverTarget(server);
 
   if (target === undefined) {
-    return [];
+    return undefined;
   }
 
-  return [
-    'port' in target
-      ? `localhost:${target.port}`
-      : hostKey(new URL(target.url)),
-  ];
+  return 'port' in target
+    ? `localhost:${target.port}`
+    : hostKey(new URL(target.url));
 }
 
 async function hookedWithin(dir: string, waitMs: number): Promise<boolean> {
@@ -705,52 +702,6 @@ async function hookedWithin(dir: string, waitMs: number): Promise<boolean> {
   return true;
 }
 
-export async function withEnv<T>(
-  values: Readonly<Record<string, string | undefined>>,
-  fn: () => Promise<T>,
-): Promise<T> {
-  const previous = envOf(Object.keys(values));
-  setEnv(values);
-
-  try {
-    return await fn();
-  } finally {
-    setEnv(previous);
-  }
-}
-
-// Playwright's own webServer port check tries both loopback addresses: localhost can resolve to only one of them.
-const loopbackHosts = ['127.0.0.1', '::1'];
-
-export interface ConnectingSocket {
-  once(event: 'connect' | 'error' | 'timeout', listener: () => void): unknown;
-  destroy(): unknown;
-}
-
-export function acceptsConnections(
-  port: number,
-  connect: (options: net.TcpNetConnectOpts) => ConnectingSocket = net.connect,
-): Promise<boolean> {
-  return new Promise((resolve) => {
-    let answered = 0;
-
-    loopbackHosts.forEach((host) => {
-      const socket = connect({ host, port, timeout: 5000 });
-      const done = (ok: boolean) => {
-        socket.destroy();
-        answered += 1;
-
-        if (ok || answered === loopbackHosts.length) {
-          resolve(ok);
-        }
-      };
-      socket.once('connect', () => done(true));
-      socket.once('error', () => done(false));
-      socket.once('timeout', () => done(false));
-    });
-  });
-}
-
 async function runGlobalSetup(playwright: TestRunner) {
   const reporter = new LzPlaywrightCollectingReporter();
   const { status } = await playwright.runGlobalSetup([reporter]);
@@ -760,50 +711,6 @@ async function runGlobalSetup(playwright: TestRunner) {
       `Playwright global setup ${status}:\n${reporter.errors.join('\n')}\n${reporter.outputTail}`,
     );
   }
-}
-
-export type ServerTarget = { readonly port: number } | { readonly url: string };
-
-export function serverTarget({
-  url,
-  port,
-}: ConfigWebServer): ServerTarget | undefined {
-  if (port !== undefined) {
-    return { port };
-  }
-
-  return url === undefined ? undefined : { url };
-}
-
-function serverCheck(
-  server: ConfigWebServer,
-  isURLAvailable: Playwright['isURLAvailable'],
-): ServerCheck[] {
-  const target = serverTarget(server);
-
-  if (target === undefined) {
-    return [];
-  }
-
-  if ('port' in target) {
-    const { port } = target;
-
-    return [
-      {
-        name: server.url ?? `port ${port}`,
-        isUp: () => acceptsConnections(port),
-      },
-    ];
-  }
-
-  const url = new URL(target.url);
-
-  return [
-    {
-      name: target.url,
-      isUp: () => isURLAvailable(url, server.ignoreHTTPSErrors),
-    },
-  ];
 }
 
 function logCoverageGaps(

@@ -19,11 +19,9 @@ import { strykerPlugins, strykerValidationSchema } from '../src/index.ts';
 import { optionProperties } from '../src/lz-playwright-runner-options-with-stryker-options.ts';
 import { fieldOf } from '../src/is-record.ts';
 import { installErrorSuffix } from '../src/protocol.ts';
-import {
-  acceptsConnections,
-  LzPlaywrightTestRunner,
-  withEnv,
-} from '../src/lz-playwright-test-runner.ts';
+import { LzPlaywrightTestRunner } from '../src/lz-playwright-test-runner.ts';
+import { withEnv } from '../src/process-env.ts';
+import { acceptsConnections } from '../src/server-checks.ts';
 import { LzPlaywrightTracesReporter } from '../src/traces-reporter.ts';
 import { namespaceToken, ownerFile, rootPrefix } from '../src/temp-root.ts';
 import {

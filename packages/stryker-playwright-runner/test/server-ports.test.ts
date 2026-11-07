@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events';
 import net from 'node:net';
 import { test } from 'node:test';
 
-import { acceptsConnections } from '../src/lz-playwright-test-runner.ts';
+import { acceptsConnections } from '../src/server-checks.ts';
 import type {
   ConfigProject,
   ConfigWebServer,

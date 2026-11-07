@@ -1,14 +1,12 @@
 import { setTimeout } from 'node:timers/promises';
 
+import type { ServerCheck } from './server-checks.ts';
 import { ServerSupportRefused } from './server-protocol.ts';
 import type { ServerMove } from './server-ports.ts';
 
 export interface MovedServers {
   readonly moves: readonly ServerMove[];
-  readonly configuredChecks: readonly (
-    | { isUp(): Promise<boolean> }
-    | undefined
-  )[];
+  readonly configuredChecks: readonly (ServerCheck | undefined)[];
 }
 
 const boundPollMs = 250;

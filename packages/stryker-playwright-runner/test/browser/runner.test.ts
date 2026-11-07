@@ -21,7 +21,7 @@ import {
 } from '@stryker-mutator/api/test-runner';
 import { Instrumenter } from '@stryker-mutator/instrumenter';
 
-import { acceptsConnections } from '../../src/lz-playwright-test-runner.ts';
+import { acceptsConnections } from '../../src/server-checks.ts';
 import { namespaceToken, ownerFile } from '../../src/temp-root.ts';
 import { stopHeadroomMs } from '../../src/timeouts.ts';
 import { logger } from '../support/doubles.ts';

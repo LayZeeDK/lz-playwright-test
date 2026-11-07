@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { withEnv } from '../../src/lz-playwright-test-runner.ts';
+import { withEnv } from '../../src/process-env.ts';
 import { loadPlaywright } from '../../src/playwright-internals.ts';
 import { type RunSettings, runSettingsEnv } from '../../src/protocol.ts';
 import { LzPlaywrightCollectingReporter } from '../../src/reporter.ts';
