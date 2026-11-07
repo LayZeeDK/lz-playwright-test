@@ -45,6 +45,13 @@ export async function loadPageHelpers(): Promise<string> {
   const instrumenterModule: unknown = await import(
     pathToFileURL(core.resolve('@stryker-mutator/instrumenter')).href
   );
+
+  return pageHelpersFrom(instrumenterModule);
+}
+
+export async function pageHelpersFrom(
+  instrumenterModule: unknown,
+): Promise<string> {
   const Instrumenter = fieldOf(instrumenterModule, 'Instrumenter');
 
   if (typeof Instrumenter !== 'function') {
