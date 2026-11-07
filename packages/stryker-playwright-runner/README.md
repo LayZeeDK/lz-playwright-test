@@ -310,8 +310,8 @@ the process falls back to sharing that server, which needs `reuseExistingServer:
 Playwright stops the start because the port is already used.
 
 Under `'auto'`, the process that runs the dry run decides for every process. When the dry run reached
-server-side mutants and another process ran as with `false`, that process fails its mutant runs with an
-error. Set `mutate: true` to see its cause as an error at startup.
+server-side mutants and another process ran as with `false`, that process runs none of its mutants, and
+Stryker reports each of them as RuntimeError. Set `mutate: true` to see its cause as an error at startup.
 
 ## Flaky tests
 

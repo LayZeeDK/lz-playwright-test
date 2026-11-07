@@ -9,6 +9,7 @@ import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 import type {
   DryRunOptions,
   DryRunResult,
+  ErrorMutantRunResult,
   MutantRunOptions,
   MutantRunResult,
   TestRunner as StrykerTestRunner,
@@ -381,6 +382,11 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
 
   async mutantRun(options: MutantRunOptions): Promise<MutantRunResult> {
     const session = this.#adoptDryRunDecision(this.#ready());
+
+    if ('status' in session) {
+      return session;
+    }
+
     const request = mutantRunRequest(options, session);
     let output: RunOutput;
 
@@ -431,7 +437,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     }
   }
 
-  #adoptDryRunDecision(session: Session): Session {
+  #adoptDryRunDecision(session: Session): Session | ErrorMutantRunResult {
     if (
       session.options.webServer.mutate !== 'auto' ||
       this.#dryRunServerMutants !== undefined
@@ -446,11 +452,13 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     }
 
     if (file.mutants.size > 0 && !session.server) {
-      throw new Error(
-        `${mutateOption} is 'auto' and the dry run reached server-side mutants, but this process turned server ` +
+      return {
+        status: MutantRunStatus.Error,
+        errorMessage:
+          `${mutateOption} is 'auto' and the dry run reached server-side mutants, but this process turned server ` +
           `support off at init (see its warning), so it cannot run them. Set ${mutateOption}: true to see the ` +
           'cause as an error.',
-      );
+      };
     }
 
     this.#dryRunServerMutants = file.mutants;

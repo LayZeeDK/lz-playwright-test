@@ -278,18 +278,22 @@ test("with webServer.mutate: 'auto' and isolate false, the dry run process leave
   });
 });
 
-test("with webServer.mutate: 'auto', a process whose init turned server support off refuses to run mutants when the dry run turned it on", async (t) => {
+test("with webServer.mutate: 'auto', a process whose init turned server support off reports each mutant as an error, without a run, when the dry run turned it on", async (t) => {
   const fake = serverFake(t, { hooked: false });
   writeServerMutantsFile(fake.sandbox, ['2']);
   const { shell } = fake.runner({ mutate: 'auto' });
   await shell.init();
 
-  await assert.rejects(shell.mutantRun(runtimeRun('1')), {
-    message:
+  const result = await shell.mutantRun(runtimeRun('1'));
+
+  assert.deepEqual(result, {
+    status: MutantRunStatus.Error,
+    errorMessage:
       "lzPlaywright.webServer.mutate is 'auto' and the dry run reached server-side mutants, but this process turned " +
       'server support off at init (see its warning), so it cannot run them. Set lzPlaywright.webServer.mutate: true ' +
       'to see the cause as an error.',
   });
+  assert.equal(fake.runs.length, 0);
 });
 
 test("with webServer.mutate: 'auto', a process whose init turned server support off runs mutants when the dry run reached no server mutant", async (t) => {
