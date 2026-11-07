@@ -1,10 +1,11 @@
 diff --git a/.gitignore b/.gitignore
-index 693c926..1e4f96e 100644
+index 693c926..7e0f5a8 100644
 --- a/.gitignore
 +++ b/.gitignore
-@@ -1,3 +1,6 @@
+@@ -1,3 +1,7 @@
 +.stryker-tmp
 +/reports
++.lz-playwright-server-mutants
 +
  # Logs
  logs

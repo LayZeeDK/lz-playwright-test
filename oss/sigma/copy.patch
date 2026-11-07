@@ -1,8 +1,8 @@
 diff --git a/.gitignore b/.gitignore
-index 46d143a..720a428 100644
+index 46d143a..cd9f2f8 100644
 --- a/.gitignore
 +++ b/.gitignore
-@@ -12,3 +12,7 @@ __screenshots__
+@@ -12,3 +12,8 @@ __screenshots__
  # Playwright test artifacts (reports, results)
  test-results
  playwright-report
@@ -10,6 +10,7 @@ index 46d143a..720a428 100644
 +# Stryker
 +.stryker-tmp
 +/reports
++.lz-playwright-server-mutants
 diff --git a/packages/browser-tests/playwright.stryker.config.ts b/packages/browser-tests/playwright.stryker.config.ts
 new file mode 100644
 index 0000000..43a4541

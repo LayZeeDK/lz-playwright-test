@@ -21,7 +21,7 @@ index 0269b6a..2786a35 100644
 +/reports
 diff --git a/playwright.stryker.config.ts b/playwright.stryker.config.ts
 new file mode 100644
-index 0000000..68b9df0
+index 0000000..c490084
 --- /dev/null
 +++ b/playwright.stryker.config.ts
 @@ -0,0 +1,33 @@
@@ -52,7 +52,7 @@ index 0000000..68b9df0
 +  ],
 +  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 +  webServer: {
-+    command: 'npx webpack serve --mode=development --no-live-reload',
++    command: 'npx webpack serve --mode=development --no-live-reload --port 8080',
 +    url: 'http://localhost:8080/controls.html',
 +    reuseExistingServer: true,
 +    timeout: 180_000,

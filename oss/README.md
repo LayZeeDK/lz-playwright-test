@@ -175,7 +175,8 @@ screenshots, against the repo's own e2e tests on its Vite dev server (`pnpm dev`
      tests, whose expected widths come from another platform's fonts: on Windows 11 arm64 "measures
      text" measured 88.06 px against 87, and the custom `renderMethod` case 168.53 px against at most
      167. The other specs then pass: 31 tests, 2 skipped;
-   - adds `.stryker-tmp` and `/reports` to `.gitignore`.
+   - adds `.stryker-tmp`, `/reports` and `.lz-playwright-server-mutants` to `.gitignore`. An in-place run
+     writes the server mutants file into the copy's root.
 2. Run `pnpm install` with the `pnpm` on your `PATH`, not the npm line above; it switches to the
    version in `packageManager`. Through `corepack pnpm install`, the nested `pnpm` in the copy's
    `postinstall` refuses to switch.
@@ -187,6 +188,12 @@ screenshots, against the repo's own e2e tests on its Vite dev server (`pnpm dev`
    Both set `inPlace: true`: the workspace packages resolve through per-package `node_modules` links to
    the copy's own source, so a sandbox would serve unmutated code. Copy
    `reports/lz-playwright-traces` aside between the runs; each run empties it.
+   The JSX config runs at `concurrency: 2`, so the runner moves each process's dev server to a port of its
+   own. `pnpm dev` binds port 5420 from the Vite config and has no port in its command for the runner to
+   move. With `webServer.mutate: true`, the runner refuses this at startup and names both ports. With
+   `LZ_CORPUS_WEBSERVER_MUTATE=auto`, a process falls back to running without server support, but with
+   more than one process that fallback does not work yet. The canvas config runs one process at
+   `concurrency: 1` and keeps port 5420.
 5. Let an in-place run finish. Stryker puts the original files back only when the run ends, and a
    stopped run leaves thousands of files instrumented; restore them from `.stryker-tmp/backup-*`. The
    JSX run is incremental, but Stryker writes the incremental file only at the end, so a stopped run
@@ -222,7 +229,8 @@ edge paths, the code the 12 regression scenarios run when they render, against `
    - adds `packages/browser-tests/playwright.stryker.config.ts`: the regression suite only, no retries, and
      only the regression `webServer`. The examples suite needs the Astro website, whose dev server downloads
      datasets first;
-   - adds `.stryker-tmp` and `/reports` to `.gitignore`.
+   - adds `.stryker-tmp`, `/reports` and `.lz-playwright-server-mutants` to `.gitignore`. An in-place run
+     writes the server mutants file into the copy's root.
 2. Run `npm ci`, then
    `npm i -D @stryker-mutator/core@10.1.1 @playwright/test@1.64.1 playwright@1.64.1 file:<runner tarball>`.
    The lockfile has Playwright 1.60, below the runner's 1.63 floor. npm 12 blocks the esbuild and sharp
@@ -253,9 +261,10 @@ own specs on its webpack dev server. The 3,551-line player core and the ad code 
 1. Apply `fluid-player/copy.patch` and copy `fluid-player/stryker.video.config.ts` into the copy's root. The
    patch:
    - adds `playwright.stryker.config.ts`: Chromium instead of upstream's Firefox-only project, no retries, and a
-     `webServer` that runs `webpack serve --mode=development --no-live-reload`. The webpack config emits the e2e
-     pages and copies the test media only in development mode, so upstream's `dev-server-test` script
-     (production mode) serves none of them;
+     `webServer` that runs `webpack serve --mode=development --no-live-reload --port 8080`. The webpack config
+     emits the e2e pages and copies the test media only in development mode, so upstream's `dev-server-test`
+     script (production mode) serves none of them. The webpack config sets no port, so without `--port 8080`
+     webpack-dev-server binds the first free port from 8080 and ignores `PORT`;
    - runs 11 of the 22 specs. Ten play local media (WebM, or an unplayable `.flv` in `ads_error_code`);
      `skip_stuck` streams `.mkv` files from `cdn.fluidplayer.com` and passed in every dry run. The other 11
      stream an H.264 MP4 from `media.w3.org` or `fluidplayer.com`, play local H.264 and HLS ads, or compare a
@@ -272,8 +281,9 @@ own specs on its webpack dev server. The 3,551-line player core and the ad code 
    minutes. Before the spec list was cut down, a plain run of all 22 specs with 5 tests left out passed the
    other 73.
 4. Run `npx stryker run stryker.video.config.ts`. It runs in Stryker's sandbox: webpack builds the sandbox's
-   `src`. With server support off, all test runner processes share one dev server on port 8080
-   (`reuseExistingServer`). With it on, the runner moves each process's server to a port of its own. To
+   `src`. The config runs at `concurrency: 3`, so the runner moves each process's dev server to a port of
+   its own: it rewrites the `--port 8080` in the command along with the `url`. Without that port in the
+   command, `webServer.mutate: true` stops the run at startup. To
    split the run, pass one file at a time with `--mutate`; the incremental file carries finished files into the next run.
    `--mutate` takes a comma-separated list, so a brace glob such as `{a,b}.js` breaks into pieces that match
    nothing.
