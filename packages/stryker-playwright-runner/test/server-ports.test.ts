@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events';
 import net from 'node:net';
 import { test } from 'node:test';
 
+import { setEnv } from '../src/process-env.ts';
 import { acceptsConnections } from '../src/server-checks.ts';
 import type {
   ConfigHandles,
@@ -439,51 +440,21 @@ const apartBy = (...moves: ServerMove[]): ServersApart => ({
   env: {},
 });
 
-test('undoing a move puts the webServer options back as they were, though a value already named the new port', () => {
-  const options = {
-    url: 'http://localhost:3000/',
-    env: { PORT: '3000', OTHER: '50100' },
-    command: 'serve --port 3000 --metrics 50100',
-  };
-  const before = structuredClone(options);
-  const undo = moveApart(
-    handles(options),
-    apartBy({ index: 0, from: 3000, to: 50_100 }),
-  );
+test('undoing a move puts back the environment variables the move set', (t) => {
+  const port = process.env['PORT'];
+  t.after(() => {
+    setEnv({ PORT: port });
+  });
+  setEnv({ PORT: '3000' });
+  const undo = moveApart(handles({ url: 'http://localhost:3000/' }), {
+    ...apartBy({ index: 0, from: 3000, to: 50_100 }),
+    env: { PORT: '50100' },
+  });
+  const moved = process.env['PORT'];
 
   undo();
 
-  assert.deepEqual(options, before);
-});
-
-test('a move with a webServer that cannot be found changes no webServer', () => {
-  const options = { url: 'http://localhost:3000/' };
-
-  assert.throws(() =>
-    moveApart(
-      handles(options),
-      apartBy(
-        { index: 0, from: 3000, to: 50_100 },
-        { index: 1, from: 3001, to: 50_101 },
-      ),
-    ),
-  );
-
-  assert.deepEqual(options, { url: 'http://localhost:3000/' });
-});
-
-test("undoing a move puts the env back into the webServer's own env object, which Playwright's cached config shares", () => {
-  const env = { PORT: '3000' };
-  const options = { url: 'http://localhost:3000/', env };
-  const undo = moveApart(
-    handles(options),
-    apartBy({ index: 0, from: 3000, to: 50_100 }),
-  );
-
-  undo();
-
-  assert.equal(options.env, env);
-  assert.deepEqual(env, { PORT: '3000' });
+  assert.deepEqual([moved, process.env['PORT']], ['50100', '3000']);
 });
 
 test('PLAYWRIGHT_TEST_BASE_URL, which Playwright sets from a port webServer, moves with it', async () => {

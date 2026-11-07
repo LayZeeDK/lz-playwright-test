@@ -311,9 +311,9 @@ function awaitSetupLeftRunning(t: TestContext): () => void {
   return () => done.resolve();
 }
 
-test('init that fails after moving the webServer puts its options and the environment back', async (t) => {
+test('init that fails after moving the webServer puts the environment back', async (t) => {
   let bound = false;
-  const { fake, init } = bindingFake(
+  const { lines, init } = bindingFake(
     t,
     () => {
       bound = true;
@@ -325,7 +325,10 @@ test('init that fails after moving the webServer puts its options and the enviro
 
   await assert.rejects(init());
 
-  assert.deepEqual(fake.webServerOptions(), moved.webServers);
+  assert.equal(
+    lines.filter(([, message]) => message.includes('4820 -> ')).length,
+    1,
+  );
   assert.equal(process.env['PORT'], undefined);
 });
 

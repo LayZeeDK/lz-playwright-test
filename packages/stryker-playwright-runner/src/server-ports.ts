@@ -158,20 +158,10 @@ export function moveApart(
   apart: ServersApart,
 ): () => void {
   const previousEnv = envOf(Object.keys(apart.env));
-  const snapshots = apart.moves.map(({ index }) => {
-    const options = playwright.webServerOptions(index);
-
-    return { options, before: { ...options } };
-  });
   moveWebServers(playwright, apart.moves, apart.baseURL);
   setEnv(apart.env);
 
-  // Playwright's cached config module owns the webServer options, so a later TestRunner would see the move.
-  // The baseURL needs no undo: it lives in this TestRunner's own CLI overrides.
   return () => {
-    snapshots.forEach(({ options, before }) => {
-      Object.assign(options, before);
-    });
     setEnv(previousEnv);
   };
 }

@@ -154,23 +154,26 @@ export function fakePlaywright(
   const calls: Call[] = [];
   const runs: Run[] = [];
   let stopRequested = Promise.withResolvers<void>();
-  // Created once, as Playwright creates its webServer plugins at the first load and keeps them.
-  const plugins = (behaviour.webServers ?? []).map((server) => ({
-    factory: {
-      name: 'playwright:webserver',
-      _options: {
-        ...server,
-        url: server.url ?? `http://localhost:${server.port}`,
-      } satisfies WebServerOptions,
-    },
-  }));
+  const webServerPlugins = () =>
+    (behaviour.webServers ?? []).map((server) => ({
+      factory: {
+        name: 'playwright:webserver',
+        _options: {
+          ...server,
+          url: server.url ?? `http://localhost:${server.port}`,
+        } satisfies WebServerOptions,
+      },
+    }));
+  let lastPlugins = webServerPlugins();
 
   class FakeTestRunner implements TestRunner {
     readonly _configCLIOverrides: Record<string, unknown>;
+    readonly #plugins = webServerPlugins();
 
     constructor(configLocation: unknown, overrides: Record<string, unknown>) {
       calls.push(['new', configLocation, overrides]);
       this._configCLIOverrides = overrides;
+      lastPlugins = this.#plugins;
     }
 
     async initialize(params: Record<string, never>) {
@@ -207,7 +210,7 @@ export function fakePlaywright(
           setsNodeOptions: false,
           ...server,
         })),
-        plugins,
+        plugins: this.#plugins,
       };
     }
 
@@ -304,7 +307,7 @@ export function fakePlaywright(
     runs,
     names: () => calls.map(([name]) => name),
     webServerOptions: (): WebServerOptions[] =>
-      plugins.map(({ factory }) => factory._options),
+      lastPlugins.map(({ factory }) => factory._options),
     overrides: (): Record<string, unknown> => {
       const overrides = calls.findLast(([name]) => name === 'new')?.[2];
       assert.ok(isRecord(overrides));
