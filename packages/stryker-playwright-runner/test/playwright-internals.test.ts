@@ -5,7 +5,6 @@ import { test } from 'node:test';
 import {
   instrumentationOf,
   isSerialSuite,
-  moveWebServerOptions,
   playwrightVersion,
   probeInternals,
   raiseRetries,
@@ -14,6 +13,7 @@ import {
   testRunnerMethods,
   workerEntry,
 } from '../src/playwright-internals.ts';
+import { moveWebServers } from '../src/server-ports.ts';
 
 const src = new URL('../src/', import.meta.url);
 const noServer = {
@@ -283,52 +283,6 @@ test("the test runner reads each project's use.baseURL", async () => {
     projects.map(({ baseURL }) => baseURL),
     ['http://localhost:3000', undefined],
   );
-});
-
-test('moving a webServer rewrites the port of the url it waits for', () => {
-  const options = {
-    url: 'http://localhost:4200/health',
-    reuseExistingServer: true,
-  };
-
-  moveWebServerOptions(options, 4200, 50_010);
-
-  assert.deepEqual(options, {
-    url: 'http://localhost:50010/health',
-    reuseExistingServer: true,
-  });
-});
-
-test("moving a webServer rewrites each env value that is its port, and only those", () => {
-  const options = {
-    env: { PORT: '4200', APP_PORT: '4200', OTHER: '42000', NODE_ENV: 'test' },
-  };
-
-  moveWebServerOptions(options, 4200, 50_010);
-
-  assert.deepEqual(options, {
-    env: { PORT: '50010', APP_PORT: '50010', OTHER: '42000', NODE_ENV: 'test' },
-  });
-});
-
-test('moving a webServer rewrites its port where it stands as a word in the command', () => {
-  const options = {
-    command: 'npm run dev -- --port 4200 --host 0.0.0.0 -p 4200 --id 14200',
-  };
-
-  moveWebServerOptions(options, 4200, 50_010);
-
-  assert.deepEqual(options, {
-    command: 'npm run dev -- --port 50010 --host 0.0.0.0 -p 50010 --id 14200',
-  });
-});
-
-test('moving a webServer leaves a url, env or command that is not what Playwright takes alone', () => {
-  const options = { url: 1, env: 'x', command: 2 };
-
-  moveWebServerOptions(options, 1, 2);
-
-  assert.deepEqual(options, { url: 1, env: 'x', command: 2 });
 });
 
 test('a use.baseURL that is no string is a config mistake', async () => {
@@ -629,7 +583,8 @@ test('the test runner moves the webServer plugins the last load returned, by the
   });
   await runner.loadConfig();
 
-  runner.moveWebServers(
+  moveWebServers(
+    runner,
     [
       { index: 0, from: 3000, to: 50_010 },
       { index: 1, from: 3001, to: 50_011 },
@@ -668,7 +623,7 @@ test('a move with no webServer plugin at its index means Playwright changed', as
   await runner.loadConfig();
 
   assert.throws(
-    () => runner.moveWebServers([{ index: 1, from: 1, to: 2 }], undefined),
+    () => moveWebServers(runner, [{ index: 1, from: 1, to: 2 }], undefined),
     { message: webServerPluginsChanged },
   );
 });
@@ -682,7 +637,7 @@ test('a move before the first load, or after a load without plugins, means Playw
 
   [unloaded, withoutPlugins].forEach((runner) => {
     assert.throws(
-      () => runner.moveWebServers([{ index: 0, from: 1, to: 2 }], undefined),
+      () => moveWebServers(runner, [{ index: 0, from: 1, to: 2 }], undefined),
       { message: webServerPluginsChanged },
     );
   });
@@ -698,7 +653,7 @@ test("the test runner moves every project to the baseURL through the CLI overrid
   ).createTestRunner(undefined, overrides);
   await runner.loadConfig();
 
-  runner.moveWebServers([], 'http://localhost:50030/');
+  moveWebServers(runner, [], 'http://localhost:50030/');
 
   assert.deepEqual(overrides, {
     workers: 1,
@@ -716,7 +671,7 @@ test('a move without a baseURL leaves the CLI overrides as they were', async () 
   ).createTestRunner(undefined, overrides);
   await runner.loadConfig();
 
-  runner.moveWebServers([], undefined);
+  moveWebServers(runner, [], undefined);
 
   assert.deepEqual(overrides, { workers: 1, use: { trace: 'off' } });
 });
@@ -732,7 +687,7 @@ test('a TestRunner that keeps no CLI overrides means Playwright changed', async 
   ).createTestRunner(undefined, {});
   await runner.loadConfig();
 
-  assert.throws(() => runner.moveWebServers([], 'http://localhost:50031/'), {
+  assert.throws(() => moveWebServers(runner, [], 'http://localhost:50031/'), {
     message: webServerPluginsChanged,
   });
 });

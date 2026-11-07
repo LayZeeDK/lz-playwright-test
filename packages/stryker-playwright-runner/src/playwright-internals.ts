@@ -63,16 +63,16 @@ export interface TestRunner {
     params: RunTestsParams,
   ): Promise<{ readonly status: Status }>;
   stopTests(): Promise<void>;
-  moveWebServers(
-    moves: readonly ServerMove[],
-    baseURL: string | undefined,
-  ): void;
 }
 
-export interface ServerMove {
-  readonly index: number;
-  readonly from: number;
-  readonly to: number;
+export interface ConfigHandles {
+  /**
+   * The live `_options` of the webServer plugin at `index` among the webServer plugins the last loadConfig()
+   * created. Global setup starts that webServer from them.
+   */
+  webServerOptions(index: number): Record<string, unknown>;
+  /** The CLI overrides Playwright merges over each project's use. */
+  cliOverrides(): Record<string, unknown>;
 }
 
 export const testRunnerMethods = [
@@ -172,7 +172,7 @@ export interface Playwright {
   createTestRunner(
     configFile: string | undefined,
     overrides: Record<string, unknown>,
-  ): Promise<TestRunner>;
+  ): Promise<TestRunner & ConfigHandles>;
   readonly isURLAvailable: CoreBundleModule['utils']['isURLAvailable'];
 }
 
@@ -248,7 +248,12 @@ export function probeInternals(
         args: readonly unknown[],
       ) => parseStatus(await call(method, args), method, version);
       let loaded: unknown;
-      const runner: TestRunner = {
+      const handlesChanged = () =>
+        internalsChanged(
+          version,
+          `TestRunner._configCLIOverrides and loadConfig() resolving to plugins[].factory named ${webServerPluginName} with _options`,
+        );
+      const runner: TestRunner & ConfigHandles = {
         async initialize(params) {
           await call('initialize', [params]);
         },
@@ -272,45 +277,37 @@ export function probeInternals(
         async stopTests() {
           await call('stopTests', []);
         },
-        moveWebServers(moves, baseURL) {
+        webServerOptions(index) {
           const plugins = fieldOf(loaded, 'plugins');
+
+          if (!Array.isArray(plugins)) {
+            throw handlesChanged();
+          }
+
+          const options = plugins.flatMap((plugin: unknown) => {
+            const factory = fieldOf(plugin, 'factory');
+            const pluginOptions = fieldOf(factory, '_options');
+
+            return fieldOf(factory, 'name') === webServerPluginName &&
+              isRecord(pluginOptions)
+              ? [pluginOptions]
+              : [];
+          })[index];
+
+          if (!options) {
+            throw handlesChanged();
+          }
+
+          return options;
+        },
+        cliOverrides() {
           const overrides = fieldOf(created, '_configCLIOverrides');
-          const changed = () =>
-            internalsChanged(
-              version,
-              `TestRunner._configCLIOverrides and loadConfig() resolving to plugins[].factory named ${webServerPluginName} with _options`,
-            );
 
           if (!isRecord(overrides)) {
-            throw changed();
+            throw handlesChanged();
           }
 
-          // Stryker disable next-line ArrayDeclaration: an entry that is no plugin object adds no webServer, as an empty list does
-          const webServers = (Array.isArray(plugins) ? plugins : []).flatMap(
-            (plugin: unknown) => {
-              const factory = fieldOf(plugin, 'factory');
-              const options = fieldOf(factory, '_options');
-
-              return fieldOf(factory, 'name') === webServerPluginName &&
-                isRecord(options)
-                ? [options]
-                : [];
-            },
-          );
-          moves.forEach(({ index, from, to }) => {
-            const options = webServers[index];
-
-            if (!options) {
-              throw changed();
-            }
-
-            moveWebServerOptions(options, from, to);
-          });
-
-          if (baseURL !== undefined) {
-            const use = overrides['use'];
-            overrides['use'] = { ...(isRecord(use) ? use : {}), baseURL };
-          }
+          return overrides;
         },
       };
       await runner.initialize({});
@@ -450,35 +447,6 @@ function parseConfig(
 }
 
 const webServerPluginName = 'playwright:webserver';
-
-export function moveWebServerOptions(
-  options: Record<string, unknown>,
-  from: number,
-  to: number,
-): void {
-  const { url, env, command } = options;
-
-  if (typeof url === 'string') {
-    const moved = new URL(url);
-    moved.port = String(to);
-    options['url'] = moved.href;
-  }
-
-  if (isRecord(env)) {
-    Object.entries(env)
-      .filter(([, value]) => value === String(from))
-      .forEach(([name]) => {
-        env[name] = String(to);
-      });
-  }
-
-  if (typeof command === 'string') {
-    options['command'] = command.replaceAll(
-      new RegExp(`\\b${from}\\b`, 'g'),
-      String(to),
-    );
-  }
-}
 
 /**
  * Playwright's runTests sets retries to 0 for every project (playwright 1.64.1 lib/runner/index.js:7010). Its

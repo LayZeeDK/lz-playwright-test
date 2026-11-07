@@ -15,7 +15,7 @@ import {
   type Instrumentation,
   type SlotType,
 } from '../../src/playwright-internals.ts';
-import { setEnv } from '../../src/lz-playwright-test-runner.ts';
+import { setEnv } from '../../src/process-env.ts';
 import type { PageSettings, RunSettings } from '../../src/protocol.ts';
 import type { StrykerNamespace } from '../../src/namespace.ts';
 import type { install } from '../../src/worker-hook.ts';

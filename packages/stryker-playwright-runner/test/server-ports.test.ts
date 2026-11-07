@@ -11,6 +11,7 @@ import type {
 import {
   freePort,
   moveServersApart,
+  moveWebServerOptions,
   startsMoreRunners,
 } from '../src/server-ports.ts';
 
@@ -54,7 +55,10 @@ test('a checker process becomes another test runner process when checking ends',
 });
 
 test('a percentage concurrency is that share of the available parallelism', () => {
-  assert.equal(startsMoreRunners({ concurrency: '50%', checkers: [] }, 8), true);
+  assert.equal(
+    startsMoreRunners({ concurrency: '50%', checkers: [] }, 8),
+    true,
+  );
 });
 
 test('a percentage concurrency rounds its share of the available parallelism', () => {
@@ -292,7 +296,7 @@ test("every project's baseURL must name a moved webServer, and the refusal names
   );
 });
 
-test("projects whose baseURLs name different webServers cannot share the one baseURL the runner moves", async () => {
+test('projects whose baseURLs name different webServers cannot share the one baseURL the runner moves', async () => {
   await assert.rejects(
     moveServersApart(
       {
@@ -311,6 +315,52 @@ test("projects whose baseURLs name different webServers cannot share the one bas
       ),
     },
   );
+});
+
+test('moving a webServer rewrites the port of the url it waits for', () => {
+  const options = {
+    url: 'http://localhost:4200/health',
+    reuseExistingServer: true,
+  };
+
+  moveWebServerOptions(options, 4200, 50_010);
+
+  assert.deepEqual(options, {
+    url: 'http://localhost:50010/health',
+    reuseExistingServer: true,
+  });
+});
+
+test('moving a webServer rewrites each env value that is its port, and only those', () => {
+  const options = {
+    env: { PORT: '4200', APP_PORT: '4200', OTHER: '42000', NODE_ENV: 'test' },
+  };
+
+  moveWebServerOptions(options, 4200, 50_010);
+
+  assert.deepEqual(options, {
+    env: { PORT: '50010', APP_PORT: '50010', OTHER: '42000', NODE_ENV: 'test' },
+  });
+});
+
+test('moving a webServer rewrites its port where it stands as a word in the command', () => {
+  const options = {
+    command: 'npm run dev -- --port 4200 --host 0.0.0.0 -p 4200 --id 14200',
+  };
+
+  moveWebServerOptions(options, 4200, 50_010);
+
+  assert.deepEqual(options, {
+    command: 'npm run dev -- --port 50010 --host 0.0.0.0 -p 50010 --id 14200',
+  });
+});
+
+test('moving a webServer leaves a url, env or command that is not what Playwright takes alone', () => {
+  const options = { url: 1, env: 'x', command: 2 };
+
+  moveWebServerOptions(options, 1, 2);
+
+  assert.deepEqual(options, { url: 1, env: 'x', command: 2 });
 });
 
 test('PLAYWRIGHT_TEST_BASE_URL, which Playwright sets from a port webServer, moves with it', async () => {

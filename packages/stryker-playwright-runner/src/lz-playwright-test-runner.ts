@@ -22,14 +22,16 @@ import {
   type LzPlaywrightRunnerOptionsWithStrykerOptions,
 } from './lz-playwright-runner-options-with-stryker-options.ts';
 import {
+  type ConfigHandles,
   type ConfigWebServer,
   isSerialSuite,
   loadPlaywright,
   noCopyPromptEnv,
   type Playwright,
-  type ServerMove,
   type TestRunner,
 } from './playwright-internals.ts';
+import { globalSetupWatchingConfiguredPorts } from './port-watch.ts';
+import { envOf, setEnv } from './process-env.ts';
 import { readSnapshotDir } from './protocol.ts';
 import {
   LzPlaywrightCollectingReporter,
@@ -57,8 +59,8 @@ import {
   serialGroups,
 } from './serial-groups.ts';
 import {
+  moveApart,
   moveServersApart,
-  type ServersApart,
   startsMoreRunners,
 } from './server-ports.ts';
 import {
@@ -201,17 +203,18 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
         );
       }
     });
-    let playwright: TestRunner | undefined;
+    let playwright: (TestRunner & ConfigHandles) | undefined;
     let undoMove: (() => void) | undefined;
 
     try {
-      playwright = await pw.createTestRunner(options.configFile, {
+      const created = await pw.createTestRunner(options.configFile, {
         outputDir: root.outputDir,
         ...runOverrides({
           traced: traces !== undefined,
           screenshots: options.traceScreenshots,
         }),
       });
+      playwright = created;
       const config = await playwright.loadConfig();
       const timeouts = configTimeouts(config.projects);
       const retriesByProject = configRetries(config.projects, options.retries);
@@ -232,7 +235,7 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
           : undefined;
 
       if (apart) {
-        undoMove = moveApart(playwright, apart).undo;
+        undoMove = moveApart(playwright, apart);
         this.#log.debug(
           `Stryker starts more than one test runner process, so this one's webServer moves to a port of its own: ${apart.moves.map(({ from, to }) => `${from} -> ${to}`).join(', ')}.`,
         );
@@ -245,17 +248,19 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       const server = mutates
         ? await serverSide(root, webServers, pw.isURLAvailable)
         : undefined;
-      await this.#globalSetupWatchingConfiguredPorts(
-        playwright,
-        server,
-        apart && {
-          moves: apart.moves,
-          configuredChecks: config.webServers.map(
-            (webServer) => serverCheck(webServer, pw.isURLAvailable)[0],
-          ),
-        },
-        options.webServer.mutate === 'auto',
-      );
+      const setup = () => this.#globalSetup(created, server, undefined);
+      await (apart
+        ? globalSetupWatchingConfiguredPorts(
+            setup,
+            {
+              moves: apart.moves,
+              configuredChecks: config.webServers.map(
+                (webServer) => serverCheck(webServer, pw.isURLAvailable)[0],
+              ),
+            },
+            options.webServer.mutate === 'auto',
+          )
+        : setup());
       // Every Stryker test runner process needs the groups, and only one of them runs the dry run.
       // Listed after global setup, like Playwright's own CLI, because test files may read what it
       // creates.
@@ -592,63 +597,6 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
     await this.#globalSetup(session.playwright, session.server, mutant);
   }
 
-  async #globalSetupWatchingConfiguredPorts(
-    playwright: TestRunner,
-    server: ServerSide | undefined,
-    moved: MovedServers | undefined,
-    startsAgainOnRefusal: boolean,
-  ) {
-    if (!moved) {
-      await this.#globalSetup(playwright, server, undefined);
-
-      return;
-    }
-
-    const answering = new Set(await boundMoves(moved));
-    const watched = {
-      ...moved,
-      moves: moved.moves.filter((move) => !answering.has(move)),
-    };
-    const setup = this.#globalSetup(playwright, server, undefined);
-    let watching = true;
-    const watch = async () => {
-      while (watching) {
-        const [bound] = await boundMoves(watched);
-
-        if (bound) {
-          return bound;
-        }
-
-        // Stryker disable next-line NodeTimerDelay: the delay only paces the watch; 1 ms more or less changes no result
-        await setTimeout(boundPollMs);
-      }
-
-      return undefined;
-    };
-
-    let early: ServerMove | undefined;
-
-    try {
-      early = await Promise.race([setup.then(() => undefined), watch()]);
-    } catch (error) {
-      const [late] = await boundMoves(watched);
-
-      throw late ? boundConfiguredPort(late, error) : error;
-    } finally {
-      watching = false;
-    }
-
-    if (early) {
-      const settled = setup.catch(() => undefined);
-
-      if (startsAgainOnRefusal) {
-        await settled;
-      }
-
-      throw boundConfiguredPort(early, undefined);
-    }
-  }
-
   /** Global teardown runs first, so this also restarts the webServer that global setup started. */
   async #globalSetup(
     playwright: TestRunner,
@@ -687,64 +635,6 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       );
     }
   }
-}
-
-function moveApart(
-  playwright: TestRunner,
-  apart: ServersApart,
-): { readonly undo: () => void } {
-  const previousEnv = envOf(Object.keys(apart.env));
-  playwright.moveWebServers(apart.moves, apart.baseURL);
-  setEnv(apart.env);
-
-  return {
-    // The webServer env object belongs to the cached config module, so a later TestRunner would see the move.
-    undo: () => {
-      playwright.moveWebServers(
-        apart.moves.map(({ index, from, to }) => ({
-          index,
-          from: to,
-          to: from,
-        })),
-        undefined,
-      );
-      setEnv(previousEnv);
-    },
-  };
-}
-
-interface MovedServers {
-  readonly moves: readonly ServerMove[];
-  readonly configuredChecks: readonly (ServerCheck | undefined)[];
-}
-
-const boundPollMs = 250;
-
-async function boundMoves({
-  moves,
-  configuredChecks,
-}: MovedServers): Promise<ServerMove[]> {
-  const bound = await Promise.all(
-    moves.map(async (move) =>
-      (await configuredChecks[move.index]?.isUp()) ? [move] : [],
-    ),
-  );
-
-  return bound.flat();
-}
-
-function boundConfiguredPort(
-  { index, from, to }: ServerMove,
-  cause: unknown,
-): ServerSupportRefused {
-  return new ServerSupportRefused(
-    " and Stryker starts more than one test runner process, so each process's webServer " +
-      `moves to a port of its own, but the command of webServer ${index} bound port ${from} instead of ${to}. ` +
-      "Make the command take its port from PORT, from the webServer's env, or from a --port in the command " +
-      '(the runner moves all three), or run Stryker with concurrency 1 and no checker ' +
-      '(see More than one Stryker process in the README).',
-    cause === undefined ? undefined : { cause },
-  );
 }
 
 /**
@@ -815,10 +705,6 @@ async function hookedWithin(dir: string, waitMs: number): Promise<boolean> {
   return true;
 }
 
-function envOf(names: readonly string[]): Record<string, string | undefined> {
-  return Object.fromEntries(names.map((name) => [name, process.env[name]]));
-}
-
 export async function withEnv<T>(
   values: Readonly<Record<string, string | undefined>>,
   fn: () => Promise<T>,
@@ -831,16 +717,6 @@ export async function withEnv<T>(
   } finally {
     setEnv(previous);
   }
-}
-
-export function setEnv(values: Readonly<Record<string, string | undefined>>) {
-  Object.entries(values).forEach(([name, value]) => {
-    if (value === undefined) {
-      delete process.env[name];
-    } else {
-      process.env[name] = value;
-    }
-  });
 }
 
 // Playwright's own webServer port check tries both loopback addresses: localhost can resolve to only one of them.

@@ -1,11 +1,19 @@
 import net from 'node:net';
 
+import { isRecord } from './is-record.ts';
 import type {
+  ConfigHandles,
   ConfigProject,
   ConfigWebServer,
-  ServerMove,
 } from './playwright-internals.ts';
+import { envOf, setEnv } from './process-env.ts';
 import { hostKey, ServerSupportRefused } from './server-protocol.ts';
+
+export interface ServerMove {
+  readonly index: number;
+  readonly from: number;
+  readonly to: number;
+}
 
 export interface ServersApart {
   readonly moves: readonly ServerMove[];
@@ -25,9 +33,7 @@ export async function moveServersApart(
   nextPort: () => Promise<number> = freePort,
 ): Promise<ServersApart | undefined> {
   const planned = await Promise.all(
-    config.webServers.map((server, index) =>
-      planMove(server, index, nextPort),
-    ),
+    config.webServers.map((server, index) => planMove(server, index, nextPort)),
   );
   const moves = planned.flatMap(({ move }) => (move ? [move] : []));
   const [first] = moves;
@@ -123,6 +129,71 @@ function withPort(url: string, port: number): string {
   moved.port = String(port);
 
   return moved.href;
+}
+
+export function moveApart(
+  playwright: ConfigHandles,
+  apart: ServersApart,
+): () => void {
+  const previousEnv = envOf(Object.keys(apart.env));
+  moveWebServers(playwright, apart.moves, apart.baseURL);
+  setEnv(apart.env);
+
+  return () => {
+    moveWebServers(
+      playwright,
+      apart.moves.map(({ index, from, to }) => ({
+        index,
+        from: to,
+        to: from,
+      })),
+      undefined,
+    );
+    setEnv(previousEnv);
+  };
+}
+
+export function moveWebServers(
+  playwright: ConfigHandles,
+  moves: readonly ServerMove[],
+  baseURL: string | undefined,
+): void {
+  const overrides = playwright.cliOverrides();
+  moves.forEach(({ index, from, to }) => {
+    moveWebServerOptions(playwright.webServerOptions(index), from, to);
+  });
+
+  if (baseURL !== undefined) {
+    const use = overrides['use'];
+    overrides['use'] = { ...(isRecord(use) ? use : {}), baseURL };
+  }
+}
+
+export function moveWebServerOptions(
+  options: Record<string, unknown>,
+  from: number,
+  to: number,
+): void {
+  const { url, env, command } = options;
+
+  if (typeof url === 'string') {
+    options['url'] = withPort(url, to);
+  }
+
+  if (isRecord(env)) {
+    Object.entries(env)
+      .filter(([, value]) => value === String(from))
+      .forEach(([name]) => {
+        env[name] = String(to);
+      });
+  }
+
+  if (typeof command === 'string') {
+    options['command'] = command.replaceAll(
+      new RegExp(`\\b${from}\\b`, 'g'),
+      String(to),
+    );
+  }
 }
 
 // ponytail: another process may take the port before the webServer binds it; Playwright then reports the bind error.

@@ -13,10 +13,8 @@ import type {
   RunTestsParams,
   TestRunner,
 } from '../../src/playwright-internals.ts';
-import {
-  LzPlaywrightTestRunner,
-  setEnv,
-} from '../../src/lz-playwright-test-runner.ts';
+import { LzPlaywrightTestRunner } from '../../src/lz-playwright-test-runner.ts';
+import { setEnv } from '../../src/process-env.ts';
 import {
   readRunSettings,
   runSettingsEnv,
@@ -160,10 +158,6 @@ export function fakePlaywright(
     constructor(configLocation: unknown, overrides: Record<string, unknown>) {
       calls.push(['new', configLocation, overrides]);
       this._configCLIOverrides = overrides;
-    }
-
-    moveWebServers(): void {
-      assert.fail('probeInternals moves the webServers, not the TestRunner');
     }
 
     async initialize(params: Record<string, never>) {
