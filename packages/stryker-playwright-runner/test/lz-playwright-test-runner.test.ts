@@ -31,6 +31,7 @@ import {
   mutantRunOptions,
   withoutPrototypes,
   strykerOptions,
+  warnings,
 } from './support/doubles.ts';
 import {
   activeMutantEnv,
@@ -185,10 +186,6 @@ test('init warns when timeoutMS is below the expect timeout plus the start and s
   );
   assert.deepEqual(enough.lines, []);
 });
-
-function warnings(lines: readonly [string, string][]) {
-  return lines.filter(([level]) => level === 'warn');
-}
 
 function leaveDeadRoots(tmp: string, suffixes: string[]): string[] {
   const dead = spawnSync(process.execPath, ['-e', '']).pid;
@@ -707,10 +704,7 @@ test('a webServer that died is restarted through global setup before the run, an
     ['runGlobalSetup', 'runTests'],
   );
   assert.deepEqual(warnings(lines), [
-    [
-      'warn',
-      'webServer at http://localhost:1/, http://localhost:3/ stopped answering; rerunning Playwright global setup (global teardown runs first).',
-    ],
+    'webServer at http://localhost:1/, http://localhost:3/ stopped answering; rerunning Playwright global setup (global teardown runs first).',
   ]);
 });
 
@@ -821,10 +815,7 @@ test('a webServer port that stopped answering is restarted and named by its port
   await shell.dryRun(dryRunOptions());
 
   assert.deepEqual(warnings(lines), [
-    [
-      'warn',
-      `webServer at port ${port} stopped answering; rerunning Playwright global setup (global teardown runs first).`,
-    ],
+    `webServer at port ${port} stopped answering; rerunning Playwright global setup (global teardown runs first).`,
   ]);
 });
 

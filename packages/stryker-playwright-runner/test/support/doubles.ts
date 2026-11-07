@@ -150,6 +150,14 @@ export function logger({
   return { log, lines };
 }
 
+export function warnings(
+  lines: readonly (readonly [string, string])[],
+): string[] {
+  return lines
+    .filter(([level]) => level === 'warn')
+    .map(([, message]) => message);
+}
+
 export function strykerOptions(
   options: Partial<LzPlaywrightRunnerOptionsWithStrykerOptions>,
 ): LzPlaywrightRunnerOptionsWithStrykerOptions {

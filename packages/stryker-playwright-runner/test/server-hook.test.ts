@@ -1,310 +1,39 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdirSync, readdirSync, readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import http from 'node:http';
 import http2 from 'node:http2';
 import https from 'node:https';
 import path from 'node:path';
-import { before, type TestContext, test } from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { before, test } from 'node:test';
 
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
-import { Instrumenter } from '@stryker-mutator/instrumenter';
 
 import { readSnapshotDir } from '../src/protocol.ts';
-import { mergeCoverage } from '../src/run-result.ts';
 import {
   anyHooked,
-  type ServerControl,
-  serverDirEnv,
   serverSnapshotPrefix,
   testIdHeader,
   untaggedArrival,
   writeServerControl,
 } from '../src/server-protocol.ts';
-import { logger, tempTree, withoutPrototypes } from './support/doubles.ts';
+import { withoutPrototypes } from './support/doubles.ts';
+import {
+  appMutantIdsOf,
+  bigRequestIds,
+  coverageOf,
+  instrumentApp,
+  moduleScopeAndBigRequestIds,
+  moduleScopeAndSmallRequestIds,
+  perTestKeysOf,
+  smallRequestIds,
+  startHeaderEcho,
+  startServer,
+  tlsCertPath,
+} from './support/hooked-server.ts';
+import { serverHookUrl } from './support/server-fake.ts';
 
-const serverHookUrl = new URL('../src/server-hook.ts', import.meta.url).href;
-const tlsKeyPath = fileURLToPath(
-  new URL('support/tls/localhost-key.pem', import.meta.url),
-);
-const tlsCertPath = fileURLToPath(
-  new URL('support/tls/localhost-cert.pem', import.meta.url),
-);
-// Mutant ids the instrumenter gives this source: 0 is 'hi', run once at module scope; 2 makes the condition
-// true; 6 empties ' many'; 7 empties 'one'.
-const source = [
-  "const greeting = 'hi';",
-  'export function answer(n) {',
-  "  return n > 1 ? greeting + ' many' : 'one';",
-  '}',
-  '',
-].join('\n');
-const bigRequestIds = ['1', '2', '3', '4', '5', '6'];
-const testIdsTheseTestsSend = ['big', 'small'];
-const namespaceGlobal = `globalThis.${INSTRUMENTER_CONSTANTS.NAMESPACE}`;
-const answerLines = [
-  "const n = Number(new URL(request.url, 'http://x').searchParams.get('n'));",
-  'response.end(answer(n));',
-];
-const answerImport = "import { answer } from './app.mjs';";
-const serverSource = serverSourceOf(answerLines, [answerImport]);
-const selfRequestLines = [
-  "const url = new URL(request.url, 'http://x');",
-  "if (url.pathname === '/redirect') {",
-  "  response.writeHead(302, { location: `http://127.0.0.1:${url.searchParams.get('to')}/` });",
-  '  response.end();',
-  '  return;',
-  '}',
-  "if (url.pathname === '/late') {",
-  "  const self = `http://127.0.0.1:${server.address().port}/?n=${url.searchParams.get('n')}`;",
-  '  globalThis.late = new Promise((resolve) => setTimeout(resolve, 20)).then(() => fetch(self)).then((answer) => answer.text());',
-  "  response.end('sent later');",
-  '  return;',
-  '}',
-  "if (url.pathname === '/late-answer') {",
-  '  response.end(await globalThis.late);',
-  '  return;',
-  '}',
-  "if (url.pathname === '/secure-port') {",
-  '  response.end(String(secure.address().port));',
-  '  return;',
-  '}',
-  "if (url.pathname !== '/') {",
-  "  const scheme = url.searchParams.get('scheme') ?? 'http';",
-  "  const port = url.searchParams.get('port') ?? (scheme === 'https' ? secure : server).address().port;",
-  "  const host = url.searchParams.get('host') ?? '127.0.0.1';",
-  "  const self = `${scheme}://${host}:${port}/${url.searchParams.get('then') ?? ''}?${url.searchParams}`;",
-  '  response.end(await clients[url.pathname.slice(1)](self, request));',
-  '  return;',
-  '}',
-  ...answerLines,
-];
-const selfRequestClients = [
-  "import https from 'node:https';",
-  "import { readFileSync } from 'node:fs';",
-  "import { get as namedGet } from 'node:http';",
-  `const tls = { key: readFileSync(${JSON.stringify(tlsKeyPath)}), cert: readFileSync(${JSON.stringify(tlsCertPath)}) };`,
-  'const secure = https.createServer(tls, (request, response) => {',
-  "  response.end(answer(Number(new URL(request.url, 'http://x').searchParams.get('n'))));",
-  '});',
-  "secure.listen(0, '127.0.0.1');",
-  'const ca = tls.cert;',
-  'const optionsOf = (url) => {',
-  '  const { hostname, port, pathname, search } = new URL(url);',
-  '  return { hostname, port, path: pathname + search, ca };',
-  '};',
-  'const sent = (request) => {',
-  '  request.end();',
-  '  return request;',
-  '};',
-  'const textOf = (request) => new Promise((resolve, reject) => {',
-  "  request.on('error', reject);",
-  "  request.on('response', (response) => {",
-  "    response.setEncoding('utf8');",
-  "    let body = '';",
-  "    response.on('data', (chunk) => (body += chunk));",
-  "    response.on('end', () => resolve(body));",
-  '  });',
-  '});',
-  'const clients = {',
-  "  'fetch-string': async (url) => (await fetch(url)).text(),",
-  "  'http-get-url': (url) => textOf(http.get(new URL(url))),",
-  "  'fetch-url': async (url) => (await fetch(new URL(url))).text(),",
-  "  'fetch-request': async (url) => (await fetch(new Request(url))).text(),",
-  "  'http-get-options': (url) => textOf(http.get(optionsOf(url))),",
-  "  'http-get-named-import': (url) => textOf(namedGet(url)),",
-  "  'http-request-url': (url) => textOf(sent(http.request(new URL(url)))),",
-  "  'http-request-options': (url) => textOf(sent(http.request(optionsOf(url)))),",
-  "  'https-get-url': (url) => textOf(https.get(new URL(url), { ca })),",
-  "  'https-request-options': (url) => textOf(sent(https.request(optionsOf(url)))),",
-  `  'fetch-own-header': async (url) => (await fetch(url, { headers: { '${testIdHeader}': 'small' } })).text(),`,
-  `  'fetch-own-header-after-another': async (url) => (await fetch(url, { headers: [['x-other', 'other'], ['${testIdHeader}', 'small']] })).text(),`,
-  `  'fetch-header-named-in-a-value': async (url) => (await fetch(url, { headers: { 'x-other': '${testIdHeader}' } })).text(),`,
-  `  'http-get-own-header': (url) => textOf(http.get(url, { headers: { '${testIdHeader}': 'small' } })),`,
-  "  'http-get-own-host': (url) => textOf(http.get(url, { headers: { host: `127.0.0.1:${server.address().port}` } })),",
-  `  'fetch-forward': async (url, incoming) => (await fetch(url, { headers: { '${testIdHeader}': incoming.headers['${testIdHeader}'] } })).text(),`,
-  "  'http-get-bad-host': async () => {",
-  "    const kind = (error) => (error instanceof TypeError ? 'TypeError' : 'other');",
-  '    try {',
-  "      return await textOf(http.get({ hostname: 'a b', port: 1 })).then(() => 'answered', kind);",
-  '    } catch (error) {',
-  '      return kind(error);',
-  '    }',
-  '  },',
-  "  'http-request-array-headers': (url) => textOf(sent(http.request(url, { headers: ['host', new URL(url).host] }))),",
-  '};',
-];
-const selfRequestServerSource = serverSourceOf(selfRequestLines, [
-  answerImport,
-  ...selfRequestClients,
-]);
-const lazyServerSource = serverSourceOf([
-  "const { answer } = await import('./app.mjs');",
-  ...answerLines,
-]);
-const edgeRuntimeLikeServerSource = serverSourceOf(
-  [
-    "const n = Number(new URL(request.url, 'http://x').searchParams.get('n'));",
-    'response.end(realmAnswer(n));',
-  ],
-  [
-    "import { readFileSync } from 'node:fs';",
-    "import vm from 'node:vm';",
-    'const realm = vm.createContext({ process: { env: { ...process.env } } });',
-    "const app = readFileSync(new URL('./app.mjs', import.meta.url), 'utf8');",
-    "vm.runInContext(app.replace('export function', 'function'), realm);",
-    "const realmAnswer = vm.runInContext('answer', realm);",
-  ],
-);
-const withoutTestRunnerHooksAndActiveMutant = {
-  NODE_OPTIONS: undefined,
-  [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: undefined,
-};
-let instrumented = '';
-let appMutantIds: ReadonlySet<string> = new Set();
-
-before(async () => {
-  const result = await new Instrumenter(logger().log).instrument(
-    [{ name: 'app.mjs', content: source, mutate: true }],
-    { plugins: null, excludedMutations: [], ignorers: [] },
-  );
-  const [file] = result.files;
-  assert.ok(file);
-  assert.deepEqual(
-    result.mutants.map(({ id, replacement }) => `${id} ${replacement}`),
-    [
-      '0 ""',
-      '1 {}',
-      '2 true',
-      '3 false',
-      '4 n >= 1',
-      '5 n <= 1',
-      '6 ""',
-      '7 ""',
-    ],
-  );
-  instrumented = file.content;
-  appMutantIds = new Set(result.mutants.map(({ id }) => id));
-});
-
-function serverSourceOf(
-  handler: readonly string[],
-  imports: readonly string[] = [],
-  createServerCall = 'http.createServer(',
-): string {
-  return [
-    "import http from 'node:http';",
-    "import http2 from 'node:http2';",
-    ...imports,
-    `const server = ${createServerCall}async (request, response) => {`,
-    ...handler.map((line) => `  ${line}`),
-    '});',
-    "server.listen(0, '127.0.0.1', () => process.stdout.write(`${server.address().port}\\n`));",
-    '',
-  ].join('\n');
-}
-
-async function startServer(
-  t: TestContext,
-  {
-    env = {},
-    server = serverSource,
-    hooks = [serverHookUrl],
-  }: {
-    readonly env?: Readonly<Record<string, string>>;
-    readonly server?: string;
-    readonly hooks?: readonly string[];
-  } = {},
-) {
-  const dir = tempTree(t, 'server-hook-test-', {
-    'app.mjs': instrumented,
-    'server.mjs': server,
-  });
-  const serverDir = path.join(dir, 'server');
-  mkdirSync(serverDir);
-  const child = spawn(
-    process.execPath,
-    [
-      ...hooks.flatMap((hook) => ['--import', hook]),
-      path.join(dir, 'server.mjs'),
-    ],
-    {
-      env: {
-        ...process.env,
-        ...withoutTestRunnerHooksAndActiveMutant,
-        [serverDirEnv]: serverDir,
-        ...env,
-      },
-      stdio: ['ignore', 'pipe', 'inherit'],
-    },
-  );
-  t.after(async () => {
-    child.kill();
-    await once(child, 'exit');
-  });
-  const listened: unknown[] = await once(child.stdout, 'data');
-  const port = Number(String(listened[0]).trim());
-  let runs = 0;
-
-  return {
-    serverDir,
-    port,
-    run(control: Omit<ServerControl, 'outDir'>) {
-      const outDir = path.join(dir, 'runs', String(runs++));
-      mkdirSync(outDir, { recursive: true });
-      writeServerControl(serverDir, {
-        outDir,
-        issuedTestIds: testIdsTheseTestsSend,
-        testIdHosts: [`localhost:${port}`],
-        ...control,
-      });
-
-      return outDir;
-    },
-    async ask(
-      n: number,
-      testId?: string,
-      via = '',
-      query: Readonly<Record<string, string>> = {},
-    ): Promise<string> {
-      const search = new URLSearchParams({ n: String(n), ...query });
-      const response = await fetch(
-        `http://127.0.0.1:${port}/${via}?${search}`,
-        {
-          headers: testId === undefined ? {} : { [testIdHeader]: testId },
-        },
-      );
-
-      return response.text();
-    },
-  };
-}
-
-async function startHeaderEcho(
-  t: TestContext,
-  host = '127.0.0.1',
-): Promise<number> {
-  const echo = http.createServer((request, response) =>
-    response.end(String(request.headers[testIdHeader])),
-  );
-  echo.listen(0, host);
-  await once(echo, 'listening');
-  t.after(() => echo.close());
-  const address = echo.address();
-  assert.ok(address !== null && typeof address === 'object');
-
-  return address.port;
-}
-
-function secureHttp2ServerSource(options: string): string {
-  return serverSourceOf(
-    answerLines,
-    ["import { readFileSync } from 'node:fs';", answerImport],
-    `http2.createSecureServer({ ...${options}, key: readFileSync(${JSON.stringify(tlsKeyPath)}), cert: readFileSync(${JSON.stringify(tlsCertPath)}) }, `,
-  );
-}
+before(instrumentApp);
 
 async function askHttp2(
   origin: string,
@@ -327,16 +56,6 @@ async function askHttp2(
   }
 }
 
-function coverageOf(outDir: string) {
-  return mergeCoverage(readSnapshotDir(outDir).snapshots);
-}
-
-function appMutantIdsOf(hits: Record<string, number> | undefined): string[] {
-  return Object.keys(hits ?? {})
-    .filter((id) => appMutantIds.has(id))
-    .sort();
-}
-
 test('the hook marks its server hooked once it listens', async (t) => {
   const server = await startServer(t);
 
@@ -346,43 +65,37 @@ test('the hook marks its server hooked once it listens', async (t) => {
 test('the active mutant switches per request from the control file, without a restart', async (t) => {
   const server = await startServer(t);
 
-  assert.equal(await server.ask(0), 'one', 'no control file yet');
+  assert.equal(await server.ask({ n: 0 }), 'one', 'no control file yet');
 
   server.run({ perTest: false, activeMutant: '2' });
 
-  assert.equal(await server.ask(0), 'hi many');
+  assert.equal(await server.ask({ n: 0 }), 'hi many');
 
   server.run({ perTest: false, activeMutant: '7' });
 
-  assert.equal(await server.ask(0), '');
-  assert.equal(await server.ask(2), 'hi many');
+  assert.equal(await server.ask({ n: 0 }), '');
+  assert.equal(await server.ask({ n: 2 }), 'hi many');
 
   server.run({ perTest: false });
 
-  assert.equal(await server.ask(0), 'one');
+  assert.equal(await server.ask({ n: 0 }), 'one');
 });
 
 test('an http2 server switches the active mutant per request too', async (t) => {
-  const server = await startServer(t, {
-    server: serverSourceOf(answerLines, [answerImport], 'http2.createServer('),
-  });
+  const server = await startServer(t, { server: 'answer-http2' });
   server.run({ perTest: false, activeMutant: '2' });
 
   assert.equal(await askHttp2(`http://127.0.0.1:${server.port}`, 0), 'hi many');
 });
 
 test('an http2 server is marked hooked once it listens', async (t) => {
-  const server = await startServer(t, {
-    server: serverSourceOf(answerLines, [answerImport], 'http2.createServer('),
-  });
+  const server = await startServer(t, { server: 'answer-http2' });
 
   assert.equal(anyHooked(server.serverDir), true);
 });
 
 test('an http2 server collects coverage per test id header', async (t) => {
-  const server = await startServer(t, {
-    server: serverSourceOf(answerLines, [answerImport], 'http2.createServer('),
-  });
+  const server = await startServer(t, { server: 'answer-http2' });
   const outDir = server.run({ perTest: true });
   await askHttp2(
     `http://127.0.0.1:${server.port}`,
@@ -398,9 +111,7 @@ test('an http2 server collects coverage per test id header', async (t) => {
 });
 
 test('a secure http2 server switches the active mutant per request too', async (t) => {
-  const server = await startServer(t, {
-    server: secureHttp2ServerSource('{}'),
-  });
+  const server = await startServer(t, { server: 'answer-secure-http2' });
   server.run({ perTest: false, activeMutant: '2' });
 
   assert.equal(
@@ -413,7 +124,8 @@ test('a secure http2 server switches the active mutant per request too', async (
 
 test('a secure http2 server that allows HTTP/1 switches the active mutant for an HTTP/1 request too', async (t) => {
   const server = await startServer(t, {
-    server: secureHttp2ServerSource('{ allowHTTP1: true }'),
+    server: 'answer-secure-http2',
+    args: ['--allow-http1'],
   });
   server.run({ perTest: false, activeMutant: '2' });
   const request = https.get(`https://127.0.0.1:${server.port}/?n=0`, {
@@ -428,13 +140,7 @@ test('a secure http2 server that allows HTTP/1 switches the active mutant for an
 });
 
 test("a server that answers 'Expect: 100-continue' itself switches the active mutant per request too", async (t) => {
-  const server = await startServer(t, {
-    server: serverSourceOf(
-      ['response.writeContinue();', ...answerLines],
-      [answerImport],
-      "http.createServer().on('checkContinue', ",
-    ),
-  });
+  const server = await startServer(t, { server: 'answer-continue' });
   server.run({ perTest: false, activeMutant: '2' });
   const request = http.request(`http://127.0.0.1:${server.port}/?n=0`, {
     method: 'POST',
@@ -450,36 +156,10 @@ test("a server that answers 'Expect: 100-continue' itself switches the active mu
 });
 
 test('instrumentation that wraps emit after the hook, by assignment and by redefining it, still runs, and the mutant still switches', async (t) => {
-  const wrapEmit = (how: string, wrap: string) => [
-    'try {',
-    '  const before = http.Server.prototype.emit;',
-    `  const wrapper = function (event, ...args) { if (event === 'request') wrapped.push('${how}'); return before.call(this, event, ...args); };`,
-    `  ${wrap};`,
-    '} catch (error) {',
-    '  wrapErrors.push(String(error));',
-    '}',
-  ];
-  const server = await startServer(t, {
-    server: serverSourceOf(
-      [
-        "const n = Number(new URL(request.url, 'http://x').searchParams.get('n'));",
-        'response.end(JSON.stringify({ answer: answer(n), wrapped: wrapped.splice(0), wrapErrors }));',
-      ],
-      [
-        answerImport,
-        'const wrapped = [];',
-        'const wrapErrors = [];',
-        ...wrapEmit('assigned', 'http.Server.prototype.emit = wrapper'),
-        ...wrapEmit(
-          'redefined',
-          "Object.defineProperty(http.Server.prototype, 'emit', { configurable: true, writable: true, value: wrapper })",
-        ),
-      ],
-    ),
-  });
+  const server = await startServer(t, { server: 'wrapped-emit' });
   server.run({ perTest: false, activeMutant: '2' });
 
-  assert.deepEqual(JSON.parse(await server.ask(0)), {
+  assert.deepEqual(JSON.parse(await server.ask({ n: 0 })), {
     answer: 'hi many',
     wrapped: ['redefined', 'assigned'],
     wrapErrors: [],
@@ -489,13 +169,8 @@ test('instrumentation that wraps emit after the hook, by assignment and by redef
 test('a server that fails to listen is not marked hooked', async (t) => {
   const takenPort = await startHeaderEcho(t);
   const server = await startServer(t, {
-    server: [
-      "import http from 'node:http';",
-      'const server = http.createServer();',
-      "server.on('error', () => process.stdout.write('failed\\n'));",
-      `server.listen(${takenPort}, '127.0.0.1');`,
-      '',
-    ].join('\n'),
+    server: 'fails-to-listen',
+    args: [String(takenPort)],
   });
 
   assert.equal(anyHooked(server.serverDir), false);
@@ -505,45 +180,50 @@ test('a mutant run once at module scope is active only in a server started with 
   const switched = await startServer(t);
   switched.run({ perTest: false, activeMutant: '0' });
 
-  assert.equal(await switched.ask(2), 'hi many');
+  assert.equal(await switched.ask({ n: 2 }), 'hi many');
 
   const started = await startServer(t, {
     env: { [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: '0' },
   });
   started.run({ perTest: false, activeMutant: '0' });
 
-  assert.equal(await started.ask(2), ' many');
+  assert.equal(await started.ask({ n: 2 }), ' many');
 });
 
 test('code the server runs in a vm realm reports no coverage and gets only the mutant the server started with', async (t) => {
-  const switched = await startServer(t, {
-    server: edgeRuntimeLikeServerSource,
-  });
+  const switched = await startServer(t, { server: 'vm-realm-answer' });
   const dryRun = switched.run({ perTest: true });
 
-  assert.equal(await switched.ask(2, 'big'), 'hi many');
+  assert.equal(await switched.ask({ n: 2, testId: 'big' }), 'hi many');
   assert.deepEqual(readSnapshotDir(dryRun).snapshots, []);
 
   switched.run({ perTest: false, activeMutant: '2' });
 
-  assert.equal(await switched.ask(0), 'one', 'no per-request mutant');
+  assert.equal(await switched.ask({ n: 0 }), 'one', 'no per-request mutant');
 
   const started = await startServer(t, {
-    server: edgeRuntimeLikeServerSource,
+    server: 'vm-realm-answer',
     env: { [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: '2' },
   });
   started.run({ perTest: false });
 
-  assert.equal(await started.ask(0), 'hi many', 'the env copy carries it');
+  assert.equal(
+    await started.ask({ n: 0 }),
+    'hi many',
+    'the env copy carries it',
+  );
 });
 
 test('coverage goes to the run folder per test id header, with what ran before the first run as static', async (t) => {
   const server = await startServer(t);
-  await server.ask(2, 'before-any-run');
+  await server.ask({ n: 2, testId: 'before-any-run' });
   const first = server.run({ perTest: true });
-  await Promise.all([server.ask(2, 'big'), server.ask(0, 'small')]);
+  await Promise.all([
+    server.ask({ n: 2, testId: 'big' }),
+    server.ask({ n: 0, testId: 'small' }),
+  ]);
   const second = server.run({ perTest: true });
-  await server.ask(0, 'small');
+  await server.ask({ n: 0, testId: 'small' });
 
   const coverage = coverageOf(first);
 
@@ -552,18 +232,11 @@ test('coverage goes to the run folder per test id header, with what ran before t
   );
   assert.deepEqual(
     appMutantIdsOf(coverage.static),
-    ['0', '1', '2', '3', '4', '5', '6'],
+    moduleScopeAndBigRequestIds,
     'module scope, and a request before any run, such as a readiness check',
   );
   assert.deepEqual(appMutantIdsOf(coverage.perTest['big']), bigRequestIds);
-  assert.deepEqual(appMutantIdsOf(coverage.perTest['small']), [
-    '1',
-    '2',
-    '3',
-    '4',
-    '5',
-    '7',
-  ]);
+  assert.deepEqual(appMutantIdsOf(coverage.perTest['small']), smallRequestIds);
   assert.equal(coverage.perTest['before-any-run'], undefined);
   assert.deepEqual(
     withoutPrototypes(coverageOf(second)),
@@ -576,9 +249,9 @@ test('coverage goes to the run folder per test id header, with what ran before t
 });
 
 test("module scope evaluated lazily inside a request is static, and the rest of that request is its test's", async (t) => {
-  const server = await startServer(t, { server: lazyServerSource });
+  const server = await startServer(t, { server: 'lazy-answer' });
   const outDir = server.run({ perTest: true });
-  await server.ask(2, 'big');
+  await server.ask({ n: 2, testId: 'big' });
 
   const coverage = coverageOf(outDir);
 
@@ -587,78 +260,42 @@ test("module scope evaluated lazily inside a request is static, and the rest of 
 });
 
 test('hits count as static only until the microtask after the first read of the namespace global', async (t) => {
-  const server = await startServer(t, {
-    server: serverSourceOf([
-      `const ns = ${namespaceGlobal};`,
-      'const during = ns.currentTestId;',
-      'await null;',
-      'response.end(JSON.stringify([during, ns.currentTestId]));',
-    ]),
-  });
+  const server = await startServer(t, { server: 'window-first-read' });
   server.run({ perTest: true });
 
-  assert.equal(await server.ask(0, 'small'), '[null,"small"]');
+  assert.equal(await server.ask({ n: 0, testId: 'small' }), '[null,"small"]');
 });
 
 test('a read of the namespace global inside an open window does not keep it open', async (t) => {
-  const server = await startServer(t, {
-    server: serverSourceOf([
-      `queueMicrotask(() => ${namespaceGlobal});`,
-      `const ns = ${namespaceGlobal};`,
-      'await null;',
-      'response.end(String(ns.currentTestId));',
-    ]),
-  });
+  const server = await startServer(t, { server: 'window-read-while-open' });
   server.run({ perTest: true });
 
-  assert.equal(await server.ask(0, 'small'), 'small');
+  assert.equal(await server.ask({ n: 0, testId: 'small' }), 'small');
 });
 
 test('a read of the namespace global inside an open window schedules no close that ends a later window early', async (t) => {
   const server = await startServer(t, {
-    server: serverSourceOf([
-      `queueMicrotask(() => ${namespaceGlobal});`,
-      `const ns = ${namespaceGlobal};`,
-      'const later = await new Promise((resolve) => {',
-      '  queueMicrotask(() => {',
-      '    queueMicrotask(() => resolve(ns.currentTestId));',
-      `    ${namespaceGlobal};`,
-      '  });',
-      '});',
-      'response.end(JSON.stringify([later]));',
-    ]),
+    server: 'window-read-then-later-window',
   });
   server.run({ perTest: true });
 
-  assert.equal(await server.ask(0, 'small'), '[null]');
+  assert.equal(await server.ask({ n: 0, testId: 'small' }), '[null]');
 });
 
 test('code that runs outside any request names no test', async (t) => {
-  const server = await startServer(t, {
-    server: serverSourceOf(
-      [
-        'const outside = await new Promise((resolve) => waiting.push(resolve));',
-        'response.end(String(outside));',
-      ],
-      [
-        `const ns = ${namespaceGlobal};`,
-        'const waiting = [];',
-        'setInterval(() => waiting.splice(0).forEach((resolve) => resolve(ns.currentTestId)), 5).unref();',
-      ],
-    ),
-  });
+  const server = await startServer(t, { server: 'outside-any-request' });
   server.run({ perTest: true });
 
-  assert.equal(await server.ask(0, 'small'), 'undefined');
+  assert.equal(await server.ask({ n: 0, testId: 'small' }), 'undefined');
 });
 
 test('a second copy of the hook leaves lazily evaluated module scope static', async (t) => {
   const server = await startServer(t, {
-    server: lazyServerSource,
+    server: 'lazy-answer',
     hooks: [serverHookUrl, `${serverHookUrl}?copy`],
   });
   const outDir = server.run({ perTest: true });
-  await server.ask(2, 'big');
+  await server.ask({ n: 2, testId: 'big' });
 
   const coverage = coverageOf(outDir);
 
@@ -667,283 +304,34 @@ test('a second copy of the hook leaves lazily evaluated module scope static', as
 });
 
 test('without per-test coverage lazily evaluated module scope and the request are static', async (t) => {
-  const server = await startServer(t, { server: lazyServerSource });
+  const server = await startServer(t, { server: 'lazy-answer' });
   const outDir = server.run({ perTest: false });
-  await server.ask(2, 'big');
+  await server.ask({ n: 2, testId: 'big' });
 
   const coverage = coverageOf(outDir);
 
   assert.deepEqual(Object.keys(coverage.perTest), []);
-  assert.deepEqual(appMutantIdsOf(coverage.static), [
-    '0',
-    '1',
-    '2',
-    '3',
-    '4',
-    '5',
-    '6',
-  ]);
+  assert.deepEqual(
+    appMutantIdsOf(coverage.static),
+    moduleScopeAndBigRequestIds,
+  );
 });
 
 test('assigning the namespace global is ignored, not a throw', async (t) => {
-  const server = await startServer(t, {
-    server: serverSourceOf([
-      `const before = ${namespaceGlobal};`,
-      'try {',
-      `  ${namespaceGlobal} = {};`,
-      '} catch (error) {',
-      '  response.end(String(error));',
-      '  return;',
-      '}',
-      `response.end(String(${namespaceGlobal} === before));`,
-    ]),
-  });
+  const server = await startServer(t, { server: 'assign-namespace' });
 
-  assert.equal(await server.ask(0), 'true');
-});
-
-[
-  { client: 'fetch-string', how: 'fetch and a string url' },
-  { client: 'http-get-url', how: 'http.get and a URL' },
-  { client: 'fetch-url', how: 'fetch and a URL' },
-  { client: 'fetch-request', how: 'fetch and a Request' },
-  { client: 'http-get-options', how: 'http.get and options' },
-  { client: 'http-get-named-import', how: 'a named import of get' },
-  { client: 'http-request-url', how: 'http.request and a URL' },
-  { client: 'http-request-options', how: 'http.request and options' },
-  { client: 'https-get-url', how: 'https.get and a URL', scheme: 'https' },
-  {
-    client: 'https-request-options',
-    how: 'https.request and options',
-    scheme: 'https',
-  },
-].forEach(({ client, how, scheme = 'http' }) => {
-  test(`a request the server sends itself with ${how} counts under the test of the request that sent it`, async (t) => {
-    const server = await startServer(t, { server: selfRequestServerSource });
-    const securePort = await server.ask(0, undefined, 'secure-port');
-    const outDir = server.run({
-      perTest: true,
-      testIdHosts: [`localhost:${server.port}`, `localhost:${securePort}`],
-    });
-
-    assert.equal(await server.ask(2, 'big', client, { scheme }), 'hi many');
-    assert.deepEqual(
-      appMutantIdsOf(coverageOf(outDir).perTest['big']),
-      bigRequestIds,
-    );
-  });
-});
-
-[
-  { client: 'fetch-own-header', how: 'fetch' },
-  {
-    client: 'fetch-own-header-after-another',
-    how: 'fetch after another header',
-  },
-  { client: 'http-get-own-header', how: 'http.get' },
-].forEach(({ client, how }) => {
-  test(`a test id header the server sets on a request to itself with ${how} is kept`, async (t) => {
-    const server = await startServer(t, { server: selfRequestServerSource });
-    const outDir = server.run({ perTest: true });
-
-    assert.equal(await server.ask(2, 'big', client), 'hi many');
-
-    const coverage = coverageOf(outDir);
-
-    assert.deepEqual(appMutantIdsOf(coverage.perTest['small']), bigRequestIds);
-    assert.deepEqual(appMutantIdsOf(coverage.perTest['big']), []);
-  });
-});
-
-[
-  { why: 'without a test id header', testId: undefined },
-  { why: 'with a test id the runner did not issue', testId: '__proto__' },
-].forEach(({ why, testId }) => {
-  test(`a request the server sends itself for a request ${why} names no test`, async (t) => {
-    const server = await startServer(t, { server: selfRequestServerSource });
-    const outDir = server.run({ perTest: true });
-
-    assert.equal(await server.ask(2, testId, 'fetch-string'), 'hi many');
-
-    const keys = readSnapshotDir(outDir).snapshots.flatMap(({ coverage }) =>
-      Object.keys(coverage?.perTest ?? {}),
-    );
-
-    assert.ok(keys.length > 0);
-    assert.ok(
-      keys.every((key) => untaggedArrival(key) !== undefined),
-      keys.join(),
-    );
-  });
-});
-
-test('requests two tests make at once each send their own test id to the server itself', async (t) => {
-  const server = await startServer(t, { server: selfRequestServerSource });
-  const outDir = server.run({ perTest: true });
-
-  await Promise.all([
-    server.ask(2, 'big', 'fetch-string'),
-    server.ask(0, 'small', 'http-get-url'),
-    server.ask(2, 'big', 'http-get-url'),
-    server.ask(0, 'small', 'fetch-string'),
-  ]);
-
-  const coverage = coverageOf(outDir);
-
-  assert.deepEqual(appMutantIdsOf(coverage.perTest['big']), bigRequestIds);
-  assert.deepEqual(appMutantIdsOf(coverage.perTest['small']), [
-    '1',
-    '2',
-    '3',
-    '4',
-    '5',
-    '7',
-  ]);
-});
-
-test('without per-test coverage a request the server sends itself is static', async (t) => {
-  const server = await startServer(t, { server: selfRequestServerSource });
-  const outDir = server.run({ perTest: false });
-
-  assert.equal(await server.ask(2, 'big', 'fetch-string'), 'hi many');
-
-  const coverage = coverageOf(outDir);
-
-  assert.deepEqual(Object.keys(coverage.perTest), []);
-  assert.deepEqual(appMutantIdsOf(coverage.static), [
-    '0',
-    '1',
-    '2',
-    '3',
-    '4',
-    '5',
-    '6',
-  ]);
-});
-
-test('a request the server sends itself after the response ended still counts under the test of the request that started it', async (t) => {
-  const server = await startServer(t, { server: selfRequestServerSource });
-  const outDir = server.run({ perTest: true });
-
-  assert.equal(await server.ask(2, 'big', 'late'), 'sent later');
-  assert.equal(await server.ask(0, undefined, 'late-answer'), 'hi many');
-  assert.deepEqual(
-    appMutantIdsOf(coverageOf(outDir).perTest['big']),
-    bigRequestIds,
-  );
-});
-
-test('a test id header the server forwards to a second hooked server counts there under the same test', async (t) => {
-  const second = await startServer(t);
-  const secondOutDir = second.run({ perTest: true });
-  const first = await startServer(t, { server: selfRequestServerSource });
-  first.run({ perTest: true });
-
-  assert.equal(
-    await first.ask(2, 'big', 'fetch-forward', { port: String(second.port) }),
-    'hi many',
-  );
-  assert.deepEqual(
-    appMutantIdsOf(coverageOf(secondOutDir).perTest['big']),
-    bigRequestIds,
-  );
-});
-
-test('a request to a host name a URL cannot hold fails as it would without the hook', async (t) => {
-  const server = await startServer(t, { server: selfRequestServerSource });
-  server.run({ perTest: true });
-
-  assert.equal(await server.ask(2, 'big', 'http-get-bad-host'), 'other');
-});
-
-test('a request the server sends itself with raw array headers still goes out, without the test id', async (t) => {
-  const server = await startServer(t, { server: selfRequestServerSource });
-  const outDir = server.run({ perTest: true });
-
-  assert.equal(
-    await server.ask(2, 'big', 'http-request-array-headers'),
-    'hi many',
-  );
-  assert.deepEqual(appMutantIdsOf(coverageOf(outDir).perTest['big']), []);
-});
-
-test('a request the server sends itself with fetch and the test id header name as another header value still names the test', async (t) => {
-  const server = await startServer(t, { server: selfRequestServerSource });
-  const outDir = server.run({ perTest: true });
-
-  assert.equal(
-    await server.ask(2, 'big', 'fetch-header-named-in-a-value'),
-    'hi many',
-  );
-  assert.deepEqual(
-    appMutantIdsOf(coverageOf(outDir).perTest['big']),
-    bigRequestIds,
-  );
-});
-
-test('a request the server sends with http.get to an IPv6 loopback host of the run carries the test id', async (t) => {
-  const echoPort = await startHeaderEcho(t, '::1');
-  const server = await startServer(t, { server: selfRequestServerSource });
-  server.run({ perTest: true, testIdHosts: [`localhost:${echoPort}`] });
-
-  assert.equal(
-    await server.ask(2, 'big', 'http-get-url', {
-      host: '[::1]',
-      port: String(echoPort),
-    }),
-    'big',
-  );
-});
-
-test('a request the server sends to another host gets no test id header', async (t) => {
-  const otherPort = await startHeaderEcho(t);
-  const server = await startServer(t, { server: selfRequestServerSource });
-  server.run({ perTest: true });
-
-  assert.equal(
-    await server.ask(2, 'big', 'fetch-string', { port: String(otherPort) }),
-    'undefined',
-  );
-});
-
-test("a request the server sends to another port with the server's own Host header gets no test id header", async (t) => {
-  const otherPort = await startHeaderEcho(t);
-  const server = await startServer(t, { server: selfRequestServerSource });
-  server.run({ perTest: true });
-
-  assert.equal(
-    await server.ask(2, 'big', 'http-get-own-host', {
-      port: String(otherPort),
-    }),
-    'undefined',
-  );
-});
-
-test('a redirect from the server to another host carries no test id header', async (t) => {
-  const otherPort = await startHeaderEcho(t);
-  const server = await startServer(t, { server: selfRequestServerSource });
-  server.run({ perTest: true });
-
-  assert.equal(
-    await server.ask(2, 'big', 'fetch-string', {
-      then: 'redirect',
-      to: String(otherPort),
-    }),
-    'undefined',
-  );
+  assert.equal(await server.ask({ n: 0 }), 'true');
 });
 
 test('a request without the header counts under its arrival time', async (t) => {
   const server = await startServer(t);
-  await server.ask(2);
+  await server.ask({ n: 2 });
   const outDir = server.run({ perTest: true });
   const sent = Date.now();
-  await server.ask(0);
+  await server.ask({ n: 0 });
   const answered = Date.now();
 
-  const keys = readSnapshotDir(outDir).snapshots.flatMap(({ coverage }) =>
-    Object.keys(coverage?.perTest ?? {}),
-  );
+  const keys = perTestKeysOf(outDir);
 
   assert.equal(keys.length, 1);
   const [key = ''] = keys;
@@ -960,11 +348,9 @@ test('a request without the header counts under its arrival time', async (t) => 
 test('a test id header the runner did not issue counts as untagged, under its arrival time', async (t) => {
   const server = await startServer(t);
   const outDir = server.run({ perTest: true });
-  await server.ask(0, '__proto__');
+  await server.ask({ n: 0, testId: '__proto__' });
 
-  const keys = readSnapshotDir(outDir).snapshots.flatMap(({ coverage }) =>
-    Object.keys(coverage?.perTest ?? {}),
-  );
+  const keys = perTestKeysOf(outDir);
 
   assert.equal(keys.length, 1);
   assert.notEqual(untaggedArrival(keys[0] ?? ''), undefined, keys[0]);
@@ -973,34 +359,29 @@ test('a test id header the runner did not issue counts as untagged, under its ar
 test('without per-test coverage every hit is static, header or not', async (t) => {
   const server = await startServer(t);
   const outDir = server.run({ perTest: false });
-  await server.ask(0, 'small');
+  await server.ask({ n: 0, testId: 'small' });
 
   const coverage = coverageOf(outDir);
 
   assert.deepEqual(Object.keys(coverage.perTest), []);
-  assert.deepEqual(appMutantIdsOf(coverage.static), [
-    '0',
-    '1',
-    '2',
-    '3',
-    '4',
-    '5',
-    '7',
-  ]);
+  assert.deepEqual(
+    appMutantIdsOf(coverage.static),
+    moduleScopeAndSmallRequestIds,
+  );
 });
 
 test("a run's hit count counts only the active mutant's hits in that run", async (t) => {
   const server = await startServer(t);
   const first = server.run({ perTest: false, activeMutant: '7', hitLimit: 10 });
-  await server.ask(0);
-  await server.ask(0);
-  await server.ask(2);
+  await server.ask({ n: 0 });
+  await server.ask({ n: 0 });
+  await server.ask({ n: 2 });
   const second = server.run({
     perTest: false,
     activeMutant: '7',
     hitLimit: 10,
   });
-  await server.ask(0);
+  await server.ask({ n: 0 });
 
   const hits = (outDir: string) =>
     readSnapshotDir(outDir).snapshots.reduce(
@@ -1019,6 +400,6 @@ test('a run folder that is gone drops the coverage, and the server keeps serving
     perTest: true,
   });
 
-  assert.equal(await server.ask(0, 'small'), 'one');
-  assert.equal(await server.ask(2, 'big'), 'hi many');
+  assert.equal(await server.ask({ n: 0, testId: 'small' }), 'one');
+  assert.equal(await server.ask({ n: 2, testId: 'big' }), 'hi many');
 });
