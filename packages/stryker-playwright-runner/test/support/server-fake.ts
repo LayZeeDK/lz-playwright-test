@@ -58,7 +58,7 @@ export function serverFake(
   const fake = fakePlaywright(t, {
     ...behaviour,
     webServers: behaviour.webServers ?? [webServer],
-    globalSetup: () => {
+    globalSetup: (reporter) => {
       const serverDir = process.env[serverDirEnv];
       setups.push({
         nodeOptions: process.env['NODE_OPTIONS'],
@@ -73,7 +73,7 @@ export function serverFake(
         writeFileSync(path.join(serverDir, `${hookedPrefix}1`), '');
       }
 
-      return 'passed';
+      return behaviour.globalSetup?.(reporter) ?? 'passed';
     },
     runTests: async (run: Run) => {
       const serverDir = setups.at(-1)?.serverDir;

@@ -227,7 +227,8 @@ ended, such as one from a timer that the handler set, still counts for that test
 Code that runs once when the server starts, such as module scope, cannot switch mutants per request. A
 module that the server loads at its first request counts as such code too. Stryker runs a mutant in that
 code against every test, and the runner restarts the `webServer` with the mutant in its environment for
-that run, and restarts it again for the next run.
+that run, and restarts it again for the next run. When global setup fails with the mutant, such as a server
+that exits at start, Stryker counts the mutant as killed by no test, with the setup error as its message.
 
 ### Isolate server-side mutants
 

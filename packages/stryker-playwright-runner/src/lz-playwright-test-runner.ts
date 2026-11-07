@@ -130,6 +130,15 @@ const workerHookUrl = hookUrl('worker-hook');
 const serverHookUrl = hookUrl('server-hook');
 const hookedWaitMs = 1000;
 
+class StaticMutantStopsServer extends Error {
+  constructor(mutant: string, cause: unknown) {
+    super(
+      `The webServer did not start with static mutant ${mutant}: ${String(cause)}`,
+      { cause },
+    );
+  }
+}
+
 const runOverrides = ({
   traced,
   screenshots,
@@ -373,7 +382,23 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
   async mutantRun(options: MutantRunOptions): Promise<MutantRunResult> {
     const session = this.#adoptDryRunDecision(this.#ready());
     const request = mutantRunRequest(options, session);
-    const output = await this.#run(session, request);
+    let output: RunOutput;
+
+    try {
+      output = await this.#run(session, request);
+    } catch (error) {
+      if (!(error instanceof StaticMutantStopsServer)) {
+        throw error;
+      }
+
+      return {
+        status: MutantRunStatus.Killed,
+        killedBy: [],
+        failureMessage: error.message,
+        nrOfTests: 0,
+      };
+    }
+
     const { result, hitCount } = mutantRunResult(output, request);
     this.#log.debug(
       `Mutant ${request.activeMutant}: ${result.status}, hitCount ${hitCount}/${request.hitLimit}`,
@@ -461,7 +486,14 @@ export class LzPlaywrightTestRunner implements StrykerTestRunner {
       kind,
     );
     this.#previousRun = kind;
-    await this.#serveMutant(session, serverMutantFor(request), isolate);
+    const mutant = serverMutantFor(request);
+    await this.#serveMutant(session, mutant, isolate).catch(
+      (error: unknown) => {
+        throw mutant === undefined || error instanceof ServerSupportRefused
+          ? error
+          : new StaticMutantStopsServer(mutant, error);
+      },
+    );
     await this.#restartDeadServers(session);
     let output = await this.#runOnce(session, request, deadlineAt);
 

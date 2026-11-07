@@ -4,7 +4,10 @@ import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { test } from 'node:test';
 
-import { DryRunStatus } from '@stryker-mutator/api/test-runner';
+import {
+  DryRunStatus,
+  MutantRunStatus,
+} from '@stryker-mutator/api/test-runner';
 
 import { serializeSnapshot } from '../src/protocol.ts';
 import { serverDirEnv } from '../src/server-protocol.ts';
@@ -15,8 +18,17 @@ import {
   mutantRunOptions,
   withoutPrototypes,
 } from './support/doubles.ts';
-import { fakePlaywright, passAll } from './support/fake-playwright.ts';
-import { serverFake, serverHookUrl, webServer } from './support/server-fake.ts';
+import {
+  activeMutantEnv,
+  fakePlaywright,
+  passAll,
+} from './support/fake-playwright.ts';
+import {
+  runtimeRun,
+  serverFake,
+  serverHookUrl,
+  webServer,
+} from './support/server-fake.ts';
 
 test('without webServer.mutate, global setup gets neither the server hook nor its folder', async (t) => {
   const setups: (string | undefined)[] = [];
@@ -194,6 +206,57 @@ test('a webServer restarted after it died keeps the static mutant it runs', asyn
     fake.setups.map(({ activeMutant }) => activeMutant),
     [undefined, '7', '7'],
   );
+});
+
+test('a static mutant that keeps the webServer from starting is killed, with the mutant and the setup error as its message', async (t) => {
+  const fake = serverFake(t, {
+    globalSetup: (reporter) => {
+      if (process.env[activeMutantEnv] === undefined) {
+        return 'passed';
+      }
+
+      reporter.onError?.({ message: 'listen EADDRINUSE' });
+
+      return 'failed';
+    },
+  });
+  const { shell } = fake.runner({ isolate: false });
+  await shell.init();
+
+  const result = await shell.mutantRun(
+    mutantRunOptions({ mutantActivation: 'static' }),
+  );
+
+  assert.deepEqual(result, {
+    status: MutantRunStatus.Killed,
+    killedBy: [],
+    failureMessage:
+      'The webServer did not start with static mutant 7: Error: Playwright global setup failed:\nlisten EADDRINUSE\n',
+    nrOfTests: 0,
+  });
+});
+
+test('after a static mutant kept the webServer from starting, the next run starts it without a mutant', async (t) => {
+  let up = true;
+  const fake = serverFake(t, {
+    globalSetup: () => {
+      up = process.env[activeMutantEnv] === undefined;
+
+      return up ? 'passed' : 'failed';
+    },
+    urlUp: async () => up,
+  });
+  const { shell } = fake.runner({ isolate: false });
+  await shell.init();
+  await shell.mutantRun(mutantRunOptions({ mutantActivation: 'static' }));
+
+  await shell.mutantRun(runtimeRun('8'));
+
+  assert.deepEqual(
+    fake.setups.map(({ activeMutant }) => activeMutant),
+    [undefined, '7', undefined],
+  );
+  assert.equal(fake.runs.length, 1);
 });
 
 test("the dry run merges the server's snapshots with the workers'", async (t) => {
