@@ -5,13 +5,17 @@ import { test } from 'node:test';
 
 import { acceptsConnections } from '../src/server-checks.ts';
 import type {
+  ConfigHandles,
   ConfigProject,
   ConfigWebServer,
 } from '../src/playwright-internals.ts';
 import {
   freePort,
+  moveApart,
   moveServersApart,
   moveWebServerOptions,
+  type ServerMove,
+  type ServersApart,
   startsMoreRunners,
 } from '../src/server-ports.ts';
 
@@ -375,6 +379,18 @@ test('moving a webServer rewrites each env value that is its port, and only thos
   });
 });
 
+test("moving a webServer leaves the env object it had as it was, since Playwright's cached config shares it", () => {
+  const env = { PORT: '4200' };
+  const options = { env };
+
+  moveWebServerOptions(options, 4200, 50_010);
+
+  assert.deepEqual(
+    { moved: options.env, configured: env },
+    { moved: { PORT: '50010' }, configured: { PORT: '4200' } },
+  );
+});
+
 test('moving a webServer rewrites an env value that is its port as a number, to a string', () => {
   const options = { env: { PORT: 4200, OTHER: 42_000 } };
 
@@ -401,6 +417,72 @@ test('moving a webServer leaves a url, env or command that is not what Playwrigh
   moveWebServerOptions(options, 1, 2);
 
   assert.deepEqual(options, { url: 1, env: 'x', command: 2 });
+});
+
+const handles = (...webServers: Record<string, unknown>[]): ConfigHandles => ({
+  webServerOptions(index) {
+    const options = webServers[index];
+
+    if (!options) {
+      throw new Error(`No webServer at ${index}.`);
+    }
+
+    return options;
+  },
+  cliOverrides: () => ({}),
+});
+const apartBy = (...moves: ServerMove[]): ServersApart => ({
+  moves,
+  webServers: [],
+  baseURL: undefined,
+  env: {},
+});
+
+test('undoing a move puts the webServer options back as they were, though a value already named the new port', () => {
+  const options = {
+    url: 'http://localhost:3000/',
+    env: { PORT: '3000', OTHER: '50100' },
+    command: 'serve --port 3000 --metrics 50100',
+  };
+  const before = structuredClone(options);
+  const undo = moveApart(
+    handles(options),
+    apartBy({ index: 0, from: 3000, to: 50_100 }),
+  );
+
+  undo();
+
+  assert.deepEqual(options, before);
+});
+
+test('a move with a webServer that cannot be found changes no webServer', () => {
+  const options = { url: 'http://localhost:3000/' };
+
+  assert.throws(() =>
+    moveApart(
+      handles(options),
+      apartBy(
+        { index: 0, from: 3000, to: 50_100 },
+        { index: 1, from: 3001, to: 50_101 },
+      ),
+    ),
+  );
+
+  assert.deepEqual(options, { url: 'http://localhost:3000/' });
+});
+
+test("undoing a move puts the env back into the webServer's own env object, which Playwright's cached config shares", () => {
+  const env = { PORT: '3000' };
+  const options = { url: 'http://localhost:3000/', env };
+  const undo = moveApart(
+    handles(options),
+    apartBy({ index: 0, from: 3000, to: 50_100 }),
+  );
+
+  undo();
+
+  assert.equal(options.env, env);
+  assert.deepEqual(env, { PORT: '3000' });
 });
 
 test('PLAYWRIGHT_TEST_BASE_URL, which Playwright sets from a port webServer, moves with it', async () => {

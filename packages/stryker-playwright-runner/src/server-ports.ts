@@ -158,19 +158,18 @@ export function moveApart(
   apart: ServersApart,
 ): () => void {
   const previousEnv = envOf(Object.keys(apart.env));
+  const snapshots = apart.moves.map(({ index }) => {
+    const options = playwright.webServerOptions(index);
+
+    return { options, before: { ...options } };
+  });
   moveWebServers(playwright, apart.moves, apart.baseURL);
   setEnv(apart.env);
 
   return () => {
-    moveWebServers(
-      playwright,
-      apart.moves.map(({ index, from, to }) => ({
-        index,
-        from: to,
-        to: from,
-      })),
-      undefined,
-    );
+    snapshots.forEach(({ options, before }) => {
+      Object.assign(options, before);
+    });
     setEnv(previousEnv);
   };
 }
@@ -203,11 +202,12 @@ export function moveWebServerOptions(
   }
 
   if (isRecord(env)) {
-    Object.entries(env)
-      .filter(([, value]) => value === from || value === String(from))
-      .forEach(([name]) => {
-        env[name] = String(to);
-      });
+    options['env'] = Object.fromEntries(
+      Object.entries(env).map(([name, value]) => [
+        name,
+        value === from || value === String(from) ? String(to) : value,
+      ]),
+    );
   }
 
   if (typeof command === 'string') {
