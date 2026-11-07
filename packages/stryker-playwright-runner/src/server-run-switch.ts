@@ -1,0 +1,98 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
+import { isRecord } from './is-record.ts';
+import type { StrykerNamespace } from './namespace.ts';
+import { serializeSnapshot } from './protocol.ts';
+import { readServerControl, type ServerControl } from './server-protocol.ts';
+
+export interface RunSwitch {
+  readonly control: () => ServerControl | undefined;
+  readonly startRequest: () => void;
+  readonly flush: () => void;
+}
+
+export function runSwitch(
+  dir: string,
+  namespace: StrykerNamespace,
+  fileName: string,
+): RunSwitch {
+  let control: ServerControl | undefined;
+  let writtenHits = 0;
+
+  return {
+    control: () => control,
+    startRequest: () => {
+      const next = readServerControl(dir) ?? control;
+
+      if (next?.outDir !== control?.outDir) {
+        namespace.hitLimit = next?.hitLimit;
+        namespace.hitCount = next?.hitLimit === undefined ? undefined : 0;
+        writtenHits = 0;
+      }
+
+      control = next;
+      namespace.activeMutant = control?.activeMutant;
+    },
+    // A throw here would end the server; after the run its folder is gone, so the write is dropped.
+    flush: () => {
+      const outDir = control?.outDir;
+
+      if (outDir === undefined) {
+        return;
+      }
+
+      const hits =
+        typeof namespace.hitCount === 'number' ? namespace.hitCount : 0;
+      const coverage = takeCoverage(namespace);
+
+      if (coverage === undefined && hits === writtenHits) {
+        return;
+      }
+
+      try {
+        fs.appendFileSync(
+          path.join(outDir, fileName),
+          serializeSnapshot({
+            mutantCoverage: coverage,
+            hitCount: hits - writtenHits,
+            outlivedItsTest: false,
+          }) + '\n',
+        );
+      } catch {
+        // Dropped, as above.
+      }
+
+      writtenHits = hits;
+    },
+  };
+}
+
+/** Copies the coverage and empties it in place: instrumented code holds the object it first created. */
+function takeCoverage(namespace: StrykerNamespace): unknown {
+  const coverage = namespace.mutantCoverage;
+
+  if (
+    !isRecord(coverage) ||
+    !isRecord(coverage['static']) ||
+    !isRecord(coverage['perTest'])
+  ) {
+    return undefined;
+  }
+
+  const { static: hits, perTest } = coverage;
+
+  if (Object.keys(hits).length === 0 && Object.keys(perTest).length === 0) {
+    return undefined;
+  }
+
+  const copy = structuredClone(coverage);
+  Object.keys(hits).forEach((key) => {
+    delete hits[key];
+  });
+  Object.keys(perTest).forEach((key) => {
+    delete perTest[key];
+  });
+
+  return copy;
+}

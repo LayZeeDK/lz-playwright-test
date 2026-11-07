@@ -10,18 +10,17 @@ import path from 'node:path';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
 import { isRecord } from './is-record.ts';
-import { globalNamespace, type StrykerNamespace } from './namespace.ts';
-import { serializeSnapshot, snapshotSuffix } from './protocol.ts';
+import { globalNamespace } from './namespace.ts';
+import { snapshotSuffix } from './protocol.ts';
 import {
   hookedPrefix,
   hostKey,
-  readServerControl,
-  type ServerControl,
   serverDirEnv,
   serverSnapshotPrefix,
   testIdHeader,
   untaggedKey,
 } from './server-protocol.ts';
+import { runSwitch } from './server-run-switch.ts';
 
 interface RequestTag {
   readonly testId: string | undefined;
@@ -50,19 +49,25 @@ export function installServerHook(
 ): void {
   const namespace = globalNamespace(ns);
   const requests = new AsyncLocalStorage<RequestTag>();
-  const fileName = `${serverSnapshotPrefix}${process.pid}-${randomUUID()}${snapshotSuffix}`;
-  let control: ServerControl | undefined;
-  let writtenHits = 0;
+  const run = runSwitch(
+    dir,
+    namespace,
+    `${serverSnapshotPrefix}${process.pid}-${randomUUID()}${snapshotSuffix}`,
+  );
   let marked = false;
-  let evaluating = false;
+  let moduleScopeRunning = false;
 
+  // The instrumenter's preamble reads this global once per module, as the module starts to run
+  // (`instrumentationBabelHeader` in @stryker-mutator/instrumenter's src/util/syntax-helpers.ts, 10.1.1), so the
+  // hits until the next microtask are module scope and count as static. The preamble never assigns it once it
+  // exists; the setter drops other assignments so they neither throw nor remove the getter.
   Object.defineProperty(globalThis, ns, {
     configurable: true,
     get: () => {
-      if (!evaluating) {
-        evaluating = true;
+      if (!moduleScopeRunning) {
+        moduleScopeRunning = true;
         queueMicrotask(() => {
-          evaluating = false;
+          moduleScopeRunning = false;
         });
       }
 
@@ -76,58 +81,13 @@ export function installServerHook(
     get: () => {
       const tag = requests.getStore();
 
-      if (evaluating || !control?.perTest || tag === undefined) {
+      if (moduleScopeRunning || !run.control()?.perTest || tag === undefined) {
         return undefined;
       }
 
       return tag.testId ?? untaggedKey(tag.arrivedAt);
     },
   });
-
-  function startRequest() {
-    const next = readServerControl(dir) ?? control;
-
-    if (next?.outDir !== control?.outDir) {
-      namespace.hitLimit = next?.hitLimit;
-      namespace.hitCount = next?.hitLimit === undefined ? undefined : 0;
-      writtenHits = 0;
-    }
-
-    control = next;
-    namespace.activeMutant = control?.activeMutant;
-  }
-
-  // A throw here would end the server; after the run its folder is gone, so the write is dropped.
-  function flush() {
-    const outDir = control?.outDir;
-
-    if (outDir === undefined) {
-      return;
-    }
-
-    const hits =
-      typeof namespace.hitCount === 'number' ? namespace.hitCount : 0;
-    const coverage = takeCoverage(namespace);
-
-    if (coverage === undefined && hits === writtenHits) {
-      return;
-    }
-
-    try {
-      fs.appendFileSync(
-        path.join(outDir, fileName),
-        serializeSnapshot({
-          mutantCoverage: coverage,
-          hitCount: hits - writtenHits,
-          outlivedItsTest: false,
-        }) + '\n',
-      );
-    } catch {
-      // Dropped, as above.
-    }
-
-    writtenHits = hits;
-  }
 
   function markHooked() {
     if (marked) {
@@ -179,15 +139,15 @@ export function installServerHook(
             return original();
           }
 
-          startRequest();
-          flushBeforeEnd(response, flush);
+          run.startRequest();
+          flushBeforeEnd(response, run.flush);
           const header = request.headers[testIdHeader];
 
           return requests.run(
             {
               testId:
                 typeof header === 'string' &&
-                control?.issuedTestIds?.includes(header)
+                run.control()?.issuedTestIds?.includes(header)
                   ? header
                   : undefined,
               arrivedAt: now(),
@@ -201,7 +161,9 @@ export function installServerHook(
   function testIdFor(target: URL): string | undefined {
     const testId = requests.getStore()?.testId;
 
-    return control?.testIdHosts?.includes(hostKey(target)) ? testId : undefined;
+    return run.control()?.testIdHosts?.includes(hostKey(target))
+      ? testId
+      : undefined;
   }
 
   // Each hop of a fetch, redirects included, creates its own undici request with its own origin.
@@ -257,7 +219,7 @@ export function installServerHook(
     });
   }
 
-  process.on('exit', flush);
+  process.on('exit', run.flush);
 }
 
 function agentTarget(options: unknown): URL | undefined {
@@ -307,33 +269,4 @@ function flushBeforeEnd(response: object, flush: () => void) {
       return Reflect.apply(end, response, args);
     },
   });
-}
-
-/** Copies the coverage and empties it in place: instrumented code holds the object it first created. */
-function takeCoverage(namespace: StrykerNamespace): unknown {
-  const coverage = namespace.mutantCoverage;
-
-  if (
-    !isRecord(coverage) ||
-    !isRecord(coverage['static']) ||
-    !isRecord(coverage['perTest'])
-  ) {
-    return undefined;
-  }
-
-  const { static: hits, perTest } = coverage;
-
-  if (Object.keys(hits).length === 0 && Object.keys(perTest).length === 0) {
-    return undefined;
-  }
-
-  const copy = structuredClone(coverage);
-  Object.keys(hits).forEach((key) => {
-    delete hits[key];
-  });
-  Object.keys(perTest).forEach((key) => {
-    delete perTest[key];
-  });
-
-  return copy;
 }
