@@ -70,6 +70,13 @@ export async function moveServersApart(
     );
   }
 
+  if (new Set(baseUrls.map(withHostKey)).size > 1) {
+    throw cannotMove(
+      mutate,
+      `the projects' baseURLs differ in more than the loopback host name (${baseUrls.join(', ')})`,
+    );
+  }
+
   const [baseURL] = baseUrls;
   const testBaseUrl = env[baseUrlEnv];
   const movedTestBaseUrl =
@@ -130,6 +137,13 @@ function cannotMove(
       "Point every project's baseURL at the url or port of the same webServer, or leave it unset, " +
       'or run Stryker with concurrency 1 and no checker (see More than one Stryker process in the README).',
   );
+}
+
+function withHostKey(url: string): string {
+  const keyed = new URL(url);
+  keyed.host = hostKey(keyed);
+
+  return keyed.href;
 }
 
 function withPort(url: string, port: number): string {

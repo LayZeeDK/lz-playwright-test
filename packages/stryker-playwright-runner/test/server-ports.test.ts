@@ -327,6 +327,28 @@ test('projects whose baseURLs name different webServers cannot share the one bas
   );
 });
 
+test('projects whose baseURLs name one webServer but differ in path cannot share the one baseURL the runner moves', async () => {
+  await assert.rejects(
+    moveServersApart(
+      {
+        projects: [
+          project('http://localhost:3000/api/'),
+          project('http://localhost:3000/'),
+        ],
+        webServers: [server({ url: 'http://localhost:3000/' })],
+      },
+      {},
+      true,
+      ports(50_100),
+    ),
+    {
+      message: cannotMove(
+        "the projects' baseURLs differ in more than the loopback host name (http://localhost:3000/api/, http://localhost:3000/)",
+      ),
+    },
+  );
+});
+
 test('moving a webServer rewrites the port of the url it waits for', () => {
   const options = {
     url: 'http://localhost:4200/health',
