@@ -121,6 +121,22 @@ test("with webServer.mutate: 'auto', init turns server support off with one warn
   assert.equal(fake.runs[0]?.settings.testIdHosts, undefined);
 });
 
+test('the dry run tags requests to the host of each webServer by its port or its url, and to no host for a webServer with neither', async (t) => {
+  const fake = serverFake(t, {
+    webServers: [{ port: 4820 }, { url: 'http://app.test:4821/' }, {}],
+    urlUp: async () => false,
+  });
+  const { shell } = fake.runner();
+  await shell.init();
+
+  await shell.dryRun(dryRunOptions());
+
+  assert.deepEqual(fake.runs[0]?.settings.testIdHosts, [
+    'localhost:4820',
+    'app.test:4821',
+  ]);
+});
+
 test("with webServer.mutate: 'auto', init that turns server support off gives the timeout warning once, after the warning that turns it off", async (t) => {
   const fake = serverFake(t, { hooked: false });
   const { shell, lines } = fake.runner({ mutate: 'auto', timeoutMS: 100 });
