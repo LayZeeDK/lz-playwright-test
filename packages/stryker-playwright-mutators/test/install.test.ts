@@ -5,6 +5,7 @@ import { markOf } from '@layzee/stryker-mutator-install';
 
 import { assertBabelTypes, install } from '../src/install.ts';
 import { defined } from './support/defined.ts';
+import { programOf } from './support/parse.ts';
 import {
   fakeInstrumenter,
   ownMark,
@@ -33,6 +34,115 @@ describe('assertBabelTypes', () => {
       });
     }
   });
+});
+
+function programPath(filename: unknown, program: unknown = emptyProgram) {
+  return {
+    node: program,
+    hub: { file: { opts: { filename } } },
+  };
+}
+
+const emptyProgram = { type: 'Program', body: [] };
+
+async function installedMutate(warn: (message: string) => void) {
+  const { instrumenter } = fakeInstrumenter();
+
+  await install(
+    sets(['LzOne', 'LzTwo']),
+    undefined,
+    async () => instrumenter,
+    warn,
+    () => undefined,
+  );
+
+  return (name: string, path: unknown): unknown =>
+    Reflect.apply(
+      defined(instrumenter.allMutators.find((listed) => listed.name === name))
+        .mutate,
+      undefined,
+      [path],
+    );
+}
+
+describe('the warning for a file that is not Playwright test code', () => {
+  it('names the file and the turned-off built-ins when a Program node has no @playwright/ import and no top-level test call', async () => {
+    const warnings: string[] = [];
+    const mutate = await installedMutate((message) => warnings.push(message));
+
+    mutate('LzOne', programPath('plain-a.ts'));
+
+    assert.deepEqual(warnings, [
+      "plain-a.ts: @layzee/stryker-playwright-mutators turned Stryker's built-in mutators off for every file in this run, and this file does not look like Playwright test code (no @playwright/ import, no top-level test call). Mutate production code in a separate Stryker config.",
+    ]);
+  });
+
+  it('warns once per file name, across calls and across mutators', async () => {
+    const warnings: string[] = [];
+    const mutate = await installedMutate((message) => warnings.push(message));
+
+    mutate('LzOne', programPath('plain-once.ts'));
+    mutate('LzTwo', programPath('plain-once.ts'));
+    mutate('LzOne', programPath('plain-once.ts'));
+    mutate('LzOne', programPath('plain-other.ts'));
+
+    assert.deepEqual(
+      warnings.map((message) => message.split(':')[0]),
+      ['plain-once.ts', 'plain-other.ts'],
+    );
+  });
+
+  for (const [title, path] of [
+    [
+      'a node that is no Program',
+      programPath('plain-node.ts', { type: 'Identifier' }),
+    ],
+    ['a path with no hub', { node: emptyProgram }],
+    ['a file name that is no string', programPath(42)],
+  ]) {
+    it(`stays silent for ${title}`, async () => {
+      const warnings: string[] = [];
+      const mutate = await installedMutate((message) => warnings.push(message));
+
+      mutate('LzOne', path);
+
+      assert.deepEqual(warnings, []);
+    });
+  }
+
+  it('returns what the mutator returns', async () => {
+    const mutate = await installedMutate(() => undefined);
+
+    assert.deepEqual(mutate('LzOne', programPath('plain-return.ts')), []);
+  });
+
+  for (const fileName of ['LzOne.self-check.tsx', 'built-ins.self-check.tsx']) {
+    it(`stays silent for the self-check sample ${fileName}`, async () => {
+      const warnings: string[] = [];
+      const mutate = await installedMutate((message) => warnings.push(message));
+
+      mutate('LzOne', programPath(fileName));
+
+      assert.deepEqual(warnings, []);
+    });
+  }
+
+  for (const source of [
+    "import { test } from '@playwright/test';\n",
+    "test('a', async () => {});\n",
+  ]) {
+    it(`stays silent for a Program node of Playwright test code: ${source.trim()}`, async () => {
+      const warnings: string[] = [];
+      const mutate = await installedMutate((message) => warnings.push(message));
+
+      mutate(
+        'LzOne',
+        programPath(`spec-${source.length}.ts`, await programOf(source)),
+      );
+
+      assert.deepEqual(warnings, []);
+    });
+  }
 });
 
 describe('install', () => {

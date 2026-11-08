@@ -3,7 +3,9 @@ import {
   checkBuiltInsRemoved,
   checkNames,
   corePackageJson,
+  fieldOf,
   isRecord,
+  isSelfCheckFile,
   register,
   removeBuiltIns,
   resolveInstrumenter,
@@ -16,6 +18,7 @@ import {
 
 import type { LzPlaywrightMutator } from './mutators.ts';
 import { packageName } from './package-name.ts';
+import { looksLikePlaywrightTest } from './playwright-test.ts';
 
 const babelTypeMembers: readonly string[] = ['emptyStatement'];
 
@@ -72,13 +75,46 @@ export async function install(
     instrumenter.allMutators,
     mutators.map(({ name, mutate }) => ({
       name,
-      mutate: (path: unknown) => mutate(path, instrumenter.types),
+      mutate: (path: unknown) => {
+        warnAboutProgram(path, warn);
+
+        return mutate(path, instrumenter.types);
+      },
     })),
   );
   await selfCheck(packageName, instrumenter, mutators);
   await checkBuiltInsRemoved(packageName, instrumenter);
   warnUntested(packageName, testedVersion, instrumenter, warn);
   info(startLine(sets, mutators));
+}
+
+// The file names warned about in this process, whatever the number of installs.
+const warnedFiles = new Set<string>();
+
+function warnAboutProgram(
+  path: unknown,
+  warn: (message: string) => void,
+): void {
+  const file = fieldOf(
+    fieldOf(fieldOf(fieldOf(path, 'hub'), 'file'), 'opts'),
+    'filename',
+  );
+  const node = fieldOf(path, 'node');
+
+  if (
+    typeof file === 'string' &&
+    fieldOf(node, 'type') === 'Program' &&
+    !isSelfCheckFile(file) &&
+    !warnedFiles.has(file) &&
+    !looksLikePlaywrightTest(node)
+  ) {
+    warnedFiles.add(file);
+    warn(
+      `${file}: ${packageName} turned Stryker's built-in mutators off for every file in this run, and this ` +
+        'file does not look like Playwright test code (no @playwright/ import, no top-level test call). Mutate ' +
+        'production code in a separate Stryker config.',
+    );
+  }
 }
 
 function startLine(

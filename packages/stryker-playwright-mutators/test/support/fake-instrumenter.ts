@@ -1,4 +1,8 @@
-import { builtInNames, markOf } from '@layzee/stryker-mutator-install';
+import {
+  builtInNames,
+  markOf,
+  selfCheckFile,
+} from '@layzee/stryker-mutator-install';
 import type {
   ListedMutator,
   MutatorSets,
@@ -63,11 +67,11 @@ export function fakeInstrumenter({
             (listed) => ownMark in listed && !silent.includes(listed.name),
           )
           .map((listed) => ({
-            fileName: `${listed.name}.self-check.tsx`,
+            fileName: selfCheckFile(listed.name),
             mutatorName: listed.name,
           })),
         ...leaking.map((mutatorName) => ({
-          fileName: 'built-ins.self-check.tsx',
+          fileName: selfCheckFile('built-ins'),
           mutatorName,
         })),
       ];
