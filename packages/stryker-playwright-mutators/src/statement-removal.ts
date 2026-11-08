@@ -207,15 +207,15 @@ function isFixtureFunction(path: unknown): boolean {
   );
 }
 
+/** `test`, or a member chain on it such as `test.describe.serial`. */
 export function isTestCallee(callee: unknown): boolean {
-  const target =
-    fieldOf(callee, 'type') === 'MemberExpression'
-      ? fieldOf(callee, 'object')
-      : callee;
+  if (fieldOf(callee, 'type') === 'MemberExpression') {
+    return isTestCallee(fieldOf(callee, 'object'));
+  }
 
   return (
-    fieldOf(target, 'type') === 'Identifier' &&
-    fieldOf(target, 'name') === 'test'
+    fieldOf(callee, 'type') === 'Identifier' &&
+    fieldOf(callee, 'name') === 'test'
   );
 }
 
