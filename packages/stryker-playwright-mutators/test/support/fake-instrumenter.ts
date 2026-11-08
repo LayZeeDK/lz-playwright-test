@@ -13,7 +13,7 @@ export function mutator(name: string): LzPlaywrightMutator {
   return {
     name,
     sample: `export const ${name.toLowerCase()} = 1;\n`,
-    mutate: () => undefined,
+    mutate: () => [],
   };
 }
 
@@ -52,7 +52,7 @@ export function fakeInstrumenter({
   const instrumenter: Instrumenter = {
     dir: '/stryker/instrumenter',
     version,
-    types: {},
+    types: { emptyStatement: () => ({}) },
     allMutators,
     async instrument(files) {
       instrumented.push([...files]);

@@ -17,7 +17,11 @@ import {
 import type { LzPlaywrightMutator } from './mutators.ts';
 import { packageName } from './package-name.ts';
 
-export type BabelTypes = Readonly<Record<string, unknown>>;
+const babelTypeMembers: readonly string[] = ['emptyStatement'];
+
+export interface BabelTypes {
+  emptyStatement(): unknown;
+}
 
 export type Instrumenter = CoreInstrumenter<BabelTypes>;
 
@@ -35,6 +39,14 @@ export function assertBabelTypes(
 ): asserts value is BabelTypes {
   if (!isRecord(value)) {
     throw missing('Babel types');
+  }
+
+  const absent = babelTypeMembers.filter(
+    (member) => typeof value[member] !== 'function',
+  );
+
+  if (absent.length > 0) {
+    throw missing(`Babel types with ${absent.join(', ')}`);
   }
 }
 
@@ -55,7 +67,14 @@ export async function install(
 
   removeBuiltIns(packageName, instrumenter, warn);
   checkNames(packageName, mutators, instrumenter.allMutators);
-  register(packageName, instrumenter.allMutators, mutators);
+  register(
+    packageName,
+    instrumenter.allMutators,
+    mutators.map(({ name, mutate }) => ({
+      name,
+      mutate: (path: unknown) => mutate(path, instrumenter.types),
+    })),
+  );
   await selfCheck(packageName, instrumenter, mutators);
   await checkBuiltInsRemoved(packageName, instrumenter);
   warnUntested(packageName, testedVersion, instrumenter, warn);

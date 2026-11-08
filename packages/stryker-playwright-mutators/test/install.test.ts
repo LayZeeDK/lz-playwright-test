@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import { markOf } from '@layzee/stryker-mutator-install';
 
 import { assertBabelTypes, install } from '../src/install.ts';
+import { defined } from './support/defined.ts';
 import {
   fakeInstrumenter,
   ownMark,
@@ -13,8 +14,16 @@ import {
 describe('assertBabelTypes', () => {
   const missing = (name: string) => new Error(`no ${name}`);
 
-  it('accepts an object', () => {
-    assert.doesNotThrow(() => assertBabelTypes({}, missing));
+  it('accepts an object with the members the mutators call', () => {
+    assert.doesNotThrow(() =>
+      assertBabelTypes({ emptyStatement: () => ({}) }, missing),
+    );
+  });
+
+  it('names the members an object lacks, through the missing-member error', () => {
+    assert.throws(() => assertBabelTypes({ emptyStatement: 1 }, missing), {
+      message: 'no Babel types with emptyStatement',
+    });
   });
 
   it('rejects a value that is no object, through the missing-member error', () => {
@@ -43,6 +52,32 @@ describe('install', () => {
       instrumenter.allMutators.every((listed) => ownMark in listed),
       true,
     );
+  });
+
+  it("registers each mutator so that its mutate call gets the instrumenter's Babel types", async () => {
+    const { instrumenter } = fakeInstrumenter();
+    const echo = {
+      name: 'LzEcho',
+      sample: 'export const echo = 1;\n',
+      mutate: (path: unknown, t: unknown) => [path, t],
+    };
+
+    await install(
+      { defaults: [echo], optIn: [], experimental: [] },
+      undefined,
+      async () => instrumenter,
+      () => undefined,
+      () => undefined,
+    );
+
+    const listed = instrumenter.allMutators.find(
+      ({ name }) => name === 'LzEcho',
+    );
+    const result: unknown = Reflect.apply(defined(listed).mutate, undefined, [
+      'path',
+    ]);
+
+    assert.deepEqual(result, ['path', instrumenter.types]);
   });
 
   it('refuses a name that another mutator holds, ignoring case, and registers nothing', async () => {
