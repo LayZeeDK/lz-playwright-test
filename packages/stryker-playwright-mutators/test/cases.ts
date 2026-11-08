@@ -143,6 +143,31 @@ export const cases: readonly Case[] = [
     "const extended = test.extend<{ ready: boolean }>({\n  ready: async ({ page }, use) => {\n    await use(true);\n    if (page) {\n      await page.locator('#a').click();\n    }\n  },\n});",
     'after-use-nested',
   ),
+  untouched(
+    'a click after await use in a fixture written as a method',
+    "const extended = test.extend<{ ready: boolean }>({\n  async ready({ page }, use) {\n    await use(true);\n    await page.locator('#a').click();\n  },\n});",
+    'after-use-method',
+  ),
+  untouched(
+    'page.keyboard.press',
+    inTest("await page.keyboard.press('Enter');"),
+    'keyboard-press',
+  ),
+  untouched(
+    'page.keyboard.type',
+    inTest("await page.keyboard.type('x');"),
+    'keyboard-type',
+  ),
+  untouched(
+    'page.mouse.click',
+    inTest('await page.mouse.click(1, 2);'),
+    'mouse-click',
+  ),
+  untouched(
+    'page.touchscreen.tap',
+    inTest('await page.touchscreen.tap(1, 2);'),
+    'touchscreen-tap',
+  ),
   {
     id: 'before-use',
     title: 'a click before await use in a fixture is removed',

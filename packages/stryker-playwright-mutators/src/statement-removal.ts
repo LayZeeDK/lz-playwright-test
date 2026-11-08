@@ -4,8 +4,6 @@ import type { LzPlaywrightMutator } from './mutators.ts';
 
 export interface RemovalRow {
   readonly mutator: string;
-  /** Where no mutant is made: `teardown` is a `test.afterEach` or `test.afterAll` callback, and code after `await use(...)`. */
-  readonly skip: 'teardown';
 }
 
 // In place of `as const`: Stryker mutates nothing inside an `as` expression, which would leave every row out of a
@@ -17,7 +15,7 @@ function removalTable<const T extends Readonly<Record<string, RemovalRow>>>(
 }
 
 function row(mutator: string): RemovalRow {
-  return { mutator, skip: 'teardown' };
+  return { mutator };
 }
 
 const click = 'LzPlaywrightClickAction';
@@ -55,6 +53,7 @@ export const statementRemovals = removalTable({
 });
 
 const teardownHooks: readonly unknown[] = ['afterEach', 'afterAll'];
+const inputDevices: readonly unknown[] = ['keyboard', 'mouse', 'touchscreen'];
 
 export function removalMutator<const TName extends string>(
   name: TName,
@@ -102,7 +101,10 @@ function awaitedMethod(node: unknown): unknown {
   const callee = fieldOf(call, 'callee');
 
   return fieldOf(callee, 'type') === 'MemberExpression' &&
-    fieldOf(callee, 'computed') === false
+    fieldOf(callee, 'computed') === false &&
+    !inputDevices.includes(
+      fieldOf(fieldOf(fieldOf(callee, 'object'), 'property'), 'name'),
+    )
     ? fieldOf(fieldOf(callee, 'property'), 'name')
     : undefined;
 }
@@ -151,7 +153,7 @@ function followsUse(blockPath: unknown, child: unknown): boolean {
     fieldOf(block, 'type') === 'BlockStatement' &&
     Array.isArray(body) &&
     typeof owner === 'string' &&
-    owner.includes('Function') &&
+    /Function|Method/.test(owner) &&
     body.slice(0, body.indexOf(child)).some(isAwaitedUse)
   );
 }
