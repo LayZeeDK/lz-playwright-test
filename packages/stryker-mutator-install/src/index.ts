@@ -20,3 +20,8 @@ export {
   type NamedMutator,
   type SampledMutator,
 } from './install.ts';
+export {
+  selectMutators,
+  type MutatorOptions,
+  type MutatorSets,
+} from './select.ts';
