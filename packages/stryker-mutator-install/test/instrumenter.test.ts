@@ -6,7 +6,11 @@ import { join } from 'node:path';
 import { describe, it, type TestContext } from 'node:test';
 import { pathToFileURL } from 'node:url';
 
-import { corePackageJson, resolveInstrumenter } from '../src/instrumenter.ts';
+import {
+  corePackageJson,
+  resolveExpressionPlacer,
+  resolveInstrumenter,
+} from '../src/instrumenter.ts';
 import { exported } from './support/exports.ts';
 import { tempRoot, writeTree } from './support/temp-tree.ts';
 
@@ -21,8 +25,17 @@ function assertTypes(
   }
 }
 
-function resolveFromCore(corePackage: string) {
-  return resolveInstrumenter(packageName, assertTypes, corePackage);
+async function resolveFromCore(corePackage: string) {
+  const instrumenter = await resolveInstrumenter(
+    packageName,
+    assertTypes,
+    corePackage,
+  );
+
+  return {
+    ...instrumenter,
+    expressionPlacer: await resolveExpressionPlacer(packageName, instrumenter),
+  };
 }
 
 describe('corePackageJson', () => {
@@ -183,6 +196,18 @@ describe('resolveFromCore against a fake instrumenter', () => {
       modules,
     };
   }
+
+  it('resolves an instrumenter without an expressionMutantPlacer, as only some packages patch it', async (t) => {
+    const { corePackage } = fakeCore(t, ['otherPlacer']);
+
+    const instrumenter = await resolveInstrumenter(
+      packageName,
+      assertTypes,
+      corePackage,
+    );
+
+    assert.equal(instrumenter.version, '9.9.8');
+  });
 
   it('throws, naming the version and dir, when the instrumenter has no expressionMutantPlacer', async (t) => {
     const { corePackage, dir } = fakeCore(t, ['otherPlacer']);

@@ -57,15 +57,22 @@ export interface Instrumenter<TTypes> {
   readonly types: TTypes;
   /** The array `transformBabel` reads by default on every file (`babel-transformer.js:8`). */
   readonly allMutators: MutatorList;
-  /**
-   * `target` is the first entry of the frozen `allMutantPlacers`; the array is frozen, this object is not
-   * (`mutant-placers/index.js:6`).
-   */
-  readonly expressionPlacer: {
-    readonly target: object;
-    readonly original: ExpressionPlacerMethods;
-  };
   instrument(files: readonly SourceFile[]): Promise<readonly MutantOrigin[]>;
+}
+
+/** What an error message says about the instrumenter in use. */
+export type InstrumenterLocation<TTypes = unknown> = Pick<
+  Instrumenter<TTypes>,
+  'dir' | 'version'
+>;
+
+/**
+ * `target` is the first entry of the frozen `allMutantPlacers`; the array is frozen, this object is not
+ * (`mutant-placers/index.js:6`).
+ */
+export interface ExpressionPlacer {
+  readonly target: object;
+  readonly original: ExpressionPlacerMethods;
 }
 
 export type AssertTypes<TTypes> = (
@@ -105,13 +112,11 @@ export async function resolveInstrumenter<TTypes>(
   const dir = dirname(packageJson);
   const manifest: unknown = fromCore(packageJson);
   const version = String(fieldOf(manifest, 'version'));
-  const [mutate, placers, babel] = await Promise.all([
+  const [mutate, babel] = await Promise.all([
     importFile(join(dir, 'dist', 'src', 'mutators', 'mutate.js')),
-    importFile(join(dir, 'dist', 'src', 'mutant-placers', 'index.js')),
     importFile(createRequire(packageJson).resolve('@babel/core')),
   ]);
   const allMutators = fieldOf(mutate, 'allMutators');
-  const allMutantPlacers = fieldOf(placers, 'allMutantPlacers');
   const types = fieldOf(babel, 'types');
   const missing = hasNo({ packageName, dir, version });
 
@@ -119,13 +124,47 @@ export async function resolveInstrumenter<TTypes>(
     throw missing('allMutators');
   }
 
-  if (!Array.isArray(allMutantPlacers)) {
-    throw missing('allMutantPlacers');
-  }
-
   const instrument = await coreInstrument({ packageName, dir, version });
 
   assertTypes(types, missing);
+
+  return {
+    dir,
+    version,
+    types,
+    allMutators,
+    async instrument(files) {
+      const mutants = fieldOf(await instrument(files), 'mutants');
+
+      if (!Array.isArray(mutants) || !mutants.every(isMutantOrigin)) {
+        throw new Error(
+          `${packageName}: the instrumenter ${version} in ${dir} resolved Instrumenter.instrument() to a ` +
+            'value whose mutants are missing or have no string fileName and mutatorName.',
+        );
+      }
+
+      return mutants.map(({ fileName, mutatorName }) => ({
+        fileName,
+        mutatorName,
+      }));
+    },
+  };
+}
+
+/** The instrumenter's `expressionMutantPlacer`, for the packages that patch it. */
+export async function resolveExpressionPlacer(
+  packageName: string,
+  { dir, version }: Pick<Located, 'dir' | 'version'>,
+): Promise<ExpressionPlacer> {
+  const placers = await importFile(
+    join(dir, 'dist', 'src', 'mutant-placers', 'index.js'),
+  );
+  const allMutantPlacers = fieldOf(placers, 'allMutantPlacers');
+  const missing = hasNo({ packageName, dir, version });
+
+  if (!Array.isArray(allMutantPlacers)) {
+    throw missing('allMutantPlacers');
+  }
 
   const placer = allMutantPlacers
     .filter(isRecord)
@@ -142,44 +181,23 @@ export async function resolveInstrumenter<TTypes>(
   const { canPlace, place } = placer;
 
   return {
-    dir,
-    version,
-    types,
-    allMutators,
-    expressionPlacer: {
-      target: placer,
-      original: {
-        canPlace(path) {
-          const placeable: unknown = Reflect.apply(canPlace, placer, [path]);
+    target: placer,
+    original: {
+      canPlace(path) {
+        const placeable: unknown = Reflect.apply(canPlace, placer, [path]);
 
-          if (typeof placeable !== 'boolean') {
-            throw new Error(
-              `${packageName}: the instrumenter ${version} in ${dir} has an expressionMutantPlacer whose ` +
-                `canPlace returned a ${typeof placeable}, not a boolean.`,
-            );
-          }
+        if (typeof placeable !== 'boolean') {
+          throw new Error(
+            `${packageName}: the instrumenter ${version} in ${dir} has an expressionMutantPlacer whose ` +
+              `canPlace returned a ${typeof placeable}, not a boolean.`,
+          );
+        }
 
-          return placeable;
-        },
-        place(path, appliedMutants) {
-          Reflect.apply(place, placer, [path, appliedMutants]);
-        },
+        return placeable;
       },
-    },
-    async instrument(files) {
-      const mutants = fieldOf(await instrument(files), 'mutants');
-
-      if (!Array.isArray(mutants) || !mutants.every(isMutantOrigin)) {
-        throw new Error(
-          `${packageName}: the instrumenter ${version} in ${dir} resolved Instrumenter.instrument() to a ` +
-            'value whose mutants are missing or have no string fileName and mutatorName.',
-        );
-      }
-
-      return mutants.map(({ fileName, mutatorName }) => ({
-        fileName,
-        mutatorName,
-      }));
+      place(path, appliedMutants) {
+        Reflect.apply(place, placer, [path, appliedMutants]);
+      },
     },
   };
 }

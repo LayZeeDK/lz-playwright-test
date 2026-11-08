@@ -1,4 +1,4 @@
-import type { Instrumenter } from './instrumenter.ts';
+import type { Instrumenter, InstrumenterLocation } from './instrumenter.ts';
 
 export const builtInNames: readonly string[] = [
   'ArithmeticOperator',
@@ -22,7 +22,8 @@ export const builtInNames: readonly string[] = [
 
 export function removeBuiltIns(
   packageName: string,
-  instrumenter: Pick<Instrumenter<unknown>, 'allMutators' | 'dir' | 'version'>,
+  instrumenter: InstrumenterLocation &
+    Pick<Instrumenter<unknown>, 'allMutators'>,
   warn: (message: string) => void,
 ): void {
   const { allMutators } = instrumenter;
@@ -49,13 +50,9 @@ export function removeBuiltIns(
     }
   }
 
-  // Stryker disable next-line ArithmeticOperator: a start past the end only visits indexes that hold nothing
-  for (let index = allMutators.length - 1; index >= 0; index--) {
-    // Stryker disable next-line StringLiteral: index is always in range, so the fallback only satisfies the index type
-    if (builtInNames.includes(allMutators[index]?.name ?? '')) {
-      allMutators.splice(index, 1);
-    }
-  }
+  const kept = allMutators.filter(({ name }) => !builtInNames.includes(name));
+
+  allMutators.splice(0, allMutators.length, ...kept);
 }
 
 function isLayzeeMarked(mutator: object): boolean {

@@ -1,5 +1,6 @@
 import type {
   Instrumenter,
+  InstrumenterLocation,
   ListedMutator,
   MutatorList,
 } from './instrumenter.ts';
@@ -79,7 +80,8 @@ export function register(
 
 export async function selfCheck(
   packageName: string,
-  instrumenter: Pick<Instrumenter<unknown>, 'dir' | 'instrument' | 'version'>,
+  instrumenter: InstrumenterLocation &
+    Pick<Instrumenter<unknown>, 'instrument'>,
   mutators: readonly SampledMutator[],
 ): Promise<void> {
   const fileOf = (name: string): string => `${name}.self-check.tsx`;
@@ -111,7 +113,7 @@ export async function selfCheck(
 export function warnUntested(
   packageName: string,
   testedVersion: string,
-  instrumenter: Pick<Instrumenter<unknown>, 'dir' | 'version'>,
+  instrumenter: InstrumenterLocation,
   warn: (message: string) => void,
 ): void {
   if (instrumenter.version !== testedVersion) {

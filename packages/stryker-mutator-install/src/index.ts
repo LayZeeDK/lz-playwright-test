@@ -2,8 +2,10 @@ export { builtInNames, removeBuiltIns } from './built-ins.ts';
 export {
   coreInstrument,
   corePackageJson,
+  resolveExpressionPlacer,
   resolveInstrumenter,
   type AssertTypes,
+  type ExpressionPlacer,
   type ExpressionPlacerMethods,
   type Instrumenter,
   type ListedMutator,
@@ -21,6 +23,7 @@ export {
   type NamedMutator,
   type SampledMutator,
 } from './install.ts';
+export { fieldOf, isRecord } from './is-record.ts';
 export {
   selectMutators,
   type MutatorOptions,

@@ -12,6 +12,9 @@ patches the installed `@stryker-mutator/instrumenter` in memory, and checks that
 
 - `resolveInstrumenter`, `coreInstrument`, `corePackageJson`: find and load the instrumenter that
   `@stryker-mutator/core` uses.
+- `resolveExpressionPlacer`: the instrumenter's expression placer, for a package that patches it. The
+  other functions do not need the placer to exist.
+- `fieldOf`, `isRecord`: read a field of a value of unknown shape, and test for an object.
 - `register`, `markOf`: add mutators to its list, each marked as a `@layzee` mutator.
 - `checkNames`: throws on a mutator name that has other characters than letters, or that another package's mutator already has (compared without case).
 - `selfCheck`: instruments one sample per mutator and throws when the instrumenter makes no mutant of it.

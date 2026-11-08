@@ -56,8 +56,7 @@ export function selectMutators<TMutator extends NamedMutator>(
     sets.optIn.length === 0 &&
     sets.experimental.length === 0 &&
     options !== undefined &&
-    (!isRecord(options) ||
-      Array.isArray(options) ||
+    (!isPlainObject(options) ||
       Object.values(options).some((value) => value !== undefined))
   ) {
     throw new Error(
@@ -95,7 +94,7 @@ export function selectMutators<TMutator extends NamedMutator>(
     }
   };
 
-  if (options !== undefined && (!isRecord(options) || Array.isArray(options))) {
+  if (options !== undefined && !isPlainObject(options)) {
     throw new Error(
       `${packageName}: the options must be an object, not ${inspect(options)}.`,
     );
@@ -143,6 +142,10 @@ export function selectMutators<TMutator extends NamedMutator>(
         experimental === true || fieldOf(experimental, name) === true,
     ),
   ];
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return isRecord(value) && !Array.isArray(value);
 }
 
 /** The entries of `value` that hold something: a key holding undefined counts as absent. */

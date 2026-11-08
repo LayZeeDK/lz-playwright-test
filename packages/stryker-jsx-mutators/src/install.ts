@@ -1,15 +1,17 @@
 import {
   checkNames,
   corePackageJson,
+  fieldOf,
   markOf,
   register,
+  resolveExpressionPlacer,
   resolveInstrumenter,
   selfCheck,
   warnUntested,
+  type ExpressionPlacer,
   type Instrumenter as CoreInstrumenter,
 } from '@layzee/stryker-mutator-install';
 
-import { fieldOf } from './is-record.ts';
 import {
   babelTypeMembers,
   toNodeMutator,
@@ -26,7 +28,9 @@ export {
   type SourceFile,
 } from '@layzee/stryker-mutator-install';
 
-export type Instrumenter = CoreInstrumenter<BabelTypes>;
+export interface Instrumenter extends CoreInstrumenter<BabelTypes> {
+  readonly expressionPlacer: ExpressionPlacer;
+}
 
 export const testedVersion = '10.1.1';
 const ownMark = markOf(packageName);
@@ -61,7 +65,16 @@ export async function install(
 export async function resolveFromCore(
   corePackage: string = corePackageJson(),
 ): Promise<Instrumenter> {
-  return resolveInstrumenter(packageName, assertBabelTypes, corePackage);
+  const instrumenter = await resolveInstrumenter(
+    packageName,
+    assertBabelTypes,
+    corePackage,
+  );
+
+  return {
+    ...instrumenter,
+    expressionPlacer: await resolveExpressionPlacer(packageName, instrumenter),
+  };
 }
 
 function assertBabelTypes(
