@@ -50,8 +50,8 @@ describe('removeBuiltIns', () => {
     );
 
     assert.deepEqual(warnings, [
-      '@layzee/test-mutators: the mutator NewStrykerMutator is not one of the 17 built-ins this module knows and ' +
-        'has no @layzee mark, so it stays on in this run and its reason is unreviewed.',
+      "@layzee/test-mutators: the mutator NewStrykerMutator is not one of Stryker's 17 built-ins and has no " +
+        '@layzee mark, so it stays on in this run; this package has not reviewed whether it fits test code.',
     ]);
     assert.deepEqual(allMutators, [unknown, marked]);
   });
@@ -83,8 +83,8 @@ describe('removeBuiltIns', () => {
         ),
       {
         message:
-          '@layzee/test-mutators: the instrumenter 1.2.3 in /fake/instrumenter has no built-in mutators named ' +
-          "Regex, UpdateOperator, so this module's list of Stryker's built-ins is out of date.",
+          '@layzee/test-mutators: @stryker-mutator/instrumenter 1.2.3 in /fake/instrumenter has no built-in mutators named ' +
+          "Regex, UpdateOperator, so this package's list of Stryker's built-ins is out of date.",
       },
     );
     assert.deepEqual(allMutators, before);

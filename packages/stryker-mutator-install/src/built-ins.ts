@@ -35,16 +35,16 @@ export function removeBuiltIns(
 
   if (missing.length > 0) {
     throw new Error(
-      `${packageName}: the instrumenter ${instrumenter.version} in ${instrumenter.dir} has no built-in mutators ` +
-        `named ${missing.join(', ')}, so this module's list of Stryker's built-ins is out of date.`,
+      `${packageName}: @stryker-mutator/instrumenter ${instrumenter.version} in ${instrumenter.dir} has no built-in mutators ` +
+        `named ${missing.join(', ')}, so this package's list of Stryker's built-ins is out of date.`,
     );
   }
 
   for (const mutator of allMutators) {
     if (!builtInNames.includes(mutator.name) && !isLayzeeMarked(mutator)) {
       warn(
-        `${packageName}: the mutator ${mutator.name} is not one of the 17 built-ins this module knows and has no ` +
-          '@layzee mark, so it stays on in this run and its reason is unreviewed.',
+        `${packageName}: the mutator ${mutator.name} is not one of Stryker's 17 built-ins and has no ` +
+          '@layzee mark, so it stays on in this run; this package has not reviewed whether it fits test code.',
       );
     }
   }
