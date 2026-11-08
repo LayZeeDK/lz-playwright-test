@@ -5,6 +5,10 @@ import { navigationFixtures } from './settings.ts';
 
 export interface RemovalRow {
   readonly mutator: string;
+  /** What the method is called on: anything but an input device, or `request` / `<x>.request`. */
+  readonly receiver: 'any' | 'request';
+  /** The positions that make no mutant: teardown, or setup hooks and `finally` blocks as well. */
+  readonly skip: 'teardown' | 'setupAndTeardown';
 }
 
 // In place of `as const`: Stryker mutates nothing inside an `as` expression, which would leave every row out of a
@@ -16,7 +20,11 @@ function removalTable<const T extends Readonly<Record<string, RemovalRow>>>(
 }
 
 function row(mutator: string): RemovalRow {
-  return { mutator };
+  return { mutator, receiver: 'any', skip: 'teardown' };
+}
+
+function requestRow(): RemovalRow {
+  return { mutator: input, receiver: 'request', skip: 'setupAndTeardown' };
 }
 
 const click = 'LzPlaywrightClickAction';
@@ -51,9 +59,17 @@ export const statementRemovals = removalTable({
   reload: row(navigation),
   goBack: row(navigation),
   goForward: row(navigation),
+  delete: requestRow(),
+  fetch: requestRow(),
+  get: requestRow(),
+  head: requestRow(),
+  patch: requestRow(),
+  post: requestRow(),
+  put: requestRow(),
 });
 
 const teardownHooks: readonly unknown[] = ['afterEach', 'afterAll'];
+const setupHooks: readonly unknown[] = ['beforeEach', 'beforeAll'];
 const inputDevices: readonly unknown[] = ['keyboard', 'mouse', 'touchscreen'];
 
 export function removalMutator<const TName extends string>(
@@ -66,7 +82,7 @@ export function removalMutator<const TName extends string>(
     *mutate(path, t) {
       const removal = removalOf(path);
 
-      if (removal?.mutator === name && !isTeardown(path)) {
+      if (removal?.mutator === name && !isSkipped(path, removal.skip)) {
         yield t.emptyStatement();
       }
     },
@@ -85,10 +101,25 @@ function removalOf(path: unknown): RemovalRow | undefined {
   }
 
   const method = awaitedMethod(callee);
+  const found =
+    typeof method === 'string' && Object.hasOwn(rows, method)
+      ? rows[method]
+      : undefined;
 
-  return typeof method === 'string' && Object.hasOwn(rows, method)
-    ? rows[method]
-    : undefined;
+  return found?.receiver === 'request' &&
+    !isRequestReceiver(fieldOf(callee, 'object'))
+    ? undefined
+    : found;
+}
+
+/** `request` or `<x>.request`. */
+function isRequestReceiver(node: unknown): boolean {
+  return (
+    fieldOf(node, 'name') === 'request' ||
+    (fieldOf(node, 'type') === 'MemberExpression' &&
+      fieldOf(node, 'computed') === false &&
+      fieldOf(fieldOf(node, 'property'), 'name') === 'request')
+  );
 }
 
 /** The call of an `await <call>;` statement. */
@@ -195,7 +226,8 @@ function isExtendCall(node: unknown): boolean {
   );
 }
 
-function isTeardown(path: unknown): boolean {
+function isSkipped(path: unknown, skip: RemovalRow['skip']): boolean {
+  const setup = skip === 'setupAndTeardown';
   let child = path;
 
   for (
@@ -204,8 +236,12 @@ function isTeardown(path: unknown): boolean {
     current = fieldOf(current, 'parentPath')
   ) {
     if (
-      isTeardownHookCall(fieldOf(current, 'node')) ||
-      followsUse(current, fieldOf(child, 'node'))
+      isHookCall(
+        fieldOf(current, 'node'),
+        setup ? [...teardownHooks, ...setupHooks] : teardownHooks,
+      ) ||
+      followsUse(current, fieldOf(child, 'node')) ||
+      (setup && isFinalizer(current, fieldOf(child, 'node')))
     ) {
       return true;
     }
@@ -216,13 +252,23 @@ function isTeardown(path: unknown): boolean {
   return false;
 }
 
-function isTeardownHookCall(node: unknown): boolean {
+function isHookCall(node: unknown, hooks: readonly unknown[]): boolean {
   const callee = fieldOf(node, 'callee');
 
   return (
     fieldOf(node, 'type') === 'CallExpression' &&
     fieldOf(callee, 'type') === 'MemberExpression' &&
-    teardownHooks.includes(fieldOf(fieldOf(callee, 'property'), 'name'))
+    hooks.includes(fieldOf(fieldOf(callee, 'property'), 'name'))
+  );
+}
+
+/** `child` is the `finally` block of the try statement at `tryPath`. */
+function isFinalizer(tryPath: unknown, child: unknown): boolean {
+  const node = fieldOf(tryPath, 'node');
+
+  return (
+    fieldOf(node, 'type') === 'TryStatement' &&
+    fieldOf(node, 'finalizer') === child
   );
 }
 

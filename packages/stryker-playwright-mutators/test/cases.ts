@@ -12,6 +12,17 @@ const input = 'LzPlaywrightInputAction';
 const focus = 'LzPlaywrightFocusAction';
 const navigation = 'LzPlaywrightNavigationAction';
 
+// The APIRequestContext methods that send a request (playwright-core client/fetch.ts at v1.64.1).
+const requestMethods = [
+  'delete',
+  'fetch',
+  'get',
+  'head',
+  'patch',
+  'post',
+  'put',
+] as const;
+
 function inTest(statement: string): string {
   return `test('case', async ({ page }) => {\n  ${statement}\n});`;
 }
@@ -229,6 +240,74 @@ export const cases: readonly Case[] = [
     "test('case', async ({ visit }) => {\n  await visit('/');\n});",
     'visit-default',
   ),
+  ...requestMethods.flatMap((method) => [
+    {
+      id: `${method}-request`,
+      title: `an awaited request.${method} is removed`,
+      source: `test('case', async ({ request }) => {\n  await request.${method}('/api');\n});`,
+      expect: [[input, ';']] as const,
+    },
+    {
+      id: `${method}-page-request`,
+      title: `an awaited page.request.${method} is removed`,
+      source: `test('case', async ({ page }) => {\n  await page.request.${method}('/api');\n});`,
+      expect: [[input, ';']] as const,
+    },
+  ]),
+  untouched(
+    'an awaited get on another receiver',
+    "test('case', async () => {\n  const map = new Map<string, number>();\n\n  await map.get('a');\n});",
+    'get-map',
+  ),
+  untouched(
+    'an awaited post on another request-like receiver',
+    "test('case', async ({ client }) => {\n  await client.requests.post('/api');\n});",
+    'post-requests',
+  ),
+  untouched(
+    'a request call whose result is used',
+    "test('case', async ({ request }) => {\n  const response = await request.get('/api');\n\n  expect(response.ok()).toBe(true);\n});",
+    'request-result-used',
+  ),
+  untouched(
+    'a request call in test.beforeEach',
+    "test.beforeEach(async ({ request }) => {\n  await request.post('/api');\n});",
+    'request-beforeEach',
+  ),
+  untouched(
+    'a request call in test.beforeAll',
+    "test.beforeAll(async ({ request }) => {\n  await request.post('/api');\n});",
+    'request-beforeAll',
+  ),
+  untouched(
+    'a request call in test.afterEach',
+    "test.afterEach(async ({ request }) => {\n  await request.delete('/api');\n});",
+    'request-afterEach',
+  ),
+  untouched(
+    'a request call in a finally block',
+    "test('case', async ({ request }) => {\n  try {\n    expect(1).toBe(1);\n  } finally {\n    await request.delete('/api');\n  }\n});",
+    'request-finally',
+  ),
+  untouched(
+    'a request call after await use in a fixture',
+    "const extended = test.extend<{ ready: boolean }>({\n  ready: async ({ request }, use) => {\n    await use(true);\n    await request.delete('/api');\n  },\n});",
+    'request-after-use',
+  ),
+  {
+    id: 'request-try',
+    title: 'a request call in a try block is removed',
+    source:
+      "test('case', async ({ request }) => {\n  try {\n    await request.post('/api');\n  } finally {\n    expect(1).toBe(1);\n  }\n});",
+    expect: [[input, ';']],
+  },
+  {
+    id: 'click-finally',
+    title: 'a click in a finally block is removed',
+    source:
+      "test('case', async ({ page }) => {\n  try {\n    expect(1).toBe(1);\n  } finally {\n    await page.locator('#a').click();\n  }\n});",
+    expect: [[click, ';']],
+  },
   {
     id: 'sibling-of-afterEach',
     title: 'a click in a test next to test.afterEach is removed',
