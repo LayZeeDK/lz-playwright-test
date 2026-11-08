@@ -15,11 +15,14 @@ patches the installed `@stryker-mutator/instrumenter` in memory, and checks that
 - `resolveExpressionPlacer`: the instrumenter's expression placer, for a package that patches it. The
   other functions do not need the placer to exist.
 - `fieldOf`, `isRecord`: read a field of a value of unknown shape, and test for an object.
-- `register`, `markOf`: add mutators to its list, each marked as a `@layzee` mutator.
+- `register`, `markOf`: put mutators in its list, each marked as a `@layzee` mutator. A second call replaces the
+  entries of the first from the same package, in place, and leaves the entries of other packages where they are.
 - `checkNames`: throws on a mutator name that has other characters than letters, or that another package's mutator already has (compared without case).
 - `selfCheck`: instruments one sample per mutator and throws when the instrumenter makes no mutant of it.
 - `warnUntested`: warns when the instrumenter is not the version the calling package was tested with.
 - `builtInNames`, `removeBuiltIns`: the 17 built-in mutators of Stryker, and the removal of them by name.
+- `builtInSample`, `checkBuiltInsRemoved`: a source file in which each of the 17 makes a mutant, and the check that
+  throws when the instrumenter still makes one of them after the removal.
 - `selectMutators`: turns the options of a mutator package into the list of mutators to install. An option
   holds only `true`. The function throws on any other value and on any unknown or misplaced name.
 - Types: `Instrumenter`, `ListedMutator`, `MutatorList`, `MutatorOptions`, `MutatorSets`, `NamedMutator`,

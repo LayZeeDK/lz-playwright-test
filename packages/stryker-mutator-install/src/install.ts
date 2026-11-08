@@ -62,16 +62,23 @@ export function checkNames(
   }
 }
 
-/** Appends each mutator whose name the list does not hold yet, marked as the package's own. */
+/**
+ * Replaces the package's own earlier entries with the mutators, marked as the package's own and appended after the
+ * entries of other packages. A mutator whose name another entry holds is skipped.
+ */
 export function register(
   packageName: string,
   allMutators: MutatorList,
   mutators: readonly ListedMutator[],
 ): void {
-  const registered = new Set(allMutators.map(({ name }) => name));
   const ownMark = markOf(packageName);
+  const kept = allMutators.filter((mutator) => !(ownMark in mutator));
+  const registered = new Set(kept.map(({ name }) => name));
 
-  allMutators.push(
+  allMutators.splice(
+    0,
+    allMutators.length,
+    ...kept,
     ...mutators
       .filter(({ name }) => !registered.has(name))
       .map((mutator) => ({ ...mutator, [ownMark]: ownMark })),

@@ -20,6 +20,48 @@ export const builtInNames: readonly string[] = [
   'UpdateOperator',
 ];
 
+/** A source file in which each of the 17 built-ins makes at least one mutant. */
+export const builtInSample = `export function sample(a: number, b: number, text: string, notify: () => void, maybe?: { value: string }) {
+  let total = a + b;
+  total += 1;
+  total++;
+
+  const flags = [true, -total];
+  const options = { text, flags };
+  const matches = /^a+\\d$/.test(text.trim());
+  const shout = () => text.toUpperCase();
+  const value = maybe?.value;
+
+  if (a === b && matches) {
+    notify();
+    console.log('same', options, shout(), value);
+  }
+
+  return a > b ? total : 0;
+}
+`;
+
+export async function checkBuiltInsRemoved(
+  packageName: string,
+  instrumenter: InstrumenterLocation &
+    Pick<Instrumenter<unknown>, 'instrument'>,
+): Promise<void> {
+  const mutants = await instrumenter.instrument([
+    { name: 'built-ins.self-check.tsx', content: builtInSample },
+  ]);
+  const remaining = builtInNames.filter((name) =>
+    mutants.some(({ mutatorName }) => mutatorName === name),
+  );
+
+  if (remaining.length > 0) {
+    throw new Error(
+      `${packageName}: the instrumenter ${instrumenter.version} in ${instrumenter.dir} still made mutants of the ` +
+        `built-ins ${remaining.join(', ')} after this package removed them, so it does not run the list this ` +
+        'package changed. A bundled or second copy of the instrumenter does that.',
+    );
+  }
+}
+
 export function removeBuiltIns(
   packageName: string,
   instrumenter: InstrumenterLocation &

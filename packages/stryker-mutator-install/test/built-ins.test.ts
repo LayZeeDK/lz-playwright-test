@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { builtInNames, removeBuiltIns } from '../src/built-ins.ts';
+import {
+  builtInNames,
+  builtInSample,
+  checkBuiltInsRemoved,
+  removeBuiltIns,
+} from '../src/built-ins.ts';
 import type { ListedMutator } from '../src/instrumenter.ts';
 
 const packageName = '@layzee/test-mutators';
@@ -104,6 +109,53 @@ describe('removeBuiltIns', () => {
       },
     );
     assert.deepEqual(allMutators, before);
+  });
+});
+
+describe('checkBuiltInsRemoved', () => {
+  const instrumenterMaking = (mutatorNames: readonly string[]) => ({
+    dir: '/fake/instrumenter',
+    version: '1.2.3',
+    instrument: async (files: readonly { name: string }[]) =>
+      mutatorNames.map((mutatorName) => ({
+        fileName: files[0]?.name ?? '',
+        mutatorName,
+      })),
+  });
+
+  it('throws, naming the built-ins that still made a mutant of the sample, in the order of the 17', async () => {
+    await assert.rejects(
+      checkBuiltInsRemoved(
+        packageName,
+        instrumenterMaking(['Regex', 'LzOwn', 'ArrowFunction', 'Regex']),
+      ),
+      {
+        message:
+          '@layzee/test-mutators: the instrumenter 1.2.3 in /fake/instrumenter still made mutants of the built-ins ' +
+          'ArrowFunction, Regex after this package removed them, so it does not run the list this package changed. ' +
+          'A bundled or second copy of the instrumenter does that.',
+      },
+    );
+  });
+
+  it('passes when no built-in made a mutant, and instruments the sample once as one file', async () => {
+    const seen: { name: string; content: string }[][] = [];
+    const instrumenter = {
+      ...instrumenterMaking([]),
+      instrument: async (
+        files: readonly { name: string; content: string }[],
+      ) => {
+        seen.push([...files]);
+
+        return [{ fileName: 'built-ins.self-check.tsx', mutatorName: 'LzOwn' }];
+      },
+    };
+
+    await checkBuiltInsRemoved(packageName, instrumenter);
+
+    assert.deepEqual(seen, [
+      [{ name: 'built-ins.self-check.tsx', content: builtInSample }],
+    ]);
   });
 });
 

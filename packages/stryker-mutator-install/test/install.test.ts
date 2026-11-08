@@ -131,6 +131,30 @@ describe('register', () => {
   });
 });
 
+describe('register converges', () => {
+  it('replaces the entries of an earlier call with the new selection, in place, and keeps the siblings', () => {
+    const builtIn = listed('Regex');
+    const foreign = {
+      ...listed('LzForeign'),
+      [markOf('@layzee/other-mutators')]: 1,
+    };
+    const allMutators: ListedMutator[] = [builtIn];
+    const list = allMutators;
+
+    register(packageName, allMutators, [listed('LzOne'), listed('LzTwo')]);
+    allMutators.splice(1, 0, foreign);
+    register(packageName, allMutators, [listed('LzTwo'), listed('LzThree')]);
+
+    assert.equal(allMutators, list);
+    assert.deepEqual(
+      allMutators.map(({ name }) => name),
+      ['Regex', 'LzForeign', 'LzTwo', 'LzThree'],
+    );
+    assert.equal(allMutators[0], builtIn);
+    assert.equal(allMutators[1], foreign);
+  });
+});
+
 describe('selfCheck', () => {
   const fakeInstrumenter = (
     mutantsOf: (files: readonly SourceFile[]) => readonly MutantOrigin[],
