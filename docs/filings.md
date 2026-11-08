@@ -532,6 +532,21 @@ cycles 4 to 12 without a fresh call "to save context", then wrote three start-li
 passed on their first run because the shared install function already did the work, and were logged as test-after.
 Evidence: `step6-p1-cycles.log`, `step6-p1-notes.md`.
 
+**O62. A case table does not fit one test per cycle.** Chunk 2a's 49 rows (one per Playwright method and form, plus
+skip positions) each count as a test. At about 7k tokens of skill text per call, a full loop does not fit one worker,
+so the worker ran 3 cycles and then one batched red (36 of 49 failing) and one green. It also wrote each test before
+calling `lz-red`, so the coaching arrived after the run. Evidence: `step6-p2a-cycles.log`, `step6-p2a-notes.md`.
+
+**O63. `lz-tpp`'s starter step fails when half the oracle is global.** The starter case asked for one mutant and no
+other in a spec file. A constant green over-generated, since every spec holds other expression statements (the
+`test(...)` wrapper), and it broke an older no-mutant test; the first green had to bring the `await` check at once.
+Evidence: `step6-p2a-notes.md` item 2.
+
+**O64. A type-level change has no runtime red.** Deriving the options type from the roster changes only types; the
+check is the type-checker, which `lz-red` does not name as a red. It was logged as test-after. The same chunk's fix
+for keyboard and mouse calls was another condition edit with no TPP name (O54). Evidence: `step6-p2a-notes.md`
+item 5; commit 699a1ee.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -725,6 +740,15 @@ not-implemented error, so the red names what was expected.
 
 **S55 (from O61).** Let one skill call cover a run of cycles a test list fixes up front, with the transformation
 named per cycle in the log, so that skipping calls is no longer the cheaper path (see S52).
+
+**S56 (from O62).** Let a case-table family (rows that differ only in data) count as one cycle: one red over the new
+rows, one green, with the row count in the log.
+
+**S57 (from O63).** In the starter-case guidance, say that when the test also asserts absence elsewhere in the input,
+the first green may need the discriminating condition, and name that as an accepted lower-priority step.
+
+**S58 (from O64).** Give `lz-red` a type-level red: a `tsc` or type-assertion failure (for example an
+`@ts-expect-error` that stops being needed) counts as the red for a change that only types can observe.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
