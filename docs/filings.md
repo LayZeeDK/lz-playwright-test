@@ -482,6 +482,40 @@ of throwing, is not one its checklist prompts for. The mandatory loop audit then
 since no loop moved. Evidence: step 6 chunk 0, commit "refactor(stryker-jsx-mutators): move instrumenter access into
 instrumenter.ts", `step6-chunk0-notes.md`.
 
+**O54. `lz-tpp` has no transformation for widening or narrowing an existing condition.** Four greens in step 6 chunk
+1 passed by editing a guard that already existed: "a key holding undefined counts as absent", "an unknown name inside
+experimental" (a clause dropped), "an array as options is rejected" (`|| Array.isArray(options)` added), and the
+`selectMutators` guard ported from the JSX package. The 14-item list has no row for it, and the nearest names,
+`(unconditional -> if)` and `(scalar -> array)`, misdescribe a condition edit. Evidence: step 6 chunk 1 parts b2, c
+and d, `step6-chunk1-cycles.log` cycles 3, 13 and 18.
+
+**O55. `lz-tpp` ranks behaviour only, not where the change lands.** For "a value other than true is rejected", the top
+choice `(unconditional -> if)` lands inside a `filter` predicate and puts a throw in a pipeline; a lower-ranked loop
+over the entries was the right green. For a range condition ("some built-ins but not all are missing"), a single
+`(unconditional -> if)` can only name one side, so the first green also fired when none were present and needed a
+second cycle. For a data-driven message, the impasse check pushed through `(case)` before the table that came in the
+next refactor. Evidence: part c cycles 6 and 11, part d cycles 22 and 23.
+
+**O56. `lz-refactor` has no case for duplication that is visible but not yet equal in behaviour.** It rightly declined
+to merge the outer and inner name checks in part c cycle 12, because merging would have changed behaviour before a
+test asked for it; the extraction had to wait a cycle. Its loop audit also pulls toward a filter pipeline for a
+backwards `splice` loop over Stryker's live mutator array, where replacing the array would break the install; it
+said "mark no" for the right reason (external mutation), but only because that criterion exists. Evidence: part c
+cycles 12 and 13, part d cycle 21.
+
+**O57. A move across packages leaves the moved code's tests behind, and no lz-tdd skill notices.** The tests that
+cover the install core stayed in the JSX package and reached the new package through the workspace link, which
+resolves outside Stryker's sandbox, so the first mutation run showed all 68 mutants of the moved `install.ts` as
+NoCoverage. `lz-refactor` says moved code takes its tests with it but gives no check; the tests written afterwards
+were characterization tests with no red and no green to coach, and `lz-red` has no step for a test written after the
+code to close a mutation gap (S44 covers the red against a mutant, not the placement). It also has no step for a
+change whose whole content is a string a test already pins. Evidence: part e, `.audit/step6-chunk1/run1.json`.
+
+**O58. Each skill call re-injects the whole skill text.** One cycle through `lz-red`, `lz-tpp` and `lz-refactor` costs
+about 9k tokens of skill text before any code, so on trivial steps the green and refactor calls carried no decision,
+and a ruled list of 15 small reds did not fit one worker under a 150k-token cap. Step 6 chunk 1 took 24 cycles across
+four workers. Evidence: part b2 and part c reports, `step6-chunk1-cycles.log`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -650,6 +684,22 @@ seam and come back for the red.
 **S47 (from O53).** Give `lz-refactor` an entry for a structural need with no smell (a module split for packaging
 or reuse) that asks what callers observe, such as sync against async failure, and skip the loop audit when the
 change moves no loop.
+
+**S48 (from O54).** Add a "(condition -> refined condition)" entry, or a note in the canonical list, for a green that
+widens or narrows an existing guard.
+
+**S49 (from O55).** In the coach procedure, after picking a transformation, ask where it lands (inside a pipeline
+callback, on one side of a range) and allow a lower-ranked one with that reason.
+
+**S50 (from O56).** Give `lz-refactor` a "duplication not yet behaviour-equal: wait for the test" case, and name
+in-place mutation of a shared array as a "mark no" example in the loop audit.
+
+**S51 (from O57).** Give `lz-refactor`'s Move Function and Move Module mechanics a step "move or add the tests in the
+destination package and run them there", and give `lz-red` a test-after route for closing a mutation gap and for a
+pinned-string change.
+
+**S52 (from O58).** Offer a short form of each skill for repeat calls in the same cycle loop, or let one call cover
+the three steps of a trivial cycle.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
