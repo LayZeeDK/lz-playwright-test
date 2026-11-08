@@ -12,7 +12,7 @@ export interface ResolvedSettings {
   readonly navigationFixtures: readonly string[];
 }
 
-const identifier = /^[\p{ID_Start}$_][\p{ID_Continue}$‌‍]*$/u;
+const identifier = /^[\p{ID_Start}$_][\p{ID_Continue}$\u{200C}\u{200D}]*$/u;
 
 function isIdentifierList(value: unknown): value is readonly string[] {
   return (

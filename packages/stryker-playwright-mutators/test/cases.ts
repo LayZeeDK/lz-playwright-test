@@ -194,6 +194,14 @@ export const cases: readonly Case[] = [
     expect: [[navigation, ';']],
   },
   {
+    id: 'navigate-step',
+    title:
+      'an awaited navigate inside test.step, from the fixtures of the test, is removed',
+    source:
+      "test('case', async ({ navigate }) => {\n  await test.step('open', async () => {\n    await navigate('/');\n  });\n});",
+    expect: [[navigation, ';']],
+  },
+  {
     id: 'navigate-hook',
     title:
       'an awaited navigate from the fixtures of test.beforeEach is removed',

@@ -148,7 +148,7 @@ function awaitedMethod(callee: unknown): unknown {
     : undefined;
 }
 
-/** `name` is in the navigation fixture list and the test, hook or fixture function around `path` destructures it. */
+/** `name` is in the navigation fixture list and a test, hook or fixture function around `path` destructures it. */
 function isNavigationFixture(path: unknown, name: unknown): boolean {
   if (typeof name !== 'string' || !navigationFixtures().includes(name)) {
     return false;
@@ -159,8 +159,11 @@ function isNavigationFixture(path: unknown, name: unknown): boolean {
     current !== undefined && current !== null;
     current = fieldOf(current, 'parentPath')
   ) {
-    if (isFixtureFunction(current)) {
-      return destructures(fieldOf(fieldOf(current, 'node'), 'params'), name);
+    if (
+      isFixtureFunction(current) &&
+      destructures(fieldOf(fieldOf(current, 'node'), 'params'), name)
+    ) {
+      return true;
     }
   }
 
