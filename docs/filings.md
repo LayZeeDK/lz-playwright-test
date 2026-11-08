@@ -547,6 +547,16 @@ check is the type-checker, which `lz-red` does not name as a red. It was logged 
 for keyboard and mouse calls was another condition edit with no TPP name (O54). Evidence: `step6-p2a-notes.md`
 item 5; commit 699a1ee.
 
+**O65. `lz-tpp` cannot split a structural search into smaller greens.** Chunk 2b's fixture check walks up the parent
+paths to the nearest test, hook or fixture function and reads its first parameter's destructuring. The list names it
+one `(unconditional -> if)` with a large body and gives no way to cut it into reds of its own. The cut that mattered
+(do not stop at a `test.step` callback, which gets no fixtures) was missed and found in review. Evidence:
+`step6-p2b-notes.md`; commit 9760292.
+
+**O66. Under type stripping a signature change reds only at the type-checker.** Adding the `settings` parameter went
+red as an assertion on the removed fixtures, not as a compile error, because `node --test` strips types; the
+type-level part showed up only under `typecheck`. This adds to O64. Evidence: `step6-p2b-notes.md`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -749,6 +759,12 @@ the first green may need the discriminating condition, and name that as an accep
 
 **S58 (from O64).** Give `lz-red` a type-level red: a `tsc` or type-assertion failure (for example an
 `@ts-expect-error` that stops being needed) counts as the red for a change that only types can observe.
+
+**S59 (from O65).** For a search over a tree (parents, scopes, bindings), have `lz-red` list the stopping conditions
+as separate tests: where the walk stops, where it must go on, and what it must skip.
+
+**S60 (from O66).** In `lz-red`'s Vitest and TypeScript mechanics, say that under type stripping the red of a
+signature change is a type-check run, and name the command beside the test command.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
