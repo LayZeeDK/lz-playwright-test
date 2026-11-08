@@ -1,3 +1,4 @@
+export { builtInNames, removeBuiltIns } from './built-ins.ts';
 export {
   coreInstrument,
   corePackageJson,
