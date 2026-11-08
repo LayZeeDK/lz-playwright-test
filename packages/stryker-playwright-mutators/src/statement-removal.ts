@@ -1,6 +1,7 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
 import type { LzPlaywrightMutator } from './mutators.ts';
+import { navigationFixtures } from './settings.ts';
 
 export interface RemovalRow {
   readonly mutator: string;
@@ -63,7 +64,7 @@ export function removalMutator<const TName extends string>(
     name,
     sample,
     *mutate(path, t) {
-      const removal = removalOf(fieldOf(path, 'node'));
+      const removal = removalOf(path);
 
       if (removal?.mutator === name && !isTeardown(path)) {
         yield t.emptyStatement();
@@ -74,16 +75,24 @@ export function removalMutator<const TName extends string>(
 
 const rows: Readonly<Record<string, RemovalRow>> = statementRemovals;
 
-function removalOf(node: unknown): RemovalRow | undefined {
-  const method = awaitedMethod(node);
+function removalOf(path: unknown): RemovalRow | undefined {
+  const callee = fieldOf(awaitedCall(fieldOf(path, 'node')), 'callee');
+
+  if (fieldOf(callee, 'type') === 'Identifier') {
+    return isNavigationFixture(path, fieldOf(callee, 'name'))
+      ? row(navigation)
+      : undefined;
+  }
+
+  const method = awaitedMethod(callee);
 
   return typeof method === 'string' && Object.hasOwn(rows, method)
     ? rows[method]
     : undefined;
 }
 
-/** The last member of the callee, for an `await <call>;` statement. */
-function awaitedMethod(node: unknown): unknown {
+/** The call of an `await <call>;` statement. */
+function awaitedCall(node: unknown): unknown {
   if (fieldOf(node, 'type') !== 'ExpressionStatement') {
     return undefined;
   }
@@ -91,15 +100,14 @@ function awaitedMethod(node: unknown): unknown {
   const awaited = fieldOf(node, 'expression');
   const call = fieldOf(awaited, 'argument');
 
-  if (
-    fieldOf(awaited, 'type') !== 'AwaitExpression' ||
-    fieldOf(call, 'type') !== 'CallExpression'
-  ) {
-    return undefined;
-  }
+  return fieldOf(awaited, 'type') === 'AwaitExpression' &&
+    fieldOf(call, 'type') === 'CallExpression'
+    ? call
+    : undefined;
+}
 
-  const callee = fieldOf(call, 'callee');
-
+/** The last member of the callee, when it is a member of something that is not an input device. */
+function awaitedMethod(callee: unknown): unknown {
   return fieldOf(callee, 'type') === 'MemberExpression' &&
     fieldOf(callee, 'computed') === false &&
     !inputDevices.includes(
@@ -107,6 +115,84 @@ function awaitedMethod(node: unknown): unknown {
     )
     ? fieldOf(fieldOf(callee, 'property'), 'name')
     : undefined;
+}
+
+/** `name` is in the navigation fixture list and the test, hook or fixture function around `path` destructures it. */
+function isNavigationFixture(path: unknown, name: unknown): boolean {
+  if (typeof name !== 'string' || !navigationFixtures().includes(name)) {
+    return false;
+  }
+
+  for (
+    let current = fieldOf(path, 'parentPath');
+    current !== undefined && current !== null;
+    current = fieldOf(current, 'parentPath')
+  ) {
+    if (isFixtureFunction(current)) {
+      return destructures(fieldOf(fieldOf(current, 'node'), 'params'), name);
+    }
+  }
+
+  return false;
+}
+
+function destructures(params: unknown, name: string): boolean {
+  const pattern: unknown = Array.isArray(params) ? params[0] : undefined;
+  const properties = fieldOf(pattern, 'properties');
+
+  return (
+    fieldOf(pattern, 'type') === 'ObjectPattern' &&
+    Array.isArray(properties) &&
+    properties.some(
+      (property) => fieldOf(fieldOf(property, 'value'), 'name') === name,
+    )
+  );
+}
+
+/** A function that Playwright calls with fixtures: an argument of `test(...)` or `test.<x>(...)`, or a `test.extend` fixture. */
+function isFixtureFunction(path: unknown): boolean {
+  const owner = fieldOf(path, 'parent');
+  const ownerPath = fieldOf(path, 'parentPath');
+
+  if (!/Function|Method/.test(String(fieldOf(fieldOf(path, 'node'), 'type')))) {
+    return false;
+  }
+
+  if (fieldOf(owner, 'type') === 'CallExpression') {
+    return isTestCallee(fieldOf(owner, 'callee'));
+  }
+
+  const objectPath =
+    fieldOf(owner, 'type') === 'ObjectProperty'
+      ? fieldOf(ownerPath, 'parentPath')
+      : ownerPath;
+
+  return (
+    fieldOf(fieldOf(objectPath, 'node'), 'type') === 'ObjectExpression' &&
+    isExtendCall(fieldOf(objectPath, 'parent'))
+  );
+}
+
+function isTestCallee(callee: unknown): boolean {
+  const target =
+    fieldOf(callee, 'type') === 'MemberExpression'
+      ? fieldOf(callee, 'object')
+      : callee;
+
+  return (
+    fieldOf(target, 'type') === 'Identifier' &&
+    fieldOf(target, 'name') === 'test'
+  );
+}
+
+function isExtendCall(node: unknown): boolean {
+  const callee = fieldOf(node, 'callee');
+
+  return (
+    fieldOf(node, 'type') === 'CallExpression' &&
+    fieldOf(callee, 'type') === 'MemberExpression' &&
+    fieldOf(fieldOf(callee, 'property'), 'name') === 'extend'
+  );
 }
 
 function isTeardown(path: unknown): boolean {

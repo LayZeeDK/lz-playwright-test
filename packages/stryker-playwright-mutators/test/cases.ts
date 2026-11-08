@@ -176,6 +176,60 @@ export const cases: readonly Case[] = [
     expect: [[click, ';']],
   },
   {
+    id: 'navigate-test',
+    title: 'an awaited navigate from the fixtures of a test is removed',
+    source:
+      "test('case', async ({ navigate }) => {\n  await navigate('/');\n});",
+    expect: [[navigation, ';']],
+  },
+  {
+    id: 'navigate-hook',
+    title:
+      'an awaited navigate from the fixtures of test.beforeEach is removed',
+    source:
+      "test.beforeEach(async ({ navigate }) => {\n  await navigate('/');\n});",
+    expect: [[navigation, ';']],
+  },
+  {
+    id: 'navigate-fixture',
+    title: 'an awaited navigate from the fixtures of a fixture is removed',
+    source:
+      "const extended = test.extend<{ ready: boolean }>({\n  ready: async ({ navigate }, use) => {\n    await navigate('/');\n    await use(true);\n  },\n});",
+    expect: [[navigation, ';']],
+  },
+  {
+    id: 'navigate-fixture-method',
+    title: 'an awaited navigate in a fixture written as a method is removed',
+    source:
+      "const extended = test.extend<{ ready: boolean }>({\n  async ready({ navigate }, use) {\n    await navigate('/');\n    await use(true);\n  },\n});",
+    expect: [[navigation, ';']],
+  },
+  untouched(
+    'an awaited navigate from an import',
+    "import { navigate } from './navigate';\n\ntest('case', async ({ page }) => {\n  await navigate('/');\n});",
+    'navigate-imported',
+  ),
+  untouched(
+    'an awaited navigate that is a local const',
+    "test('case', async ({ page }) => {\n  const navigate = async (url: string) => page.goto(url);\n\n  await navigate('/');\n});",
+    'navigate-local',
+  ),
+  untouched(
+    'an awaited navigate that is no fixture of its test',
+    "test('case', async ({ page }) => {\n  await navigate('/');\n});",
+    'navigate-unbound',
+  ),
+  untouched(
+    'an awaited navigate in test.afterEach',
+    "test.afterEach(async ({ navigate }) => {\n  await navigate('/');\n});",
+    'navigate-afterEach',
+  ),
+  untouched(
+    'an awaited call to a fixture that is not in the list',
+    "test('case', async ({ visit }) => {\n  await visit('/');\n});",
+    'visit-default',
+  ),
+  {
     id: 'sibling-of-afterEach',
     title: 'a click in a test next to test.afterEach is removed',
     source: `test.afterEach(async () => {});\n${inTest("await page.locator('#a').click();")}`,
