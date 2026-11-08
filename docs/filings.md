@@ -516,6 +516,22 @@ about 9k tokens of skill text before any code, so on trivial steps the green and
 and a ruled list of 15 small reds did not fit one worker under a 150k-token cap. Step 6 chunk 1 took 24 cycles across
 four workers. Evidence: part b2 and part c reports, `step6-chunk1-cycles.log`.
 
+**O59. `lz-tpp` has no step for a green whose content is data or a message template.** In step 6 chunk P1 the green
+for "the negative sample makes a mutant of each of the 17 built-ins" was a source string found by experiment: the
+failure output named the built-ins still missing, and two edits closed it. No transformation ranks "find the text
+that makes these mutators fire", so the cycle log calls it `(constant -> constant)`. The start-line test pins a whole
+sentence, and the smallest pass is the whole template. Evidence: `step6-p1-notes.md`, commits ea2da5c and 3e86a22.
+
+**O60. A rejection test against a stub that resolves gives a red that names no value.** `assert.rejects` on a stub
+that returns reports only "Missing expected rejection". `lz-red` step 5 accepts a not-implemented throw as a valid red
+but does not say that, for a test of a rejection, a throwing stub reads better than one that resolves. Evidence:
+`step6-p1-notes.md`.
+
+**O61. The cost in O58 makes workers drop skill calls.** The P1 worker called all three skills in cycle 1 only and ran
+cycles 4 to 12 without a fresh call "to save context", then wrote three start-line tests in one edit. Several tests
+passed on their first run because the shared install function already did the work, and were logged as test-after.
+Evidence: `step6-p1-cycles.log`, `step6-p1-notes.md`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -700,6 +716,15 @@ pinned-string change.
 
 **S52 (from O58).** Offer a short form of each skill for repeat calls in the same cycle loop, or let one call cover
 the three steps of a trivial cycle.
+
+**S53 (from O59).** Name a data or template green in the reference list: the test's failure output drives the edits,
+and the cycle is recorded as such, not forced onto a transformation.
+
+**S54 (from O60).** In `lz-red` step 5, say that a test of a throw or a rejection gets a stub that throws a
+not-implemented error, so the red names what was expected.
+
+**S55 (from O61).** Let one skill call cover a run of cycles a test list fixes up front, with the transformation
+named per cycle in the log, so that skipping calls is no longer the cheaper path (see S52).
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
