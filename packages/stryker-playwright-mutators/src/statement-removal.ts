@@ -207,7 +207,7 @@ function isFixtureFunction(path: unknown): boolean {
   );
 }
 
-function isTestCallee(callee: unknown): boolean {
+export function isTestCallee(callee: unknown): boolean {
   const target =
     fieldOf(callee, 'type') === 'MemberExpression'
       ? fieldOf(callee, 'object')
