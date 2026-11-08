@@ -19,6 +19,129 @@ describe('selectMutators', () => {
     assert.deepEqual(select(undefined), sets.defaults);
   });
 
+  it('adds every opt-in mutator with extended, in roster order', () => {
+    assert.deepEqual(select({ extended: true }), [
+      ...sets.defaults,
+      ...sets.optIn,
+    ]);
+  });
+
+  it('adds an opt-in mutator turned on by its name', () => {
+    assert.deepEqual(select({ LzOptInB: true }), [
+      ...sets.defaults,
+      named('LzOptInB'),
+    ]);
+  });
+
+  it('rejects a value other than true', () => {
+    assert.throws(() => select({ LzOptInA: false }), {
+      message:
+        "@layzee/test-mutators: LzOptInA takes only true, not false; Stryker's mutator.excludedMutations turns " +
+        'mutators off.',
+    });
+  });
+
+  it('rejects an unknown name, listing the opt-in names', () => {
+    assert.throws(() => select({ LzOptInC: true }), {
+      message:
+        '@layzee/test-mutators: no opt-in mutator is named LzOptInC; the names are LzOptInA, LzOptInB.',
+    });
+  });
+
+  it("rejects a default mutator's name, as it runs by default", () => {
+    assert.throws(() => select({ LzDefaultA: true }), {
+      message:
+        '@layzee/test-mutators: no opt-in mutator is named LzDefaultA; it runs by default.',
+    });
+  });
+
+  it('adds every experimental mutator with experimental: true', () => {
+    assert.deepEqual(select({ experimental: true }), [
+      ...sets.defaults,
+      ...sets.experimental,
+    ]);
+  });
+
+  it('adds an experimental mutator turned on by its name inside experimental', () => {
+    assert.deepEqual(select({ experimental: { LzExperimentalB: true } }), [
+      ...sets.defaults,
+      named('LzExperimentalB'),
+    ]);
+  });
+
+  it('rejects an experimental name outside experimental', () => {
+    assert.throws(() => select({ LzExperimentalA: true }), {
+      message:
+        '@layzee/test-mutators: no opt-in mutator is named LzExperimentalA; it is experimental, so it goes inside ' +
+        'experimental.',
+    });
+  });
+
+  it('rejects an opt-in name inside experimental', () => {
+    assert.throws(() => select({ experimental: { LzOptInA: true } }), {
+      message:
+        '@layzee/test-mutators: no experimental mutator is named LzOptInA; it is opt-in, so it goes outside ' +
+        'experimental.',
+    });
+  });
+
+  it('rejects an unknown name inside experimental, listing the experimental names', () => {
+    assert.throws(() => select({ experimental: { LzExperimentalC: true } }), {
+      message:
+        '@layzee/test-mutators: no experimental mutator is named LzExperimentalC; the names are LzExperimentalA, ' +
+        'LzExperimentalB.',
+    });
+  });
+
+  it('rejects a value other than true inside experimental', () => {
+    assert.throws(() => select({ experimental: { LzExperimentalA: 1 } }), {
+      message:
+        "@layzee/test-mutators: experimental.LzExperimentalA takes only true, not 1; Stryker's " +
+        'mutator.excludedMutations turns mutators off.',
+    });
+  });
+
+  it('rejects experimental when the package has no experimental mutators', () => {
+    assert.throws(
+      () =>
+        selectMutators(
+          packageName,
+          installName,
+          { ...sets, experimental: [] },
+          { experimental: true },
+        ),
+      {
+        message:
+          '@layzee/test-mutators: the package has no experimental mutators yet, so lzTestMutators() takes no ' +
+          'experimental option.',
+      },
+    );
+  });
+
+  it('rejects extended when the package has no opt-in mutators', () => {
+    assert.throws(
+      () =>
+        selectMutators(
+          packageName,
+          installName,
+          { ...sets, optIn: [] },
+          { extended: true },
+        ),
+      {
+        message:
+          '@layzee/test-mutators: the package has no opt-in mutators yet, so lzTestMutators() takes no ' +
+          'extended option.',
+      },
+    );
+  });
+
+  it('rejects options that are not an object', () => {
+    assert.throws(() => select('extended'), {
+      message:
+        "@layzee/test-mutators: the options must be an object, not 'extended'.",
+    });
+  });
+
   describe('when the package has no opt-in or experimental mutators', () => {
     const defaultsOnly = { ...sets, optIn: [], experimental: [] };
     const noOptions =
