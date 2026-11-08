@@ -21,9 +21,11 @@ export {
 } from './instrumenter.ts';
 export {
   checkNames,
+  isSelfCheckFile,
   markOf,
   register,
   selfCheck,
+  selfCheckFile,
   warnUntested,
   type NamedMutator,
   type SampledMutator,

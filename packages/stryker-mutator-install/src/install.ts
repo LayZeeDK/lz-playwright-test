@@ -24,6 +24,17 @@ export function markOf(packageName: string): symbol {
   return Symbol.for(packageName);
 }
 
+const selfCheckSuffix = '.self-check.tsx';
+
+/** The name of the sample file the install checks instrument for `name`. */
+export function selfCheckFile(name: string): string {
+  return `${name}${selfCheckSuffix}`;
+}
+
+export function isSelfCheckFile(fileName: string): boolean {
+  return fileName.endsWith(selfCheckSuffix);
+}
+
 export function checkNames(
   packageName: string,
   mutators: readonly NamedMutator[],
@@ -91,10 +102,9 @@ export async function selfCheck(
     Pick<Instrumenter<unknown>, 'instrument'>,
   mutators: readonly SampledMutator[],
 ): Promise<void> {
-  const fileOf = (name: string): string => `${name}.self-check.tsx`;
   const mutants = await instrumenter.instrument(
     mutators.map(({ name, sample }) => ({
-      name: fileOf(name),
+      name: selfCheckFile(name),
       content: sample,
     })),
   );
@@ -104,7 +114,7 @@ export async function selfCheck(
       (name) =>
         !mutants.some(
           ({ fileName, mutatorName }) =>
-            fileName === fileOf(name) && mutatorName === name,
+            fileName === selfCheckFile(name) && mutatorName === name,
         ),
     );
 

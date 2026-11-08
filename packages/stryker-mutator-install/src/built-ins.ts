@@ -1,3 +1,4 @@
+import { selfCheckFile } from './install.ts';
 import type { Instrumenter, InstrumenterLocation } from './instrumenter.ts';
 
 export const builtInNames: readonly string[] = [
@@ -47,7 +48,7 @@ export async function checkBuiltInsRemoved(
     Pick<Instrumenter<unknown>, 'instrument'>,
 ): Promise<void> {
   const mutants = await instrumenter.instrument([
-    { name: 'built-ins.self-check.tsx', content: builtInSample },
+    { name: selfCheckFile('built-ins'), content: builtInSample },
   ]);
   const remaining = builtInNames.filter((name) =>
     mutants.some(({ mutatorName }) => mutatorName === name),
