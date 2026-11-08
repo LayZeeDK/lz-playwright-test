@@ -39,6 +39,7 @@ export function checkNames(
   }
 
   // Stryker's directives match mutator names ignoring case (directive-bookkeeper.ts:63, :73).
+  // Stryker disable next-line MethodExpression: names hold ASCII letters only, so upper-casing groups the same names
   const keyOf = (name: string): string => name.toLowerCase();
   const keys = names.map(keyOf);
   const ownMark = markOf(packageName);
@@ -78,7 +79,7 @@ export function register(
 
 export async function selfCheck(
   packageName: string,
-  instrumenter: Instrumenter<unknown>,
+  instrumenter: Pick<Instrumenter<unknown>, 'dir' | 'instrument' | 'version'>,
   mutators: readonly SampledMutator[],
 ): Promise<void> {
   const fileOf = (name: string): string => `${name}.self-check.tsx`;
@@ -110,7 +111,7 @@ export async function selfCheck(
 export function warnUntested(
   packageName: string,
   testedVersion: string,
-  instrumenter: Instrumenter<unknown>,
+  instrumenter: Pick<Instrumenter<unknown>, 'dir' | 'version'>,
   warn: (message: string) => void,
 ): void {
   if (instrumenter.version !== testedVersion) {

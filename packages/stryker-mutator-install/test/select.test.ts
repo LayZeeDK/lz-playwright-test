@@ -168,6 +168,34 @@ describe('selectMutators', () => {
     });
   });
 
+  it('selects an opt-in name when the package has no experimental mutators', () => {
+    assert.deepEqual(
+      selectMutators(
+        packageName,
+        installName,
+        { ...sets, experimental: [] },
+        { LzOptInA: true },
+      ),
+      [...sets.defaults, sets.optIn[0]],
+    );
+  });
+
+  it('rejects an object as the value of an opt-in name', () => {
+    assert.throws(() => select({ LzOptInA: { LzExperimentalA: true } }), {
+      message:
+        "@layzee/test-mutators: LzOptInA takes only true, not { LzExperimentalA: true }; Stryker's " +
+        'mutator.excludedMutations turns mutators off.',
+    });
+  });
+
+  it('rejects false as the value of experimental', () => {
+    assert.throws(() => select({ experimental: false }), {
+      message:
+        "@layzee/test-mutators: experimental takes only true, not false; Stryker's " +
+        'mutator.excludedMutations turns mutators off.',
+    });
+  });
+
   describe('when the package has no opt-in or experimental mutators', () => {
     const defaultsOnly = { ...sets, optIn: [], experimental: [] };
     const noOptions =
@@ -179,6 +207,24 @@ describe('selectMutators', () => {
         () =>
           selectMutators(packageName, installName, defaultsOnly, {
             extended: true,
+          }),
+        { message: noOptions },
+      );
+    });
+
+    it('selects the defaults when there are no options', () => {
+      assert.deepEqual(
+        selectMutators(packageName, installName, defaultsOnly, undefined),
+        sets.defaults,
+      );
+    });
+
+    it('rejects an options key next to one that holds undefined', () => {
+      assert.throws(
+        () =>
+          selectMutators(packageName, installName, defaultsOnly, {
+            extended: undefined,
+            LzOptInA: true,
           }),
         { message: noOptions },
       );

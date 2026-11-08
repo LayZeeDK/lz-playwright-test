@@ -56,6 +56,22 @@ describe('removeBuiltIns', () => {
     assert.deepEqual(allMutators, [unknown, marked]);
   });
 
+  it('warns about an entry whose symbol is registered under another scope', () => {
+    const foreign = {
+      ...listed('ForeignMutator'),
+      [Symbol.for('@other/mutators')]: 1,
+    };
+    const warnings: string[] = [];
+
+    removeBuiltIns(
+      packageName,
+      fakeInstrumenter([...builtInNames.map(listed), foreign]),
+      (message) => warnings.push(message),
+    );
+
+    assert.equal(warnings.length, 1);
+  });
+
   it('does not warn when none of the built-ins is present, as nothing is removed', () => {
     const warnings: string[] = [];
 

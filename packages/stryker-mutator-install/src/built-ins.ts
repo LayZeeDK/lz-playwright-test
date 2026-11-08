@@ -49,7 +49,9 @@ export function removeBuiltIns(
     }
   }
 
+  // Stryker disable next-line ArithmeticOperator: a start past the end only visits indexes that hold nothing
   for (let index = allMutators.length - 1; index >= 0; index--) {
+    // Stryker disable next-line StringLiteral: index is always in range, so the fallback only satisfies the index type
     if (builtInNames.includes(allMutators[index]?.name ?? '')) {
       allMutators.splice(index, 1);
     }
