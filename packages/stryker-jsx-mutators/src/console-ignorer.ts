@@ -1,7 +1,7 @@
+import { fieldOf } from '@layzee/stryker-mutator-install';
 import type { Ignorer } from '@stryker-mutator/api/ignore';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
-import { fieldOf } from './is-record.ts';
 import { packageName } from './package-name.ts';
 import { statementCallee } from './statement-call.ts';
 

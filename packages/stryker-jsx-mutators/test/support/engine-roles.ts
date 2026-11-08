@@ -2,8 +2,9 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
+import { fieldOf, isRecord } from '@layzee/stryker-mutator-install';
+
 import type { ImplicitRole, RoleTable } from '../../src/implicit-roles.ts';
-import { fieldOf, isRecord } from '../../src/is-record.ts';
 
 const require = createRequire(import.meta.url);
 

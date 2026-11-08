@@ -1,3 +1,4 @@
+import { fieldOf } from '@layzee/stryker-mutator-install';
 import type { MutantStatus, Position } from '@stryker-mutator/api/core';
 import type { Ignorer } from '@stryker-mutator/api/ignore';
 
@@ -6,7 +7,6 @@ import {
   type Instrumenter,
   type SourceFile,
 } from '../../src/install.ts';
-import { fieldOf } from '../../src/is-record.ts';
 import { packageName } from '../../src/package-name.ts';
 
 export interface InstrumentedMutant {

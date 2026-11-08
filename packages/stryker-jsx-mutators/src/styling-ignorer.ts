@@ -1,8 +1,9 @@
+import { fieldOf, isRecord } from '@layzee/stryker-mutator-install';
 import type { Ignorer } from '@stryker-mutator/api/ignore';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
-import { fieldOf, isRecord, typeOf } from './is-record.ts';
 import { packageName } from './package-name.ts';
+import { typeOf } from './type-of.ts';
 
 const classNamePattern = /^\S+$/;
 

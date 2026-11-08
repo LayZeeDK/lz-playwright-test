@@ -1,4 +1,6 @@
-import { fieldOf, typeOf } from './is-record.ts';
+import { fieldOf } from '@layzee/stryker-mutator-install';
+
+import { typeOf } from './type-of.ts';
 
 const callTypes: readonly unknown[] = [
   'CallExpression',
