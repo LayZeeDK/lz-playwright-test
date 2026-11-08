@@ -17,6 +17,9 @@
     },
     {
       "path": "./packages/stryker-mutator-install"
+    },
+    {
+      "path": "./packages/stryker-playwright-mutators"
     }
   ]
 }
