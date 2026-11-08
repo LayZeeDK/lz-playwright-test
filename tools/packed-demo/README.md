@@ -1,11 +1,11 @@
 # Packed demo: the demo app on the packed tarballs
 
 This folder holds what a scratch project outside the workspace needs to run the demo's e2e Stryker run with
-the JSX mutators on the two packed packages, with no workspace links. `docs/VERDICT.md` (Evidence) has the
+the JSX mutators on the three packed packages, with no workspace links. `docs/VERDICT.md` (Evidence) has the
 result. The configs are plain JavaScript versions of the demo's Vite, Playwright and `stryker.e2e.ui.config.ts`
 settings, without Nx.
 
-From the repo root, with `<scratch>` the absolute path of a new folder outside the repo (the two `npm pack`
+From the repo root, with `<scratch>` the absolute path of a new folder outside the repo (the three `npm pack`
 lines run from a package folder). The `rm` line drops the story file, which belongs to the component tests
 that this project does not run.
 
@@ -18,10 +18,11 @@ rm <scratch>/app/src/app/price-tag.story.tsx
 cp apps/demo-app-e2e/src/*.spec.ts <scratch>/e2e/
 (cd packages/stryker-playwright-runner && npm pack --pack-destination <scratch>/tarballs)
 (cd packages/stryker-jsx-mutators && npm pack --pack-destination <scratch>/tarballs)
+(cd packages/stryker-mutator-install && npm pack --pack-destination <scratch>/tarballs)
 cd <scratch>
 npm install --ignore-scripts
 npx playwright install chromium
-node --no-experimental-strip-types --input-type=module -e "await import('@layzee/stryker-playwright-runner'); await import('@layzee/stryker-jsx-mutators')"
+node --no-experimental-strip-types --input-type=module -e "await import('@layzee/stryker-playwright-runner'); await import('@layzee/stryker-jsx-mutators'); await import('@layzee/stryker-mutator-install')"
 npx playwright test
 npx stryker run stryker.config.mjs
 ```
@@ -31,7 +32,7 @@ during the install. The project has no lockfile, so transitive dependencies reso
 with one, npm would take each tarball's contents from its cache by the recorded integrity and install the
 old package after a repack.
 
-The `node` line imports both packages with type stripping turned off, so it fails if anything in them is
+The `node` line imports all three packages with type stripping turned off, so it fails if anything in them is
 TypeScript. The dev server listens on 127.0.0.1, on port 4500 outside Stryker and 4600 plus the worker number
 under it.
 

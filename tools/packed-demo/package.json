@@ -10,6 +10,7 @@
   "devDependencies": {
     "@layzee/stryker-playwright-runner": "file:tarballs/layzee-stryker-playwright-runner-0.0.0.tgz",
     "@layzee/stryker-jsx-mutators": "file:tarballs/layzee-stryker-jsx-mutators-0.0.0.tgz",
+    "@layzee/stryker-mutator-install": "file:tarballs/layzee-stryker-mutator-install-0.0.0.tgz",
     "@playwright/test": "1.64.1",
     "@stryker-mutator/core": "10.1.1",
     "@vitejs/plugin-react": "6.1.2",
