@@ -77,7 +77,7 @@ export function selectMutators<TMutator extends NamedMutator>(
     if (tier !== expected) {
       const hint =
         tier === undefined
-          ? `the names are ${sets[expected].map((mutator) => mutator.name).join(', ')}`
+          ? `the names are ${sets[expected].map((mutator) => mutator.name).join(', ') || 'none'}`
           : whereTiersGo[tier];
 
       throw new Error(
@@ -95,7 +95,7 @@ export function selectMutators<TMutator extends NamedMutator>(
     }
   };
 
-  if (options !== undefined && !isRecord(options)) {
+  if (options !== undefined && (!isRecord(options) || Array.isArray(options))) {
     throw new Error(
       `${packageName}: the options must be an object, not ${inspect(options)}.`,
     );

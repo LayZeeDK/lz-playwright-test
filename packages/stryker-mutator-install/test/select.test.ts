@@ -142,6 +142,32 @@ describe('selectMutators', () => {
     });
   });
 
+  it('lists none when an opt-in name is given and the package has no opt-in mutators', () => {
+    assert.throws(
+      () =>
+        selectMutators(
+          packageName,
+          installName,
+          { ...sets, optIn: [] },
+          { LzOptInA: true },
+        ),
+      {
+        message:
+          '@layzee/test-mutators: no opt-in mutator is named LzOptInA; the names are none.',
+      },
+    );
+  });
+
+  it('rejects an array as the options', () => {
+    assert.throws(() => select(['extended']), {
+      message:
+        "@layzee/test-mutators: the options must be an object, not [ 'extended' ].",
+    });
+    assert.throws(() => select([]), {
+      message: '@layzee/test-mutators: the options must be an object, not [].',
+    });
+  });
+
   describe('when the package has no opt-in or experimental mutators', () => {
     const defaultsOnly = { ...sets, optIn: [], experimental: [] };
     const noOptions =
