@@ -6,9 +6,10 @@ import { isNamedReceiver } from './statement-removal.ts';
 
 /** The methods that send a GET or HEAD request; `fetch` sends a GET unless it has a method option. */
 const getMethods: readonly unknown[] = ['get', 'head', 'fetch'];
-const absolute = /^([a-z][a-z0-9+.-]*:|\/\/)/i;
+// The URL parser reads any two of `/` and `\` at the start of a URL as the start of a host.
+const absolute = /^([a-z][a-z0-9+.-]*:|[\\/]{2})/i;
 const localHost =
-  /^(https?:)?\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])([:/?#]|$)/i;
+  /^(https?:)?[\\/]{2}(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])([:/?#]|$)/i;
 
 /** An absolute URL to a host other than this machine: emptying it would leave the service under test. */
 function isThirdParty(url: string): boolean {
@@ -48,13 +49,14 @@ function isCandidate(node: unknown): boolean {
 function isReadUrlArgument(path: unknown): boolean {
   const call = fieldOf(path, 'parent');
   const callee = fieldOf(call, 'callee');
+  const method = fieldOf(fieldOf(callee, 'property'), 'name');
 
   return (
     fieldOf(path, 'listKey') === 'arguments' &&
     fieldOf(path, 'key') === 0 &&
     isRequestReceiver(path, fieldOf(callee, 'object')) &&
-    getMethods.includes(fieldOf(fieldOf(callee, 'property'), 'name')) &&
-    !hasMethodOption(call) &&
+    getMethods.includes(method) &&
+    !(method === 'fetch' && hasMethodOption(call)) &&
     resultIsRead(fieldOf(path, 'parentPath'))
   );
 }
@@ -142,8 +144,11 @@ function resultIsRead(callPath: unknown): boolean {
   const user = fieldOf(userPath, 'node');
   const type = fieldOf(user, 'type');
   const target = fieldOf(user, type === 'AssignmentExpression' ? 'left' : 'id');
+  const assignmentIsRead =
+    type === 'AssignmentExpression' &&
+    fieldOf(fieldOf(userPath, 'parent'), 'type') !== 'ExpressionStatement';
 
-  if (fieldOf(target, 'type') === 'Identifier') {
+  if (fieldOf(target, 'type') === 'Identifier' && !assignmentIsRead) {
     const references = fieldOf(
       bindingOf(userPath, fieldOf(target, 'name')),
       'referencePaths',
@@ -188,7 +193,8 @@ function bindingOf(path: unknown, name: unknown): unknown {
     : undefined;
 }
 
-/** The options argument names a method, or may: it is no object literal, or it holds a spread. */
+/** The options argument names a method, or may: it is no object literal, or it holds a spread. `get` and `head` set
+ * their own method over any option, so only `fetch` asks. */
 function hasMethodOption(call: unknown): boolean {
   const args = fieldOf(call, 'arguments');
   const options: unknown = Array.isArray(args) ? args[1] : undefined;

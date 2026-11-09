@@ -123,6 +123,13 @@ export const routeMockCases: readonly Case[] = [
     expect: [],
   },
   {
+    id: 'fulfill-computed-response-key',
+    title:
+      'a computed key named response is not the response option, so the status still becomes 200',
+    source: inRoute('await route.fulfill({ [response]: 1, status: 404 });'),
+    expect: [[fulfill, '200']],
+  },
+  {
     id: 'fulfill-non-object',
     title: 'a fulfill whose argument is not an object literal makes no mutant',
     source: inRoute('await route.fulfill(options);'),
