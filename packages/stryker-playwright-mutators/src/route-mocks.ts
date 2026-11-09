@@ -103,7 +103,6 @@ function isInHandlerOf(path: unknown, route: string): boolean {
   const first = paramsOf(handlerPath)[0];
 
   return (
-    handlerPath !== undefined &&
     fieldOf(first, 'name') === route &&
     (isRouteAnnotated(first) ||
       isRouteCallback(
