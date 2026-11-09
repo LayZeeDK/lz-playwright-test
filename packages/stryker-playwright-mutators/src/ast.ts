@@ -17,7 +17,7 @@ const typeWrappers: readonly unknown[] = [
 ];
 
 /** `<x> satisfies <T>`, `<x>!` or `<T><x>`. */
-export function isTypeWrapper(node: unknown): boolean {
+function isTypeWrapper(node: unknown): boolean {
   return typeWrappers.includes(fieldOf(node, 'type'));
 }
 
