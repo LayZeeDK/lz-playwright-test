@@ -126,6 +126,7 @@ describe('lz-console', () => {
     [
       ['an update', 'console.log(count++);'],
       ['a call', 'console.log(queue.shift());'],
+      ['an arrow function', "console.log(() => (on ? 'a' : 'b'));"],
       [
         'a function expression',
         "console.log(function () { return on ? 'a' : 'b'; });",
