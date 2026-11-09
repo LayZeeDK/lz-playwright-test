@@ -10,10 +10,11 @@ const instrumenter = resolveFromCore();
 export async function ignorerOutcomes(
   ignorer: Ignorer,
   code: string,
+  name = 'a.tsx',
 ): Promise<string[]> {
   const { mutants } = await instrumentFully(
     await instrumenter,
-    [{ name: 'a.tsx', content: code }],
+    [{ name, content: code }],
     [],
     [ignorer],
   );
@@ -27,8 +28,9 @@ export async function assertEveryOutcome(
   ignorer: Ignorer,
   code: string,
   outcome: string,
+  name?: string,
 ): Promise<void> {
-  const found = await ignorerOutcomes(ignorer, code);
+  const found = await ignorerOutcomes(ignorer, code, name);
 
   assert.ok(found.length > 0, `no mutants in ${code}`);
   assert.deepEqual(new Set(found), new Set([outcome]), code);

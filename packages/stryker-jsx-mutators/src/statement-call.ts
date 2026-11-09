@@ -14,6 +14,7 @@ const effectTypes: readonly unknown[] = [
   'AwaitExpression',
   'ClassMethod',
   'ClassPrivateMethod',
+  'Decorator',
   'FunctionExpression',
   'ImportExpression',
   'NewExpression',
@@ -22,6 +23,8 @@ const effectTypes: readonly unknown[] = [
   'UpdateExpression',
   'YieldExpression',
 ];
+
+const effectOperators: readonly unknown[] = ['delete', 'throw', '|>'];
 
 export function hideableCallee(node: unknown): string | undefined {
   if (typeOf(node) !== 'ExpressionStatement') {
@@ -48,7 +51,7 @@ export function hideableCallee(node: unknown): string | undefined {
 function holdsEffect(node: unknown): boolean {
   return (
     effectTypes.includes(typeOf(node)) ||
-    fieldOf(node, 'operator') === 'delete' ||
+    effectOperators.includes(fieldOf(node, 'operator')) ||
     (isRecord(node) && Object.values(node).some(holdsEffect))
   );
 }

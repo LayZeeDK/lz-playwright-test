@@ -153,10 +153,25 @@ describe('lz-console', () => {
       ],
       ['a delete', "console.log(delete cache[on ? 'a' : 'b']);"],
       ['a dynamic import', "console.log(import(on ? './a' : './b'));"],
+      [
+        'a decorated class',
+        "console.log(@track class { mode = on ? 'a' : 'b'; });",
+      ],
     ] as const
   ).forEach(([effect, code]) => {
     it(`keeps the mutants of a console.log statement whose argument holds ${effect}, as removing the statement changes what the page does`, async () => {
       await assertEvery(code, 'placed');
+    });
+  });
+
+  (
+    [
+      ['a pipeline', "console.log((on ? 'a' : 'b') |> format);"],
+      ['a throw expression', "console.log(throw (on ? 'a' : 'b'));"],
+    ] as const
+  ).forEach(([effect, code]) => {
+    it(`keeps the mutants of a console.log statement in a .jsx file whose argument holds ${effect}`, async () => {
+      await assertEveryOutcome(consoleIgnorer({}), code, 'placed', 'a.jsx');
     });
   });
 
