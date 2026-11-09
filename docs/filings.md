@@ -609,6 +609,30 @@ test-after pins; four cycles drove new behaviour. The last green took the protot
 step, because the prototype, not the transformation list, decided how much of the rule to write. Evidence:
 `step6-c8a-notes.md`.
 
+**O76. A green can force an edit to an earlier test's expectation.** In chunk 8b the case runner compares every
+mutant of a file. When the second mutator went green, an existing row that expected no URL mutant (`data-method-get`)
+now had one, and the green had to change that row as well. `lz-tpp` says to apply only the one transformation; it
+does not say what to do when a correct green changes what an older test must expect. Evidence: `step6-c8b-notes.md`,
+cycle U1.
+
+**O77. Widening a guard with an alternative has no transformation (lz-tpp misfit).** For "a template that starts
+with an expression is a site", the smallest change was a disjunction added to the emptiness check
+(`text !== '' || hasExpressions`). None of the 14 transformations names it. The worker logged it as
+`(unconditional -> if)`, which describes the first guard, not this change. Evidence: `step6-c8b-notes.md`, cycle U14.
+
+**O78. A second kind of site arrives as one large step (lz-tpp misfit).** The rule that a `for...of` loop over an array
+literal makes its elements sites is a new kind of site, not a generalisation of the first. It arrived as one
+`(expression -> function)` with four structural checks. One red per check would have needed code that no other test
+asks for, so the stop conditions became test-after pins, and one check that no pin could tell apart was deleted. The
+transformation list offers no smaller step for adding a second, parallel rule. Evidence: `step6-c8b-notes.md`, cycle
+U15.
+
+**O79. One red can need two transformations in two functions.** In the 8b fix round, the row for an optional clock
+receiver stayed red after the receiver check was widened: the awaited-call and awaited-method checks also rejected
+optional nodes. `lz-tpp` picks one transformation per red and does not say what to do when a rerun shows the same test
+failing for a second, unrelated reason. The worker applied a second transformation and logged both. Evidence:
+`step6-c8b-fix-notes.md`, cycle 1.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -847,6 +871,21 @@ and inputs the rest of the code already rejects are pins.
 **S69 (from O75).** Add a "port" route to `lz-red` and `lz-tpp`: when a reference implementation exists, write its
 documented limits as a pinned table, drive only the behaviour the target does not yet have, and say that the
 reference decides the size of each green.
+
+**S70 (from O76).** In `lz-tpp`'s green step, allow one named exception: when the test harness compares a whole output
+(every mutant, every event), an earlier test's expectation may change with the green, and the cycle log names that
+row and why.
+
+**S71 (from O77).** Add `(condition -> disjunction)` to the TypeScript overlay: widen an existing guard with an
+alternative, ranked just below `(unconditional -> if)`.
+
+**S72 (from O78).** In the impasse check, add the case of a second, parallel rule: write its positive red, take
+`(expression -> function)` for it, and pin its stop conditions in the same cycle. Do not invent reds that need code
+no other test asks for.
+
+**S73 (from O79).** In `lz-tpp`'s procedure, add a rerun step: after the chosen transformation, run the red test again.
+When it still fails for a new reason, name that reason, pick the next transformation for it, and log both under the
+same cycle.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
