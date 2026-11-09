@@ -1,6 +1,7 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
 import type { LzPlaywrightMutator } from './mutators.ts';
+import { callTypes, memberTypes } from './same-file-swap.ts';
 import { navigationFixtures } from './settings.ts';
 
 export interface RemovalRow {
@@ -133,11 +134,11 @@ function removalOf(path: unknown): RemovalRow | undefined {
     : found;
 }
 
-/** `<name>` or `<x>.<name>`. */
+/** `<name>`, `<x>.<name>` or `<x>?.<name>`. */
 export function isNamedReceiver(node: unknown, name: string): boolean {
   return (
     fieldOf(node, 'name') === name ||
-    (fieldOf(node, 'type') === 'MemberExpression' &&
+    (memberTypes.includes(fieldOf(node, 'type')) &&
       fieldOf(node, 'computed') === false &&
       fieldOf(fieldOf(node, 'property'), 'name') === name)
   );
@@ -153,7 +154,7 @@ function awaitedCall(node: unknown): unknown {
   const call = fieldOf(awaited, 'argument');
 
   return fieldOf(awaited, 'type') === 'AwaitExpression' &&
-    fieldOf(call, 'type') === 'CallExpression'
+    callTypes.includes(fieldOf(call, 'type'))
     ? call
     : undefined;
 }
@@ -162,7 +163,7 @@ function awaitedCall(node: unknown): unknown {
 function awaitedMethod(callee: unknown): unknown {
   const object = fieldOf(callee, 'object');
 
-  return fieldOf(callee, 'type') === 'MemberExpression' &&
+  return memberTypes.includes(fieldOf(callee, 'type')) &&
     fieldOf(callee, 'computed') === false &&
     !inputDevices.includes(fieldOf(fieldOf(object, 'property'), 'name')) &&
     !testRunners.includes(fieldOf(object, 'name'))

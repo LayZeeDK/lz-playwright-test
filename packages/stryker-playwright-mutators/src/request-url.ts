@@ -6,9 +6,9 @@ import { isNamedReceiver } from './statement-removal.ts';
 
 /** The methods that send a GET or HEAD request; `fetch` sends a GET unless it has a method option. */
 const getMethods: readonly unknown[] = ['get', 'head', 'fetch'];
-const absolute = /^[a-z][a-z0-9+.-]*:/i;
+const absolute = /^([a-z][a-z0-9+.-]*:|\/\/)/i;
 const localHost =
-  /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])([:/?#]|$)/i;
+  /^(https?:)?\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])([:/?#]|$)/i;
 
 /** An absolute URL to a host other than this machine: emptying it would leave the service under test. */
 function isThirdParty(url: string): boolean {
@@ -140,14 +140,12 @@ function resultIsRead(callPath: unknown): boolean {
       ? fieldOf(parentPath, 'parentPath')
       : parentPath;
   const user = fieldOf(userPath, 'node');
-  const id = fieldOf(user, 'id');
+  const type = fieldOf(user, 'type');
+  const target = fieldOf(user, type === 'AssignmentExpression' ? 'left' : 'id');
 
-  if (
-    fieldOf(user, 'type') === 'VariableDeclarator' &&
-    fieldOf(id, 'type') === 'Identifier'
-  ) {
+  if (fieldOf(target, 'type') === 'Identifier') {
     const references = fieldOf(
-      bindingOf(userPath, fieldOf(id, 'name')),
+      bindingOf(userPath, fieldOf(target, 'name')),
       'referencePaths',
     );
 
@@ -157,7 +155,10 @@ function resultIsRead(callPath: unknown): boolean {
     );
   }
 
-  return fieldOf(user, 'type') !== 'ExpressionStatement';
+  return (
+    type !== 'ExpressionStatement' &&
+    !(type === 'UnaryExpression' && fieldOf(user, 'operator') === 'void')
+  );
 }
 
 /** Some call around `path` is `console.<x>(...)`. */
@@ -187,8 +188,22 @@ function bindingOf(path: unknown, name: unknown): unknown {
     : undefined;
 }
 
+/** The options argument names a method, or may: it is no object literal, or it holds a spread. */
 function hasMethodOption(call: unknown): boolean {
   const args = fieldOf(call, 'arguments');
+  const options: unknown = Array.isArray(args) ? args[1] : undefined;
 
-  return hasProperty(Array.isArray(args) ? args[1] : undefined, 'method');
+  if (options === undefined) {
+    return false;
+  }
+
+  const properties = fieldOf(options, 'properties');
+
+  return (
+    !Array.isArray(properties) ||
+    properties.some(
+      (property) => fieldOf(property, 'type') === 'SpreadElement',
+    ) ||
+    hasProperty(options, 'method')
+  );
 }

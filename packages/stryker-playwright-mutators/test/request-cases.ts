@@ -36,6 +36,13 @@ const dataMethods: readonly (readonly [string, Case['expect']])[] = [
   ['head', [[url, '""']]],
 ];
 
+// [id, options]: options that may name a method.
+const fetchOptions: readonly (readonly [string, string])[] = [
+  ['quoted-method', "{ 'method': 'POST' }"],
+  ['spread', '{ ...options }'],
+  ['variable', 'options'],
+];
+
 export const requestCases: readonly Case[] = [
   ...['form', 'params'].map(
     (key): Case => ({
@@ -76,6 +83,12 @@ export const requestCases: readonly Case[] = [
     id: 'data-page-request',
     title: 'a string in the data of a call on page.request gets the suffix x',
     source: readResult("page.request.post('/a', { data: { name: 'n' } })"),
+    expect: [[data, '"nx"']],
+  },
+  {
+    id: 'data-optional-page-request',
+    title: 'a string in the data of a call on page?.request gets the suffix x',
+    source: readResult("page?.request.post('/a', { data: { name: 'n' } })"),
     expect: [[data, '"nx"']],
   },
   {
@@ -187,6 +200,14 @@ export const requestCases: readonly Case[] = [
     source: readResult("request.fetch('/a', { method: 'POST' })"),
     expect: [],
   },
+  ...fetchOptions.map(
+    ([id, options]): Case => ({
+      id: `url-fetch-${id}`,
+      title: `the URL of a request.fetch with the options ${options} makes no mutant`,
+      source: readResult(`request.fetch('/a', ${options})`),
+      expect: [],
+    }),
+  ),
   {
     id: 'url-discarded',
     title:
@@ -199,6 +220,28 @@ export const requestCases: readonly Case[] = [
     title:
       'the URL of a request.get whose stored result is never read makes no mutant',
     source: inTest("const unread = await request.get('/a');"),
+    expect: [],
+  },
+  {
+    id: 'url-assigned-unread',
+    title:
+      'the URL of a request.get whose result is assigned and never read makes no mutant',
+    source: inTest("let unread;\n  unread = await request.get('/a');"),
+    expect: [],
+  },
+  {
+    id: 'url-assigned-read',
+    title:
+      'the URL of a request.get whose result is assigned and then read becomes empty',
+    source: inTest(
+      "let response;\n  response = await request.get('/a');\n\n  expect(response.ok()).toBe(true);",
+    ),
+    expect: [[url, '""']],
+  },
+  {
+    id: 'url-void',
+    title: 'the URL of a request.get under void makes no mutant',
+    source: inTest("void request.get('/a');"),
     expect: [],
   },
   {
@@ -220,6 +263,12 @@ export const requestCases: readonly Case[] = [
     id: 'url-page-request',
     title: 'the URL of a page.request.get whose result is read becomes empty',
     source: readResult("page.request.get('/a')"),
+    expect: [[url, '""']],
+  },
+  {
+    id: 'url-optional-page-request',
+    title: 'the URL of a page?.request.get whose result is read becomes empty',
+    source: readResult("page?.request.get('/a')"),
     expect: [[url, '""']],
   },
   {
@@ -254,6 +303,20 @@ export const requestCases: readonly Case[] = [
     title: 'the URL of a request.get to a third-party host makes no mutant',
     source: readResult("request.get('https://api.github.com/x')"),
     expect: [],
+  },
+  {
+    id: 'url-protocol-relative-third-party',
+    title:
+      'the protocol-relative URL of a request.get to a third-party host makes no mutant',
+    source: readResult("request.get('//cdn.example.com/x')"),
+    expect: [],
+  },
+  {
+    id: 'url-protocol-relative-local',
+    title:
+      'the protocol-relative URL of a request.get to localhost becomes empty',
+    source: readResult("request.get('//localhost:3000/x')"),
+    expect: [[url, '""']],
   },
   ...['localhost:3000/y', '127.0.0.1/y', '0.0.0.0:80', '[::1]:3000/y'].map(
     (host): Case => ({

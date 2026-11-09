@@ -111,11 +111,11 @@ function callsOf(program: object): readonly unknown[] {
   return calls;
 }
 
-const callTypes: readonly unknown[] = [
+export const callTypes: readonly unknown[] = [
   'CallExpression',
   'OptionalCallExpression',
 ];
-const memberTypes: readonly unknown[] = [
+export const memberTypes: readonly unknown[] = [
   'MemberExpression',
   'OptionalMemberExpression',
 ];
