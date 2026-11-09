@@ -1,6 +1,6 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
-import { isNamedReceiver, propertyNameOf } from './ast.ts';
+import { isNamedReceiver, methodOf } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 
 const payloadKeys: readonly unknown[] = ['data', 'form', 'params'];
@@ -83,6 +83,6 @@ function isPayloadCall(call: unknown): boolean {
 
   return (
     isNamedReceiver(fieldOf(callee, 'object'), 'request') &&
-    payloadMethods.includes(propertyNameOf(callee))
+    payloadMethods.includes(methodOf(callee))
   );
 }

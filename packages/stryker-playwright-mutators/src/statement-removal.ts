@@ -7,7 +7,6 @@ import {
   isNamedReceiver,
   isTestCallee,
   methodOf,
-  propertyNameOf,
 } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 import { navigationFixtures } from './settings.ts';
@@ -174,7 +173,7 @@ function awaitedCall(node: unknown): unknown {
 function awaitedMethod(callee: unknown): unknown {
   const object = fieldOf(callee, 'object');
 
-  return !inputDevices.includes(propertyNameOf(object)) &&
+  return !inputDevices.includes(methodOf(object)) &&
     !testRunners.includes(fieldOf(object, 'name'))
     ? methodOf(callee)
     : undefined;
@@ -236,7 +235,7 @@ function isExtendCall(node: unknown): boolean {
   return (
     fieldOf(node, 'type') === 'CallExpression' &&
     fieldOf(callee, 'type') === 'MemberExpression' &&
-    propertyNameOf(callee) === 'extend'
+    methodOf(callee) === 'extend'
   );
 }
 
@@ -261,7 +260,7 @@ function isHookCall(node: unknown, hooks: readonly unknown[]): boolean {
   return (
     fieldOf(node, 'type') === 'CallExpression' &&
     fieldOf(callee, 'type') === 'MemberExpression' &&
-    hooks.includes(propertyNameOf(callee))
+    hooks.includes(methodOf(callee))
   );
 }
 

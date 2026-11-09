@@ -462,6 +462,29 @@ export const requestCases: readonly Case[] = [
     expect: [],
   },
   {
+    id: 'data-computed-method',
+    title:
+      'a string in the data of a request method read through a computed member makes no mutant',
+    source: readResult("request[post]('/a', { data: { name: 'n' } })"),
+    expect: [],
+  },
+  {
+    id: 'url-computed-method',
+    title:
+      'the URL of a request method read through a computed member makes no mutant',
+    source: readResult("request[get]('/a')"),
+    expect: [],
+  },
+  {
+    id: 'url-new-context-computed',
+    title:
+      'the URL of a head on a context from a newContext read through a computed member makes no mutant',
+    source: inTest(
+      "let context;\n  context = await request[newContext]();\n  const response = await context.head('/a');\n\n  expect(response.ok()).toBe(true);",
+    ),
+    expect: [],
+  },
+  {
     id: 'url-goto',
     title: 'the URL of page.goto makes no RequestUrl mutant',
     source: inTest("await page.goto('/goto');"),

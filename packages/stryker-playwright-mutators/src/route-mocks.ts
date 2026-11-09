@@ -5,7 +5,7 @@ import {
   argumentOf,
   callTypes,
   hasProperty,
-  propertyNameOf,
+  methodOf,
 } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 
@@ -64,7 +64,7 @@ export function outcomeMutator<const TName extends string>(
       const node = fieldOf(path, 'node');
       const callee = fieldOf(node, 'callee');
       const route = fieldOf(fieldOf(callee, 'object'), 'name');
-      const method = propertyNameOf(callee);
+      const method = methodOf(callee);
       const flipped =
         typeof method === 'string' && Object.hasOwn(outcomeFlips, method)
           ? outcomeFlips[method]
@@ -114,7 +114,7 @@ function paramsOf(functionPath: unknown): readonly unknown[] {
 function isRouteCallback(call: unknown, handler: unknown): boolean {
   return (
     argumentOf(call, 1) === handler &&
-    propertyNameOf(fieldOf(call, 'callee')) === 'route'
+    methodOf(fieldOf(call, 'callee')) === 'route'
   );
 }
 
@@ -174,6 +174,6 @@ function isFulfillOption(path: unknown, key: string): boolean {
     fieldOf(object, 'type') === 'ObjectExpression' &&
     !hasProperty(object, 'response') &&
     fieldOf(call, 'type') === 'CallExpression' &&
-    propertyNameOf(fieldOf(call, 'callee')) === 'fulfill'
+    methodOf(fieldOf(call, 'callee')) === 'fulfill'
   );
 }

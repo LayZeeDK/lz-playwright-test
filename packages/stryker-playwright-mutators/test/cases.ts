@@ -317,6 +317,26 @@ export const cases: readonly Case[] = [
     expect: [[click, ';']],
   },
   {
+    id: 'keyboard-computed',
+    title:
+      'a press on a keyboard read through a computed member is removed: the name of a computed member is unknown',
+    source: inTest("await page[keyboard].press('Enter');"),
+    expect: [[input, ';']],
+  },
+  untouched(
+    'an awaited navigate in a fixture of an extend read through a computed member',
+    "const extended = test[extend]<{ ready: boolean }>({\n  ready: async ({ navigate }, use) => {\n    await navigate('/');\n    await use(true);\n  },\n});",
+    'navigate-computed-extend',
+  ),
+  {
+    id: 'afterEach-computed',
+    title:
+      'a click in a hook read through a computed member is removed: it is no known teardown hook',
+    source:
+      "test[afterEach](async ({ page }) => {\n  await page.locator('#a').click();\n});",
+    expect: [[click, ';']],
+  },
+  {
     id: 'sibling-of-afterEach',
     title: 'a click in a test next to test.afterEach is removed',
     source: `test.afterEach(async () => {});\n${inTest("await page.locator('#a').click();")}`,

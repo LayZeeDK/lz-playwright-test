@@ -6,7 +6,7 @@ import {
   bindingOf,
   hasProperty,
   isNamedReceiver,
-  propertyNameOf,
+  methodOf,
 } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 
@@ -55,7 +55,7 @@ function isCandidate(node: unknown): boolean {
 function isReadUrlArgument(path: unknown): boolean {
   const call = fieldOf(path, 'parent');
   const callee = fieldOf(call, 'callee');
-  const method = propertyNameOf(callee);
+  const method = methodOf(callee);
 
   return (
     fieldOf(path, 'listKey') === 'arguments' &&
@@ -136,7 +136,7 @@ function isNewContextCall(node: unknown): boolean {
   const callee = fieldOf(call, 'callee');
 
   return (
-    propertyNameOf(callee) === 'newContext' &&
+    methodOf(callee) === 'newContext' &&
     isNamedReceiver(fieldOf(callee, 'object'), 'request')
   );
 }

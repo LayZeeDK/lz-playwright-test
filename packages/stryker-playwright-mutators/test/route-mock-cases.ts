@@ -244,6 +244,26 @@ export const routeMockCases: readonly Case[] = [
     expect: [[outcome, 'route.continue()']],
   },
   {
+    id: 'abort-computed-member',
+    title: 'an abort read through a computed member makes no mutant',
+    source: inRoute('await route[abort]();'),
+    expect: [],
+  },
+  {
+    id: 'abort-computed-route-method',
+    title:
+      'an abort in a callback of a route method read through a computed member makes no mutant',
+    source:
+      "test('case', async ({ page }) => {\n  await page[route]('**/api', (route) => route.abort());\n});",
+    expect: [],
+  },
+  {
+    id: 'fulfill-computed-member',
+    title: 'a fulfill read through a computed member makes no mutant',
+    source: inRoute('await route[fulfill]({ status: 404 });'),
+    expect: [],
+  },
+  {
     id: 'fallback-expression-body',
     title: 'a fallback as the expression body of a handler becomes an abort',
     source:
