@@ -208,6 +208,16 @@ export const requestCases: readonly Case[] = [
       expect: [],
     }),
   ),
+  ...['get', 'head'].flatMap((method) =>
+    fetchOptions.map(
+      ([id, options]): Case => ({
+        id: `url-${method}-${id}`,
+        title: `the URL of a request.${method} with the options ${options} becomes empty: ${method} sets its own method`,
+        source: readResult(`request.${method}('/a', ${options})`),
+        expect: [[url, '""']],
+      }),
+    ),
+  ),
   {
     id: 'url-discarded',
     title:
@@ -238,6 +248,22 @@ export const requestCases: readonly Case[] = [
     ),
     expect: [[url, '""']],
   },
+  ...(
+    [
+      [
+        'expect',
+        "expect((response = await request.get('/a')).ok()).toBe(true);",
+      ],
+      ['condition', "if ((response = await request.get('/a'))) {\n  }"],
+    ] as const
+  ).map(
+    ([id, statement]): Case => ({
+      id: `url-assignment-read-${id}`,
+      title: `the URL of a request.get whose assignment is read in an ${id} becomes empty`,
+      source: inTest(`let response;\n  ${statement}`),
+      expect: [[url, '""']],
+    }),
+  ),
   {
     id: 'url-void',
     title: 'the URL of a request.get under void makes no mutant',
@@ -309,6 +335,13 @@ export const requestCases: readonly Case[] = [
     title:
       'the protocol-relative URL of a request.get to a third-party host makes no mutant',
     source: readResult("request.get('//cdn.example.com/x')"),
+    expect: [],
+  },
+  {
+    id: 'url-backslash-relative-third-party',
+    title:
+      'a URL that starts with two backslashes names a host, as the URL parser reads it, and a third-party one makes no mutant',
+    source: readResult("request.get('\\\\\\\\cdn.example.com/x')"),
     expect: [],
   },
   {
