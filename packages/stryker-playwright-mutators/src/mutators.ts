@@ -12,6 +12,7 @@ import {
   testIdSite,
   textSite,
 } from './same-file-swap.ts';
+import { requestDataMutator } from './request-data.ts';
 import { removalMutator } from './statement-removal.ts';
 
 export interface LzPlaywrightMutator extends SampledMutator {
@@ -92,7 +93,14 @@ export const mutatorSets = roster({
       sampleOf('await page.clock.runFor(1000);'),
     ),
   ],
-  experimental: [],
+  experimental: [
+    requestDataMutator(
+      'LzPlaywrightRequestData',
+      sampleOf(
+        "const response = await request.post('/a', { data: { a: 'b' } });\n  expect(response.ok()).toBe(true);",
+      ),
+    ),
+  ],
 });
 
 type NamesIn<TTier extends readonly SampledMutator[]> = TTier[number]['name'];

@@ -22,6 +22,7 @@ export const fakeTypes: BabelTypes = {
   arrayExpression: () => ({}),
   stringLiteral: () => ({}),
   numericLiteral: () => ({}),
+  booleanLiteral: () => ({}),
   callExpression: () => ({}),
   memberExpression: () => ({}),
   identifier: () => ({}),
