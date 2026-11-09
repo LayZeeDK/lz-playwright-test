@@ -1,30 +1,25 @@
 import { selectMutators } from '@layzee/stryker-mutator-install';
 import { declareFactoryPlugin, PluginKind } from '@stryker-mutator/api/plugin';
 
-import {
-  consoleIgnorer,
-  strykerValidationSchema as consoleSchema,
-} from './console-ignorer.ts';
+import { consoleIgnorer, lzConsoleSchema } from './console-ignorer.ts';
 import { implicitRoles } from './implicit-roles.ts';
 import { install } from './install.ts';
 import { mutatorsFor } from './mutators.ts';
 import { packageName } from './package-name.ts';
-import {
-  strykerValidationSchema as stylingSchema,
-  stylingIgnorer,
-} from './styling-ignorer.ts';
-import {
-  telemetryIgnorer,
-  strykerValidationSchema as telemetrySchema,
-} from './telemetry-ignorer.ts';
+import { lzJsxStylingSchema, stylingIgnorer } from './styling-ignorer.ts';
+import { lzTelemetrySchema, telemetryIgnorer } from './telemetry-ignorer.ts';
 
-/** Stryker reads one schema per plugin module, so it names the options of every ignorer here. */
+/**
+ * Stryker reads one schema per plugin module, so it names the options of every ignorer here. Core merges its
+ * `properties` into its own (meta-schema-builder.js:27).
+ */
 export const strykerValidationSchema = {
-  ...stylingSchema,
+  $schema: 'http://json-schema.org/draft-07/schema#',
+  type: 'object',
   properties: {
-    ...stylingSchema.properties,
-    ...telemetrySchema.properties,
-    ...consoleSchema.properties,
+    lzJsxStyling: lzJsxStylingSchema,
+    lzTelemetry: lzTelemetrySchema,
+    lzConsole: lzConsoleSchema,
   },
 };
 

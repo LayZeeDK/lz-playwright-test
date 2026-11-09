@@ -1,13 +1,9 @@
-import { fieldOf } from '@layzee/stryker-mutator-install';
-
-const callTypes: readonly unknown[] = [
-  'CallExpression',
-  'OptionalCallExpression',
-];
-const memberTypes: readonly unknown[] = [
-  'MemberExpression',
-  'OptionalMemberExpression',
-];
+import {
+  bindingOf,
+  callTypes,
+  fieldOf,
+  memberTypes,
+} from '@layzee/stryker-mutator-install';
 
 // Stryker's instrumenter visits nothing inside `as`, but it visits inside these wrappers.
 const typeWrappers: readonly unknown[] = [
@@ -138,14 +134,4 @@ export function* ancestors(path: unknown): Generator<unknown, void, void> {
   ) {
     yield current;
   }
-}
-
-/** The Babel binding that `name` refers to in the scope of `path`. */
-export function bindingOf(path: unknown, name: unknown): unknown {
-  const scope = fieldOf(path, 'scope');
-  const getBinding = fieldOf(scope, 'getBinding');
-
-  return typeof getBinding === 'function'
-    ? Reflect.apply(getBinding, scope, [name])
-    : undefined;
 }

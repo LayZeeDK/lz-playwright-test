@@ -1,30 +1,23 @@
-import { fieldOf } from '@layzee/stryker-mutator-install';
+import { bindingOf, fieldOf } from '@layzee/stryker-mutator-install';
 import type { Ignorer } from '@stryker-mutator/api/ignore';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
-import { packageName } from './package-name.ts';
+import { listOption } from './list-option.ts';
 import { statementCallee } from './statement-call.ts';
-import { typeOf } from './type-of.ts';
 
 const calleePattern = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/;
 
-export const strykerValidationSchema = {
-  $schema: 'http://json-schema.org/draft-07/schema#',
+export const lzTelemetrySchema = {
   type: 'object',
+  additionalProperties: false,
+  description: 'Options of the lz-telemetry ignorer.',
   properties: {
-    lzTelemetry: {
-      type: 'object',
-      additionalProperties: false,
-      description: 'Options of the lz-telemetry ignorer.',
-      properties: {
-        calls: {
-          type: 'array',
-          items: { type: 'string', pattern: calleePattern.source },
-          description:
-            'Callees, such as track or analytics.track, added to the built-in ones. lz-telemetry hides the ' +
-            'mutants of a statement that only calls one of them.',
-        },
-      },
+    calls: {
+      type: 'array',
+      items: { type: 'string', pattern: calleePattern.source },
+      description:
+        'Callees, such as track or analytics.track, added to the built-in ones. lz-telemetry hides the ' +
+        'mutants of a statement that only calls one of them.',
     },
   },
 };
@@ -83,88 +76,40 @@ const callsReason =
   'lz-telemetry: telemetry call from lzTelemetry.calls; DOM tests do not observe what it sends';
 
 export function telemetryIgnorer(options: object): Ignorer {
-  const calls = ownCalls(options);
+  const calls = listOption(
+    options,
+    'lzTelemetry',
+    'calls',
+    [],
+    isCallee,
+    'an array of callee names such as track or analytics.track',
+  );
+  const reasons = new Map<unknown, string>([
+    ...calls.map((callee) => [callee, callsReason] as const),
+    ...analyticsCalls.map((callee) => [callee, analyticsReason] as const),
+    ...errorCalls.map((callee) => [callee, errorReason] as const),
+  ]);
 
   return {
     shouldIgnore(path) {
       const callee = statementCallee(fieldOf(path, 'node'));
 
-      if (analyticsCalls.includes(callee)) {
-        return analyticsReason;
-      }
-
-      if (
-        errorCalls.includes(callee) ||
-        (sentryImportedFunctions.includes(callee) &&
-          importsFromSentry(path, callee))
-      ) {
-        return errorReason;
-      }
-
-      if (calls.includes(callee)) {
-        return callsReason;
-      }
-
-      return undefined;
+      return sentryImportedFunctions.includes(callee) &&
+        importsFromSentry(path, callee)
+        ? errorReason
+        : reasons.get(callee);
     },
   };
 }
 telemetryIgnorer.inject = tokens(commonTokens.options);
 
-function ownCalls(options: object): readonly unknown[] {
-  const own = fieldOf(fieldOf(options, 'lzTelemetry'), 'calls');
-
-  if (own === undefined) {
-    // Stryker disable next-line ArrayDeclaration: a callee is a dotted name, never "Stryker was here" with its spaces
-    return [];
-  }
-
-  if (!isCallList(own)) {
-    throw new Error(
-      `${packageName}: lzTelemetry.calls must be an array of callee names such as track or analytics.track, ` +
-        `not ${JSON.stringify(own)}.`,
-    );
-  }
-
-  return own;
-}
-
-function isCallList(value: unknown): value is readonly string[] {
-  return (
-    Array.isArray(value) &&
-    value.every(
-      (name: unknown) => typeof name === 'string' && calleePattern.test(name),
-    )
-  );
+function isCallee(name: unknown): name is string {
+  return typeof name === 'string' && calleePattern.test(name);
 }
 
 function importsFromSentry(path: unknown, name: unknown): boolean {
-  const body = fieldOf(programOf(path), 'body');
+  const declaration = fieldOf(fieldOf(bindingOf(path, name), 'path'), 'parent');
+  const source = fieldOf(fieldOf(declaration, 'source'), 'value');
 
-  return (
-    Array.isArray(body) &&
-    body.some((statement: unknown) => {
-      const source = fieldOf(fieldOf(statement, 'source'), 'value');
-      const specifiers = fieldOf(statement, 'specifiers');
-
-      return (
-        typeOf(statement) === 'ImportDeclaration' &&
-        typeof source === 'string' &&
-        source.startsWith('@sentry/') &&
-        Array.isArray(specifiers) &&
-        specifiers.some(
-          (specifier: unknown) =>
-            fieldOf(fieldOf(specifier, 'local'), 'name') === name,
-        )
-      );
-    })
-  );
-}
-
-function programOf(path: unknown): unknown {
-  const node = fieldOf(path, 'node');
-
-  return typeOf(node) === 'Program'
-    ? node
-    : programOf(fieldOf(path, 'parentPath'));
+  return typeof source === 'string' && source.startsWith('@sentry/');
 }

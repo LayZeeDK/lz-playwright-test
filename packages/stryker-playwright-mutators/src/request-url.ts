@@ -1,9 +1,8 @@
-import { fieldOf } from '@layzee/stryker-mutator-install';
+import { bindingOf, fieldOf } from '@layzee/stryker-mutator-install';
 
 import {
   ancestors,
   argumentOf,
-  bindingOf,
   hasProperty,
   isCall,
   isRequestContext,
