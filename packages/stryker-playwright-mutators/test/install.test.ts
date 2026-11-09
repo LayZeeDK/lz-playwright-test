@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { markOf } from '@layzee/stryker-mutator-install';
+import { builtInNames, markOf } from '@layzee/stryker-mutator-install';
 
 import { assertBabelTypes, install } from '../src/install.ts';
 import { defined } from './support/defined.ts';
@@ -190,7 +190,7 @@ describe('install', () => {
     assert.deepEqual(result, ['path', instrumenter.types]);
   });
 
-  it('refuses a name that another mutator holds, ignoring case, and registers nothing', async () => {
+  it('refuses a name that another mutator holds, ignoring case, and leaves the list as it was', async () => {
     const { instrumenter, names } = fakeInstrumenter({
       extra: [{ name: 'lzone', mutate: () => undefined }],
     });
@@ -208,7 +208,7 @@ describe('install', () => {
           '@layzee/stryker-playwright-mutators: another mutator already has the name LzOne.',
       },
     );
-    assert.deepEqual(names(), ['lzone']);
+    assert.deepEqual(names(), [...builtInNames, 'lzone']);
   });
 
   it('leaves exactly the second selection when it is called twice, and keeps the mutators of other packages', async () => {
@@ -270,6 +270,29 @@ describe('install', () => {
         'LzPlaywright mutators on. Opt-in or experimental: LzThree, LzFour.',
     ]);
   });
+
+  for (const [title, options] of [
+    ['the self-check', { silent: ['LzOne'] }],
+    ['the check that the built-ins are gone', { leaking: ['Regex'] }],
+  ] as const) {
+    it(`leaves the list as it was when ${title} throws`, async () => {
+      const { instrumenter, names } = fakeInstrumenter(options);
+      const list = instrumenter.allMutators;
+
+      await assert.rejects(
+        install(
+          sets(['LzOne']),
+          undefined,
+          async () => instrumenter,
+          () => undefined,
+          () => undefined,
+        ),
+      );
+
+      assert.deepEqual(names(), builtInNames);
+      assert.equal(instrumenter.allMutators, list);
+    });
+  }
 
   it('prints no start line when a check throws', async () => {
     const { instrumenter } = fakeInstrumenter({ silent: ['LzOne'] });

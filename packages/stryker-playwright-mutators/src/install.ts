@@ -88,11 +88,14 @@ export async function install(
   );
   const instrumenter = await resolve();
 
+  const { allMutators } = instrumenter;
+  const before = [...allMutators];
+
+  checkNames(packageName, mutators, allMutators);
   removeBuiltIns(packageName, instrumenter, warn);
-  checkNames(packageName, mutators, instrumenter.allMutators);
   register(
     packageName,
-    instrumenter.allMutators,
+    allMutators,
     mutators.map(({ name, mutate }) => ({
       name,
       mutate: (path: unknown) => {
@@ -102,8 +105,17 @@ export async function install(
       },
     })),
   );
-  await selfCheck(packageName, instrumenter, mutators);
-  await checkBuiltInsRemoved(packageName, instrumenter);
+
+  // The two checks instrument through the changed list, so they run after the change and undo it when they throw.
+  try {
+    await selfCheck(packageName, instrumenter, mutators);
+    await checkBuiltInsRemoved(packageName, instrumenter);
+  } catch (error) {
+    allMutators.splice(0, allMutators.length, ...before);
+
+    throw error;
+  }
+
   warnUntested(packageName, testedVersion, instrumenter, warn);
   info(startLine(sets, mutators));
 }
