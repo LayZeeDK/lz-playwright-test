@@ -39,7 +39,7 @@ export function isCall(node: unknown): boolean {
 }
 
 /** `<x>.<y>`, `<x>[<y>]`, or either through `?.`. */
-export function isMember(node: unknown): boolean {
+function isMember(node: unknown): boolean {
   return memberTypes.includes(fieldOf(node, 'type'));
 }
 
