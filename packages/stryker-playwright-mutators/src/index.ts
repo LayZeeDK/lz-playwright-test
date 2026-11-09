@@ -1,5 +1,8 @@
+import { declareValuePlugin, PluginKind } from '@stryker-mutator/api/plugin';
+
 import { install, resolveFromCore } from './install.ts';
 import { mutatorSets, type LzPlaywrightMutatorOptions } from './mutators.ts';
+import { serializedIgnorer } from './serialized-ignorer.ts';
 import {
   parseSettings,
   useSettings,
@@ -25,3 +28,15 @@ export async function lzPlaywrightMutators(
   await install(mutatorSets, options, resolveFromCore);
   useSettings(parsed);
 }
+
+/**
+ * The opt-in ignorer for functions that Playwright sends to another realm. Listing this package in `appendPlugins`
+ * loads it and installs no mutator; `ignorers: ['lz-playwright-serialized']` turns it on.
+ */
+export const strykerPlugins = [
+  declareValuePlugin(
+    PluginKind.Ignore,
+    'lz-playwright-serialized',
+    serializedIgnorer,
+  ),
+];
