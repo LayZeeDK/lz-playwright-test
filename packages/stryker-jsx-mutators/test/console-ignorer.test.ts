@@ -113,6 +113,42 @@ describe('lz-console', () => {
     });
   });
 
+  (
+    [
+      ['an update', 'console.log(count++);'],
+      ['a call', 'console.log(queue.shift());'],
+      [
+        'a function expression',
+        "console.log(function () { return on ? 'a' : 'b'; });",
+      ],
+      [
+        'an object method',
+        "console.log({ toString() { return on ? 'a' : 'b'; } });",
+      ],
+      [
+        'a class method',
+        "console.log(class { run() { return on ? 'a' : 'b'; } });",
+      ],
+      [
+        'a private class method',
+        "console.log(class { #run() { return on ? 'a' : 'b'; } });",
+      ],
+      ['a new expression', "console.log(new Session(on ? 'a' : 'b'));"],
+      ['a tagged template', "console.log(sql`select ${on ? 'a' : 'b'}`);"],
+      ['an assignment', "console.log((mode = on ? 'a' : 'b'));"],
+      ['an await', 'console.log(await (on ? a : b));'],
+      [
+        'a yield',
+        "export function* steps() { console.log(yield on ? 'a' : 'b'); }",
+      ],
+      ['a delete', "console.log(delete cache[on ? 'a' : 'b']);"],
+    ] as const
+  ).forEach(([effect, code]) => {
+    it(`keeps the mutants of a console.log statement whose argument holds ${effect}, as removing the statement changes what the page does`, async () => {
+      await assertEvery(code, 'placed');
+    });
+  });
+
   ['console.warn', 'console.error', 'format', 'logger.log'].forEach(
     (callee) => {
       it(`keeps the mutants of a ${callee} statement by default`, async () => {

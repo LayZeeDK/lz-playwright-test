@@ -215,6 +215,20 @@ describe('lz-telemetry', () => {
     });
   });
 
+  it('keeps the mutants of a telemetry call statement whose arguments hold an arrow function, as the function can act on the page', async () => {
+    await assertEvery(
+      "analytics.track('Clicked', {}, {}, () => { navigate(on ? '/a' : '/b'); });",
+      'placed',
+    );
+  });
+
+  it('keeps the mutants of a telemetry call statement whose object argument holds a callback property', async () => {
+    await assertEvery(
+      "window.dataLayer.push({ event: 'x', eventCallback: () => { setDone(on && ok); } });",
+      'placed',
+    );
+  });
+
   it('keeps the mutants of a call statement to an unknown callee', async () => {
     await assertEvery("format('a', on ? 'b' : 'c');", 'placed');
   });
