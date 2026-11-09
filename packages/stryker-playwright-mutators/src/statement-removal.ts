@@ -1,7 +1,9 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
 import {
+  ancestors,
   callTypes,
+  isFunctionNode,
   isNamedReceiver,
   isTestCallee,
   memberTypes,
@@ -94,6 +96,20 @@ export const statementRemovals = removalTable({
 
 const teardownHooks: readonly unknown[] = ['afterEach', 'afterAll'];
 const setupHooks: readonly unknown[] = ['beforeEach', 'beforeAll'];
+
+interface SkipPolicy {
+  readonly hooks: readonly unknown[];
+  readonly finallyBlocks: boolean;
+}
+
+const skipPolicies: Readonly<Record<RemovalRow['skip'], SkipPolicy>> = {
+  teardown: { hooks: teardownHooks, finallyBlocks: false },
+  setupAndTeardown: {
+    hooks: [...teardownHooks, ...setupHooks],
+    finallyBlocks: true,
+  },
+};
+
 const inputDevices: readonly unknown[] = ['keyboard', 'mouse', 'touchscreen'];
 // The globals of Vitest and Jest, whose waitFor and friends share Playwright's method names.
 const testRunners: readonly unknown[] = ['vi', 'jest'];
@@ -172,20 +188,11 @@ function isNavigationFixture(path: unknown, name: unknown): boolean {
     return false;
   }
 
-  for (
-    let current = fieldOf(path, 'parentPath');
-    current !== undefined && current !== null;
-    current = fieldOf(current, 'parentPath')
-  ) {
-    if (
-      isFixtureFunction(current) &&
-      destructures(fieldOf(fieldOf(current, 'node'), 'params'), name)
-    ) {
-      return true;
-    }
-  }
-
-  return false;
+  return [...ancestors(path)].some(
+    (ancestor) =>
+      isFixtureFunction(ancestor) &&
+      destructures(fieldOf(fieldOf(ancestor, 'node'), 'params'), name),
+  );
 }
 
 function destructures(params: unknown, name: string): boolean {
@@ -206,7 +213,7 @@ function isFixtureFunction(path: unknown): boolean {
   const owner = fieldOf(path, 'parent');
   const ownerPath = fieldOf(path, 'parentPath');
 
-  if (!/Function|Method/.test(String(fieldOf(fieldOf(path, 'node'), 'type')))) {
+  if (!isFunctionNode(fieldOf(path, 'node'))) {
     return false;
   }
 
@@ -236,29 +243,18 @@ function isExtendCall(node: unknown): boolean {
 }
 
 function isSkipped(path: unknown, skip: RemovalRow['skip']): boolean {
-  const setup = skip === 'setupAndTeardown';
-  let child = path;
+  const { hooks, finallyBlocks } = skipPolicies[skip];
+  const chain = [path, ...ancestors(path)];
 
-  for (
-    let current = fieldOf(path, 'parentPath');
-    current !== undefined && current !== null;
-    current = fieldOf(current, 'parentPath')
-  ) {
-    if (
-      isHookCall(
-        fieldOf(current, 'node'),
-        setup ? [...teardownHooks, ...setupHooks] : teardownHooks,
-      ) ||
-      followsUse(current, fieldOf(child, 'node')) ||
-      (setup && isFinalizer(current, fieldOf(child, 'node')))
-    ) {
-      return true;
-    }
+  return chain.slice(1).some((current, index) => {
+    const child = fieldOf(chain[index], 'node');
 
-    child = current;
-  }
-
-  return false;
+    return (
+      isHookCall(fieldOf(current, 'node'), hooks) ||
+      followsUse(current, child) ||
+      (finallyBlocks && isFinalizer(current, child))
+    );
+  });
 }
 
 function isHookCall(node: unknown, hooks: readonly unknown[]): boolean {
@@ -285,16 +281,11 @@ function isFinalizer(tryPath: unknown, child: unknown): boolean {
 function followsUse(blockPath: unknown, child: unknown): boolean {
   const block = fieldOf(blockPath, 'node');
   const body = fieldOf(block, 'body');
-  const owner = fieldOf(
-    fieldOf(fieldOf(blockPath, 'parentPath'), 'node'),
-    'type',
-  );
 
   return (
     fieldOf(block, 'type') === 'BlockStatement' &&
     Array.isArray(body) &&
-    typeof owner === 'string' &&
-    /Function|Method/.test(owner) &&
+    isFunctionNode(fieldOf(fieldOf(blockPath, 'parentPath'), 'node')) &&
     body.slice(0, body.indexOf(child)).some(isAwaitedUse)
   );
 }

@@ -1,6 +1,6 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
-import { argumentOf, callTypes, hasProperty } from './ast.ts';
+import { ancestors, argumentOf, callTypes, hasProperty } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 
 export function fulfillMutator<const TName extends string>(
@@ -83,28 +83,27 @@ export function outcomeMutator<const TName extends string>(
 
 /** The nearest function around `path` with a parameter named `route` is a route handler, and `route` is its first. */
 function isInHandlerOf(path: unknown, route: unknown): boolean {
-  for (
-    let current = fieldOf(path, 'parentPath');
-    current !== undefined && current !== null;
-    current = fieldOf(current, 'parentPath')
-  ) {
-    const handler = fieldOf(current, 'node');
-    const params = fieldOf(handler, 'params');
-    const list: readonly unknown[] = Array.isArray(params) ? params : [];
+  const handlerPath = [...ancestors(path)].find((ancestor) =>
+    paramsOf(ancestor).some((param) => fieldOf(param, 'name') === route),
+  );
+  const first = paramsOf(handlerPath)[0];
 
-    if (list.some((param) => fieldOf(param, 'name') === route)) {
-      const first = list[0];
+  return (
+    handlerPath !== undefined &&
+    fieldOf(first, 'type') === 'Identifier' &&
+    fieldOf(first, 'name') === route &&
+    (isRouteAnnotated(first) ||
+      isRouteCallback(
+        fieldOf(handlerPath, 'parent'),
+        fieldOf(handlerPath, 'node'),
+      ))
+  );
+}
 
-      return (
-        fieldOf(first, 'type') === 'Identifier' &&
-        fieldOf(first, 'name') === route &&
-        (isRouteAnnotated(first) ||
-          isRouteCallback(fieldOf(current, 'parent'), handler))
-      );
-    }
-  }
+function paramsOf(functionPath: unknown): readonly unknown[] {
+  const params = fieldOf(fieldOf(functionPath, 'node'), 'params');
 
-  return false;
+  return Array.isArray(params) ? params : [];
 }
 
 /** `handler` is the second argument of `<x>.route(...)`. */

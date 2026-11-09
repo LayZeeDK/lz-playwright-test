@@ -46,34 +46,23 @@ export function requestDataMutator<const TName extends string>(
 
 /** `path` sits, through object values and array elements, inside the object that is the value of a payload property. */
 function inPayload(path: unknown): boolean {
-  let current = path;
+  const parentType = fieldOf(fieldOf(path, 'parent'), 'type');
 
-  for (;;) {
-    const parentType = fieldOf(fieldOf(current, 'parent'), 'type');
+  if (fieldOf(path, 'key') === 'value' && parentType === 'ObjectProperty') {
+    const property = fieldOf(path, 'parentPath');
 
-    if (
-      fieldOf(current, 'key') === 'value' &&
-      parentType === 'ObjectProperty'
-    ) {
-      const property = fieldOf(current, 'parentPath');
-
-      if (
-        fieldOf(fieldOf(current, 'node'), 'type') === 'ObjectExpression' &&
-        isPayload(property)
-      ) {
-        return true;
-      }
-
-      current = fieldOf(property, 'parentPath');
-    } else if (
-      fieldOf(current, 'listKey') === 'elements' &&
-      parentType === 'ArrayExpression'
-    ) {
-      current = fieldOf(current, 'parentPath');
-    } else {
-      return false;
-    }
+    return (
+      (fieldOf(fieldOf(path, 'node'), 'type') === 'ObjectExpression' &&
+        isPayload(property)) ||
+      inPayload(fieldOf(property, 'parentPath'))
+    );
   }
+
+  return (
+    fieldOf(path, 'listKey') === 'elements' &&
+    parentType === 'ArrayExpression' &&
+    inPayload(fieldOf(path, 'parentPath'))
+  );
 }
 
 /** A payload property of the options argument of a request call. */

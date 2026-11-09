@@ -1,6 +1,12 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
-import { argumentOf, bindingOf, hasProperty, isNamedReceiver } from './ast.ts';
+import {
+  ancestors,
+  argumentOf,
+  bindingOf,
+  hasProperty,
+  isNamedReceiver,
+} from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 
 /** The methods that send a GET or HEAD request; `fetch` sends a GET unless it has a method option. */
@@ -167,19 +173,13 @@ function resultIsRead(callPath: unknown): boolean {
 
 /** Some call around `path` is `console.<x>(...)`. */
 function isInConsoleCall(path: unknown): boolean {
-  for (
-    let current = fieldOf(path, 'parentPath');
-    current !== undefined && current !== null;
-    current = fieldOf(current, 'parentPath')
-  ) {
-    const callee = fieldOf(fieldOf(current, 'node'), 'callee');
-
-    if (fieldOf(fieldOf(callee, 'object'), 'name') === 'console') {
-      return true;
-    }
-  }
-
-  return false;
+  return [...ancestors(path)].some(
+    (ancestor) =>
+      fieldOf(
+        fieldOf(fieldOf(fieldOf(ancestor, 'node'), 'callee'), 'object'),
+        'name',
+      ) === 'console',
+  );
 }
 
 /** The options argument names a method, or may: it is no object literal, or it holds a spread. `get` and `head` set

@@ -57,6 +57,24 @@ export function isTestCallee(callee: unknown): boolean {
   );
 }
 
+/** A node whose type names a function or a method, such as `ArrowFunctionExpression` or `ObjectMethod`. */
+export function isFunctionNode(node: unknown): boolean {
+  const type = fieldOf(node, 'type');
+
+  return typeof type === 'string' && /Function|Method/.test(type);
+}
+
+/** The paths around `path`, nearest first. */
+export function* ancestors(path: unknown): Generator<unknown, void, void> {
+  for (
+    let current = fieldOf(path, 'parentPath');
+    current !== undefined && current !== null;
+    current = fieldOf(current, 'parentPath')
+  ) {
+    yield current;
+  }
+}
+
 /** The Babel binding that `name` refers to in the scope of `path`. */
 export function bindingOf(path: unknown, name: unknown): unknown {
   const scope = fieldOf(path, 'scope');
