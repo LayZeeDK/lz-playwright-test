@@ -13,14 +13,18 @@ The answer to whether this works, the evidence, and the limits are in `docs/VERD
 - `packages/stryker-playwright-runner/README.md`: the runner's requirements, Stryker config, options,
   and the Playwright settings it replaces on every run.
 - `packages/stryker-jsx-mutators/README.md`: the ten JSX mutators and how to turn them on.
+- `packages/stryker-playwright-mutators/README.md`: the mutators for Playwright test code, their tiers and
+  limits, and why Stryker's built-in mutators are off in test code.
 
-Both packages ship built JavaScript in `dist`. The workspace's own Stryker runs load them from there, so
-build first (the Nx targets below do).
+These packages ship built JavaScript in `dist`. The workspace's own Stryker runs load the runner and the JSX
+mutators from there, so build first (the Nx targets below do).
 
 ## Layout
 
 - `packages/stryker-playwright-runner`: the runner, package `@layzee/stryker-playwright-runner`.
 - `packages/stryker-jsx-mutators`: the JSX mutators, package `@layzee/stryker-jsx-mutators`.
+- `packages/stryker-playwright-mutators`: the mutators for Playwright test code, package
+  `@layzee/stryker-playwright-mutators`.
 - `apps/demo-app` (Nx project `@layzee/demo-app`): the demo app and its Playwright component tests
   (`playwright.components.config.mts`).
 - `apps/demo-app-e2e`: the demo app's Playwright e2e tests.
