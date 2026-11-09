@@ -12,10 +12,14 @@ export interface Site {
 /** Reads the site of a call expression, when the call has one. */
 export type SiteReader = (call: unknown) => Site | undefined;
 
+/** True when two site values must never replace each other. */
+type Excludes = (one: string, other: string) => boolean;
+
 export function swapMutator<const TName extends string>(
   name: TName,
   sample: string,
   read: SiteReader,
+  excludes: Excludes = (one, other) => one === other,
 ): LzPlaywrightMutator & { readonly name: TName } {
   const indexed = new WeakMap<
     object,
@@ -36,7 +40,7 @@ export function swapMutator<const TName extends string>(
       // range for a line range. Either way no mutant has been placed in the file yet.
       const known = indexed.get(program);
       const replacements =
-        known ?? replacementsBySite(callsOf(program).map(read));
+        known ?? replacementsBySite(callsOf(program).map(read), excludes);
 
       if (known === undefined) {
         indexed.set(program, replacements);
@@ -51,6 +55,7 @@ export function swapMutator<const TName extends string>(
 
 function replacementsBySite(
   found: readonly (Site | undefined)[],
+  excludes: Excludes,
 ): ReadonlyMap<unknown, readonly unknown[]> {
   const sites = found
     .filter((site) => site !== undefined)
@@ -60,8 +65,8 @@ function replacementsBySite(
     sites.map((site, index) => [
       site.node,
       [
-        sites.slice(0, index).findLast(isReplacementFor(site)),
-        sites.slice(index + 1).find(isReplacementFor(site)),
+        sites.slice(0, index).findLast(isReplacementFor(site, excludes)),
+        sites.slice(index + 1).find(isReplacementFor(site, excludes)),
       ]
         .filter((neighbour) => neighbour !== undefined)
         .filter(
@@ -79,8 +84,11 @@ function startOf(node: unknown): number {
   return typeof start === 'number' ? start : 0;
 }
 
-function isReplacementFor(site: Site): (other: Site) => boolean {
-  return ({ key, value }) => key === site.key && value !== site.value;
+function isReplacementFor(
+  site: Site,
+  excludes: Excludes,
+): (other: Site) => boolean {
+  return ({ key, value }) => key === site.key && !excludes(value, site.value);
 }
 
 function programOf(path: unknown): unknown {
@@ -147,10 +155,32 @@ function argumentOf(call: unknown, index: number): unknown {
  */
 function valueOf(node: unknown): string | undefined {
   switch (fieldOf(node, 'type')) {
+    case 'StringLiteral':
+    case 'TemplateLiteral': {
+      const text = textOf(node);
+
+      return text === undefined ? undefined : `string:${text}`;
+    }
+    case 'RegExpLiteral': {
+      const pattern = fieldOf(node, 'pattern');
+      const flags = fieldOf(node, 'flags');
+
+      return typeof pattern === 'string' && typeof flags === 'string'
+        ? `regex:/${pattern}/${flags}`
+        : undefined;
+    }
+    default:
+      return undefined;
+  }
+}
+
+/** The text of a string literal or of an expression-free template literal. */
+function textOf(node: unknown): string | undefined {
+  switch (fieldOf(node, 'type')) {
     case 'StringLiteral': {
       const text = fieldOf(node, 'value');
 
-      return typeof text === 'string' ? `string:${text}` : undefined;
+      return typeof text === 'string' ? text : undefined;
     }
     case 'TemplateLiteral': {
       const quasis = fieldOf(node, 'quasis');
@@ -162,15 +192,7 @@ function valueOf(node: unknown): string | undefined {
       return Array.isArray(quasis) &&
         quasis.length === 1 &&
         typeof text === 'string'
-        ? `string:${text}`
-        : undefined;
-    }
-    case 'RegExpLiteral': {
-      const pattern = fieldOf(node, 'pattern');
-      const flags = fieldOf(node, 'flags');
-
-      return typeof pattern === 'string' && typeof flags === 'string'
-        ? `regex:/${pattern}/${flags}`
+        ? text
         : undefined;
     }
     default:
@@ -219,6 +241,24 @@ function firstArgumentSite(methods: readonly string[]): SiteReader {
       ? { key: method, value, node: argument }
       : undefined;
   };
+}
+
+/** `Button/Primary` and `components/Button/Primary` name the same story. */
+export function isSameStory(one: string, other: string): boolean {
+  return (
+    one === other || one.endsWith(`/${other}`) || other.endsWith(`/${one}`)
+  );
+}
+
+export function mountStorySite(call: unknown): Site | undefined {
+  const argument = argumentOf(call, 0);
+  const value = textOf(argument);
+
+  return (fieldOf(fieldOf(call, 'callee'), 'name') === 'mount' ||
+    methodOf(call) === 'mount') &&
+    value !== undefined
+    ? { key: 'mount', value, node: argument }
+    : undefined;
 }
 
 export const testIdSite = firstArgumentSite(['getByTestId']);

@@ -7,6 +7,8 @@ import type {
 import type { BabelTypes } from './install.ts';
 import { fulfillMutator, outcomeMutator } from './route-mocks.ts';
 import {
+  isSameStory,
+  mountStorySite,
   roleSite,
   swapMutator,
   testIdSite,
@@ -74,7 +76,14 @@ export const mutatorSets = roster({
       sampleOf("await page.route('**/api', (route) => route.abort());"),
     ),
   ],
-  optIn: [],
+  optIn: [
+    swapMutator(
+      'LzPlaywrightMountStory',
+      sampleOf("await mount('a');\n  await mount('b');"),
+      mountStorySite,
+      isSameStory,
+    ),
+  ],
   experimental: [],
 });
 
