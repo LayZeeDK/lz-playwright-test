@@ -580,6 +580,17 @@ for three literal kinds (string, expression-free template, regex) was a `switch`
 `lz-tpp` step 6 says to pose a simpler test first, but the simpler tests (strings only) had passed in earlier cycles,
 and the three kinds are the domain, not an accident of the test order. Evidence: `step6-c4-notes.md`.
 
+**O71. An expected value written by hand can fail on its spelling, not on the behaviour.** In chunk 5's third cycle
+the expected replacement used single quotes, while Babel's generator prints the replacement in its own quote style. The
+red was right (no mutant yet), but the first green still failed, on the text. `lz-red` says to confirm the red fails
+for the right reason; it says nothing about checking that the expected value is written the way the subject prints it.
+Evidence: `step6-c5-notes.md`.
+
+**O72. A red raised in a shared setup hook stays "one failing test" only while the file has one test.** In chunk 6
+the second cycle's red came from the install's self-check in a `before` hook: a new mutator whose sample made no mutant.
+`node:test` reported it against the one case in the new file. With more rows the same hook error fails every row at
+once, which reads as many reds for one missing behaviour. Evidence: `step6-c6-notes.md`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -801,6 +812,13 @@ array)` and `(loop -> find)`, ranked near `(scalar -> array)`.
 
 **S64 (from O70).** In the impasse check, add the outcome "the simpler tests are already green and the cases are the
 domain": take `(case)` and say so, instead of backtracking.
+
+**S65 (from O71).** In `lz-red`'s step 5, add: when the expected value is text the subject generates, take its spelling
+from one real run of the subject, so the red and the later green both turn on behaviour.
+
+**S66 (from O72).** In `lz-red`'s Vitest and TypeScript mechanics, say how to read a red raised in a shared setup hook:
+count it as one red for the behaviour the hook checks, and prefer a red inside the test body when the file has several
+tests.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
