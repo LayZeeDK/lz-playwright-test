@@ -1,6 +1,13 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
-import { ancestors, argumentOf, hasProperty, isCall, methodOf } from './ast.ts';
+import {
+  ancestors,
+  argumentOf,
+  hasProperty,
+  isCall,
+  methodOf,
+  propertyKey,
+} from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 
 export function fulfillMutator<const TName extends string>(
@@ -163,8 +170,7 @@ function isFulfillOption(path: unknown, key: string): boolean {
 
   return (
     fieldOf(property, 'type') === 'ObjectProperty' &&
-    fieldOf(property, 'computed') === false &&
-    fieldOf(fieldOf(property, 'key'), 'name') === key &&
+    propertyKey(property) === key &&
     fieldOf(property, 'value') === fieldOf(path, 'node') &&
     fieldOf(object, 'type') === 'ObjectExpression' &&
     !hasProperty(object, 'response') &&

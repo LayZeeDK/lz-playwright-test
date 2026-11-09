@@ -28,21 +28,26 @@ export function argumentOf(call: unknown, index: number): unknown {
   return Array.isArray(args) ? args[index] : undefined;
 }
 
-/** The object literal has a non-computed property whose key is the identifier or string `key`. */
-export function hasProperty(object: unknown, key: string): boolean {
+/** The key of a non-computed property: the name of an identifier key, or the value of a literal key. */
+export function propertyKey(property: unknown): unknown {
+  const key = fieldOf(property, 'key');
+
+  return fieldOf(property, 'computed') === false
+    ? (fieldOf(key, 'name') ?? fieldOf(key, 'value'))
+    : undefined;
+}
+
+/** The property of the object literal whose key, by `propertyKey`, is `key`. */
+export function findProperty(object: unknown, key: string): unknown {
   const properties = fieldOf(object, 'properties');
 
-  return (
-    Array.isArray(properties) &&
-    properties.some((property) => {
-      const propertyKey = fieldOf(property, 'key');
+  return Array.isArray(properties)
+    ? properties.find((property) => propertyKey(property) === key)
+    : undefined;
+}
 
-      return (
-        fieldOf(property, 'computed') !== true &&
-        (fieldOf(propertyKey, 'name') ?? fieldOf(propertyKey, 'value')) === key
-      );
-    })
-  );
+export function hasProperty(object: unknown, key: string): boolean {
+  return findProperty(object, key) !== undefined;
 }
 
 /** `<name>`, `<x>.<name>` or `<x>?.<name>`. */

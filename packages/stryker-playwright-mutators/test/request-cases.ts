@@ -125,6 +125,13 @@ export const requestCases: readonly Case[] = [
     expect: [[data, '"nx"']],
   },
   {
+    id: 'data-computed-payload-key',
+    title:
+      'a string under a computed key named data makes no mutant: a computed key is no payload key',
+    source: readResult("request.post('/a', { [data]: { name: 'n' } })"),
+    expect: [],
+  },
+  {
     id: 'data-nested-object',
     title:
       'a string in an object inside the data of a request call gets the suffix x',

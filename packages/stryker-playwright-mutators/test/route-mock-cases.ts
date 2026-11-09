@@ -278,6 +278,12 @@ export const routeMockCases: readonly Case[] = [
     expect: [],
   },
   {
+    id: 'fulfill-quoted-key',
+    title: 'a status under a quoted key becomes 200',
+    source: inRoute("await route.fulfill({ 'status': 404 });"),
+    expect: [[fulfill, '200']],
+  },
+  {
     id: 'fallback-expression-body',
     title: 'a fallback as the expression body of a handler becomes an abort',
     source:

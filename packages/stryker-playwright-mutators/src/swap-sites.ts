@@ -1,6 +1,6 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
-import { argumentOf, isNamedReceiver, methodOf } from './ast.ts';
+import { argumentOf, findProperty, isNamedReceiver, methodOf } from './ast.ts';
 import type { Site, SiteReader } from './same-file-swap.ts';
 
 /**
@@ -54,25 +54,9 @@ function textOf(node: unknown): string | undefined {
   }
 }
 
-/** The value of the `name` property of an object literal, when the property is written out. */
-function nameOf(options: unknown): unknown {
-  const properties = fieldOf(options, 'properties');
-  const property: unknown = Array.isArray(properties)
-    ? properties.find(
-        (candidate) =>
-          fieldOf(candidate, 'type') === 'ObjectProperty' &&
-          fieldOf(candidate, 'computed') === false &&
-          (fieldOf(fieldOf(candidate, 'key'), 'name') === 'name' ||
-            fieldOf(fieldOf(candidate, 'key'), 'value') === 'name'),
-      )
-    : undefined;
-
-  return fieldOf(property, 'value');
-}
-
 export function roleSite(call: unknown): Site | undefined {
   const role = argumentOf(call, 0);
-  const name = nameOf(argumentOf(call, 1));
+  const name = fieldOf(findProperty(argumentOf(call, 1), 'name'), 'value');
   const value = valueOf(name);
 
   return methodOf(fieldOf(call, 'callee')) === 'getByRole' &&
