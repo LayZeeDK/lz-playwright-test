@@ -8,8 +8,24 @@ import type {
   MutatorSets,
 } from '@layzee/stryker-mutator-install';
 
-import { testedVersion, type Instrumenter } from '../../src/install.ts';
+import {
+  testedVersion,
+  type BabelTypes,
+  type Instrumenter,
+} from '../../src/install.ts';
 import type { LzPlaywrightMutator } from '../../src/mutators.ts';
+
+export const fakeTypes: BabelTypes = {
+  emptyStatement: () => ({}),
+  cloneNode: (node) => node,
+  objectExpression: () => ({}),
+  arrayExpression: () => ({}),
+  stringLiteral: () => ({}),
+  numericLiteral: () => ({}),
+  callExpression: () => ({}),
+  memberExpression: () => ({}),
+  identifier: () => ({}),
+};
 
 export const ownMark = markOf('@layzee/stryker-playwright-mutators');
 
@@ -56,7 +72,7 @@ export function fakeInstrumenter({
   const instrumenter: Instrumenter = {
     dir: '/stryker/instrumenter',
     version,
-    types: { emptyStatement: () => ({}), cloneNode: (node) => node },
+    types: fakeTypes,
     allMutators,
     async instrument(files) {
       instrumented.push([...files]);

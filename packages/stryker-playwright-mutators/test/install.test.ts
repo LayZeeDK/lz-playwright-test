@@ -8,6 +8,7 @@ import { defined } from './support/defined.ts';
 import { programOf } from './support/parse.ts';
 import {
   fakeInstrumenter,
+  fakeTypes,
   ownMark,
   sets,
 } from './support/fake-instrumenter.ts';
@@ -16,19 +17,13 @@ describe('assertBabelTypes', () => {
   const missing = (name: string) => new Error(`no ${name}`);
 
   it('accepts an object with the members the mutators call', () => {
-    assert.doesNotThrow(() =>
-      assertBabelTypes(
-        { emptyStatement: () => ({}), cloneNode: () => ({}) },
-        missing,
-      ),
-    );
+    assert.doesNotThrow(() => assertBabelTypes(fakeTypes, missing));
   });
 
   it('names the members an object lacks, through the missing-member error', () => {
     assert.throws(
-      () =>
-        assertBabelTypes({ emptyStatement: () => ({}), cloneNode: 1 }, missing),
-      { message: 'no Babel types with cloneNode' },
+      () => assertBabelTypes({ ...fakeTypes, emptyStatement: 1 }, missing),
+      { message: 'no Babel types with emptyStatement' },
     );
   });
 

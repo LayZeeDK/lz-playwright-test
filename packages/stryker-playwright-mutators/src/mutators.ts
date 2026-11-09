@@ -5,6 +5,7 @@ import type {
 } from '@layzee/stryker-mutator-install';
 
 import type { BabelTypes } from './install.ts';
+import { fulfillMutator, outcomeMutator } from './route-mocks.ts';
 import {
   roleSite,
   swapMutator,
@@ -61,6 +62,16 @@ export const mutatorSets = roster({
       'LzPlaywrightTextLocator',
       sampleOf("page.getByText('a');\n  page.getByText('b');"),
       textSite,
+    ),
+    fulfillMutator(
+      'LzPlaywrightFulfill',
+      sampleOf(
+        "await page.route('**/api', (route) => route.fulfill({ json: { a: 1 } }));",
+      ),
+    ),
+    outcomeMutator(
+      'LzPlaywrightRouteOutcome',
+      sampleOf("await page.route('**/api', (route) => route.abort());"),
     ),
   ],
   optIn: [],
