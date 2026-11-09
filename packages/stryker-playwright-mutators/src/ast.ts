@@ -9,6 +9,30 @@ const memberTypes: readonly unknown[] = [
   'OptionalMemberExpression',
 ];
 
+// Stryker's instrumenter visits nothing inside `as`, but it visits inside these wrappers.
+const typeWrappers: readonly unknown[] = [
+  'TSSatisfiesExpression',
+  'TSNonNullExpression',
+  'TSTypeAssertion',
+];
+
+/** `<x> satisfies <T>`, `<x>!` or `<T><x>`. */
+export function isTypeWrapper(node: unknown): boolean {
+  return typeWrappers.includes(fieldOf(node, 'type'));
+}
+
+/** The expression inside any type wrapper around `node`. */
+export function unwrapped(node: unknown): unknown {
+  return isTypeWrapper(node) ? unwrapped(fieldOf(node, 'expression')) : node;
+}
+
+/** The path of the outermost type wrapper around `path`, or `path` itself. */
+export function outermost(path: unknown): unknown {
+  return isTypeWrapper(fieldOf(path, 'parent'))
+    ? outermost(fieldOf(path, 'parentPath'))
+    : path;
+}
+
 /** `<x>(...)` or `<x>?.(...)`. */
 export function isCall(node: unknown): boolean {
   return callTypes.includes(fieldOf(node, 'type'));

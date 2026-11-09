@@ -1,6 +1,13 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
-import { isRequest, methodOf, propertyKey } from './ast.ts';
+import {
+  isRequest,
+  isTypeWrapper,
+  methodOf,
+  outermost,
+  propertyKey,
+  unwrapped,
+} from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 
 const payloadKeys: readonly unknown[] = ['data', 'form', 'params'];
@@ -11,12 +18,6 @@ const payloadMethods: readonly unknown[] = [
   'patch',
   'delete',
   'fetch',
-];
-// Stryker's instrumenter visits nothing inside `as`, but it visits inside these wrappers.
-const typeWrappers: readonly unknown[] = [
-  'TSSatisfiesExpression',
-  'TSNonNullExpression',
-  'TSTypeAssertion',
 ];
 
 export function requestDataMutator<const TName extends string>(
@@ -54,7 +55,7 @@ export function requestDataMutator<const TName extends string>(
 function inPayload(path: unknown): boolean {
   const parentType = fieldOf(fieldOf(path, 'parent'), 'type');
 
-  if (typeWrappers.includes(parentType)) {
+  if (isTypeWrapper(fieldOf(path, 'parent'))) {
     return inPayload(fieldOf(path, 'parentPath'));
   }
 
@@ -72,20 +73,6 @@ function inPayload(path: unknown): boolean {
   return (
     parentType === 'ArrayExpression' && inPayload(fieldOf(path, 'parentPath'))
   );
-}
-
-/** The expression inside any type wrapper around `node`. */
-function unwrapped(node: unknown): unknown {
-  return typeWrappers.includes(fieldOf(node, 'type'))
-    ? unwrapped(fieldOf(node, 'expression'))
-    : node;
-}
-
-/** The path of the outermost type wrapper around `path`, or `path` itself. */
-function outermost(path: unknown): unknown {
-  return typeWrappers.includes(fieldOf(fieldOf(path, 'parent'), 'type'))
-    ? outermost(fieldOf(path, 'parentPath'))
-    : path;
 }
 
 /** A payload property of the options argument of a request call. */
