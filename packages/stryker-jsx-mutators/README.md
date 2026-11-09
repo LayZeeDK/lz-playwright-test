@@ -171,7 +171,7 @@ the list above does not name.
 Analytics and error-monitoring calls send data that a DOM test does not see, so the mutants in their
 arguments survive. The opt-in `lz-telemetry` ignorer reports them as Ignored, with a reason.
 
-It hides every mutant of a statement that only calls one of these callees:
+It hides every mutant of a statement that is just a call to one of these callees:
 
 - Analytics: `gtag`, `window.gtag`, `fbq`, `ttq.track`, `dataLayer.push`, `window.dataLayer.push`,
   `analytics.track`, `analytics.page`, `analytics.identify`, `analytics.group`, `analytics.alias`,
@@ -182,15 +182,25 @@ It hides every mutant of a statement that only calls one of these callees:
   observe what it sends".
 - Error monitoring: `Sentry.captureException`, `Sentry.captureMessage`, `Sentry.addBreadcrumb`,
   `Sentry.setUser`, `Sentry.setTag`, `Sentry.setTags`, `Sentry.setContext`, `Sentry.setExtra`, and
-  `Sentry.flush`. A bare `captureException` or `captureMessage` counts when the file imports it under that
-  name from a `@sentry/` package. Reason: "lz-telemetry: error-monitoring call; DOM tests do not observe
-  what it reports".
+  `Sentry.flush`. A bare `captureException` or `captureMessage` counts when the name, where it is called,
+  refers to an import under that name from a `@sentry/` package; a parameter or local of the same name does
+  not count. Reason: "lz-telemetry: error-monitoring call; DOM tests do not observe what it reports".
+
+The ignorer matches a callee by its name only, so an app's own object named `analytics` or `posthog` counts
+too.
 
 The statement can be an optional call, such as `window.gtag?.('event', name)`, and can sit under `await` or
-`void`, such as `await Sentry.flush(2000)`.
+`void`, such as `await Sentry.flush(2000)`. An optional call's own mutant, the one that removes the `?.`, is
+hidden with the rest of the statement, though a test that runs without the library loaded could kill it.
 
 The ignorer keeps the mutants in every other case:
 
+- An argument holds code that can act on the page: a function (arrow, function expression, object or class
+  method), a call, `new`, a tagged template, an assignment, an update such as `count++`, `await`, `yield`,
+  or `delete`. For example, the callback in `analytics.track('Clicked', {}, {}, () => navigate('/done'))`
+  or the `eventCallback` in `dataLayer.push({ event: 'buy', eventCallback: () => setDone(true) })` runs
+  in the page, and a DOM test can see what it does.
+- The call is not a statement of its own, such as the body of `onClick={() => gtag('event', 'buy')}`.
 - The code uses the call's result, such as `const id = analytics.track('signup')` or `return gtag(...)`.
 - The callee is computed, such as `analytics['track'](...)`, or longer than the listed name, such as
   `lib.analytics.track(...)`.
@@ -198,7 +208,8 @@ The ignorer keeps the mutants in every other case:
   test can check them.
 
 Add your project's own callees with `lzTelemetry.calls`. They add to the lists above. Reason:
-"lz-telemetry: telemetry call from lzTelemetry.calls; DOM tests do not observe what it sends".
+"lz-telemetry: telemetry call from lzTelemetry.calls; DOM tests do not observe what it sends". When
+`calls` repeats a built-in callee, such as `gtag`, the statement keeps the built-in reason.
 
 ```ts
 appendPlugins: ['@layzee/stryker-playwright-runner', '@layzee/stryker-jsx-mutators'],
@@ -218,8 +229,8 @@ analytics request with `page.route`.
 ## Hide console mutants with lz-console
 
 Console output does not reach the DOM, so the mutants in a `console.log` call's arguments survive. The
-opt-in `lz-console` ignorer hides every mutant of a statement that only calls one of the listed `console`
-methods. Reason: "lz-console: console output; DOM tests do not observe it".
+opt-in `lz-console` ignorer hides every mutant of a statement that is just a call to one of the listed
+`console` methods. Reason: "lz-console: console output; DOM tests do not observe it".
 
 By default it hides `console.log`, `console.debug`, `console.info`, and `console.trace`. It keeps the
 mutants of `console.warn` and `console.error` unless you list them. Set `lzConsole.methods` to choose the
@@ -238,9 +249,14 @@ lzConsole: {
 `timeEnd`, `timeLog`, `trace`, and `warn`. Stryker checks it against the schema the plugin exports, and the
 ignorer throws when it is created with any other value, such as the typo `lgo`.
 
-As with `lz-telemetry`, the statement can sit under `await` or `void`. The ignorer keeps the mutants of a
-console call whose result the code uses, such as `ok || console.log(message)`, and of a computed callee,
-such as `console['log'](message)`.
+As with `lz-telemetry`, the statement can be an optional call, such as `console.log?.(message)`, whose `?.`
+mutant is hidden with the statement, and can sit under `await` or `void`. The ignorer keeps the mutants of a
+console call whose result the code uses, such as `ok || console.log(message)`, of a computed callee, such
+as `console['log'](message)`, and of a call whose argument can act on the page, by the same rule as
+`lz-telemetry`: `console.log(count++)` and `console.log(queue.shift())` keep their mutants.
+
+Leave `lz-console` out when your tests check console output, for example with Playwright's
+`page.on('console')` or a spy on `console` in a unit test.
 
 ## Use several ignorers
 
