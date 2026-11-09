@@ -76,10 +76,12 @@ its source, run Stryker on it with the package's own config, where `<package>` i
 
 ```sh
 npx nx run @layzee/stryker-playwright-mutators:test
+npx nx run-many -t build
 npx stryker run packages/<package>/stryker.config.mjs
 ```
 
-The configs' thresholds are 100, so the run exits 1 when a mutant survives. To mutate only a change, add
+Build first: one of the JSX mutators' tests starts a process that loads the install code from its `dist` folder, so
+without a build Stryker's first test run fails. The configs' thresholds are 100, so the run exits 1 when a mutant survives. To mutate only a change, add
 `--mutate "packages/<package>/src/<file>.ts:<startLine>-<endLine>"`. Each config runs the tests with
 Stryker's `command` runner and `node --test --test-concurrency=1`. Run in parallel, each Stryker worker would start
 test files on every core, and mutants would time out without being killed. For the same reason each config sets
