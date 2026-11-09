@@ -63,7 +63,7 @@ Write one catalog per configuration (for example `.audit/common-mistakes/<area>.
   - **lint** when the pattern is visible in the syntax alone; search the lint plugins for the API and name the rule.
     A highly configurable rule that only matches the pattern when given a project-specific selector or pattern
     (`no-restricted-syntax`, `no-invalid-regexp`, `no-restricted-imports` and the like) counts as a custom lint
-    rule, not an available one. If no available rule exists, mark the row *lint-replaceable mutator candidate without existing lint rule* and reconsider
+    rule, not an available one. If no available rule exists, mark the row _lint-replaceable mutator candidate without existing lint rule_ and reconsider
     it as a mutator proposal (section 3), so it gets a different triage outcome than Drop;
   - **mutator** when only running the tests tells weak from strong (for example whether anything after a call
     depends on it);
@@ -149,23 +149,23 @@ how it ships. A proposal can move between outcomes as evidence arrives; record e
 
 ### Triage outcomes (before anything is built)
 
-| Outcome | When it fits | What happens next |
-| --- | --- | --- |
-| **Prototype** | A new name with no overlap, a clear survivor meaning, enough corpus sites (counted, with repos), and a static predicate for its noise. | A spike plugin and one measured run per mutator (section 4). The result goes to the next ruling batch. Nothing is built in the package yet. |
-| **Fold in** | The idea is a new case of an existing or approved mutator: a further call it should match, a coarse mode of a planned mutator, an extra site class. | No new public name. Add the case to the target mutator's proposal and build it with that mutator. |
-| **Defer** | Another mutator's measurement settles this one (the same idea on another API, a shared noise risk), or it waits on a ruling or a build. | Write down what it waits on and what result would revive it. Revisit when that measurement lands. |
-| **Drop** | No static predicate can skip its noise, a survivor would not point at a specific weak check, no common mistake stands behind it, or an existing lint rule catches the mistake from the syntax alone. A lint-shaped mistake with no existing rule is not dropped for being lint-shaped: it is a *lint-replaceable mutator candidate without existing lint rule* and is triaged on its merits as a mutator. | Record the reason in the rejected list so the idea does not come back. A lint-shaped mistake without a rule gets an upstream lint-rule draft in the filing ledger; nothing is filed without Lars's yes. |
+| Outcome       | When it fits                                                                                                                                                                                                                                                                                                                                                                                              | What happens next                                                                                                                                                                                       |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Prototype** | A new name with no overlap, a clear survivor meaning, enough corpus sites (counted, with repos), and a static predicate for its noise.                                                                                                                                                                                                                                                                    | A spike plugin and one measured run per mutator (section 4). The result goes to the next ruling batch. Nothing is built in the package yet.                                                             |
+| **Fold in**   | The idea is a new case of an existing or approved mutator: a further call it should match, a coarse mode of a planned mutator, an extra site class.                                                                                                                                                                                                                                                       | No new public name. Add the case to the target mutator's proposal and build it with that mutator.                                                                                                       |
+| **Defer**     | Another mutator's measurement settles this one (the same idea on another API, a shared noise risk), or it waits on a ruling or a build.                                                                                                                                                                                                                                                                   | Write down what it waits on and what result would revive it. Revisit when that measurement lands.                                                                                                       |
+| **Drop**      | No static predicate can skip its noise, a survivor would not point at a specific weak check, no common mistake stands behind it, or an existing lint rule catches the mistake from the syntax alone. A lint-shaped mistake with no existing rule is not dropped for being lint-shaped: it is a _lint-replaceable mutator candidate without existing lint rule_ and is triaged on its merits as a mutator. | Record the reason in the rejected list so the idea does not come back. A lint-shaped mistake without a rule gets an upstream lint-rule draft in the filing ledger; nothing is filed without Lars's yes. |
 
 Prototypes run while other work waits on rulings, so they delay no build. Book each in its own lock slot.
 
 ### How a measured mutator ships
 
-| Outcome | When it fits |
-| --- | --- |
-| **Main entry** | Measured on at least two corpus repositories; survivors are mostly Useful; kills are cheap (no timeout-only kills). |
-| **Opt-in entry** | Useful, but costly (timeout kills, slow runs) or noisy in some codebases, so users turn it on deliberately. |
-| **Experimental** | Approved to ship but resting on thin evidence: measured on one repository or few sites, a flaky kill risk, or a survivor meaning not yet confirmed by triage. It ships marked experimental in the package and README, with the evidence it waits for written down (which repositories, how many sites, what useful share). A later measurement promotes it to main or opt-in, or demotes it to fold in or drop. |
-| **Back to triage** | The measurement contradicts the proposal (mostly Noise, or kills only by crashing the test). Re-sort it with the table above. |
+| Outcome            | When it fits                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Main entry**     | Measured on at least two corpus repositories; survivors are mostly Useful; kills are cheap (no timeout-only kills).                                                                                                                                                                                                                                                                                             |
+| **Opt-in entry**   | Useful, but costly (timeout kills, slow runs) or noisy in some codebases, so users turn it on deliberately.                                                                                                                                                                                                                                                                                                     |
+| **Experimental**   | Approved to ship but resting on thin evidence: measured on one repository or few sites, a flaky kill risk, or a survivor meaning not yet confirmed by triage. It ships marked experimental in the package and README, with the evidence it waits for written down (which repositories, how many sites, what useful share). A later measurement promotes it to main or opt-in, or demotes it to fold in or drop. |
+| **Back to triage** | The measurement contradicts the proposal (mostly Noise, or kills only by crashing the test). Re-sort it with the table above.                                                                                                                                                                                                                                                                                   |
 
 Example from 2026-11-05: Lars approved seven Storybook play mutators, marking three as experimental "pending more
 evidence"; the common-mistakes proposals were sorted into four prototypes, three fold-ins, one deferral and one drop.
@@ -175,7 +175,11 @@ ships.
 
 ## 6. Built-in mutators in a test-code configuration
 
-Do not exclude all built-ins from test code, and do not keep them all. Decide per built-in mutator.
+Decide per built-in mutator before you exclude any. In this repository the analyses turned all 17 built-ins off in
+the test-code configurations. For Storybook play functions that was approved on 2026-11-05. For Playwright test code
+the analysis drops them as built-ins and brings their useful parts back as named custom mutators; which of those parts
+become mutators, and whether test doubles keep the built-ins, still wait on measurements. Run the steps below again
+for a new kind of test code instead of assuming that result.
 
 1. **Classify the sites.** Run the instrumenter over the test files and sort each mutant by site class: action
    call, assertion, wait, mock or double, setup data, helper logic, hook. Note the test kind (browser e2e, component,
@@ -186,10 +190,12 @@ Do not exclude all built-ins from test code, and do not keep them all. Decide pe
    doubles behave like production code and keep every built-in (they are the server side of the test).
 4. **Verdict per built-in mutator:** keep, exclude, or replace with a named custom mutator that does the useful part
    without the noise. Note where the verdict differs between test kinds and why.
-5. **Apply it** with `mutator.excludedMutations` in the test-code configuration, and document each exclusion's
-   reason next to the configuration.
+5. **Apply it** in the test-code configuration, with `mutator.excludedMutations` or a mutator package's install call
+   that removes the built-ins, and document each exclusion's reason where users of that configuration read it.
 
-The Playwright analysis (`.audit/builtin-mutators/analysis.md`) is the worked example.
+The Playwright analysis (`.audit/builtin-mutators/analysis.md`) is the worked example, and
+`.audit/builtin-mutators/analysis-play.md` repeats it for Storybook play functions. The reasons per built-in are in
+the "Why Stryker's built-in mutators are off" section of `packages/stryker-playwright-mutators/README.md`.
 
 ## 7. Auditing mutators that already ship
 

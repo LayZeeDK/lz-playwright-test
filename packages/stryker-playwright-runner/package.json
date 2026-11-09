@@ -47,6 +47,7 @@
   },
   "devDependencies": {
     "@layzee/stryker-jsx-mutators": "*",
+    "@layzee/stryker-playwright-mutators": "*",
     "ajv": "8.20.0"
   },
   "initStrykerConfig": {

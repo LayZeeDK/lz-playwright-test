@@ -633,6 +633,16 @@ optional nodes. `lz-tpp` picks one transformation per red and does not say what 
 failing for a second, unrelated reason. The worker applied a second transformation and logged both. Evidence:
 `step6-c8b-fix-notes.md`, cycle 1.
 
+**O80. A test that pins a document has no green transformation (lz-tpp misfit).** Chunk 12's test fails when the
+README's tier tables differ from the roster. Its red was the stale README, and the change that made it green was prose
+and three Markdown tables. None of the 14 transformations describes that, so the cycle was logged as "green: none on
+the list". Evidence: `step6-c12-notes.md`.
+
+**O81. A formatter run after green can change what the test reads.** After the README went green, Prettier padded the
+table cells, and the test's pattern, which expected a single space before a cell's closing `|`, no longer matched
+(inferred from the padded row; the test was not run between the format and the fix). The cycle has no step that
+formats the changed files and runs the tests again before the refactor step. Evidence: `step6-c12-notes.md`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -886,6 +896,13 @@ no other test asks for.
 **S73 (from O79).** In `lz-tpp`'s procedure, add a rerun step: after the chosen transformation, run the red test again.
 When it still fails for a new reason, name that reason, pick the next transformation for it, and log both under the
 same cycle.
+
+**S74 (from O80).** Give `lz-tpp` a route for a test whose subject is not code (a document, a generated file, a
+config): say that the transformation list does not apply, and that the green is the smallest edit to the artifact
+that the test reads.
+
+**S75 (from O81).** End each green with "run the project's formatter on the changed files, then run the tests again",
+so that a formatter rewrite is caught before the refactor step starts.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
