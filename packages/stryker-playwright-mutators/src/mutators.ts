@@ -5,6 +5,12 @@ import type {
 } from '@layzee/stryker-mutator-install';
 
 import type { BabelTypes } from './install.ts';
+import {
+  roleSite,
+  swapMutator,
+  testIdSite,
+  textSite,
+} from './same-file-swap.ts';
 import { removalMutator } from './statement-removal.ts';
 
 export interface LzPlaywrightMutator extends SampledMutator {
@@ -38,6 +44,23 @@ export const mutatorSets = roster({
     removalMutator(
       'LzPlaywrightNavigationAction',
       sampleOf("await page.goto('/');"),
+    ),
+    swapMutator(
+      'LzPlaywrightTestIdLocator',
+      sampleOf("page.getByTestId('a');\n  page.getByTestId('b');"),
+      testIdSite,
+    ),
+    swapMutator(
+      'LzPlaywrightRoleLocator',
+      sampleOf(
+        "page.getByRole('button', { name: 'a' });\n  page.getByRole('button', { name: 'b' });",
+      ),
+      roleSite,
+    ),
+    swapMutator(
+      'LzPlaywrightTextLocator',
+      sampleOf("page.getByText('a');\n  page.getByText('b');"),
+      textSite,
     ),
   ],
   optIn: [],
