@@ -627,6 +627,12 @@ asks for, so the stop conditions became test-after pins, and one check that no p
 transformation list offers no smaller step for adding a second, parallel rule. Evidence: `step6-c8b-notes.md`, cycle
 U15.
 
+**O79. One red can need two transformations in two functions.** In the 8b fix round, the row for an optional clock
+receiver stayed red after the receiver check was widened: the awaited-call and awaited-method checks also rejected
+optional nodes. `lz-tpp` picks one transformation per red and does not say what to do when a rerun shows the same test
+failing for a second, unrelated reason. The worker applied a second transformation and logged both. Evidence:
+`step6-c8b-fix-notes.md`, cycle 1.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -876,6 +882,10 @@ alternative, ranked just below `(unconditional -> if)`.
 **S72 (from O78).** In the impasse check, add the case of a second, parallel rule: write its positive red, take
 `(expression -> function)` for it, and pin its stop conditions in the same cycle. Do not invent reds that need code
 no other test asks for.
+
+**S73 (from O79).** In `lz-tpp`'s procedure, add a rerun step: after the chosen transformation, run the red test again.
+When it still fails for a new reason, name that reason, pick the next transformation for it, and log both under the
+same cycle.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
