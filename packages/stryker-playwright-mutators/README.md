@@ -291,7 +291,10 @@ These mutants survive or are missed by design. Each entry says what to do with i
 ### The Action mutators
 
 - A call on `keyboard`, `mouse` or `touchscreen`, such as `await page.keyboard.press('Enter');` or
-  `await page.mouse.click(10, 20);`, makes no mutant. Only calls on a locator or a page are removed.
+  `await page.mouse.click(10, 20);`, makes no mutant, and neither does a call on Vitest's `vi` or Jest's `jest`.
+- The mutators match the method name, not the type of what it is called on: an awaited `db.clear()` or
+  `userEvent.click(el)` in a test file is removed like a Playwright call. Disable such a mutant with a comment, or keep
+  helpers like these out of `mutate`.
 - A click right before a `fill` on the same element, or a value written and overwritten before any assertion, can
   survive. The survivor shows a line that the test does not need.
 - A removed `goto` or click makes the next action wait for an element that never appears. Without
