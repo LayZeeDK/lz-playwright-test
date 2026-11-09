@@ -17,14 +17,14 @@ function fileOf(testCase: Case): string {
   return join(import.meta.dirname, '..', 'out', `${testCase.id}.spec.ts`);
 }
 
-function source(testCase: Case): string {
-  return `import { expect, test } from '@playwright/test';\n\n${testCase.source}\n`;
-}
-
 export function runCases(
   cases: readonly Case[],
   options?: LzPlaywrightMutatorOptions,
+  testModule = '@playwright/test',
 ): void {
+  const source = (testCase: Case): string =>
+    `import { expect, test } from '${testModule}';\n\n${testCase.source}\n`;
+
   let mutants: readonly Mutant[];
 
   before(async () => {
