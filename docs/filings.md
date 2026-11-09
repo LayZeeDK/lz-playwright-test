@@ -591,6 +591,24 @@ the second cycle's red came from the install's self-check in a `before` hook: a 
 `node:test` reported it against the one case in the new file. With more rows the same hook error fails every row at
 once, which reads as many reds for one missing behaviour. Evidence: `step6-c6-notes.md`.
 
+**O73. A sample that holds other mutants lets a constant green pass for the wrong reason.** Chunk 7's first test
+asked that every mutant of `page.evaluate(() => ...);` carry the ignorer's reason. The `(nil -> constant)` green
+ignored the whole file, so it passed, although the statement also carried Stryker's statement-removal mutant outside
+the callback. The first real condition turned the earlier test red, and the fix was in the sample, not the code.
+`lz-red` has no prompt to check that the test input exercises only the node under test. Evidence:
+`step6-c7-notes.md`.
+
+**O74. A red for a guard needs an input chosen from the parser's node shapes.** For "a computed member is not
+matched", `page['evaluate']` and a bare `evaluate(...)` passed before the guard existed, because their nodes lack the
+field the code reads; only `page[evaluate]` made the guard's test red. `lz-red` does not say that picking a red input for
+a guard means knowing which shapes the guard is the only thing excluding. Evidence: `step6-c7-notes.md`.
+
+**O75. Porting a working prototype onto a shared engine leaves few drivers.** In chunk 8a, once the site reader used
+the engine from chunk 4, eight of the prototype's documented limits passed on their first run and were logged as
+test-after pins; four cycles drove new behaviour. The last green took the prototype's whole path-suffix rule in one
+step, because the prototype, not the transformation list, decided how much of the rule to write. Evidence:
+`step6-c8a-notes.md`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -819,6 +837,16 @@ from one real run of the subject, so the red and the later green both turn on be
 **S66 (from O72).** In `lz-red`'s Vitest and TypeScript mechanics, say how to read a red raised in a shared setup hook:
 count it as one red for the behaviour the hook checks, and prefer a red inside the test body when the file has several
 tests.
+
+**S67 (from O73).** In `lz-red`'s step 5, add a purity check for inputs that produce many outcomes (mutants, events,
+log lines): list everything the input produces once, and keep only what the test is about.
+
+**S68 (from O74).** In `lz-red`'s test selection, name the guard case: the red input is one the guard alone excludes,
+and inputs the rest of the code already rejects are pins.
+
+**S69 (from O75).** Add a "port" route to `lz-red` and `lz-tpp`: when a reference implementation exists, write its
+documented limits as a pinned table, drive only the behaviour the target does not yet have, and say that the
+reference decides the size of each green.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
