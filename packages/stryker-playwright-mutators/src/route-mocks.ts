@@ -146,7 +146,7 @@ function isNumberBetween(node: unknown, min: number, max: number): boolean {
   );
 }
 
-function hasProperty(object: unknown, key: string): boolean {
+export function hasProperty(object: unknown, key: string): boolean {
   const properties = fieldOf(object, 'properties');
 
   return (

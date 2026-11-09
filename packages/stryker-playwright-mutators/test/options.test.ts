@@ -40,3 +40,26 @@ it('turns one opt-in mutator on by its name', async () => {
 
   assert.match(line, / Opt-in or experimental: LzPlaywrightSleepWait\.$/);
 });
+
+it('turns every experimental mutator on with experimental', async () => {
+  const line = await startLineWith({ experimental: true });
+
+  assert.match(
+    line,
+    / Opt-in or experimental: LzPlaywrightRequestData, LzPlaywrightRequestUrl\.$/,
+  );
+});
+
+for (const name of ['LzPlaywrightRequestData', 'LzPlaywrightRequestUrl']) {
+  it(`turns ${name} on alone by its name inside experimental`, async () => {
+    const line = await startLineWith({ experimental: { [name]: true } });
+
+    assert.match(line, new RegExp(` Opt-in or experimental: ${name}\\.$`));
+  });
+}
+
+it('leaves every experimental mutator off with extended', async () => {
+  const line = await startLineWith({ extended: true });
+
+  assert.doesNotMatch(line, /LzPlaywrightRequest/);
+});

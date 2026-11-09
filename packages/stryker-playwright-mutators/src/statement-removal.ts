@@ -134,7 +134,7 @@ function removalOf(path: unknown): RemovalRow | undefined {
 }
 
 /** `<name>` or `<x>.<name>`. */
-function isNamedReceiver(node: unknown, name: string): boolean {
+export function isNamedReceiver(node: unknown, name: string): boolean {
   return (
     fieldOf(node, 'name') === name ||
     (fieldOf(node, 'type') === 'MemberExpression' &&
