@@ -23,8 +23,10 @@ patches the installed `@stryker-mutator/instrumenter` in memory, and checks that
 - `builtInNames`, `removeBuiltIns`: the 17 built-in mutators of Stryker, and the removal of them by name.
 - `builtInSample`, `checkBuiltInsRemoved`: a source file in which each of the 17 makes a mutant, and the check that
   throws when the instrumenter still makes one of them after the removal.
-- `selectMutators`: turns the options of a mutator package into the list of mutators to install. An option
-  holds only `true`. The function throws on any other value and on any unknown or misplaced name.
+- `selectMutators`: turns the options of a mutator package into the list of mutators to install. The options and
+  an `experimental` object are plain objects, an object literal or an object without a prototype, and only their
+  own keys count. An option holds only `true`. The function throws on any other value and on any unknown or
+  misplaced name.
 - Types: `Instrumenter`, `ListedMutator`, `MutatorList`, `MutatorOptions`, `MutatorSets`, `NamedMutator`,
   `SampledMutator`, and the types of the instrumenter's parts.
 

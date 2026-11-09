@@ -131,6 +131,44 @@ export const requestCases: readonly Case[] = [
     expect: [[data, '"nx"']],
   },
   {
+    id: 'data-computed-payload-key',
+    title:
+      'a string under a computed key named data makes no mutant: a computed key is no payload key',
+    source: readResult("request.post('/a', { [data]: { name: 'n' } })"),
+    expect: [],
+  },
+  {
+    id: 'data-wrapped-as',
+    title:
+      "a string in a data object under as makes no mutant: Stryker's instrumenter skips everything inside a type assertion",
+    source: readResult(
+      "request.post('/a', { data: { name: 'n' } as Payload })",
+    ),
+    expect: [],
+  },
+  ...(
+    [
+      ['satisfies', "{ name: 'n' } satisfies Payload"],
+      ['non-null', "{ name: 'n' }!"],
+    ] as const
+  ).map(
+    ([id, payload]): Case => ({
+      id: `data-wrapped-${id}`,
+      title: `a string in a data object under ${id} gets the suffix x`,
+      source: readResult(`request.post('/a', { data: ${payload} })`),
+      expect: [[data, '"nx"']],
+    }),
+  ),
+  {
+    id: 'data-wrapped-options',
+    title:
+      'a string in the data of request options under satisfies gets the suffix x',
+    source: readResult(
+      "request.post('/a', { data: { name: 'n' } } satisfies Options)",
+    ),
+    expect: [[data, '"nx"']],
+  },
+  {
     id: 'data-nested-object',
     title:
       'a string in an object inside the data of a request call gets the suffix x',
@@ -466,6 +504,59 @@ export const requestCases: readonly Case[] = [
       "const other = { get: async (u: string) => u };\n\n  expect(await other.get('/not-request')).toBe('/not-request');",
     ),
     expect: [],
+  },
+  {
+    id: 'data-computed-method',
+    title:
+      'a string in the data of a request method read through a computed member makes no mutant',
+    source: readResult("request[post]('/a', { data: { name: 'n' } })"),
+    expect: [],
+  },
+  {
+    id: 'url-computed-method',
+    title:
+      'the URL of a request method read through a computed member makes no mutant',
+    source: readResult("request[get]('/a')"),
+    expect: [],
+  },
+  {
+    id: 'url-new-context-computed',
+    title:
+      'the URL of a head on a context from a newContext read through a computed member makes no mutant',
+    source: inTest(
+      "let context;\n  context = await request[newContext]();\n  const response = await context.head('/a');\n\n  expect(response.ok()).toBe(true);",
+    ),
+    expect: [],
+  },
+  {
+    id: 'url-new-context-constructed',
+    title:
+      'the URL of a get on a name bound to a new expression named newContext makes no mutant: a new expression is no call',
+    source: inTest(
+      "const context = new request.newContext();\n  const response = await context.get('/a');\n\n  expect(response.ok()).toBe(true);",
+    ),
+    expect: [],
+  },
+  ...(
+    [
+      ['data', "request.post('/a', { data: { name: 'n' } })"],
+      ['url', "request.get('/a')"],
+    ] as const
+  ).map(
+    ([id, call]): Case => ({
+      id: `${id}-imported-request`,
+      title: `a ${call} on an imported request makes no mutant: only a parameter binds a bare request`,
+      source: `import request from 'superagent';\n\ntest('case', async () => {\n  const response = await ${call};\n\n  expect(response.ok()).toBe(true);\n});`,
+      expect: [],
+    }),
+  ),
+  {
+    id: 'url-helper-parameter',
+    title:
+      "the URL of a get on a helper's request parameter whose result is read becomes empty",
+    source:
+      "async function load(request: APIRequestContext) {\n  const response = await request.get('/a');\n\n  expect(response.ok()).toBe(true);\n}",
+    expect: [[url, '""']],
   },
   {
     id: 'url-goto',

@@ -317,6 +317,57 @@ export const cases: readonly Case[] = [
     expect: [[click, ';']],
   },
   {
+    id: 'keyboard-computed',
+    title:
+      'a press on a keyboard read through a computed member is removed: the name of a computed member is unknown',
+    source: inTest("await page[keyboard].press('Enter');"),
+    expect: [[input, ';']],
+  },
+  untouched(
+    'an awaited navigate in a fixture of an extend read through a computed member',
+    "const extended = test[extend]<{ ready: boolean }>({\n  ready: async ({ navigate }, use) => {\n    await navigate('/');\n    await use(true);\n  },\n});",
+    'navigate-computed-extend',
+  ),
+  {
+    id: 'afterEach-computed',
+    title:
+      'a click in a hook read through a computed member is removed: it is no known teardown hook',
+    source:
+      "test[afterEach](async ({ page }) => {\n  await page.locator('#a').click();\n});",
+    expect: [[click, ';']],
+  },
+  {
+    id: 'navigate-optional-test',
+    title:
+      'an awaited navigate from the fixtures of a test called through an optional chain is removed',
+    source:
+      "test?.('case', async ({ navigate }) => {\n  await navigate('/');\n});",
+    expect: [[navigation, ';']],
+  },
+  {
+    id: 'navigate-optional-chain-extend',
+    title:
+      'an awaited navigate in a fixture of an extend called through an optional chain is removed',
+    source:
+      "const extended = test?.extend({\n  ready: async ({ navigate }, use) => {\n    await navigate('/');\n    await use(true);\n  },\n});",
+    expect: [[navigation, ';']],
+  },
+  untouched(
+    'a click in test.afterEach called through an optional chain',
+    "test?.afterEach(async ({ page }) => {\n  await page.locator('#a').click();\n});",
+    'afterEach-optional',
+  ),
+  untouched(
+    'a click after await use called through an optional chain',
+    "const extended = test.extend<{ ready: boolean }>({\n  ready: async ({ page }, use) => {\n    await use?.(true);\n    await page.locator('#a').click();\n  },\n});",
+    'after-optional-use',
+  ),
+  untouched(
+    'an awaited post on an imported request',
+    "import request from 'superagent';\n\ntest('case', async () => {\n  await request.post('/api');\n});",
+    'request-imported',
+  ),
+  {
     id: 'sibling-of-afterEach',
     title: 'a click in a test next to test.afterEach is removed',
     source: `test.afterEach(async () => {});\n${inTest("await page.locator('#a').click();")}`,
@@ -366,11 +417,14 @@ export const cases: readonly Case[] = [
     "const extended = new test.extend({\n  ready: async ({ navigate }, use) => {\n    await navigate('/');\n    await use(true);\n  },\n});",
     'navigate-new-extend',
   ),
-  untouched(
-    'an awaited navigate in a fixture of (test?.extend)(...)',
-    "const extended = (test?.extend)({\n  ready: async ({ navigate }, use) => {\n    await navigate('/');\n    await use(true);\n  },\n});",
-    'navigate-optional-extend',
-  ),
+  {
+    id: 'navigate-optional-extend',
+    title:
+      'an awaited navigate in a fixture of (test?.extend)(...) is removed: an optional member counts',
+    source:
+      "const extended = (test?.extend)({\n  ready: async ({ navigate }, use) => {\n    await navigate('/');\n    await use(true);\n  },\n});",
+    expect: [[navigation, ';']],
+  },
   untouched(
     'an awaited navigate in a function passed to a method other than extend',
     "const extended = test.with({\n  ready: async ({ navigate }, use) => {\n    await navigate('/');\n    await use(true);\n  },\n});",
@@ -405,11 +459,9 @@ export const cases: readonly Case[] = [
       "new test.afterEach(async ({ page }) => {\n  await page.locator('#a').click();\n});",
     expect: [[click, ';']],
   },
-  {
-    id: 'optional-afterEach',
-    title: 'a click in a function passed to (test?.afterEach)(...) is removed',
-    source:
-      "(test?.afterEach)(async ({ page }) => {\n  await page.locator('#a').click();\n});",
-    expect: [[click, ';']],
-  },
+  untouched(
+    'a click in a function passed to (test?.afterEach)(...), a teardown hook through an optional member,',
+    "(test?.afterEach)(async ({ page }) => {\n  await page.locator('#a').click();\n});",
+    'optional-afterEach',
+  ),
 ];

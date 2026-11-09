@@ -1,6 +1,6 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
-import { isNamedReceiver, propertyNameOf } from './ast.ts';
+import { isRequest, methodOf, propertyKey } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 
 const payloadKeys: readonly unknown[] = ['data', 'form', 'params'];
@@ -11,6 +11,11 @@ const payloadMethods: readonly unknown[] = [
   'patch',
   'delete',
   'fetch',
+];
+// Stryker's instrumenter visits nothing inside `as`, so only these two wrappers can hold a mutated value.
+const typeWrappers: readonly unknown[] = [
+  'TSSatisfiesExpression',
+  'TSNonNullExpression',
 ];
 
 export function requestDataMutator<const TName extends string>(
@@ -48,11 +53,16 @@ export function requestDataMutator<const TName extends string>(
 function inPayload(path: unknown): boolean {
   const parentType = fieldOf(fieldOf(path, 'parent'), 'type');
 
+  if (typeWrappers.includes(parentType)) {
+    return inPayload(fieldOf(path, 'parentPath'));
+  }
+
   if (fieldOf(path, 'key') === 'value') {
     const property = fieldOf(path, 'parentPath');
 
     return (
-      (fieldOf(fieldOf(path, 'node'), 'type') === 'ObjectExpression' &&
+      (fieldOf(unwrapped(fieldOf(path, 'node')), 'type') ===
+        'ObjectExpression' &&
         isPayload(property)) ||
       inPayload(fieldOf(property, 'parentPath'))
     );
@@ -63,23 +73,36 @@ function inPayload(path: unknown): boolean {
   );
 }
 
+/** The expression inside any `satisfies` and `!` around `node`. */
+function unwrapped(node: unknown): unknown {
+  return typeWrappers.includes(fieldOf(node, 'type'))
+    ? unwrapped(fieldOf(node, 'expression'))
+    : node;
+}
+
+/** The path of the outermost `satisfies` or `!` around `path`, or `path` itself. */
+function outermost(path: unknown): unknown {
+  return typeWrappers.includes(fieldOf(fieldOf(path, 'parent'), 'type'))
+    ? outermost(fieldOf(path, 'parentPath'))
+    : path;
+}
+
 /** A payload property of the options argument of a request call. */
 function isPayload(propertyPath: unknown): boolean {
-  const optionsPath = fieldOf(propertyPath, 'parentPath');
-  const key = fieldOf(fieldOf(propertyPath, 'node'), 'key');
+  const optionsPath = outermost(fieldOf(propertyPath, 'parentPath'));
 
   return (
-    payloadKeys.includes(fieldOf(key, 'name') ?? fieldOf(key, 'value')) &&
+    payloadKeys.includes(propertyKey(fieldOf(propertyPath, 'node'))) &&
     fieldOf(optionsPath, 'key') === 1 &&
-    isPayloadCall(fieldOf(optionsPath, 'parent'))
+    isPayloadCall(optionsPath, fieldOf(optionsPath, 'parent'))
   );
 }
 
-function isPayloadCall(call: unknown): boolean {
+function isPayloadCall(path: unknown, call: unknown): boolean {
   const callee = fieldOf(call, 'callee');
 
   return (
-    isNamedReceiver(fieldOf(callee, 'object'), 'request') &&
-    payloadMethods.includes(propertyNameOf(callee))
+    isRequest(path, fieldOf(callee, 'object')) &&
+    payloadMethods.includes(methodOf(callee))
   );
 }

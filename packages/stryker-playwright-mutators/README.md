@@ -84,7 +84,8 @@ With opt-in or experimental mutators on, the line names them:
 @layzee/stryker-playwright-mutators: Stryker's 17 built-in mutators are off for every file in this run; 11 LzPlaywright mutators on. Opt-in or experimental: LzPlaywrightSleepWait, LzPlaywrightRequestUrl.
 ```
 
-The call throws, with a message that starts with the package name, on an unknown key, on a value other than `true`,
+The call throws, with a message that starts with the package name, on options that are not a plain object, such as
+a `Map` or an array, on an unknown key, on a value other than `true`,
 on the name of a default mutator, on an opt-in name inside `experimental`, and on an experimental name outside it.
 For example:
 
@@ -116,17 +117,17 @@ that stands alone as a statement, such as `await page.goto('/');`. A call whose 
 
 These run on `await lzPlaywrightMutators()`.
 
-| Mutator                        | What it changes                                                                                                                                                                                                                                                                                                                    | Example                                                                                    |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `LzPlaywrightClickAction`      | Removes an awaited `click`, `dblclick`, `tap`, `dragTo`, `dispatchEvent` or `dragAndDrop` statement.                                                                                                                                                                                                                               | `await page.getByRole('button').click();` is removed.                                      |
-| `LzPlaywrightInputAction`      | Removes an awaited `fill`, `clear`, `press`, `pressSequentially`, `type`, `selectOption`, `selectText`, `setInputFiles`, `drop`, `check`, `uncheck` or `setChecked` statement, and an awaited API request (`delete`, `fetch`, `get`, `head`, `patch`, `post`, `put` on `request` or `<x>.request`) whose result the test discards. | `await page.getByLabel('Name').fill('Ada');` is removed.                                   |
-| `LzPlaywrightFocusAction`      | Removes an awaited `focus`, `blur` or `hover` statement.                                                                                                                                                                                                                                                                           | `await page.getByRole('link').hover();` is removed.                                        |
-| `LzPlaywrightNavigationAction` | Removes an awaited `goto`, `reload`, `goBack` or `goForward` statement, and an awaited call to a navigation fixture that a test, hook or fixture takes from its fixtures, also inside `test.step`.                                                                                                                                 | `await navigate('/cart');` is removed.                                                     |
-| `LzPlaywrightTestIdLocator`    | Replaces the argument of `getByTestId` with another test id that the same file passes to `getByTestId`.                                                                                                                                                                                                                            | `getByTestId('badge')` becomes `getByTestId('total')`.                                     |
-| `LzPlaywrightRoleLocator`      | Replaces the `name` of `getByRole(role, { name })` with another name that the same file gives the same role.                                                                                                                                                                                                                       | `getByRole('button', { name: 'Save' })` becomes `getByRole('button', { name: 'Cancel' })`. |
-| `LzPlaywrightTextLocator`      | Replaces the first argument of `getByText`, `getByLabel`, `getByPlaceholder`, `getByAltText` or `getByTitle` with another value that the same file passes to the same method.                                                                                                                                                      | `getByLabel('Email')` becomes `getByLabel('Password')`.                                    |
-| `LzPlaywrightFulfill`          | Empties the `json` or `body` of `route.fulfill({ ... })`, and turns a literal `status` from 200-399 into 500 and from 400-599 into 200.                                                                                                                                                                                            | `json: { items: [1] }` becomes `json: {}`; `status: 404` becomes `status: 200`.            |
-| `LzPlaywrightRouteOutcome`     | In a route handler, turns `route.abort(...)` into `route.continue()`, and `route.continue(...)` or `route.fallback(...)` into `route.abort()`.                                                                                                                                                                                     | `await route.abort();` becomes `await route.continue();`.                                  |
+| Mutator                        | What it changes                                                                                                                                                                                                                                                                                                                                | Example                                                                                    |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `LzPlaywrightClickAction`      | Removes an awaited `click`, `dblclick`, `tap`, `dragTo`, `dispatchEvent` or `dragAndDrop` statement.                                                                                                                                                                                                                                           | `await page.getByRole('button').click();` is removed.                                      |
+| `LzPlaywrightInputAction`      | Removes an awaited `fill`, `clear`, `press`, `pressSequentially`, `type`, `selectOption`, `selectText`, `setInputFiles`, `drop`, `check`, `uncheck` or `setChecked` statement, and an awaited API request (`delete`, `fetch`, `get`, `head`, `patch`, `post`, `put` on a `request` parameter or `<x>.request`) whose result the test discards. | `await page.getByLabel('Name').fill('Ada');` is removed.                                   |
+| `LzPlaywrightFocusAction`      | Removes an awaited `focus`, `blur` or `hover` statement.                                                                                                                                                                                                                                                                                       | `await page.getByRole('link').hover();` is removed.                                        |
+| `LzPlaywrightNavigationAction` | Removes an awaited `goto`, `reload`, `goBack` or `goForward` statement, and an awaited call to a navigation fixture that a test, hook or fixture takes from its fixtures, also inside `test.step`.                                                                                                                                             | `await navigate('/cart');` is removed.                                                     |
+| `LzPlaywrightTestIdLocator`    | Replaces the argument of `getByTestId` with another test id that the same file passes to `getByTestId`.                                                                                                                                                                                                                                        | `getByTestId('badge')` becomes `getByTestId('total')`.                                     |
+| `LzPlaywrightRoleLocator`      | Replaces the `name` of `getByRole(role, { name })` with another name that the same file gives the same role.                                                                                                                                                                                                                                   | `getByRole('button', { name: 'Save' })` becomes `getByRole('button', { name: 'Cancel' })`. |
+| `LzPlaywrightTextLocator`      | Replaces the first argument of `getByText`, `getByLabel`, `getByPlaceholder`, `getByAltText` or `getByTitle` with another value that the same file passes to the same method.                                                                                                                                                                  | `getByLabel('Email')` becomes `getByLabel('Password')`.                                    |
+| `LzPlaywrightFulfill`          | Empties the `json` or `body` of `route.fulfill({ ... })`, and turns a literal `status` from 200-399 into 500 and from 400-599 into 200.                                                                                                                                                                                                        | `json: { items: [1] }` becomes `json: {}`; `status: 404` becomes `status: 200`.            |
+| `LzPlaywrightRouteOutcome`     | In a route handler, turns `route.abort(...)` into `route.continue()`, and `route.continue(...)` or `route.fallback(...)` into `route.abort()`.                                                                                                                                                                                                 | `await route.abort();` becomes `await route.continue();`.                                  |
 
 The four Action mutators skip teardown: `test.afterEach` and `test.afterAll` bodies, and the code after
 `await use(...)` in a fixture. The API request removals of `LzPlaywrightInputAction` also skip `test.beforeEach` and
@@ -316,6 +317,9 @@ These mutants survive or are missed by design. Each entry says what to do with i
 
 ### LzPlaywrightFulfill
 
+- It takes `fulfill` only on the route parameter of a handler, found as `LzPlaywrightRouteOutcome` finds it, and
+  only the object literal that is its first argument. A `fulfill` on another receiver, such as a deferred promise,
+  gets no mutant.
 - `status` gets a mutant only as a numeric literal from 200 to 599. A string or an expression gets none.
 - A fulfill with a `response` option gets no mutant at all, its `status` included.
 - A `json` value that is not a literal, such as a variable or a number, becomes `{}`.
@@ -339,9 +343,12 @@ These mutants survive or are missed by design. Each entry says what to do with i
 
 ### LzPlaywrightRequestData
 
-- It follows only `request` and `<x>.request`. A context from `request.newContext()` gets no mutant, although
-  `LzPlaywrightRequestUrl` follows one.
+- It follows only `<x>.request` and a bare `request` that a parameter binds: the `request` fixture or a helper's
+  argument. An imported `request`, such as superagent's, gets no mutant, and neither does a context from
+  `request.newContext()`, although `LzPlaywrightRequestUrl` follows one.
 - It never empties a value or drops a key. Identifiers, raw string bodies and negative numbers get no mutant.
+- A payload or options object under `satisfies` or `!` keeps its mutants. One under `as` gets none: Stryker's
+  instrumenter mutates nothing inside a type assertion.
 - Values that set up data or pick a page, such as a page size, often survive. Leave them with a disable comment.
 
 ### LzPlaywrightRequestUrl
@@ -355,8 +362,9 @@ These mutants survive or are missed by design. Each entry says what to do with i
   can make the request time out, and that kills the mutant even when no check would have. Warm the server before
   the run, or rerun such a kill before you trust it.
 - A survivor means the test's checks also pass on the root's response, such as a status-only `toBeOK()`.
-- A result that the test stores and never reads gets no mutant, but one wrapped in a type assertion, such as
-  `(await request.get('/a')) as Health`, still does.
+- A result that the test stores and never reads gets no mutant. A request inside a type assertion, such as
+  `(await request.get('/a')) as Health`, gets none either, read or not: Stryker's instrumenter mutates nothing inside
+  `as`.
 
 ## Set a short actionTimeout
 

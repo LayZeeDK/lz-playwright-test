@@ -40,6 +40,9 @@ describe('looksLikePlaywrightTest', () => {
     'test.beforeEach(async () => {});\n',
     "test.describe.serial('a', () => {});\n",
     "test.describe.configure({ mode: 'serial' });\n",
+    "test?.describe('a', () => {});\n",
+    "test.describe?.serial('a', () => {});\n",
+    "test?.('a', async () => {});\n",
   ]) {
     it(`is true for a file with a top-level test call: ${source.trim()}`, async () => {
       assert.equal(looksLikePlaywrightTest(await programOf(source)), true);

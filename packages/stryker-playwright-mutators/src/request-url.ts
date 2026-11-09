@@ -5,8 +5,10 @@ import {
   argumentOf,
   bindingOf,
   hasProperty,
+  isCall,
   isNamedReceiver,
-  propertyNameOf,
+  isRequest,
+  methodOf,
 } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 
@@ -55,7 +57,7 @@ function isCandidate(node: unknown): boolean {
 function isReadUrlArgument(path: unknown): boolean {
   const call = fieldOf(path, 'parent');
   const callee = fieldOf(call, 'callee');
-  const method = propertyNameOf(callee);
+  const method = methodOf(callee);
 
   return (
     fieldOf(path, 'listKey') === 'arguments' &&
@@ -97,7 +99,7 @@ function urlText(node: unknown): string | undefined {
 
   const quasis = fieldOf(node, 'quasis');
 
-  return type === 'TemplateLiteral' && Array.isArray(quasis)
+  return Array.isArray(quasis)
     ? String(fieldOf(fieldOf(quasis[0], 'value'), 'cooked'))
     : undefined;
 }
@@ -110,7 +112,7 @@ function hasExpressions(template: unknown): boolean {
 
 /** `request`, `<x>.request`, or a name bound to `await <request receiver>.newContext(...)`. */
 function isRequestReceiver(path: unknown, node: unknown): boolean {
-  if (isNamedReceiver(node, 'request')) {
+  if (isRequest(path, node)) {
     return true;
   }
 
@@ -136,7 +138,8 @@ function isNewContextCall(node: unknown): boolean {
   const callee = fieldOf(call, 'callee');
 
   return (
-    propertyNameOf(callee) === 'newContext' &&
+    isCall(call) &&
+    methodOf(callee) === 'newContext' &&
     isNamedReceiver(fieldOf(callee, 'object'), 'request')
   );
 }

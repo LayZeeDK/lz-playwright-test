@@ -244,6 +244,67 @@ export const routeMockCases: readonly Case[] = [
     expect: [[outcome, 'route.continue()']],
   },
   {
+    id: 'abort-computed-member',
+    title: 'an abort read through a computed member makes no mutant',
+    source: inRoute('await route[abort]();'),
+    expect: [],
+  },
+  {
+    id: 'abort-computed-route-method',
+    title:
+      'an abort in a callback of a route method read through a computed member makes no mutant',
+    source:
+      "test('case', async ({ page }) => {\n  await page[route]('**/api', (route) => route.abort());\n});",
+    expect: [],
+  },
+  {
+    id: 'fulfill-computed-member',
+    title: 'a fulfill read through a computed member makes no mutant',
+    source: inRoute('await route[fulfill]({ status: 404 });'),
+    expect: [],
+  },
+  {
+    id: 'fulfill-optional-call',
+    title: 'a fulfill on an optional chain gets its mutants',
+    source: inRoute('await route?.fulfill({ status: 404 });'),
+    expect: [[fulfill, '200']],
+  },
+  {
+    id: 'abort-new-route',
+    title:
+      'an abort in a callback of a constructor named route makes no mutant: a new expression is no call',
+    source:
+      "test('case', async ({ page }) => {\n  new router.route('**/api', (route) => route.abort());\n});",
+    expect: [],
+  },
+  {
+    id: 'fulfill-quoted-key',
+    title: 'a status under a quoted key becomes 200',
+    source: inRoute("await route.fulfill({ 'status': 404 });"),
+    expect: [[fulfill, '200']],
+  },
+  {
+    id: 'fulfill-outside-handler',
+    title: 'a fulfill outside any route handler makes no mutant',
+    source:
+      "test('case', async ({ page }) => {\n  deferred.fulfill({ body: 'done', status: 200 });\n});",
+    expect: [],
+  },
+  {
+    id: 'fulfill-other-receiver',
+    title:
+      'a fulfill on a receiver that is not the handler parameter makes no mutant',
+    source: inRoute("deferred.fulfill({ body: 'done', status: 200 });"),
+    expect: [],
+  },
+  {
+    id: 'fulfill-second-argument',
+    title:
+      'an object literal in the second argument of a fulfill makes no mutant',
+    source: inRoute('await route.fulfill(options, { json: { a: 1 } });'),
+    expect: [],
+  },
+  {
     id: 'fallback-expression-body',
     title: 'a fallback as the expression body of a handler becomes an abort',
     source:

@@ -13,6 +13,7 @@ const sets: MutatorSets<{ readonly name: string }> = {
 };
 const select = (options: unknown) =>
   selectMutators(packageName, installName, sets, options);
+const inheriting = (prototype: object): unknown => Object.create(prototype);
 
 describe('selectMutators', () => {
   it('selects the defaults when there are no options', () => {
@@ -138,9 +139,69 @@ describe('selectMutators', () => {
   it('rejects options that are not an object', () => {
     assert.throws(() => select('extended'), {
       message:
-        "@layzee/test-mutators: the options must be an object, not 'extended'.",
+        "@layzee/test-mutators: the options must be a plain object, not 'extended'.",
     });
   });
+
+  for (const [title, experimental, shown] of [
+    ['an array', ['LzExperimentalA'], "[ 'LzExperimentalA' ]"],
+    [
+      'an object whose names it inherits',
+      inheriting({ LzExperimentalA: true }),
+      '{}',
+    ],
+  ] as const) {
+    it(`rejects ${title} as the value of experimental`, () => {
+      assert.throws(() => select({ experimental }), {
+        message:
+          `@layzee/test-mutators: experimental takes only true, not ${shown}; Stryker's ` +
+          'mutator.excludedMutations turns mutators off.',
+      });
+    });
+  }
+
+  it('selects by the keys the options own, not by keys on Object.prototype', () => {
+    const inherited = ['extended', 'LzOptInA', 'LzExperimentalA'];
+
+    for (const key of inherited) {
+      Object.defineProperty(Object.prototype, key, {
+        value: true,
+        configurable: true,
+      });
+    }
+
+    try {
+      assert.deepEqual(select({ experimental: {} }), sets.defaults);
+    } finally {
+      for (const key of inherited) {
+        Reflect.deleteProperty(Object.prototype, key);
+      }
+    }
+  });
+
+  it('takes options without a prototype', () => {
+    const options: unknown = Object.assign(Object.create(null), {
+      extended: true,
+    });
+
+    assert.deepEqual(select(options), [...sets.defaults, ...sets.optIn]);
+  });
+
+  for (const [title, options, shown] of [
+    ['a Map', new Map([['extended', true]]), "Map(1) { 'extended' => true }"],
+    ['a Date', new Date(0), '1970-01-01T00:00:00.000Z'],
+    [
+      'an object whose keys it inherits',
+      inheriting({ LzOptInB: true, experimental: true }),
+      '{}',
+    ],
+  ] as const) {
+    it(`rejects ${title} as the options`, () => {
+      assert.throws(() => select(options), {
+        message: `@layzee/test-mutators: the options must be a plain object, not ${shown}.`,
+      });
+    });
+  }
 
   it('lists none when an opt-in name is given and the package has no opt-in mutators', () => {
     assert.throws(
@@ -161,10 +222,11 @@ describe('selectMutators', () => {
   it('rejects an array as the options', () => {
     assert.throws(() => select(['extended']), {
       message:
-        "@layzee/test-mutators: the options must be an object, not [ 'extended' ].",
+        "@layzee/test-mutators: the options must be a plain object, not [ 'extended' ].",
     });
     assert.throws(() => select([]), {
-      message: '@layzee/test-mutators: the options must be an object, not [].',
+      message:
+        '@layzee/test-mutators: the options must be a plain object, not [].',
     });
   });
 
