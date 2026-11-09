@@ -96,6 +96,12 @@ export const locatorCases: readonly Case[] = [
     expect: [],
   },
   {
+    id: 'testid-new-expression',
+    title: 'a test id passed to a constructor is no site',
+    source: inTest(["page.getByTestId('a');", "new page.getByTestId('b');"]),
+    expect: [],
+  },
+  {
     id: 'role-lone',
     title: 'a lone role name makes no mutant',
     source: inTest(["page.getByRole('button', { name: 'Save' });"]),
