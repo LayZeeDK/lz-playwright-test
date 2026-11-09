@@ -753,6 +753,20 @@ a config folder starts Node and loads Storybook (1 to 2.5 s each, measured in th
 reaches Storybook's own story list is this child process; a pure seam would test the parser, not the discovery.
 Neither skill weighs run time per cycle. Evidence: `sb-s1/notes.md`.
 
+**O98 (lz-tpp misfit). A normalisation applied to both sides of a comparison has a red for one side only.** S1 cycle
+13's red ("a path whose drive letter is lower case matches") came from the caller's side, and the minimal green
+upper-cased the query only. Storybook's side got the same function, because a lower-case working folder would give
+lower-case paths from Storybook, but no fixture can make Storybook return a lower-case drive (it resolves through the
+real path), so that half of the green has no red and no reachable test. `lz-tpp` has no transformation for "apply the
+same function to the other operand", and `lz-red` has no move for a test whose input only a platform state can
+produce. Evidence: `sb-s1/notes.md`, `sb-s1/cycles.log`, cycle 13.
+
+**O99. A list item whose natural test depends on test order is dropped, not shrunk.** S1's "one load per config
+folder" (memoising `storybookProject`) needs a module-level cache, and with it any test that asserts the info or
+warning line depends on whether an earlier test in the same file loaded that folder. `lz-red` offers no move between
+"pass the cache in" (a new parameter only tests use) and "defer", so the item was deferred to S3, where its callers
+exist. Evidence: `sb-s1/notes.md`, "After the reboot".
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -1071,6 +1085,14 @@ order.
 
 **S90 (from O97).** In `lz-red`'s stance advice, name the slow-seam case: keep one test per slow call and drive the
 rest of the behaviour through a recorded result, so run time grows with the number of slow tests rather than cycles.
+
+**S91 (from O98).** In `lz-tpp`, name the symmetric case: when a green normalises one operand of a comparison, say
+whether the other operand needs the same, and if no test can reach that side, log it as a guard with its reason. In
+`lz-red`, add a move for input only a platform state produces: a seam that injects the value, or a recorded
+exception to test-first.
+
+**S92 (from O99).** In `lz-red`, add a move for state shared across tests: a factory that returns a fresh cache per
+test, or a reset the module exports, with the price of each, before "defer".
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
