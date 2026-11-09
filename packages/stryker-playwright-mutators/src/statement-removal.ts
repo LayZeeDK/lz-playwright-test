@@ -6,7 +6,8 @@ import {
   isFunctionNode,
   isNamedReceiver,
   isTestCallee,
-  memberTypes,
+  methodOf,
+  propertyNameOf,
 } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 import { navigationFixtures } from './settings.ts';
@@ -174,11 +175,9 @@ function awaitedCall(node: unknown): unknown {
 function awaitedMethod(callee: unknown): unknown {
   const object = fieldOf(callee, 'object');
 
-  return memberTypes.includes(fieldOf(callee, 'type')) &&
-    fieldOf(callee, 'computed') === false &&
-    !inputDevices.includes(fieldOf(fieldOf(object, 'property'), 'name')) &&
+  return !inputDevices.includes(propertyNameOf(object)) &&
     !testRunners.includes(fieldOf(object, 'name'))
-    ? fieldOf(fieldOf(callee, 'property'), 'name')
+    ? methodOf(callee)
     : undefined;
 }
 
@@ -238,7 +237,7 @@ function isExtendCall(node: unknown): boolean {
   return (
     fieldOf(node, 'type') === 'CallExpression' &&
     fieldOf(callee, 'type') === 'MemberExpression' &&
-    fieldOf(fieldOf(callee, 'property'), 'name') === 'extend'
+    propertyNameOf(callee) === 'extend'
   );
 }
 
@@ -263,7 +262,7 @@ function isHookCall(node: unknown, hooks: readonly unknown[]): boolean {
   return (
     fieldOf(node, 'type') === 'CallExpression' &&
     fieldOf(callee, 'type') === 'MemberExpression' &&
-    hooks.includes(fieldOf(fieldOf(callee, 'property'), 'name'))
+    hooks.includes(propertyNameOf(callee))
   );
 }
 

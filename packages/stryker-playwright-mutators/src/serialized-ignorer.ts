@@ -1,10 +1,8 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 import type { Ignorer } from '@stryker-mutator/api/ignore';
 
-const functionTypes: readonly unknown[] = [
-  'ArrowFunctionExpression',
-  'FunctionExpression',
-];
+import { isFunctionNode, methodOf } from './ast.ts';
+
 const serializingMethods: readonly unknown[] = [
   'evaluate',
   'evaluateHandle',
@@ -21,12 +19,11 @@ export const serializedIgnorer: Ignorer = {
       fieldOf(fieldOf(path, 'parentPath'), 'node'),
       'callee',
     );
-    const method = fieldOf(fieldOf(callee, 'property'), 'name');
+    const method = methodOf(callee);
 
     if (
       fieldOf(path, 'listKey') === 'arguments' &&
-      functionTypes.includes(fieldOf(fieldOf(path, 'node'), 'type')) &&
-      fieldOf(callee, 'computed') === false &&
+      isFunctionNode(fieldOf(path, 'node')) &&
       typeof method === 'string' &&
       serializingMethods.includes(method)
     ) {

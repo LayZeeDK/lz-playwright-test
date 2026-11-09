@@ -4,7 +4,7 @@ export const callTypes: readonly unknown[] = [
   'CallExpression',
   'OptionalCallExpression',
 ];
-export const memberTypes: readonly unknown[] = [
+const memberTypes: readonly unknown[] = [
   'MemberExpression',
   'OptionalMemberExpression',
 ];
@@ -13,8 +13,13 @@ export const memberTypes: readonly unknown[] = [
 export function methodOf(member: unknown): unknown {
   return memberTypes.includes(fieldOf(member, 'type')) &&
     fieldOf(member, 'computed') === false
-    ? fieldOf(fieldOf(member, 'property'), 'name')
+    ? propertyNameOf(member)
     : undefined;
+}
+
+/** The `name` of a node's `property`, whatever the node and whether or not it is computed. */
+export function propertyNameOf(node: unknown): unknown {
+  return fieldOf(fieldOf(node, 'property'), 'name');
 }
 
 export function argumentOf(call: unknown, index: number): unknown {
