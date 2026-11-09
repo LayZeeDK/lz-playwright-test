@@ -1,6 +1,7 @@
 import type { Case } from './cases.ts';
 
 const fulfill = 'LzPlaywrightFulfill';
+const outcome = 'LzPlaywrightRouteOutcome';
 
 function inRoute(statement: string): string {
   return `test('case', async ({ page }) => {\n  await page.route('**/api', async (route) => {\n    ${statement}\n  });\n});`;
@@ -132,5 +133,99 @@ export const routeMockCases: readonly Case[] = [
     title: 'a json property in a call that is not fulfill makes no mutant',
     source: inRoute('await route.send({ json: { name: "a" }, status: 200 });'),
     expect: [],
+  },
+  {
+    id: 'abort-inline',
+    title: 'an abort in an inline handler becomes a continue',
+    source: inRoute('await route.abort();'),
+    expect: [[outcome, 'route.continue()']],
+  },
+  {
+    id: 'abort-error-code',
+    title: 'an abort with an error code becomes a continue without arguments',
+    source: inRoute("await route.abort('failed');"),
+    expect: [[outcome, 'route.continue()']],
+  },
+  {
+    id: 'continue-inline',
+    title: 'a continue in an inline handler becomes an abort',
+    source: inRoute('await route.continue();'),
+    expect: [[outcome, 'route.abort()']],
+  },
+  {
+    id: 'continue-options',
+    title: 'a continue with options becomes an abort without arguments',
+    source: inRoute("await route.continue({ headers: { a: 'b' } });"),
+    expect: [[outcome, 'route.abort()']],
+  },
+  {
+    id: 'fallback-inline',
+    title: 'a fallback in an inline handler becomes an abort',
+    source: inRoute('await route.fallback();'),
+    expect: [[outcome, 'route.abort()']],
+  },
+  {
+    id: 'abort-other-receiver',
+    title:
+      'an abort on a receiver that is not the handler parameter makes no mutant',
+    source: inRoute('await controller.abort();'),
+    expect: [],
+  },
+  {
+    id: 'abort-outside-handler',
+    title: 'an abort outside any route handler makes no mutant',
+    source:
+      "test('case', async ({ page }) => {\n  const controller = new AbortController();\n\n  controller.abort();\n});",
+    expect: [],
+  },
+  {
+    id: 'abort-other-callback',
+    title: 'an abort in a callback that is not a route handler makes no mutant',
+    source:
+      "test('case', async ({ page }) => {\n  page.on('request', (route) => route.abort());\n});",
+    expect: [],
+  },
+  {
+    id: 'abort-annotated-declaration',
+    title:
+      'an abort in a function declaration whose parameter is a Route becomes a continue',
+    source: 'async function handle(route: Route) {\n  await route.abort();\n}',
+    expect: [[outcome, 'route.continue()']],
+  },
+  {
+    id: 'continue-annotated-arrow',
+    title:
+      'a continue in an arrow function whose parameter is a Route becomes an abort',
+    source:
+      'const handle = async (route: Route) => {\n  await route.continue();\n};',
+    expect: [[outcome, 'route.abort()']],
+  },
+  {
+    id: 'abort-unannotated-function',
+    title:
+      'an abort in a function with no Route annotation, held in a variable, makes no mutant',
+    source: 'async function handle(route) {\n  await route.abort();\n}',
+    expect: [],
+  },
+  {
+    id: 'abort-annotated-other-receiver',
+    title:
+      'an abort on a receiver that is not the Route parameter of its function makes no mutant',
+    source:
+      'async function handle(route: Route) {\n  await controller.abort();\n}',
+    expect: [],
+  },
+  {
+    id: 'abort-returned',
+    title: 'a returned abort becomes a continue',
+    source: inRoute('return route.abort();'),
+    expect: [[outcome, 'route.continue()']],
+  },
+  {
+    id: 'fallback-expression-body',
+    title: 'a fallback as the expression body of a handler becomes an abort',
+    source:
+      "test('case', async ({ page }) => {\n  await page.route('**/api', (route) => route.fallback());\n});",
+    expect: [[outcome, 'route.abort()']],
   },
 ];

@@ -39,6 +39,95 @@ export function fulfillMutator<const TName extends string>(
   };
 }
 
+/** The Route method that ends a request, mapped to the one that lets it go on, and the reverse. */
+const outcomeFlips: Readonly<Record<string, string>> = {
+  abort: 'continue',
+  continue: 'abort',
+  fallback: 'abort',
+};
+
+export function outcomeMutator<const TName extends string>(
+  name: TName,
+  sample: string,
+): LzPlaywrightMutator & { readonly name: TName } {
+  return {
+    name,
+    sample,
+    *mutate(path, t) {
+      const node = fieldOf(path, 'node');
+      const callee = fieldOf(node, 'callee');
+      const object = fieldOf(callee, 'object');
+      const method = fieldOf(fieldOf(callee, 'property'), 'name');
+      const flipped =
+        typeof method === 'string' && Object.hasOwn(outcomeFlips, method)
+          ? outcomeFlips[method]
+          : undefined;
+
+      if (
+        fieldOf(node, 'type') === 'CallExpression' &&
+        flipped !== undefined &&
+        isInHandlerOf(path, fieldOf(object, 'name'))
+      ) {
+        yield t.callExpression(
+          t.memberExpression(
+            t.identifier(String(fieldOf(object, 'name'))),
+            t.identifier(flipped),
+          ),
+          [],
+        );
+      }
+    },
+  };
+}
+
+/** A route handler around `path` has `route` as the name of its first parameter. */
+function isInHandlerOf(path: unknown, route: unknown): boolean {
+  for (
+    let current = fieldOf(path, 'parentPath');
+    current !== undefined && current !== null;
+    current = fieldOf(current, 'parentPath')
+  ) {
+    const handler = fieldOf(current, 'node');
+    const params = fieldOf(handler, 'params');
+    const first: unknown = Array.isArray(params) ? params[0] : undefined;
+
+    if (
+      fieldOf(first, 'type') === 'Identifier' &&
+      fieldOf(first, 'name') === route &&
+      (isRouteAnnotated(first) ||
+        isRouteCallback(fieldOf(current, 'parent'), handler))
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/** `handler` is the second argument of `<x>.route(...)`. */
+function isRouteCallback(call: unknown, handler: unknown): boolean {
+  const args = fieldOf(call, 'arguments');
+
+  return (
+    Array.isArray(args) &&
+    args[1] === handler &&
+    fieldOf(fieldOf(fieldOf(call, 'callee'), 'property'), 'name') === 'route'
+  );
+}
+
+/** The parameter is written `<name>: Route`. */
+function isRouteAnnotated(parameter: unknown): boolean {
+  const annotation = fieldOf(
+    fieldOf(parameter, 'typeAnnotation'),
+    'typeAnnotation',
+  );
+
+  return (
+    fieldOf(annotation, 'type') === 'TSTypeReference' &&
+    fieldOf(fieldOf(annotation, 'typeName'), 'name') === 'Route'
+  );
+}
+
 function isNumberBetween(node: unknown, min: number, max: number): boolean {
   const value = fieldOf(node, 'value');
 

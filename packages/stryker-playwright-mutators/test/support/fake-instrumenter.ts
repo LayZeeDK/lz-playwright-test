@@ -21,6 +21,9 @@ export const fakeTypes: BabelTypes = {
   arrayExpression: () => ({}),
   stringLiteral: () => ({}),
   numericLiteral: () => ({}),
+  callExpression: () => ({}),
+  memberExpression: () => ({}),
+  identifier: () => ({}),
 };
 
 export const ownMark = markOf('@layzee/stryker-playwright-mutators');

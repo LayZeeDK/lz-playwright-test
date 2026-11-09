@@ -26,6 +26,9 @@ const babelTypeMembers: readonly string[] = [
   'arrayExpression',
   'stringLiteral',
   'numericLiteral',
+  'callExpression',
+  'memberExpression',
+  'identifier',
 ];
 
 export interface BabelTypes {
@@ -34,6 +37,9 @@ export interface BabelTypes {
   arrayExpression(elements: readonly unknown[]): unknown;
   stringLiteral(value: string): unknown;
   numericLiteral(value: number): unknown;
+  callExpression(callee: unknown, args: readonly unknown[]): unknown;
+  memberExpression(object: unknown, property: unknown): unknown;
+  identifier(name: string): unknown;
 }
 
 export type Instrumenter = CoreInstrumenter<BabelTypes>;
