@@ -95,13 +95,13 @@ export const mutatorSets = roster({
     requestDataMutator(
       'LzPlaywrightRequestData',
       sampleOf(
-        "const response = await request.post('/a', { data: { a: 'b' } });\n  expect(response.ok()).toBe(true);",
+        "const response = await page.request.post('/a', { data: { a: 'b' } });\n  expect(response.ok()).toBe(true);",
       ),
     ),
     requestUrlMutator(
       'LzPlaywrightRequestUrl',
       sampleOf(
-        "const response = await request.get('/a');\n  expect(response.ok()).toBe(true);",
+        "const response = await page.request.get('/a');\n  expect(response.ok()).toBe(true);",
       ),
     ),
   ],

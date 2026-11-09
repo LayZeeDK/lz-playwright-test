@@ -7,6 +7,7 @@ import {
   hasProperty,
   isCall,
   isNamedReceiver,
+  isRequest,
   methodOf,
 } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
@@ -111,7 +112,7 @@ function hasExpressions(template: unknown): boolean {
 
 /** `request`, `<x>.request`, or a name bound to `await <request receiver>.newContext(...)`. */
 function isRequestReceiver(path: unknown, node: unknown): boolean {
-  if (isNamedReceiver(node, 'request')) {
+  if (isRequest(path, node)) {
     return true;
   }
 

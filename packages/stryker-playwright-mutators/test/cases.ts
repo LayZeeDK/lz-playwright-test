@@ -362,6 +362,11 @@ export const cases: readonly Case[] = [
     "const extended = test.extend<{ ready: boolean }>({\n  ready: async ({ page }, use) => {\n    await use?.(true);\n    await page.locator('#a').click();\n  },\n});",
     'after-optional-use',
   ),
+  untouched(
+    'an awaited post on an imported request',
+    "import request from 'superagent';\n\ntest('case', async () => {\n  await request.post('/api');\n});",
+    'request-imported',
+  ),
   {
     id: 'sibling-of-afterEach',
     title: 'a click in a test next to test.afterEach is removed',

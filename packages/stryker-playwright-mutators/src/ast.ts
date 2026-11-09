@@ -55,6 +55,15 @@ export function isNamedReceiver(node: unknown, name: string): boolean {
   return fieldOf(node, 'name') === name || methodOf(node) === name;
 }
 
+/** `<x>.request`, `<x>?.request`, or a bare `request` that a parameter binds: a fixture or a helper's argument. */
+export function isRequest(path: unknown, node: unknown): boolean {
+  return (
+    methodOf(node) === 'request' ||
+    (fieldOf(node, 'name') === 'request' &&
+      fieldOf(bindingOf(path, 'request'), 'kind') === 'param')
+  );
+}
+
 /** `test`, or a member chain on it such as `test.describe.serial`. */
 export function isTestCallee(callee: unknown): boolean {
   if (memberTypes.includes(fieldOf(callee, 'type'))) {

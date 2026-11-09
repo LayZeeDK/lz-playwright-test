@@ -531,6 +531,27 @@ export const requestCases: readonly Case[] = [
     ),
     expect: [],
   },
+  ...(
+    [
+      ['data', "request.post('/a', { data: { name: 'n' } })"],
+      ['url', "request.get('/a')"],
+    ] as const
+  ).map(
+    ([id, call]): Case => ({
+      id: `${id}-imported-request`,
+      title: `a ${call} on an imported request makes no mutant: only a parameter binds a bare request`,
+      source: `import request from 'superagent';\n\ntest('case', async () => {\n  const response = await ${call};\n\n  expect(response.ok()).toBe(true);\n});`,
+      expect: [],
+    }),
+  ),
+  {
+    id: 'url-helper-parameter',
+    title:
+      "the URL of a get on a helper's request parameter whose result is read becomes empty",
+    source:
+      "async function load(request: APIRequestContext) {\n  const response = await request.get('/a');\n\n  expect(response.ok()).toBe(true);\n}",
+    expect: [[url, '""']],
+  },
   {
     id: 'url-goto',
     title: 'the URL of page.goto makes no RequestUrl mutant',
