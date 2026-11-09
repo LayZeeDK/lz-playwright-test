@@ -97,7 +97,8 @@ export function register(
 }
 
 /**
- * Runs `change`; when it throws, gives each target back exactly the own properties it had before, and rethrows.
+ * Runs `change`; when it throws, gives each target back the own properties it had before, and rethrows. The restore
+ * is shallow (property values come back by reference) and needs extensible targets with configurable properties.
  */
 export async function undoOnThrow(
   targets: readonly object[],

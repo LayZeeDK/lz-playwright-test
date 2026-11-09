@@ -21,7 +21,7 @@ patches the installed `@stryker-mutator/instrumenter` in memory, and checks that
 - `selfCheck`: instruments one sample per mutator and throws when the instrumenter makes no mutant of it.
 - `undoOnThrow`: runs an install's changes and the checks after them. When one of them throws, it gives each object
   it was handed, such as the mutator list or the expression placer, back the own properties it had before, and
-  rethrows.
+  rethrows. The restore is shallow, and it needs objects that can take new properties, as both of those can.
 - `warnUntested`: warns when the instrumenter is not the version the calling package was tested with.
 - `builtInNames`, `removeBuiltIns`: the 17 built-in mutators of Stryker, and the removal of them by name.
 - `builtInSample`, `checkBuiltInsRemoved`: a source file in which each of the 17 makes a mutant, and the check that
