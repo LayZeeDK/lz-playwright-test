@@ -223,6 +223,28 @@ export const requestCases: readonly Case[] = [
     expect: [],
   },
   {
+    id: 'url-assigned-unread',
+    title:
+      'the URL of a request.get whose result is assigned and never read makes no mutant',
+    source: inTest("let unread;\n  unread = await request.get('/a');"),
+    expect: [],
+  },
+  {
+    id: 'url-assigned-read',
+    title:
+      'the URL of a request.get whose result is assigned and then read becomes empty',
+    source: inTest(
+      "let response;\n  response = await request.get('/a');\n\n  expect(response.ok()).toBe(true);",
+    ),
+    expect: [[url, '""']],
+  },
+  {
+    id: 'url-void',
+    title: 'the URL of a request.get under void makes no mutant',
+    source: inTest("void request.get('/a');"),
+    expect: [],
+  },
+  {
     id: 'url-logged',
     title:
       'the URL of a request.get whose result is only logged makes no mutant',

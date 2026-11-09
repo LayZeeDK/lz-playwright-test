@@ -140,14 +140,12 @@ function resultIsRead(callPath: unknown): boolean {
       ? fieldOf(parentPath, 'parentPath')
       : parentPath;
   const user = fieldOf(userPath, 'node');
-  const id = fieldOf(user, 'id');
+  const type = fieldOf(user, 'type');
+  const target = fieldOf(user, type === 'AssignmentExpression' ? 'left' : 'id');
 
-  if (
-    fieldOf(user, 'type') === 'VariableDeclarator' &&
-    fieldOf(id, 'type') === 'Identifier'
-  ) {
+  if (fieldOf(target, 'type') === 'Identifier') {
     const references = fieldOf(
-      bindingOf(userPath, fieldOf(id, 'name')),
+      bindingOf(userPath, fieldOf(target, 'name')),
       'referencePaths',
     );
 
@@ -157,7 +155,10 @@ function resultIsRead(callPath: unknown): boolean {
     );
   }
 
-  return fieldOf(user, 'type') !== 'ExpressionStatement';
+  return (
+    type !== 'ExpressionStatement' &&
+    !(type === 'UnaryExpression' && fieldOf(user, 'operator') === 'void')
+  );
 }
 
 /** Some call around `path` is `console.<x>(...)`. */
