@@ -655,6 +655,13 @@ check. The two forms differ only on node shapes Babel never builds. `lz-refactor
 change and routes it to `lz-tpp`, with no way to record the argument that the difference cannot be reached. This is
 the converse of O56. Evidence: `step6-r6-wave1-notes.md`.
 
+**O84. A test that kills a mutant is red only with the mutant applied, and `lz-red` does not say how to show that.**
+Step 5 asks for a red that ran and failed in the code under test. A test written for a Stryker survivor passes on the
+real code by construction, so its red exists only in the mutated code. Chunk 10's worker applied each mutant by hand
+in a scratch copy of the package. That copy needed its own `node_modules` junction, and batching several mutants in
+one copy was safe only when each new test reached exactly one of them, which took three batches for one file. A
+script that applies one mutant at a time replaced the batches. Evidence: `c10/notes.md`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -923,6 +930,10 @@ TypeScript overlay already gives.
 **S77 (from O83).** Give `lz-refactor` a "reachable inputs" note: a change that keeps the output for every input the
 producer can build (a parser, a schema) counts as behaviour-preserving when the note names the producer and the
 shapes it never builds.
+
+**S78 (from O84).** In `lz-red`'s step 5, add the mutant-killing case: the red is the new test failing with the
+mutant applied, shown by a rerun of the mutation tool scoped to the line or by applying that one mutant in a copy.
+Name the one-mutant-per-run rule.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
