@@ -100,6 +100,10 @@ export function selectMutators<TMutator extends NamedMutator>(
     );
   }
 
+  let extended = false;
+  let allExperimental = false;
+  const named = new Set<string>();
+
   for (const [key, value] of definedEntries(options)) {
     if (key === 'extended' && sets.optIn.length === 0) {
       throw new Error(
@@ -119,33 +123,29 @@ export function selectMutators<TMutator extends NamedMutator>(
       for (const [name, member] of definedEntries(value)) {
         onlyTrue(`experimental.${name}`, member);
         checkTier('experimental', name);
+        named.add(name);
       }
     } else {
       onlyTrue(key, value);
 
-      if (key !== 'extended' && key !== 'experimental') {
+      if (key === 'extended') {
+        extended = true;
+      } else if (key === 'experimental') {
+        allExperimental = true;
+      } else {
         checkTier('optIn', key);
+        named.add(key);
       }
     }
   }
 
-  const extended = ownFieldOf(options, 'extended') === true;
-  const experimental = ownFieldOf(options, 'experimental');
-
   return [
     ...sets.defaults,
-    ...sets.optIn.filter(
-      ({ name }) => extended || ownFieldOf(options, name) === true,
-    ),
+    ...sets.optIn.filter(({ name }) => extended || named.has(name)),
     ...sets.experimental.filter(
-      ({ name }) =>
-        experimental === true || ownFieldOf(experimental, name) === true,
+      ({ name }) => allExperimental || named.has(name),
     ),
   ];
-}
-
-function ownFieldOf(value: unknown, key: string): unknown {
-  return isRecord(value) && Object.hasOwn(value, key) ? value[key] : undefined;
 }
 
 /** An object literal or an object without a prototype, so that every key it has is its own. */

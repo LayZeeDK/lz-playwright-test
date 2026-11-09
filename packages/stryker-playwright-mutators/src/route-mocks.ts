@@ -5,8 +5,10 @@ import {
   argumentOf,
   hasProperty,
   isCall,
-  methodOf,
+  memberNameOf,
+  outermost,
   propertyKey,
+  rowOf,
 } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 
@@ -63,20 +65,18 @@ export function outcomeMutator<const TName extends string>(
     sample,
     *mutate(path, t) {
       const node = fieldOf(path, 'node');
-      const callee = fieldOf(node, 'callee');
-      const route = fieldOf(fieldOf(callee, 'object'), 'name');
-      const method = methodOf(callee);
-      const flipped =
-        typeof method === 'string' && Object.hasOwn(outcomeFlips, method)
-          ? outcomeFlips[method]
-          : undefined;
+      const flipped = rowOf(
+        outcomeFlips,
+        memberNameOf(fieldOf(node, 'callee')),
+      );
 
-      if (
-        isCall(node) &&
-        flipped !== undefined &&
-        typeof route === 'string' &&
-        isInHandlerOf(path, route)
-      ) {
+      if (!isCall(node) || flipped === undefined) {
+        return;
+      }
+
+      const route = handlerRouteOf(path, node);
+
+      if (route !== undefined) {
         yield t.callExpression(
           t.memberExpression(t.identifier(route), t.identifier(flipped)),
           [],
@@ -84,6 +84,15 @@ export function outcomeMutator<const TName extends string>(
       }
     },
   };
+}
+
+/** The name of the receiver of `call`, when it is the route parameter of a handler around `path`. */
+function handlerRouteOf(path: unknown, call: unknown): string | undefined {
+  const route = fieldOf(fieldOf(fieldOf(call, 'callee'), 'object'), 'name');
+
+  return typeof route === 'string' && isInHandlerOf(path, route)
+    ? route
+    : undefined;
 }
 
 /** The nearest function around `path` with a parameter named `route` is a route handler, and `route` is its first. */
@@ -115,7 +124,7 @@ function isRouteCallback(call: unknown, handler: unknown): boolean {
   return (
     isCall(call) &&
     argumentOf(call, 1) === handler &&
-    methodOf(fieldOf(call, 'callee')) === 'route'
+    memberNameOf(fieldOf(call, 'callee')) === 'route'
   );
 }
 
@@ -129,12 +138,14 @@ function isRouteAnnotated(parameter: unknown): boolean {
   return fieldOf(fieldOf(annotation, 'typeName'), 'name') === 'Route';
 }
 
+/** A numeric literal from `min` to `max`. */
 function isNumberBetween(node: unknown, min: number, max: number): boolean {
   const value = fieldOf(node, 'value');
 
   return typeof value === 'number' && value >= min && value <= max;
 }
 
+/** A fulfill option value that is already empty: `{}`, `[]` or `''`. */
 function isEmptyValue(node: unknown): boolean {
   return (
     lengthOf(fieldOf(node, 'properties')) === 0 ||
@@ -147,25 +158,23 @@ function lengthOf(list: unknown): number | undefined {
   return Array.isArray(list) ? list.length : undefined;
 }
 
-/** The value of the property `key` in the object literal that is the first argument of `<route>.fulfill(...)` in a
- * handler of `<route>`. */
+/** The value of the property `key` in the object literal that is the first argument of `<route>.fulfill(...)`, under
+ * any type wrapper, in a handler of `<route>`. */
 function isFulfillOption(path: unknown, key: string): boolean {
   const property = fieldOf(path, 'parent');
   const object = fieldOf(fieldOf(path, 'parentPath'), 'parent');
-  const call = fieldOf(
+  const optionsPath = outermost(
     fieldOf(fieldOf(path, 'parentPath'), 'parentPath'),
-    'parent',
   );
-  const route = fieldOf(fieldOf(fieldOf(call, 'callee'), 'object'), 'name');
+  const call = fieldOf(optionsPath, 'parent');
 
   return (
     propertyKey(property) === key &&
     fieldOf(property, 'value') === fieldOf(path, 'node') &&
-    argumentOf(call, 0) === object &&
+    argumentOf(call, 0) === fieldOf(optionsPath, 'node') &&
     !hasProperty(object, 'response') &&
     isCall(call) &&
-    methodOf(fieldOf(call, 'callee')) === 'fulfill' &&
-    typeof route === 'string' &&
-    isInHandlerOf(path, route)
+    memberNameOf(fieldOf(call, 'callee')) === 'fulfill' &&
+    handlerRouteOf(path, call) !== undefined
   );
 }

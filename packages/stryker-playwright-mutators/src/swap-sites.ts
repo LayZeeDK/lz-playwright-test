@@ -1,6 +1,11 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
-import { argumentOf, findProperty, isNamedReceiver, methodOf } from './ast.ts';
+import {
+  argumentOf,
+  findProperty,
+  isNamedReceiver,
+  memberNameOf,
+} from './ast.ts';
 import type { Site, SiteReader } from './same-file-swap.ts';
 
 /**
@@ -53,7 +58,7 @@ export function roleSite(call: unknown): Site | undefined {
   const name = fieldOf(findProperty(argumentOf(call, 1), 'name'), 'value');
   const value = valueOf(name);
 
-  return methodOf(fieldOf(call, 'callee')) === 'getByRole' &&
+  return memberNameOf(fieldOf(call, 'callee')) === 'getByRole' &&
     fieldOf(role, 'type') === 'StringLiteral' &&
     value !== undefined
     ? { key: `getByRole:${valueOf(role)}`, value, node: name }
@@ -63,7 +68,7 @@ export function roleSite(call: unknown): Site | undefined {
 /** The first argument of a call to one of the methods; the method is the key. */
 function firstArgumentSite(methods: readonly string[]): SiteReader {
   return (call) => {
-    const method = methodOf(fieldOf(call, 'callee'));
+    const method = memberNameOf(fieldOf(call, 'callee'));
     const argument = argumentOf(call, 0);
     const value = valueOf(argument);
 

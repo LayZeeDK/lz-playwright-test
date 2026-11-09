@@ -5,9 +5,10 @@ import {
   isCall,
   isFunctionNode,
   isNamedReceiver,
-  isRequest,
+  isRequestContext,
   isTestCallee,
-  methodOf,
+  memberNameOf,
+  rowOf,
 } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 import { navigationFixtures } from './settings.ts';
@@ -15,10 +16,10 @@ import { navigationFixtures } from './settings.ts';
 export interface RemovalRow {
   readonly mutator: string;
   /**
-   * What the method is called on: anything, or `<receiver>` / `<x>.<receiver>`. No row takes a call on an input
-   * device or a test runner global.
+   * Whether the method's receiver counts, or absent when any receiver does. No row takes a call on an input device or
+   * a test runner global.
    */
-  readonly receiver: 'any' | 'request' | 'clock';
+  readonly receiver?: (path: unknown, object: unknown) => boolean;
   /** The positions that make no mutant: teardown, or setup hooks and `finally` blocks as well. */
   readonly skip: 'teardown' | 'setupAndTeardown';
 }
@@ -33,18 +34,19 @@ export const networkWait = 'LzPlaywrightNetworkWait';
 export const clock = 'LzPlaywrightClock';
 
 function row(mutator: string): RemovalRow {
-  return { mutator, receiver: 'any', skip: 'teardown' };
+  return { mutator, skip: 'teardown' };
 }
 
 const navigationRow = row(navigationAction);
 const requestRow: RemovalRow = {
   mutator: inputAction,
-  receiver: 'request',
+  receiver: isRequestContext,
   skip: 'setupAndTeardown',
 };
+/** On `clock` or `<x>.clock`. */
 const clockRow: RemovalRow = {
   mutator: clock,
-  receiver: 'clock',
+  receiver: (_path, object) => isNamedReceiver(object, 'clock'),
   skip: 'teardown',
 };
 
@@ -140,22 +142,12 @@ function removalOf(path: unknown): RemovalRow | undefined {
       : undefined;
   }
 
-  const method = String(awaitedMethod(callee));
-  const found = Object.hasOwn(statementRemovals, method)
-    ? statementRemovals[method]
+  const found = rowOf(statementRemovals, awaitedMethod(callee));
+
+  return found?.receiver === undefined ||
+    found.receiver(path, fieldOf(callee, 'object'))
+    ? found
     : undefined;
-
-  if (found === undefined || found.receiver === 'any') {
-    return found;
-  }
-
-  const object = fieldOf(callee, 'object');
-  const onReceiver =
-    found.receiver === 'request'
-      ? isRequest(path, object)
-      : isNamedReceiver(object, found.receiver);
-
-  return onReceiver ? found : undefined;
 }
 
 /** The call of an `await <call>;` statement. */
@@ -176,9 +168,9 @@ function awaitedCall(node: unknown): unknown {
 function awaitedMethod(callee: unknown): unknown {
   const object = fieldOf(callee, 'object');
 
-  return !inputDevices.includes(methodOf(object)) &&
+  return !inputDevices.includes(memberNameOf(object)) &&
     !testRunners.includes(fieldOf(object, 'name'))
-    ? methodOf(callee)
+    ? memberNameOf(callee)
     : undefined;
 }
 
@@ -195,6 +187,7 @@ function isNavigationFixture(path: unknown, name: unknown): boolean {
   );
 }
 
+/** The first of a function's `params` is an object pattern that binds `name`. */
 function destructures(params: unknown, name: string): boolean {
   const pattern: unknown = Array.isArray(params) ? params[0] : undefined;
   const properties = fieldOf(pattern, 'properties');
@@ -228,7 +221,7 @@ function isFixtureFunction(path: unknown): boolean {
 }
 
 function isExtendCall(node: unknown): boolean {
-  return isCall(node) && methodOf(fieldOf(node, 'callee')) === 'extend';
+  return isCall(node) && memberNameOf(fieldOf(node, 'callee')) === 'extend';
 }
 
 function isSkipped(path: unknown, skip: RemovalRow['skip']): boolean {
@@ -247,7 +240,7 @@ function isSkipped(path: unknown, skip: RemovalRow['skip']): boolean {
 }
 
 function isHookCall(node: unknown, hooks: readonly unknown[]): boolean {
-  return isCall(node) && hooks.includes(methodOf(fieldOf(node, 'callee')));
+  return isCall(node) && hooks.includes(memberNameOf(fieldOf(node, 'callee')));
 }
 
 /** `child` is the `finally` block of the try statement at `tryPath`. */

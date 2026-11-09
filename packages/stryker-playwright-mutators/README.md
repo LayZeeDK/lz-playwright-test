@@ -320,6 +320,8 @@ These mutants survive or are missed by design. Each entry says what to do with i
 - It takes `fulfill` only on the route parameter of a handler, found as `LzPlaywrightRouteOutcome` finds it, and
   only the object literal that is its first argument. A `fulfill` on another receiver, such as a deferred promise,
   gets no mutant.
+- An options object under `satisfies`, `!` or `<T>` keeps its mutants. One under `as` gets none: Stryker's
+  instrumenter mutates nothing under `as`.
 - `status` gets a mutant only as a numeric literal from 200 to 599. A string or an expression gets none.
 - A fulfill with a `response` option gets no mutant at all, its `status` included.
 - A `json` value that is not a literal, such as a variable or a number, becomes `{}`.
@@ -347,12 +349,15 @@ These mutants survive or are missed by design. Each entry says what to do with i
   argument. An imported `request`, such as superagent's, gets no mutant, and neither does a context from
   `request.newContext()`, although `LzPlaywrightRequestUrl` follows one.
 - It never empties a value or drops a key. Identifiers, raw string bodies and negative numbers get no mutant.
-- A payload or options object under `satisfies` or `!` keeps its mutants. One under `as` gets none: Stryker's
-  instrumenter mutates nothing inside a type assertion.
+- A payload or options object under `satisfies`, `!` or `<T>` keeps its mutants. One under `as` gets none: Stryker's
+  instrumenter mutates nothing under `as`.
 - Values that set up data or pick a page, such as a page size, often survive. Leave them with a disable comment.
 
 ### LzPlaywrightRequestUrl
 
+- It follows `<x>.request`, a bare `request` that a parameter binds, and a context from `request.newContext()`. An
+  imported `request`, such as superagent's, gets no mutant, but a context from its `newContext()` does: a bare
+  `request` counts there however it is bound.
 - Only `get`, `head`, and `fetch` without a `method` option get a mutant. A `fetch` with any `method` option, even
   `method: 'GET'`, or with options given as a variable or with a spread, gets none.
 - An absolute URL to a host other than `localhost`, `127.0.0.1`, `0.0.0.0` or `[::1]` gets no mutant. Other forms
@@ -362,8 +367,8 @@ These mutants survive or are missed by design. Each entry says what to do with i
   can make the request time out, and that kills the mutant even when no check would have. Warm the server before
   the run, or rerun such a kill before you trust it.
 - A survivor means the test's checks also pass on the root's response, such as a status-only `toBeOK()`.
-- A result that the test stores and never reads gets no mutant. A request inside a type assertion, such as
-  `(await request.get('/a')) as Health`, gets none either, read or not: Stryker's instrumenter mutates nothing inside
+- A result that the test stores and never reads gets no mutant. A request under `as`, such as
+  `(await request.get('/a')) as Health`, gets none either, read or not: Stryker's instrumenter mutates nothing under
   `as`.
 
 ## Set a short actionTimeout
