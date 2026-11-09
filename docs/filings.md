@@ -564,6 +564,22 @@ their first run, so they were logged as test-after. A first green that deliberat
 is narrowed by later tests also fits `(nil -> constant)` only loosely. The reused predicate's own gap (one member
 level, so `test.describe.serial` missed) surfaced in review. Evidence: `step6-p2c-notes.md`; commit 544c4df.
 
+**O68. The first green of a new plugin has no transformation smaller than the whole engine.** Chunk 4's first test
+asked for one Locator swap through the real instrumenter. Between "no mutator in the roster" and a working mutator
+there was a roster entry, a site reader, a per-file index and the swap itself; `(nil -> constant)` could not stand in,
+because a hard-coded mutant would make the self-check sample pass for the wrong reason. This adds to O28, where the
+first test was data-driven; here the first test needed a component. Evidence: `step6-c4-notes.md`; commit 7571ca8.
+
+**O69. `lz-tpp`'s list has no step for collection operations such as "deduplicate" or "find the nearest other".**
+Chunk 4's second and third cycles made the swap skip equal values and keep one mutant when both neighbours agree.
+The worker fitted them to `(unconditional -> if)` and `(scalar -> array)` only by stretching; the actual changes were a
+`filter` by first index and a `findLast`/`find` with a predicate. Evidence: `step6-c4-notes.md`.
+
+**O70. The impasse step points at a simpler test that is already green.** In chunk 4's fourth cycle the only green
+for three literal kinds (string, expression-free template, regex) was a `switch`, the low-priority `(case)`.
+`lz-tpp` step 6 says to pose a simpler test first, but the simpler tests (strings only) had passed in earlier cycles,
+and the three kinds are the domain, not an accident of the test order. Evidence: `step6-c4-notes.md`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -776,6 +792,15 @@ signature change is a type-check run, and name the command beside the test comma
 **S61 (from O67).** Add a "reuse an existing function" option to the coach procedure, ranked with
 `(expression -> function)`, and have `lz-red` ask whether the reused function's own edge cases are pinned where it
 is reused.
+
+**S62 (from O68).** Name a "first green of a new component" case in `lz-tpp`: allow the smallest working slice through
+every layer the test crosses, and have `lz-red` prefer a first test that crosses as few layers as the design allows.
+
+**S63 (from O69).** Add collection transformations to the TypeScript overlay, for example `(array -> filtered
+array)` and `(loop -> find)`, ranked near `(scalar -> array)`.
+
+**S64 (from O70).** In the impasse check, add the outcome "the simpler tests are already green and the cases are the
+domain": take `(case)` and say so, instead of backtracking.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
