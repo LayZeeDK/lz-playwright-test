@@ -7,7 +7,10 @@ import { before, test } from 'node:test';
 import { lzPlaywrightMutators } from '../src/index.ts';
 import { resolveFromCore } from '../src/install.ts';
 import { cases, type Case } from './cases.ts';
+import { routeMockCases } from './route-mock-cases.ts';
 import { mutantsOf, type Mutant } from './support/mutants.ts';
+
+const allCases: readonly Case[] = [...cases, ...routeMockCases];
 
 function fileOf(testCase: Case): string {
   return join(import.meta.dirname, 'out', `${testCase.id}.spec.ts`);
@@ -25,14 +28,14 @@ before(async () => {
   await lzPlaywrightMutators();
   mutants = await mutantsOf(
     instrumenter,
-    cases.map((testCase) => ({
+    allCases.map((testCase) => ({
       name: fileOf(testCase),
       content: source(testCase),
     })),
   );
 });
 
-cases.forEach((testCase) => {
+allCases.forEach((testCase) => {
   test(`${testCase.id}: ${testCase.title}`, () => {
     const actual = mutants
       .filter(({ fileName }) => fileName === fileOf(testCase))

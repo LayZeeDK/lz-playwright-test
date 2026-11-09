@@ -5,6 +5,7 @@ import type {
 } from '@layzee/stryker-mutator-install';
 
 import type { BabelTypes } from './install.ts';
+import { fulfillMutator } from './route-mocks.ts';
 import { removalMutator } from './statement-removal.ts';
 
 export interface LzPlaywrightMutator extends SampledMutator {
@@ -38,6 +39,12 @@ export const mutatorSets = roster({
     removalMutator(
       'LzPlaywrightNavigationAction',
       sampleOf("await page.goto('/');"),
+    ),
+    fulfillMutator(
+      'LzPlaywrightFulfill',
+      sampleOf(
+        "await page.route('**/api', (route) => route.fulfill({ json: { a: 1 } }));",
+      ),
     ),
   ],
   optIn: [],

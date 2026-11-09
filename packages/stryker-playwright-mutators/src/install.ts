@@ -20,10 +20,20 @@ import type { LzPlaywrightMutator } from './mutators.ts';
 import { packageName } from './package-name.ts';
 import { looksLikePlaywrightTest } from './playwright-test.ts';
 
-const babelTypeMembers: readonly string[] = ['emptyStatement'];
+const babelTypeMembers: readonly string[] = [
+  'emptyStatement',
+  'objectExpression',
+  'arrayExpression',
+  'stringLiteral',
+  'numericLiteral',
+];
 
 export interface BabelTypes {
   emptyStatement(): unknown;
+  objectExpression(properties: readonly unknown[]): unknown;
+  arrayExpression(elements: readonly unknown[]): unknown;
+  stringLiteral(value: string): unknown;
+  numericLiteral(value: number): unknown;
 }
 
 export type Instrumenter = CoreInstrumenter<BabelTypes>;
