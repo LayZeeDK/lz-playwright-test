@@ -699,6 +699,27 @@ at the base, and became a test-after pin. Unlike O86, neither half held at the s
 way to see the shared code coming, or to choose between testing the lookup once and pinning each reader. Evidence:
 `step6-r6-round3-cycles.log`.
 
+**O90. A green that adds an error path which restores state has no transformation (lz-tpp misfit).** The install
+rollback's two greens wrapped existing statements in a `try` whose `catch` restores a snapshot and rethrows. The
+success path does not change and no condition is added, so neither `(unconditional -> if)` nor any other of the 14
+names "run this on failure". The worker logged `(statement -> statements)`, which hides that the new statements run
+only on a throw. Evidence: `install-rollback/cycles.log`, cycles 1 and 2.
+
+**O91. A simplification found by predicting an equivalent mutant has no home in `lz-refactor`.** After moving the
+rollback into the install core, the restore deleted only the keys the change added. Deleting every own key before
+redefining the snapshot gives the same state, so Stryker would have shown the key filter as an equivalent mutant. The
+worker removed the filter before any run. No smell names "code a mutation run would show to be redundant"; O87 is the
+opposite move. Evidence: commit `ca59eba`, `install-rollback/notes.md`.
+
+**O92. When the generic rule is already known, the first green turns the other expected reds into test-after.** Round
+4 listed four red rows (destructured, rest and array parameters, and a named function through a wrapper) and named
+the rule for the green. The first row went red, and the one `(unconditional -> if)` that states the rule covered the
+other three, which then passed on their first run. A narrower green would have kept them red only by writing a
+condition already known to be wrong. A second gap from the same round: a row placed before the green to stop it
+dropping a wanted outcome (`route = fallback` keeps its mutant) is a test-after pin with a job, and `lz-red` describes
+pins only as characterization. Close to O86 and O89. Evidence: `install-rollback/cycles.log`, cycle 3 and the lines
+after it.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -987,6 +1008,18 @@ test.
 **S82 (from O88).** In the test-after route for closing a mutation gap (S51), add a step: rerun every line whose
 status is Timeout with a generous timeout before counting it detected, because load can turn a survivor into a
 Timeout.
+
+**S83 (from O90).** Add an error-path transformation to `lz-tpp`'s list, or an overlay note: wrapping statements so
+that new statements run only on a throw (restore and rethrow) is a behaviour change on the failure path only, ranked
+near `(unconditional -> if)`.
+
+**S84 (from O91).** Give `lz-refactor` a "redundant under every input" smell: a condition or filter whose removal
+leaves the result the same for every input the code receives. It is found by asking what a mutation tool would show
+as equivalent, and Remove Dead Code fixes it, as S6 describes for a surviving mutant.
+
+**S85 (from O92).** In `lz-red`'s test-list advice, say that when the green's rule is already known, the list should
+start with the rows that tell the rule apart from simpler candidates, and that rows the rule covers by construction
+are pins. Add "guard pin": a passing row placed before a green so that the green may not drop a wanted outcome.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
