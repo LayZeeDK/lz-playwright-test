@@ -15,10 +15,10 @@ import { navigationFixtures } from './settings.ts';
 export interface RemovalRow {
   readonly mutator: string;
   /**
-   * What the method is called on: anything, or `<receiver>` / `<x>.<receiver>`. No row takes a call on an input
-   * device or a test runner global.
+   * Whether the method's receiver counts, or absent when any receiver does. No row takes a call on an input device or
+   * a test runner global.
    */
-  readonly receiver: 'any' | 'request' | 'clock';
+  readonly receiver?: (path: unknown, object: unknown) => boolean;
   /** The positions that make no mutant: teardown, or setup hooks and `finally` blocks as well. */
   readonly skip: 'teardown' | 'setupAndTeardown';
 }
@@ -33,18 +33,19 @@ export const networkWait = 'LzPlaywrightNetworkWait';
 export const clock = 'LzPlaywrightClock';
 
 function row(mutator: string): RemovalRow {
-  return { mutator, receiver: 'any', skip: 'teardown' };
+  return { mutator, skip: 'teardown' };
 }
 
 const navigationRow = row(navigationAction);
 const requestRow: RemovalRow = {
   mutator: inputAction,
-  receiver: 'request',
+  receiver: isRequestContext,
   skip: 'setupAndTeardown',
 };
+/** On `clock` or `<x>.clock`. */
 const clockRow: RemovalRow = {
   mutator: clock,
-  receiver: 'clock',
+  receiver: (_path, object) => isNamedReceiver(object, 'clock'),
   skip: 'teardown',
 };
 
@@ -145,17 +146,10 @@ function removalOf(path: unknown): RemovalRow | undefined {
     ? statementRemovals[method]
     : undefined;
 
-  if (found === undefined || found.receiver === 'any') {
-    return found;
-  }
-
-  const object = fieldOf(callee, 'object');
-  const onReceiver =
-    found.receiver === 'request'
-      ? isRequestContext(path, object)
-      : isNamedReceiver(object, found.receiver);
-
-  return onReceiver ? found : undefined;
+  return found?.receiver === undefined ||
+    found.receiver(path, fieldOf(callee, 'object'))
+    ? found
+    : undefined;
 }
 
 /** The call of an `await <call>;` statement. */
