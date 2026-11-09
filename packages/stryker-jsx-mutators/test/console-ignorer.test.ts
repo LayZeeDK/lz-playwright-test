@@ -47,14 +47,25 @@ describe('lz-console', () => {
     "export function f() { return console.log('saved', on ? 'a' : 'b'); }",
     "ok || console.log('saved', on ? 'a' : 'b');",
     "report(console.log('saved', on ? 'a' : 'b'));",
+    "export const view = <p>{console.log('saved', on ? 'a' : 'b')}</p>;",
+  ].forEach((code) => {
+    it(`keeps the mutants of a console call whose result is used: ${code}`, async () => {
+      await assertEvery(code, 'placed');
+    });
+  });
+
+  [
     "new console.log('saved', on ? 'a' : 'b');",
     "console['log']('saved', on ? 'a' : 'b');",
     "console[log]('saved', on ? 'a' : 'b');",
-    "export const view = <p>{console.log('saved', on ? 'a' : 'b')}</p>;",
   ].forEach((code) => {
-    it(`keeps the mutants of a console call used as an expression or not a plain call: ${code}`, async () => {
+    it(`keeps the mutants of a console statement whose callee is constructed or computed: ${code}`, async () => {
       await assertEvery(code, 'placed');
     });
+  });
+
+  it('ignores every mutant of an optional console?.log call statement', async () => {
+    await assertEvery("console?.log('saved', on ? 'a' : 'b');", consoleReason);
   });
 
   ['await', 'void'].forEach((operator) => {

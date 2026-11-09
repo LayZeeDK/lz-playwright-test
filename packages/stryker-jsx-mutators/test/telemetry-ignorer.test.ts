@@ -6,7 +6,10 @@ import {
   lzTelemetrySchema,
   telemetryIgnorer,
 } from '../src/telemetry-ignorer.ts';
-import { assertEveryOutcome } from './support/ignorer-outcomes.ts';
+import {
+  assertEveryOutcome,
+  ignorerOutcomes,
+} from './support/ignorer-outcomes.ts';
 import { validateOptions } from './support/validate-options.ts';
 
 const analyticsReason =
@@ -20,13 +23,6 @@ const assertEvery = (code: string, outcome: string, options: object = {}) =>
   assertEveryOutcome(telemetryIgnorer(options), code, outcome);
 
 describe('lz-telemetry', () => {
-  it('ignores every mutant of a gtag call statement, with the analytics reason', async () => {
-    await assertEvery(
-      "gtag('event', 'sign_up', { method: on ? 'a' : 'b' });",
-      analyticsReason,
-    );
-  });
-
   [
     'gtag',
     'window.gtag',
@@ -170,7 +166,7 @@ describe('lz-telemetry', () => {
     'lib.analytics.track',
     'analytics.track.call',
   ].forEach((callee) => {
-    it(`keeps the mutants of a ${callee} statement`, async () => {
+    it(`keeps the mutants of a ${callee} statement, whose callee is constructed, computed or not a listed name`, async () => {
       await assertEvery(`${callee}('event', on ? 'a' : 'b');`, 'placed');
     });
   });
@@ -239,6 +235,25 @@ describe('lz-telemetry', () => {
   it('keeps the mutants of a telemetry call statement whose object argument holds a callback property', async () => {
     await assertEvery(
       "window.dataLayer.push({ event: 'x', eventCallback: () => { setDone(on && ok); } });",
+      'placed',
+    );
+  });
+
+  it('keeps the mutants of the statement beside an ignored telemetry call statement', async () => {
+    assert.deepEqual(
+      new Set(
+        await ignorerOutcomes(
+          telemetryIgnorer({}),
+          "gtag('event', on ? 'a' : 'b');\nsetOpen(on ? 1 : 2);",
+        ),
+      ),
+      new Set([analyticsReason, 'placed']),
+    );
+  });
+
+  it('keeps the mutants of a telemetry call that is the body of an arrow function, as it is no statement', async () => {
+    await assertEvery(
+      "export const view = <button onClick={() => gtag('event', on ? 'a' : 'b')}>Buy</button>;",
       'placed',
     );
   });
