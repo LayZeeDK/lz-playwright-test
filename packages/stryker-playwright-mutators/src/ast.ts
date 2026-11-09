@@ -38,9 +38,14 @@ export function isCall(node: unknown): boolean {
   return callTypes.includes(fieldOf(node, 'type'));
 }
 
+/** `<x>.<y>`, `<x>[<y>]`, or either through `?.`. */
+export function isMember(node: unknown): boolean {
+  return memberTypes.includes(fieldOf(node, 'type'));
+}
+
 /** The property name of `<x>.<name>` or `<x>?.<name>`. */
-export function methodOf(member: unknown): unknown {
-  return fieldOf(member, 'computed') === false
+export function memberNameOf(member: unknown): unknown {
+  return isMember(member) && fieldOf(member, 'computed') === false
     ? fieldOf(fieldOf(member, 'property'), 'name')
     : undefined;
 }
@@ -85,7 +90,7 @@ export function hasProperty(object: unknown, key: string): boolean {
 
 /** `<name>`, `<x>.<name>` or `<x>?.<name>`. */
 export function isNamedReceiver(node: unknown, name: string): boolean {
-  return fieldOf(node, 'name') === name || methodOf(node) === name;
+  return fieldOf(node, 'name') === name || memberNameOf(node) === name;
 }
 
 /**
@@ -94,7 +99,7 @@ export function isNamedReceiver(node: unknown, name: string): boolean {
  */
 export function isRequestContext(path: unknown, node: unknown): boolean {
   return (
-    methodOf(node) === 'request' ||
+    memberNameOf(node) === 'request' ||
     (fieldOf(node, 'name') === 'request' &&
       fieldOf(bindingOf(path, 'request'), 'kind') === 'param')
   );
@@ -110,7 +115,7 @@ export function isRequestFactory(node: unknown): boolean {
 
 /** `test`, or a member chain on it such as `test.describe.serial`. */
 export function isTestCallee(callee: unknown): boolean {
-  if (memberTypes.includes(fieldOf(callee, 'type'))) {
+  if (isMember(callee)) {
     return isTestCallee(fieldOf(callee, 'object'));
   }
 

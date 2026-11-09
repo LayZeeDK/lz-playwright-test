@@ -5,7 +5,7 @@ import {
   argumentOf,
   hasProperty,
   isCall,
-  methodOf,
+  memberNameOf,
   outermost,
   propertyKey,
   rowOf,
@@ -65,7 +65,10 @@ export function outcomeMutator<const TName extends string>(
     sample,
     *mutate(path, t) {
       const node = fieldOf(path, 'node');
-      const flipped = rowOf(outcomeFlips, methodOf(fieldOf(node, 'callee')));
+      const flipped = rowOf(
+        outcomeFlips,
+        memberNameOf(fieldOf(node, 'callee')),
+      );
 
       if (!isCall(node) || flipped === undefined) {
         return;
@@ -121,7 +124,7 @@ function isRouteCallback(call: unknown, handler: unknown): boolean {
   return (
     isCall(call) &&
     argumentOf(call, 1) === handler &&
-    methodOf(fieldOf(call, 'callee')) === 'route'
+    memberNameOf(fieldOf(call, 'callee')) === 'route'
   );
 }
 
@@ -169,7 +172,7 @@ function isFulfillOption(path: unknown, key: string): boolean {
     argumentOf(call, 0) === fieldOf(optionsPath, 'node') &&
     !hasProperty(object, 'response') &&
     isCall(call) &&
-    methodOf(fieldOf(call, 'callee')) === 'fulfill' &&
+    memberNameOf(fieldOf(call, 'callee')) === 'fulfill' &&
     handlerRouteOf(path, call) !== undefined
   );
 }

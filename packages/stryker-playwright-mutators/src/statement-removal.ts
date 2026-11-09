@@ -7,7 +7,7 @@ import {
   isNamedReceiver,
   isRequestContext,
   isTestCallee,
-  methodOf,
+  memberNameOf,
   rowOf,
 } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
@@ -168,9 +168,9 @@ function awaitedCall(node: unknown): unknown {
 function awaitedMethod(callee: unknown): unknown {
   const object = fieldOf(callee, 'object');
 
-  return !inputDevices.includes(methodOf(object)) &&
+  return !inputDevices.includes(memberNameOf(object)) &&
     !testRunners.includes(fieldOf(object, 'name'))
-    ? methodOf(callee)
+    ? memberNameOf(callee)
     : undefined;
 }
 
@@ -220,7 +220,7 @@ function isFixtureFunction(path: unknown): boolean {
 }
 
 function isExtendCall(node: unknown): boolean {
-  return isCall(node) && methodOf(fieldOf(node, 'callee')) === 'extend';
+  return isCall(node) && memberNameOf(fieldOf(node, 'callee')) === 'extend';
 }
 
 function isSkipped(path: unknown, skip: RemovalRow['skip']): boolean {
@@ -239,7 +239,7 @@ function isSkipped(path: unknown, skip: RemovalRow['skip']): boolean {
 }
 
 function isHookCall(node: unknown, hooks: readonly unknown[]): boolean {
-  return isCall(node) && hooks.includes(methodOf(fieldOf(node, 'callee')));
+  return isCall(node) && hooks.includes(memberNameOf(fieldOf(node, 'callee')));
 }
 
 /** `child` is the `finally` block of the try statement at `tryPath`. */
