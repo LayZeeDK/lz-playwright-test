@@ -339,6 +339,14 @@ export const routeMockCases: readonly Case[] = [
     expect: [],
   },
   {
+    id: 'abort-handler-with-request-parameter',
+    title:
+      'an abort in a route callback that also takes the request becomes a continue',
+    source:
+      "test('case', async ({ page }) => {\n  await page.route('**/api', async (route, request) => {\n    await route.abort();\n  });\n});",
+    expect: [[outcome, 'route.continue()']],
+  },
+  {
     id: 'abort-callback-first-argument',
     title:
       'an abort in a callback passed as the first argument of route makes no mutant',

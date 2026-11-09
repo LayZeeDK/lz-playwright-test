@@ -41,7 +41,10 @@ export function swapMutator<const TName extends string>(
       // range for a line range. Either way no mutant has been placed in the file yet.
       const replacements =
         indexed.get(program) ??
-        replacementsBySite(callsOf(program).map(read), excludes);
+        replacementsBySite(
+          recordsIn(program).filter(isCall).map(read),
+          excludes,
+        );
 
       indexed.set(program, replacements);
 
@@ -96,17 +99,6 @@ function programOf(path: unknown): unknown {
     fieldOf(fieldOf(fieldOf(path, 'hub'), 'file'), 'ast'),
     'program',
   );
-}
-
-const callLists = new WeakMap<object, readonly unknown[]>();
-
-/** The calls of a file in the order of the walk, read once for every mutator that asks. */
-function callsOf(program: object): readonly unknown[] {
-  const calls = callLists.get(program) ?? recordsIn(program).filter(isCall);
-
-  callLists.set(program, calls);
-
-  return calls;
 }
 
 /** `record` and every record under it, depth first. */

@@ -19,8 +19,7 @@ function isPlaywrightImport(statement: unknown): boolean {
 
   return (
     fieldOf(statement, 'type') === 'ImportDeclaration' &&
-    typeof source === 'string' &&
-    source.startsWith('@playwright/')
+    String(source).startsWith('@playwright/')
   );
 }
 

@@ -97,13 +97,18 @@ function handlerRouteOf(path: unknown, call: unknown): string | undefined {
 
 /** The nearest function around `path` with a parameter named `route` is a route handler, and `route` is its first. */
 function isInHandlerOf(path: unknown, route: string): boolean {
-  const handlerPath = [...ancestors(path)].find((ancestor) =>
-    paramsOf(ancestor).some((param) => fieldOf(param, 'name') === route),
-  );
-  const first = paramsOf(handlerPath)[0];
+  const handlerPath = [...ancestors(path)].find((ancestor) => {
+    const params = paramsOf(ancestor);
+
+    return (
+      Array.isArray(params) &&
+      params.some((param) => fieldOf(param, 'name') === route)
+    );
+  });
+  const params = paramsOf(handlerPath);
+  const first: unknown = Array.isArray(params) ? params[0] : undefined;
 
   return (
-    handlerPath !== undefined &&
     fieldOf(first, 'name') === route &&
     (isRouteAnnotated(first) ||
       isRouteCallback(
@@ -113,10 +118,8 @@ function isInHandlerOf(path: unknown, route: string): boolean {
   );
 }
 
-function paramsOf(functionPath: unknown): readonly unknown[] {
-  const params = fieldOf(fieldOf(functionPath, 'node'), 'params');
-
-  return Array.isArray(params) ? params : [];
+function paramsOf(functionPath: unknown): unknown {
+  return fieldOf(fieldOf(functionPath, 'node'), 'params');
 }
 
 /** `handler` is the second argument of `<x>.route(...)`. */

@@ -27,6 +27,17 @@ describe('assertBabelTypes', () => {
     );
   });
 
+  it('lists every member an object lacks, comma-separated', () => {
+    assert.throws(
+      () =>
+        assertBabelTypes(
+          { ...fakeTypes, emptyStatement: 1, identifier: undefined },
+          missing,
+        ),
+      { message: 'no Babel types with emptyStatement, identifier' },
+    );
+  });
+
   it('rejects a value that is no object, through the missing-member error', () => {
     for (const value of [undefined, null, 'types']) {
       assert.throws(() => assertBabelTypes(value, missing), {
