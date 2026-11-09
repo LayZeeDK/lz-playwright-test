@@ -64,20 +64,19 @@ export function outcomeMutator<const TName extends string>(
     sample,
     *mutate(path, t) {
       const node = fieldOf(path, 'node');
-      const callee = fieldOf(node, 'callee');
-      const route = fieldOf(fieldOf(callee, 'object'), 'name');
-      const method = methodOf(callee);
+      const method = methodOf(fieldOf(node, 'callee'));
       const flipped =
         typeof method === 'string' && Object.hasOwn(outcomeFlips, method)
           ? outcomeFlips[method]
           : undefined;
 
-      if (
-        isCall(node) &&
-        flipped !== undefined &&
-        typeof route === 'string' &&
-        isInHandlerOf(path, route)
-      ) {
+      if (!isCall(node) || flipped === undefined) {
+        return;
+      }
+
+      const route = handlerRouteOf(path, node);
+
+      if (route !== undefined) {
         yield t.callExpression(
           t.memberExpression(t.identifier(route), t.identifier(flipped)),
           [],
@@ -85,6 +84,15 @@ export function outcomeMutator<const TName extends string>(
       }
     },
   };
+}
+
+/** The name of the receiver of `call`, when it is the route parameter of a handler around `path`. */
+function handlerRouteOf(path: unknown, call: unknown): string | undefined {
+  const route = fieldOf(fieldOf(fieldOf(call, 'callee'), 'object'), 'name');
+
+  return typeof route === 'string' && isInHandlerOf(path, route)
+    ? route
+    : undefined;
 }
 
 /** The nearest function around `path` with a parameter named `route` is a route handler, and `route` is its first. */
@@ -157,7 +165,6 @@ function isFulfillOption(path: unknown, key: string): boolean {
     fieldOf(fieldOf(path, 'parentPath'), 'parentPath'),
   );
   const call = fieldOf(optionsPath, 'parent');
-  const route = fieldOf(fieldOf(fieldOf(call, 'callee'), 'object'), 'name');
 
   return (
     propertyKey(property) === key &&
@@ -166,7 +173,6 @@ function isFulfillOption(path: unknown, key: string): boolean {
     !hasProperty(object, 'response') &&
     isCall(call) &&
     methodOf(fieldOf(call, 'callee')) === 'fulfill' &&
-    typeof route === 'string' &&
-    isInHandlerOf(path, route)
+    handlerRouteOf(path, call) !== undefined
   );
 }
