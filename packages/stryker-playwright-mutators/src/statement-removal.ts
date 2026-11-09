@@ -5,8 +5,8 @@ import { navigationFixtures } from './settings.ts';
 
 export interface RemovalRow {
   readonly mutator: string;
-  /** What the method is called on: anything but an input device, or `request` / `<x>.request`. */
-  readonly receiver: 'any' | 'request';
+  /** What the method is called on: anything but an input device, or `<receiver>` / `<x>.<receiver>`. */
+  readonly receiver: 'any' | 'request' | 'clock';
   /** The positions that make no mutant: teardown, or setup hooks and `finally` blocks as well. */
   readonly skip: 'teardown' | 'setupAndTeardown';
 }
@@ -27,6 +27,10 @@ function requestRow(): RemovalRow {
   return { mutator: input, receiver: 'request', skip: 'setupAndTeardown' };
 }
 
+function clockRow(): RemovalRow {
+  return { mutator: clock, receiver: 'clock', skip: 'teardown' };
+}
+
 const click = 'LzPlaywrightClickAction';
 const input = 'LzPlaywrightInputAction';
 const focus = 'LzPlaywrightFocusAction';
@@ -34,6 +38,7 @@ const navigation = 'LzPlaywrightNavigationAction';
 const sleep = 'LzPlaywrightSleepWait';
 const state = 'LzPlaywrightStateWait';
 const network = 'LzPlaywrightNetworkWait';
+const clock = 'LzPlaywrightClock';
 
 /** The method an awaited call statement ends in, mapped to the one mutator that removes the statement. */
 export const statementRemovals = removalTable({
@@ -77,6 +82,8 @@ export const statementRemovals = removalTable({
   waitForFunction: row(state),
   waitForResponse: row(network),
   waitForRequest: row(network),
+  runFor: clockRow(),
+  fastForward: clockRow(),
 });
 
 const teardownHooks: readonly unknown[] = ['afterEach', 'afterAll'];
@@ -117,19 +124,20 @@ function removalOf(path: unknown): RemovalRow | undefined {
       ? rows[method]
       : undefined;
 
-  return found?.receiver === 'request' &&
-    !isRequestReceiver(fieldOf(callee, 'object'))
+  return found !== undefined &&
+    found.receiver !== 'any' &&
+    !isNamedReceiver(fieldOf(callee, 'object'), found.receiver)
     ? undefined
     : found;
 }
 
-/** `request` or `<x>.request`. */
-function isRequestReceiver(node: unknown): boolean {
+/** `<name>` or `<x>.<name>`. */
+function isNamedReceiver(node: unknown, name: string): boolean {
   return (
-    fieldOf(node, 'name') === 'request' ||
+    fieldOf(node, 'name') === name ||
     (fieldOf(node, 'type') === 'MemberExpression' &&
       fieldOf(node, 'computed') === false &&
-      fieldOf(fieldOf(node, 'property'), 'name') === 'request')
+      fieldOf(fieldOf(node, 'property'), 'name') === name)
   );
 }
 

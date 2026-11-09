@@ -3,6 +3,7 @@ import type { Case } from './cases.ts';
 const sleep = 'LzPlaywrightSleepWait';
 const state = 'LzPlaywrightStateWait';
 const network = 'LzPlaywrightNetworkWait';
+const clock = 'LzPlaywrightClock';
 
 function inTest(statement: string): string {
   return `test('case', async ({ page }) => {\n  ${statement}\n});`;
@@ -18,6 +19,8 @@ const removedWaits: readonly (readonly [string, string, string])[] = [
   ['waitForFunction-page', state, 'page.waitForFunction(() => true)'],
   ['waitForResponse-page', network, "page.waitForResponse('/api')"],
   ['waitForRequest-page', network, "page.waitForRequest('/api')"],
+  ['runFor-page-clock', clock, 'page.clock.runFor(1000)'],
+  ['fastForward-page-clock', clock, 'page.clock.fastForward(1000)'],
 ];
 
 export const waitCases: readonly Case[] = [
@@ -37,6 +40,20 @@ export const waitCases: readonly Case[] = [
       expect: [],
     }),
   ),
+  {
+    id: 'runFor-destructured-clock',
+    title: 'an awaited runFor on a clock destructured from page is removed',
+    source: inTest('const { clock } = page;\n\n  await clock.runFor(1000);'),
+    expect: [[clock, ';']],
+  },
+  {
+    id: 'runFor-other-receiver',
+    title: 'an awaited runFor on a receiver that is no clock makes no mutant',
+    source: inTest(
+      'const timer = { runFor: async (ms: number) => ms };\n\n  await timer.runFor(1000);',
+    ),
+    expect: [],
+  },
   {
     id: 'waitForResponse-result-used',
     title: 'a waitForResponse whose result is assigned makes no mutant',

@@ -20,6 +20,21 @@ async function startLineWith(options: unknown): Promise<string> {
   return lines.join('\n');
 }
 
+it('leaves every opt-in mutator off with no options', async () => {
+  const line = await startLineWith(undefined);
+
+  assert.doesNotMatch(line, /Opt-in/);
+});
+
+it('turns every opt-in mutator on with extended', async () => {
+  const line = await startLineWith({ extended: true });
+
+  assert.match(
+    line,
+    / Opt-in or experimental: LzPlaywrightSleepWait, LzPlaywrightStateWait, LzPlaywrightNetworkWait, LzPlaywrightClock\.$/,
+  );
+});
+
 it('turns one opt-in mutator on by its name', async () => {
   const line = await startLineWith({ LzPlaywrightSleepWait: true });
 

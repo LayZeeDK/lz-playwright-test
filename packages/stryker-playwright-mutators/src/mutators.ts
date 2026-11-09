@@ -76,6 +76,10 @@ export const mutatorSets = roster({
       'LzPlaywrightNetworkWait',
       sampleOf("await page.waitForResponse('/a');"),
     ),
+    removalMutator(
+      'LzPlaywrightClock',
+      sampleOf('await page.clock.runFor(1000);'),
+    ),
   ],
   experimental: [],
 });
