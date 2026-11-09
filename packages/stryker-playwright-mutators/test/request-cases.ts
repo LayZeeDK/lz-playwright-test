@@ -304,6 +304,20 @@ export const requestCases: readonly Case[] = [
     source: readResult("request.get('https://api.github.com/x')"),
     expect: [],
   },
+  {
+    id: 'url-protocol-relative-third-party',
+    title:
+      'the protocol-relative URL of a request.get to a third-party host makes no mutant',
+    source: readResult("request.get('//cdn.example.com/x')"),
+    expect: [],
+  },
+  {
+    id: 'url-protocol-relative-local',
+    title:
+      'the protocol-relative URL of a request.get to localhost becomes empty',
+    source: readResult("request.get('//localhost:3000/x')"),
+    expect: [[url, '""']],
+  },
   ...['localhost:3000/y', '127.0.0.1/y', '0.0.0.0:80', '[::1]:3000/y'].map(
     (host): Case => ({
       id: `url-local-${host}`,

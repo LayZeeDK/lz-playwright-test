@@ -6,9 +6,9 @@ import { isNamedReceiver } from './statement-removal.ts';
 
 /** The methods that send a GET or HEAD request; `fetch` sends a GET unless it has a method option. */
 const getMethods: readonly unknown[] = ['get', 'head', 'fetch'];
-const absolute = /^[a-z][a-z0-9+.-]*:/i;
+const absolute = /^([a-z][a-z0-9+.-]*:|\/\/)/i;
 const localHost =
-  /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])([:/?#]|$)/i;
+  /^(https?:)?\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])([:/?#]|$)/i;
 
 /** An absolute URL to a host other than this machine: emptying it would leave the service under test. */
 function isThirdParty(url: string): boolean {
