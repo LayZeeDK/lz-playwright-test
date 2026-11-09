@@ -214,6 +214,15 @@ export const locatorCases: readonly Case[] = [
     ],
   },
   {
+    id: 'testid-regex-patterns',
+    title: 'regexes with other patterns replace each other',
+    source: testIds('/a/', '/b/'),
+    expect: [
+      [testId, '/b/'],
+      [testId, '/a/'],
+    ],
+  },
+  {
     id: 'testid-equal-regex',
     title: 'equal regexes make no mutant',
     source: testIds('/a/i', '/a/i'),
