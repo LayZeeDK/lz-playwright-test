@@ -97,12 +97,10 @@ function handlerRouteOf(path: unknown, call: unknown): string | undefined {
 
 /** `route`, in the scope of `path`, is the first parameter of a route handler. */
 function isInHandlerOf(path: unknown, route: string): boolean {
-  const binding = bindingOf(path, route);
-  const paramPath = fieldOf(binding, 'path');
+  const paramPath = fieldOf(bindingOf(path, route), 'path');
   const handlerPath = fieldOf(paramPath, 'parentPath');
 
   return (
-    fieldOf(binding, 'kind') === 'param' &&
     fieldOf(paramPath, 'key') === 0 &&
     (isRouteAnnotated(fieldOf(paramPath, 'node')) ||
       isRouteCallback(
