@@ -55,6 +55,14 @@ export const waitCases: readonly Case[] = [
     expect: [],
   },
   {
+    id: 'waitFor-test-runner-globals',
+    title: "an awaited waitFor of Vitest's vi or Jest's jest makes no mutant",
+    source: inTest(
+      'await vi.waitFor(() => true);\n  await jest.waitFor(() => true);',
+    ),
+    expect: [],
+  },
+  {
     id: 'waitForResponse-result-used',
     title: 'a waitForResponse whose result is assigned makes no mutant',
     source: inTest(

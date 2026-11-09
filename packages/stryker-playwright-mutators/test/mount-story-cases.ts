@@ -12,6 +12,16 @@ function mounts(...args: readonly string[]): string {
 
 export const mountStoryCases: readonly Case[] = [
   {
+    id: 'mount-neighbours-same-story',
+    title: 'neighbours that name the same story make one mutant',
+    source: mounts("'a/B'", "'C'", "'B'"),
+    expect: [
+      [mountStory, "'C'"],
+      [mountStory, "'a/B'"],
+      [mountStory, "'C'"],
+    ],
+  },
+  {
     id: 'mount-two-ids',
     title: 'two mounted ids each take the other',
     source: mounts("'a'", "'b'"),

@@ -71,7 +71,8 @@ function replacementsBySite(
         .filter((neighbour) => neighbour !== undefined)
         .filter(
           (neighbour, at, all) =>
-            all.findIndex(({ value }) => value === neighbour.value) === at,
+            all.findIndex(({ value }) => excludes(value, neighbour.value)) ===
+            at,
         )
         .map((neighbour) => neighbour.node),
     ]),

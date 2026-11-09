@@ -89,6 +89,8 @@ export const statementRemovals = removalTable({
 const teardownHooks: readonly unknown[] = ['afterEach', 'afterAll'];
 const setupHooks: readonly unknown[] = ['beforeEach', 'beforeAll'];
 const inputDevices: readonly unknown[] = ['keyboard', 'mouse', 'touchscreen'];
+// The globals of Vitest and Jest, whose waitFor and friends share Playwright's method names.
+const testRunners: readonly unknown[] = ['vi', 'jest'];
 
 export function removalMutator<const TName extends string>(
   name: TName,
@@ -156,13 +158,14 @@ function awaitedCall(node: unknown): unknown {
     : undefined;
 }
 
-/** The last member of the callee, when it is a member of something that is not an input device. */
+/** The last member of the callee, when it is a member of something that is neither an input device nor a test runner. */
 function awaitedMethod(callee: unknown): unknown {
+  const object = fieldOf(callee, 'object');
+
   return fieldOf(callee, 'type') === 'MemberExpression' &&
     fieldOf(callee, 'computed') === false &&
-    !inputDevices.includes(
-      fieldOf(fieldOf(fieldOf(callee, 'object'), 'property'), 'name'),
-    )
+    !inputDevices.includes(fieldOf(fieldOf(object, 'property'), 'name')) &&
+    !testRunners.includes(fieldOf(object, 'name'))
     ? fieldOf(fieldOf(callee, 'property'), 'name')
     : undefined;
 }
