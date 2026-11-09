@@ -2,7 +2,7 @@ import { fieldOf, isRecord } from '@layzee/stryker-mutator-install';
 import type { Ignorer } from '@stryker-mutator/api/ignore';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
-import { packageName } from './package-name.ts';
+import { listOption } from './list-option.ts';
 import { typeOf } from './type-of.ts';
 
 const classNamePattern = /^\S+$/;
@@ -85,7 +85,17 @@ const paintKeys: readonly string[] = [
 ];
 
 export function stylingIgnorer(options: object): Ignorer {
-  const hiding = new Set(hidingClasses(options));
+  const hiding = new Set([
+    ...visibilityClasses,
+    ...listOption(
+      options,
+      'lzJsxStyling',
+      'visibilityClasses',
+      [],
+      isClassName,
+      'an array of class names, each without whitespace',
+    ),
+  ]);
   const hides = (node: unknown): boolean =>
     classTexts(node)
       .flatMap((text) => text.split(/\s/))
@@ -113,31 +123,8 @@ export function stylingIgnorer(options: object): Ignorer {
 }
 stylingIgnorer.inject = tokens(commonTokens.options);
 
-function hidingClasses(options: object): readonly string[] {
-  const own = fieldOf(fieldOf(options, 'lzJsxStyling'), 'visibilityClasses');
-
-  if (own === undefined) {
-    return visibilityClasses;
-  }
-
-  if (!isClassList(own)) {
-    throw new Error(
-      `${packageName}: lzJsxStyling.visibilityClasses must be an array of class names, each without whitespace, ` +
-        `not ${JSON.stringify(own)}.`,
-    );
-  }
-
-  return [...visibilityClasses, ...own];
-}
-
-function isClassList(value: unknown): value is readonly string[] {
-  return (
-    Array.isArray(value) &&
-    value.every(
-      (name: unknown) =>
-        typeof name === 'string' && classNamePattern.test(name),
-    )
-  );
+function isClassName(name: unknown): name is string {
+  return typeof name === 'string' && classNamePattern.test(name);
 }
 
 function isClassAttribute(node: unknown): boolean {

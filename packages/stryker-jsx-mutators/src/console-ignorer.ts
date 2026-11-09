@@ -2,7 +2,7 @@ import { fieldOf } from '@layzee/stryker-mutator-install';
 import type { Ignorer } from '@stryker-mutator/api/ignore';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
-import { packageName } from './package-name.ts';
+import { listOption } from './list-option.ts';
 import { statementCallee } from './statement-call.ts';
 
 const consoleMethods: readonly unknown[] = [
@@ -50,9 +50,14 @@ export const strykerValidationSchema = {
 };
 
 export function consoleIgnorer(options: object): Ignorer {
-  const callees: readonly unknown[] = methodsOf(options).map(
-    (method) => `console.${method}`,
-  );
+  const callees: readonly unknown[] = listOption(
+    options,
+    'lzConsole',
+    'methods',
+    defaultMethods,
+    isMethod,
+    'an array of console method names, such as log or warn',
+  ).map((method) => `console.${method}`);
 
   return {
     shouldIgnore(path) {
@@ -66,26 +71,6 @@ export function consoleIgnorer(options: object): Ignorer {
 }
 consoleIgnorer.inject = tokens(commonTokens.options);
 
-function methodsOf(options: object): readonly string[] {
-  const own = fieldOf(fieldOf(options, 'lzConsole'), 'methods');
-
-  if (own === undefined) {
-    return defaultMethods;
-  }
-
-  if (!isMethodList(own)) {
-    throw new Error(
-      `${packageName}: lzConsole.methods must be an array of console method names, such as log or warn, ` +
-        `not ${JSON.stringify(own)}.`,
-    );
-  }
-
-  return own;
-}
-
-function isMethodList(value: unknown): value is readonly string[] {
-  return (
-    Array.isArray(value) &&
-    value.every((name: unknown) => consoleMethods.includes(name))
-  );
+function isMethod(name: unknown): name is string {
+  return consoleMethods.includes(name);
 }

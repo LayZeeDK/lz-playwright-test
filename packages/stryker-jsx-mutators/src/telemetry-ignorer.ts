@@ -2,7 +2,7 @@ import { bindingOf, fieldOf } from '@layzee/stryker-mutator-install';
 import type { Ignorer } from '@stryker-mutator/api/ignore';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
-import { packageName } from './package-name.ts';
+import { listOption } from './list-option.ts';
 import { statementCallee } from './statement-call.ts';
 
 const calleePattern = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/;
@@ -82,7 +82,14 @@ const callsReason =
   'lz-telemetry: telemetry call from lzTelemetry.calls; DOM tests do not observe what it sends';
 
 export function telemetryIgnorer(options: object): Ignorer {
-  const calls = ownCalls(options);
+  const calls: readonly unknown[] = listOption(
+    options,
+    'lzTelemetry',
+    'calls',
+    [],
+    isCallee,
+    'an array of callee names such as track or analytics.track',
+  );
 
   return {
     shouldIgnore(path) {
@@ -110,31 +117,8 @@ export function telemetryIgnorer(options: object): Ignorer {
 }
 telemetryIgnorer.inject = tokens(commonTokens.options);
 
-function ownCalls(options: object): readonly unknown[] {
-  const own = fieldOf(fieldOf(options, 'lzTelemetry'), 'calls');
-
-  if (own === undefined) {
-    // Stryker disable next-line ArrayDeclaration: a callee is a dotted name, never "Stryker was here" with its spaces
-    return [];
-  }
-
-  if (!isCallList(own)) {
-    throw new Error(
-      `${packageName}: lzTelemetry.calls must be an array of callee names such as track or analytics.track, ` +
-        `not ${JSON.stringify(own)}.`,
-    );
-  }
-
-  return own;
-}
-
-function isCallList(value: unknown): value is readonly string[] {
-  return (
-    Array.isArray(value) &&
-    value.every(
-      (name: unknown) => typeof name === 'string' && calleePattern.test(name),
-    )
-  );
+function isCallee(name: unknown): name is string {
+  return typeof name === 'string' && calleePattern.test(name);
 }
 
 function importsFromSentry(path: unknown, name: unknown): boolean {
