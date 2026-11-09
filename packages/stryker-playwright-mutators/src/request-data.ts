@@ -1,7 +1,7 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
+import { isNamedReceiver } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
-import { isNamedReceiver } from './statement-removal.ts';
 
 const payloadKeys: readonly unknown[] = ['data', 'form', 'params'];
 const payloadMethods: readonly unknown[] = [

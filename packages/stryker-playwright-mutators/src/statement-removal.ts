@@ -1,7 +1,12 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
+import {
+  callTypes,
+  isNamedReceiver,
+  isTestCallee,
+  memberTypes,
+} from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
-import { callTypes, memberTypes } from './same-file-swap.ts';
 import { navigationFixtures } from './settings.ts';
 
 export interface RemovalRow {
@@ -134,16 +139,6 @@ function removalOf(path: unknown): RemovalRow | undefined {
     : found;
 }
 
-/** `<name>`, `<x>.<name>` or `<x>?.<name>`. */
-export function isNamedReceiver(node: unknown, name: string): boolean {
-  return (
-    fieldOf(node, 'name') === name ||
-    (memberTypes.includes(fieldOf(node, 'type')) &&
-      fieldOf(node, 'computed') === false &&
-      fieldOf(fieldOf(node, 'property'), 'name') === name)
-  );
-}
-
 /** The call of an `await <call>;` statement. */
 function awaitedCall(node: unknown): unknown {
   if (fieldOf(node, 'type') !== 'ExpressionStatement') {
@@ -227,18 +222,6 @@ function isFixtureFunction(path: unknown): boolean {
   return (
     fieldOf(fieldOf(objectPath, 'node'), 'type') === 'ObjectExpression' &&
     isExtendCall(fieldOf(objectPath, 'parent'))
-  );
-}
-
-/** `test`, or a member chain on it such as `test.describe.serial`. */
-export function isTestCallee(callee: unknown): boolean {
-  if (fieldOf(callee, 'type') === 'MemberExpression') {
-    return isTestCallee(fieldOf(callee, 'object'));
-  }
-
-  return (
-    fieldOf(callee, 'type') === 'Identifier' &&
-    fieldOf(callee, 'name') === 'test'
   );
 }
 

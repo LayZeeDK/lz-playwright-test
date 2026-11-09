@@ -1,5 +1,6 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
+import { argumentOf, callTypes, hasProperty } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 
 export function fulfillMutator<const TName extends string>(
@@ -38,11 +39,6 @@ export function fulfillMutator<const TName extends string>(
     },
   };
 }
-
-const callTypes: readonly unknown[] = [
-  'CallExpression',
-  'OptionalCallExpression',
-];
 
 /** The Route method that ends a request, mapped to the one that lets it go on, and the reverse. */
 const outcomeFlips: Readonly<Record<string, string>> = {
@@ -113,11 +109,8 @@ function isInHandlerOf(path: unknown, route: unknown): boolean {
 
 /** `handler` is the second argument of `<x>.route(...)`. */
 function isRouteCallback(call: unknown, handler: unknown): boolean {
-  const args = fieldOf(call, 'arguments');
-
   return (
-    Array.isArray(args) &&
-    args[1] === handler &&
+    argumentOf(call, 1) === handler &&
     fieldOf(fieldOf(fieldOf(call, 'callee'), 'property'), 'name') === 'route'
   );
 }
@@ -143,22 +136,6 @@ function isNumberBetween(node: unknown, min: number, max: number): boolean {
     typeof value === 'number' &&
     value >= min &&
     value <= max
-  );
-}
-
-export function hasProperty(object: unknown, key: string): boolean {
-  const properties = fieldOf(object, 'properties');
-
-  return (
-    Array.isArray(properties) &&
-    properties.some((property) => {
-      const propertyKey = fieldOf(property, 'key');
-
-      return (
-        fieldOf(property, 'computed') !== true &&
-        (fieldOf(propertyKey, 'name') ?? fieldOf(propertyKey, 'value')) === key
-      );
-    })
   );
 }
 

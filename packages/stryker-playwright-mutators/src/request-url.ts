@@ -1,8 +1,7 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
+import { argumentOf, bindingOf, hasProperty, isNamedReceiver } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
-import { hasProperty } from './route-mocks.ts';
-import { isNamedReceiver } from './statement-removal.ts';
 
 /** The methods that send a GET or HEAD request; `fetch` sends a GET unless it has a method option. */
 const getMethods: readonly unknown[] = ['get', 'head', 'fetch'];
@@ -183,21 +182,10 @@ function isInConsoleCall(path: unknown): boolean {
   return false;
 }
 
-/** The Babel binding that `name` refers to in the scope of `path`. */
-function bindingOf(path: unknown, name: unknown): unknown {
-  const scope = fieldOf(path, 'scope');
-  const getBinding = fieldOf(scope, 'getBinding');
-
-  return typeof getBinding === 'function'
-    ? Reflect.apply(getBinding, scope, [name])
-    : undefined;
-}
-
 /** The options argument names a method, or may: it is no object literal, or it holds a spread. `get` and `head` set
  * their own method over any option, so only `fetch` asks. */
 function hasMethodOption(call: unknown): boolean {
-  const args = fieldOf(call, 'arguments');
-  const options: unknown = Array.isArray(args) ? args[1] : undefined;
+  const options = argumentOf(call, 1);
 
   if (options === undefined) {
     return false;
