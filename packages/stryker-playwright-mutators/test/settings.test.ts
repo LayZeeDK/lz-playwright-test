@@ -15,6 +15,11 @@ const badLists: readonly (readonly [string, unknown, string])[] = [
   ['a string', 'visit', "'visit'"],
   ['null', null, 'null'],
   ['an entry that is no string', [1], '[ 1 ]'],
+  [
+    'an entry that is an array holding a name',
+    [['navigate']],
+    "[ [ 'navigate' ] ]",
+  ],
   ['an entry with a dash', ['a-b'], "[ 'a-b' ]"],
   ['an entry that starts with a digit', ['1a'], "[ '1a' ]"],
   ['an empty entry', [''], "[ '' ]"],

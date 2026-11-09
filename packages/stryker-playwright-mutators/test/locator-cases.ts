@@ -329,4 +329,49 @@ export const locatorCases: readonly Case[] = [
       [click, ';'],
     ],
   },
+  {
+    id: 'testId-computed-member',
+    title: 'a call through a computed member named getByTestId is no site',
+    source: inTest(["page.getByTestId('a');", "page[getByTestId]('b');"]),
+    expect: [],
+  },
+  {
+    id: 'role-computed-name-key',
+    title: 'a computed key named name is no role name',
+    source: inTest([
+      "page.getByRole('button', { [name]: 'a' });",
+      "page.getByRole('button', { [name]: 'b' });",
+    ]),
+    expect: [],
+  },
+  {
+    id: 'role-quoted-name-key',
+    title: 'a quoted name key is a role name',
+    source: inTest([
+      "page.getByRole('button', { 'name': 'a' });",
+      "page.getByRole('button', { 'name': 'b' });",
+    ]),
+    expect: [
+      [role, "'a'"],
+      [role, "'b'"],
+    ],
+  },
+  {
+    id: 'role-other-method',
+    title: 'a name option of a method other than getByRole is no site',
+    source: inTest([
+      "page.locator('button', { name: 'a' });",
+      "page.locator('button', { name: 'b' });",
+    ]),
+    expect: [],
+  },
+  {
+    id: 'role-non-literal-role',
+    title: 'two names of the same non-literal role are no sites',
+    source: inTest([
+      "page.getByRole(kind, { name: 'a' });",
+      "page.getByRole(kind, { name: 'b' });",
+    ]),
+    expect: [],
+  },
 ];

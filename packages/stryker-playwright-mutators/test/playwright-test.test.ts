@@ -27,6 +27,7 @@ describe('looksLikePlaywrightTest', () => {
     "import { chunk } from 'lodash';\n",
     "import { x } from '@playwrightx/foo';\n",
     "import { chromium } from 'playwright-core';\n",
+    "export { expect } from '@playwright/test';\n",
   ]) {
     it(`is false for a file whose imports are not @playwright/: ${source.trim()}`, async () => {
       assert.equal(looksLikePlaywrightTest(await programOf(source)), false);
@@ -50,6 +51,8 @@ describe('looksLikePlaywrightTest', () => {
     "foo.test('a', () => {});\n",
     "describe('a', () => {});\n",
     'expect(1).toBe(1);\n',
+    "new test('a', () => {});\n",
+    "export = test('a', () => {});\n",
   ]) {
     it(`is false for a file with no top-level test call: ${source.trim().replace(/\n/g, ' ')}`, async () => {
       assert.equal(looksLikePlaywrightTest(await programOf(source)), false);

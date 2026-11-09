@@ -283,6 +283,7 @@ describe('install', () => {
         () => undefined,
         (message) => lines.push(message),
       ),
+      { message: /made no mutants of LzOne from their samples/ },
     );
 
     assert.deepEqual(lines, []);

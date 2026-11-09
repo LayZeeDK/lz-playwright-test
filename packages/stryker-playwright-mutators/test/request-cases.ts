@@ -118,6 +118,12 @@ export const requestCases: readonly Case[] = [
     expect: [[data, 'true']],
   },
   {
+    id: 'data-boolean-true',
+    title: 'a true in the data of a request call flips to false',
+    source: readResult("request.put('/a', { data: { done: true } })"),
+    expect: [[data, 'false']],
+  },
+  {
     id: 'data-quoted-payload-key',
     title:
       'a string under a quoted data key of a request call gets the suffix x',
@@ -466,5 +472,95 @@ export const requestCases: readonly Case[] = [
     title: 'the URL of page.goto makes no RequestUrl mutant',
     source: inTest("await page.goto('/goto');"),
     expect: [['LzPlaywrightNavigationAction', ';']],
+  },
+  {
+    id: 'url-scheme-in-query',
+    title: 'a relative URL with an absolute URL in its query becomes empty',
+    source: readResult("request.get('/a?next=http://b')"),
+    expect: [[url, '""']],
+  },
+  {
+    id: 'url-third-party-with-localhost-path',
+    title:
+      'the URL of a third-party host whose path starts with //localhost makes no mutant',
+    source: readResult("request.get('https://example.com//localhost/a')"),
+    expect: [],
+  },
+  {
+    id: 'url-localhost-no-path',
+    title: 'the URL http://localhost with nothing after the host becomes empty',
+    source: readResult("request.get('http://localhost')"),
+    expect: [[url, '""']],
+  },
+  {
+    id: 'url-second-argument',
+    title: 'a string in the second argument of request.get makes no mutant',
+    source: readResult("request.get(base, '/a')"),
+    expect: [],
+  },
+  {
+    id: 'url-loop-over-call',
+    title:
+      'a string passed to the call that a for-of loop iterates makes no mutant',
+    source: inTest(
+      "for (const path of paths('/a')) {\n    const response = await request.get(path);\n\n    expect(response.ok()).toBe(true);\n  }",
+    ),
+    expect: [],
+  },
+  {
+    id: 'url-loop-variable-also-logged',
+    title:
+      'a loop URL that is also logged becomes empty, as one reference reads a response',
+    source: inTest(
+      "for (const path of ['/l1']) {\n    console.log(path);\n    const response = await request.get(path);\n\n    expect(response.ok()).toBe(true);\n  }",
+    ),
+    expect: [[url, '""']],
+  },
+  {
+    id: 'url-unawaited-new-context',
+    title:
+      'the URL of a GET on an unawaited request.newContext() result becomes empty',
+    source: inTest(
+      "const context = request.newContext();\n  const response = await context.get('/a');\n\n  expect(response.ok()).toBe(true);",
+    ),
+    expect: [[url, '""']],
+  },
+  {
+    id: 'url-other-request-method-result',
+    title:
+      'the URL of a GET on the result of a request method other than newContext makes no mutant',
+    source: inTest(
+      "const other = request.connect();\n  const response = await other.get('/a');\n\n  expect(response.ok()).toBe(true);",
+    ),
+    expect: [],
+  },
+  {
+    id: 'url-new-context-of-other-receiver',
+    title:
+      'the URL of a GET on a newContext() of a receiver other than request makes no mutant',
+    source: inTest(
+      "const context = await api.newContext();\n  const response = await context.get('/a');\n\n  expect(response.ok()).toBe(true);",
+    ),
+    expect: [],
+  },
+  {
+    id: 'url-unawaited-unread',
+    title:
+      'the URL of an unawaited GET whose result is never read makes no mutant',
+    source: inTest("const response = request.get('/a');"),
+    expect: [],
+  },
+  {
+    id: 'url-negated-result',
+    title: 'the URL of a GET whose awaited result is negated becomes empty',
+    source: inTest("expect(!(await request.get('/a'))).toBe(false);"),
+    expect: [[url, '""']],
+  },
+  {
+    id: 'url-fetch-spread-and-other-option',
+    title:
+      'the URL of a fetch whose options hold a spread among other properties makes no mutant',
+    source: readResult("request.fetch('/a', { ...options, timeout: 1 })"),
+    expect: [],
   },
 ];

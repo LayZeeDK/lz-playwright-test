@@ -48,7 +48,7 @@ export function requestDataMutator<const TName extends string>(
 function inPayload(path: unknown): boolean {
   const parentType = fieldOf(fieldOf(path, 'parent'), 'type');
 
-  if (fieldOf(path, 'key') === 'value' && parentType === 'ObjectProperty') {
+  if (fieldOf(path, 'key') === 'value') {
     const property = fieldOf(path, 'parentPath');
 
     return (
@@ -59,9 +59,7 @@ function inPayload(path: unknown): boolean {
   }
 
   return (
-    fieldOf(path, 'listKey') === 'elements' &&
-    parentType === 'ArrayExpression' &&
-    inPayload(fieldOf(path, 'parentPath'))
+    parentType === 'ArrayExpression' && inPayload(fieldOf(path, 'parentPath'))
   );
 }
 
@@ -72,7 +70,6 @@ function isPayload(propertyPath: unknown): boolean {
 
   return (
     payloadKeys.includes(fieldOf(key, 'name') ?? fieldOf(key, 'value')) &&
-    fieldOf(optionsPath, 'listKey') === 'arguments' &&
     fieldOf(optionsPath, 'key') === 1 &&
     isPayloadCall(fieldOf(optionsPath, 'parent'))
   );
