@@ -199,10 +199,10 @@ The ignorer keeps the mutants in every other case:
 
 - An argument holds code that can act on the page: a function (arrow, function expression, object or class
   method), a call, a dynamic `import()`, `new`, a tagged template, a decorator, an assignment, an update such
-  as `count++`, `await`, `yield`, `delete`, and in `.js` and `.jsx` files a `throw` expression or a pipeline
-  (`|>`). For example, the callback in `analytics.track('Clicked', {}, {}, () => navigate('/done'))` or the
-  `eventCallback` in `dataLayer.push({ event: 'buy', eventCallback: () => setDone(true) })` runs in the page,
-  and a DOM test can see what it does.
+  as `count++`, `await`, `yield`, `delete`, `throw`, and in JavaScript files a pipeline (`|>`). For example,
+  the callback in `analytics.track('Clicked', {}, {}, () => navigate('/done'))` or the `eventCallback` in
+  `dataLayer.push({ event: 'buy', eventCallback: () => setDone(true) })` runs in the page, and a DOM test can
+  see what it does.
 - The call is not a statement of its own, such as the body of `onClick={() => gtag('event', 'buy')}`.
 - The code uses the call's result, such as `const id = analytics.track('signup')` or `return gtag(...)`.
 - The callee is computed, such as `analytics['track'](...)`, or longer than the listed name, such as

@@ -157,6 +157,10 @@ describe('lz-console', () => {
         'a decorated class',
         "console.log(@track class { mode = on ? 'a' : 'b'; });",
       ],
+      [
+        'a throw statement',
+        "console.log(class { static { throw on ? 'a' : 'b'; } });",
+      ],
     ] as const
   ).forEach(([effect, code]) => {
     it(`keeps the mutants of a console.log statement whose argument holds ${effect}, as removing the statement changes what the page does`, async () => {

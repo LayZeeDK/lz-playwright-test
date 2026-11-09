@@ -20,6 +20,7 @@ const effectTypes: readonly unknown[] = [
   'NewExpression',
   'ObjectMethod',
   'TaggedTemplateExpression',
+  'ThrowStatement',
   'UpdateExpression',
   'YieldExpression',
 ];
