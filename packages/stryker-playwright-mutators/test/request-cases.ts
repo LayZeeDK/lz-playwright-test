@@ -306,6 +306,15 @@ export const requestCases: readonly Case[] = [
     ),
     expect: [[url, '""']],
   },
+  {
+    id: 'url-assigned-to-member',
+    title:
+      'the URL of a request.get whose result is assigned to a member becomes empty',
+    source: inTest(
+      "const holder = {};\n  holder.response = await request.get('/a');",
+    ),
+    expect: [[url, '""']],
+  },
   ...(
     [
       [
