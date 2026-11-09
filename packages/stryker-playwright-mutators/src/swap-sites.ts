@@ -88,12 +88,13 @@ export function isSameStory(one: string, other: string): boolean {
 }
 
 export function mountStorySite(call: unknown): Site | undefined {
-  const key = 'mount';
+  const receiver = 'mount';
   const argument = argumentOf(call, 0);
   const value = textOf(argument);
 
-  return isNamedReceiver(fieldOf(call, 'callee'), key) && value !== undefined
-    ? { key, value, node: argument }
+  return isNamedReceiver(fieldOf(call, 'callee'), receiver) &&
+    value !== undefined
+    ? { key: receiver, value, node: argument }
     : undefined;
 }
 
