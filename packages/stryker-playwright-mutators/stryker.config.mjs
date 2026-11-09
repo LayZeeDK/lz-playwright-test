@@ -5,7 +5,7 @@ export default {
   testRunner: 'command',
   commandRunner: {
     command:
-      'node --conditions=@layzee/source --test packages/stryker-playwright-mutators/test/*.test.ts',
+      'node --conditions=@layzee/source --test --test-concurrency=1 packages/stryker-playwright-mutators/test/*.test.ts',
   },
   coverageAnalysis: 'off',
   checkers: ['typescript'],
