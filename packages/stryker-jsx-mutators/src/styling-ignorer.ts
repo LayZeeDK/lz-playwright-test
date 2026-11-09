@@ -7,24 +7,17 @@ import { typeOf } from './type-of.ts';
 
 const classNamePattern = /^\S+$/;
 
-// Core merges the `properties` of each plugin's schema into its own (meta-schema-builder.js:27).
-export const strykerValidationSchema = {
-  $schema: 'http://json-schema.org/draft-07/schema#',
+export const lzJsxStylingSchema = {
   type: 'object',
+  additionalProperties: false,
+  description: 'Options of the lz-jsx-styling ignorer.',
   properties: {
-    lzJsxStyling: {
-      type: 'object',
-      additionalProperties: false,
-      description: 'Options of the lz-jsx-styling ignorer.',
-      properties: {
-        visibilityClasses: {
-          type: 'array',
-          items: { type: 'string', pattern: classNamePattern.source },
-          description:
-            'Class names that hide an element, added to the built-in ones. lz-jsx-styling keeps the mutants of ' +
-            'a class expression that holds one of them.',
-        },
-      },
+    visibilityClasses: {
+      type: 'array',
+      items: { type: 'string', pattern: classNamePattern.source },
+      description:
+        'Class names that hide an element, added to the built-in ones. lz-jsx-styling keeps the mutants of ' +
+        'a class expression that holds one of them.',
     },
   },
 };

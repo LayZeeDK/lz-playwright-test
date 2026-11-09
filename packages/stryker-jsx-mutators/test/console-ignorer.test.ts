@@ -1,10 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import {
-  consoleIgnorer,
-  strykerValidationSchema,
-} from '../src/console-ignorer.ts';
+import { consoleIgnorer, lzConsoleSchema } from '../src/console-ignorer.ts';
+import { strykerValidationSchema } from '../src/index.ts';
 import { assertEveryOutcome } from './support/ignorer-outcomes.ts';
 import { validateOptions } from './support/validate-options.ts';
 
@@ -158,25 +156,19 @@ describe('lz-console', () => {
   );
 });
 
-describe('the lz-console strykerValidationSchema', () => {
+describe('the lz-console options schema', () => {
   it('describes lzConsole.methods as a list of console method names', () => {
-    assert.deepEqual(strykerValidationSchema, {
-      $schema: 'http://json-schema.org/draft-07/schema#',
+    assert.deepEqual(lzConsoleSchema, {
       type: 'object',
+      additionalProperties: false,
+      description: 'Options of the lz-console ignorer.',
       properties: {
-        lzConsole: {
-          type: 'object',
-          additionalProperties: false,
-          description: 'Options of the lz-console ignorer.',
-          properties: {
-            methods: {
-              type: 'array',
-              items: { enum: consoleMethods },
-              description:
-                'The console methods whose call statements lz-console hides. Replaces the default list: log, ' +
-                'debug, info and trace.',
-            },
-          },
+        methods: {
+          type: 'array',
+          items: { enum: consoleMethods },
+          description:
+            'The console methods whose call statements lz-console hides. Replaces the default list: log, ' +
+            'debug, info and trace.',
         },
       },
     });

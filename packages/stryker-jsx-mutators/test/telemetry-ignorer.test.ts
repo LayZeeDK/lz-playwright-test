@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { strykerValidationSchema } from '../src/index.ts';
 import {
-  strykerValidationSchema,
+  lzTelemetrySchema,
   telemetryIgnorer,
 } from '../src/telemetry-ignorer.ts';
 import { assertEveryOutcome } from './support/ignorer-outcomes.ts';
@@ -247,28 +248,22 @@ describe('lz-telemetry', () => {
   });
 });
 
-describe('the lz-telemetry strykerValidationSchema', () => {
+describe('the lz-telemetry options schema', () => {
   it('describes lzTelemetry.calls as a list of callee names', () => {
-    assert.deepEqual(strykerValidationSchema, {
-      $schema: 'http://json-schema.org/draft-07/schema#',
+    assert.deepEqual(lzTelemetrySchema, {
       type: 'object',
+      additionalProperties: false,
+      description: 'Options of the lz-telemetry ignorer.',
       properties: {
-        lzTelemetry: {
-          type: 'object',
-          additionalProperties: false,
-          description: 'Options of the lz-telemetry ignorer.',
-          properties: {
-            calls: {
-              type: 'array',
-              items: {
-                type: 'string',
-                pattern: '^[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)*$',
-              },
-              description:
-                'Callees, such as track or analytics.track, added to the built-in ones. lz-telemetry hides the ' +
-                'mutants of a statement that only calls one of them.',
-            },
+        calls: {
+          type: 'array',
+          items: {
+            type: 'string',
+            pattern: '^[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)*$',
           },
+          description:
+            'Callees, such as track or analytics.track, added to the built-in ones. lz-telemetry hides the ' +
+            'mutants of a statement that only calls one of them.',
         },
       },
     });

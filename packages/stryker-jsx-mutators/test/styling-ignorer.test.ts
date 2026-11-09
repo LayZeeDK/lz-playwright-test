@@ -2,10 +2,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import {
-  strykerValidationSchema,
-  stylingIgnorer,
-} from '../src/styling-ignorer.ts';
+import { strykerValidationSchema } from '../src/index.ts';
+import { lzJsxStylingSchema, stylingIgnorer } from '../src/styling-ignorer.ts';
 import {
   assertEveryOutcome,
   ignorerOutcomes,
@@ -367,27 +365,21 @@ describe('lz-jsx-styling', () => {
   });
 });
 
-describe('strykerValidationSchema', () => {
+describe('the lz-jsx-styling options schema', () => {
   const unknownOption = /^warn Unknown stryker config option "lzJsxStyling"/;
 
   it('describes lzJsxStyling.visibilityClasses as a list of class names', () => {
-    assert.deepEqual(strykerValidationSchema, {
-      $schema: 'http://json-schema.org/draft-07/schema#',
+    assert.deepEqual(lzJsxStylingSchema, {
       type: 'object',
+      additionalProperties: false,
+      description: 'Options of the lz-jsx-styling ignorer.',
       properties: {
-        lzJsxStyling: {
-          type: 'object',
-          additionalProperties: false,
-          description: 'Options of the lz-jsx-styling ignorer.',
-          properties: {
-            visibilityClasses: {
-              type: 'array',
-              items: { type: 'string', pattern: '^\\S+$' },
-              description:
-                'Class names that hide an element, added to the built-in ones. lz-jsx-styling keeps the mutants of ' +
-                'a class expression that holds one of them.',
-            },
-          },
+        visibilityClasses: {
+          type: 'array',
+          items: { type: 'string', pattern: '^\\S+$' },
+          description:
+            'Class names that hide an element, added to the built-in ones. lz-jsx-styling keeps the mutants of ' +
+            'a class expression that holds one of them.',
         },
       },
     });

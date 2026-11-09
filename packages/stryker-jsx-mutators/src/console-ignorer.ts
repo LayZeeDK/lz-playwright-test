@@ -28,23 +28,17 @@ const consoleMethods: readonly unknown[] = [
 ];
 const defaultMethods: readonly string[] = ['log', 'debug', 'info', 'trace'];
 
-export const strykerValidationSchema = {
-  $schema: 'http://json-schema.org/draft-07/schema#',
+export const lzConsoleSchema = {
   type: 'object',
+  additionalProperties: false,
+  description: 'Options of the lz-console ignorer.',
   properties: {
-    lzConsole: {
-      type: 'object',
-      additionalProperties: false,
-      description: 'Options of the lz-console ignorer.',
-      properties: {
-        methods: {
-          type: 'array',
-          items: { enum: consoleMethods },
-          description:
-            'The console methods whose call statements lz-console hides. Replaces the default list: log, ' +
-            'debug, info and trace.',
-        },
-      },
+    methods: {
+      type: 'array',
+      items: { enum: consoleMethods },
+      description:
+        'The console methods whose call statements lz-console hides. Replaces the default list: log, ' +
+        'debug, info and trace.',
     },
   },
 };

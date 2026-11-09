@@ -7,23 +7,17 @@ import { statementCallee } from './statement-call.ts';
 
 const calleePattern = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/;
 
-export const strykerValidationSchema = {
-  $schema: 'http://json-schema.org/draft-07/schema#',
+export const lzTelemetrySchema = {
   type: 'object',
+  additionalProperties: false,
+  description: 'Options of the lz-telemetry ignorer.',
   properties: {
-    lzTelemetry: {
-      type: 'object',
-      additionalProperties: false,
-      description: 'Options of the lz-telemetry ignorer.',
-      properties: {
-        calls: {
-          type: 'array',
-          items: { type: 'string', pattern: calleePattern.source },
-          description:
-            'Callees, such as track or analytics.track, added to the built-in ones. lz-telemetry hides the ' +
-            'mutants of a statement that only calls one of them.',
-        },
-      },
+    calls: {
+      type: 'array',
+      items: { type: 'string', pattern: calleePattern.source },
+      description:
+        'Callees, such as track or analytics.track, added to the built-in ones. lz-telemetry hides the ' +
+        'mutants of a statement that only calls one of them.',
     },
   },
 };
