@@ -1,9 +1,9 @@
 # @layzee/stryker-mutator-install
 
 The code that puts custom mutators into StrykerJS. It is not a mutator package and has no mutators of its own.
-`@layzee/stryker-jsx-mutators` uses it, and so will this repository's other mutator packages. The package is
-private and is not for direct use. The JSX package declares it as a regular dependency, so installing that
-package installs this one.
+`@layzee/stryker-jsx-mutators` and `@layzee/stryker-playwright-mutators` use it. The package is private and is not
+for direct use. Both mutator packages declare it as a regular dependency, so installing either one installs this
+one.
 
 StrykerJS has no public way to add a mutator to its instrumenter or to turn off a built-in one. This package
 patches the installed `@stryker-mutator/instrumenter` in memory, and checks that the patch took effect.

@@ -6,9 +6,9 @@ import {
   bindingOf,
   hasProperty,
   isCall,
-  isNamedReceiver,
-  isRequest,
-  methodOf,
+  isRequestContext,
+  isRequestFactory,
+  memberNameOf,
 } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 
@@ -57,7 +57,7 @@ function isCandidate(node: unknown): boolean {
 function isReadUrlArgument(path: unknown): boolean {
   const call = fieldOf(path, 'parent');
   const callee = fieldOf(call, 'callee');
-  const method = methodOf(callee);
+  const method = memberNameOf(callee);
 
   return (
     fieldOf(path, 'listKey') === 'arguments' &&
@@ -110,9 +110,9 @@ function hasExpressions(template: unknown): boolean {
   return Array.isArray(expressions) && expressions.length > 0;
 }
 
-/** `request`, `<x>.request`, or a name bound to `await <request receiver>.newContext(...)`. */
+/** A request context: one by `isRequestContext`, or a name bound to `await <request factory>.newContext(...)`. */
 function isRequestReceiver(path: unknown, node: unknown): boolean {
-  if (isRequest(path, node)) {
+  if (isRequestContext(path, node)) {
     return true;
   }
 
@@ -139,8 +139,8 @@ function isNewContextCall(node: unknown): boolean {
 
   return (
     isCall(call) &&
-    methodOf(callee) === 'newContext' &&
-    isNamedReceiver(fieldOf(callee, 'object'), 'request')
+    memberNameOf(callee) === 'newContext' &&
+    isRequestFactory(fieldOf(callee, 'object'))
   );
 }
 

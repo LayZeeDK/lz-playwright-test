@@ -9,15 +9,54 @@ const memberTypes: readonly unknown[] = [
   'OptionalMemberExpression',
 ];
 
+// Stryker's instrumenter visits nothing inside `as`, but it visits inside these wrappers.
+const typeWrappers: readonly unknown[] = [
+  'TSSatisfiesExpression',
+  'TSNonNullExpression',
+  'TSTypeAssertion',
+];
+
+/** `<x> satisfies <T>`, `<x>!` or `<T><x>`. */
+export function isTypeWrapper(node: unknown): boolean {
+  return typeWrappers.includes(fieldOf(node, 'type'));
+}
+
+/** The expression inside any type wrapper around `node`. */
+export function unwrapped(node: unknown): unknown {
+  return isTypeWrapper(node) ? unwrapped(fieldOf(node, 'expression')) : node;
+}
+
+/** The path of the outermost type wrapper around `path`, or `path` itself. */
+export function outermost(path: unknown): unknown {
+  return isTypeWrapper(fieldOf(path, 'parent'))
+    ? outermost(fieldOf(path, 'parentPath'))
+    : path;
+}
+
 /** `<x>(...)` or `<x>?.(...)`. */
 export function isCall(node: unknown): boolean {
   return callTypes.includes(fieldOf(node, 'type'));
 }
 
+/** `<x>.<y>`, `<x>[<y>]`, or either through `?.`. */
+export function isMember(node: unknown): boolean {
+  return memberTypes.includes(fieldOf(node, 'type'));
+}
+
 /** The property name of `<x>.<name>` or `<x>?.<name>`. */
-export function methodOf(member: unknown): unknown {
-  return fieldOf(member, 'computed') === false
+export function memberNameOf(member: unknown): unknown {
+  return isMember(member) && fieldOf(member, 'computed') === false
     ? fieldOf(fieldOf(member, 'property'), 'name')
+    : undefined;
+}
+
+/** The row of `table` under `key`, or undefined when `key` is no string or no own key of it. */
+export function rowOf<T>(
+  table: Readonly<Record<string, T>>,
+  key: unknown,
+): T | undefined {
+  return typeof key === 'string' && Object.hasOwn(table, key)
+    ? table[key]
     : undefined;
 }
 
@@ -51,21 +90,32 @@ export function hasProperty(object: unknown, key: string): boolean {
 
 /** `<name>`, `<x>.<name>` or `<x>?.<name>`. */
 export function isNamedReceiver(node: unknown, name: string): boolean {
-  return fieldOf(node, 'name') === name || methodOf(node) === name;
+  return fieldOf(node, 'name') === name || memberNameOf(node) === name;
 }
 
-/** `<x>.request`, `<x>?.request`, or a bare `request` that a parameter binds: a fixture or a helper's argument. */
-export function isRequest(path: unknown, node: unknown): boolean {
+/**
+ * An APIRequestContext, which sends requests: `<x>.request`, `<x>?.request`, or a bare `request` that a parameter
+ * binds, a fixture or a helper's argument.
+ */
+export function isRequestContext(path: unknown, node: unknown): boolean {
   return (
-    methodOf(node) === 'request' ||
+    memberNameOf(node) === 'request' ||
     (fieldOf(node, 'name') === 'request' &&
       fieldOf(bindingOf(path, 'request'), 'kind') === 'param')
   );
 }
 
+/**
+ * An APIRequest, which `newContext` is called on: `request`, `<x>.request` or `<x>?.request`. A bare `request` counts
+ * however it is bound, as `import { request } from '@playwright/test'` gives one.
+ */
+export function isRequestFactory(node: unknown): boolean {
+  return isNamedReceiver(node, 'request');
+}
+
 /** `test`, or a member chain on it such as `test.describe.serial`. */
 export function isTestCallee(callee: unknown): boolean {
-  if (memberTypes.includes(fieldOf(callee, 'type'))) {
+  if (isMember(callee)) {
     return isTestCallee(fieldOf(callee, 'object'));
   }
 

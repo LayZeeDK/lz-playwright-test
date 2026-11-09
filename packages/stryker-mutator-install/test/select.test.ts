@@ -179,6 +179,15 @@ describe('selectMutators', () => {
     }
   });
 
+  it('neither checks nor reads an own key that is not enumerable', () => {
+    const options = Object.defineProperties(
+      {},
+      { extended: { value: true }, LzNoSuch: { value: 'yes' } },
+    );
+
+    assert.deepEqual(select(options), sets.defaults);
+  });
+
   it('takes options without a prototype', () => {
     const options: unknown = Object.assign(Object.create(null), {
       extended: true,
