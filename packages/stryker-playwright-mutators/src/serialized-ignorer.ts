@@ -24,9 +24,11 @@ export const serializedIgnorer: Ignorer = {
     const method = fieldOf(fieldOf(callee, 'property'), 'name');
 
     if (
+      // Stryker disable next-line ConditionalExpression: a function whose parent is a call is its callee or an argument, and a function callee has no property name
       fieldOf(path, 'listKey') === 'arguments' &&
       functionTypes.includes(fieldOf(fieldOf(path, 'node'), 'type')) &&
       fieldOf(callee, 'computed') === false &&
+      // Stryker disable next-line ConditionalExpression: serializingMethods holds strings only, so includes rejects every other value
       typeof method === 'string' &&
       serializingMethods.includes(method)
     ) {
