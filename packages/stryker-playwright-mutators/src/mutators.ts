@@ -6,14 +6,7 @@ import type {
 
 import type { BabelTypes } from './install.ts';
 import { fulfillMutator, outcomeMutator } from './route-mocks.ts';
-import {
-  isSameStory,
-  mountStorySite,
-  roleSite,
-  swapMutator,
-  testIdSite,
-  textSite,
-} from './same-file-swap.ts';
+import { swapMutator } from './same-file-swap.ts';
 import { requestDataMutator } from './request-data.ts';
 import { requestUrlMutator } from './request-url.ts';
 import {
@@ -27,6 +20,13 @@ import {
   sleepWait,
   stateWait,
 } from './statement-removal.ts';
+import {
+  isSameStory,
+  mountStorySite,
+  roleSite,
+  testIdSite,
+  textSite,
+} from './swap-sites.ts';
 
 export interface LzPlaywrightMutator extends SampledMutator {
   mutate(path: unknown, t: BabelTypes): Iterable<unknown>;
