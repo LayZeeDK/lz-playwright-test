@@ -48,6 +48,48 @@ const textCases: readonly Case[] = textMethods.flatMap(
 export const locatorCases: readonly Case[] = [
   ...textCases,
   {
+    id: 'testid-chained-source-order',
+    title:
+      'neighbours follow source order when a test id call is chained on another',
+    source: inTest([
+      "page.getByTestId('a').getByTestId('b');",
+      "page.getByTestId('c');",
+    ]),
+    expect: [
+      [testId, "'b'"],
+      [testId, "'a'"],
+      [testId, "'c'"],
+      [testId, "'b'"],
+    ],
+  },
+  {
+    id: 'testid-optional-call',
+    title: 'test ids on an optional chain are sites',
+    source: inTest([
+      "page?.getByTestId('a');",
+      "page.locator('#form')?.getByTestId('b');",
+    ]),
+    expect: [
+      [testId, "'b'"],
+      [testId, "'a'"],
+    ],
+  },
+  {
+    id: 'text-chained-source-order',
+    title:
+      'neighbours follow source order when a text call is chained on another',
+    source: inTest([
+      "page.getByText('a');",
+      "page.getByText('b').getByText('c');",
+    ]),
+    expect: [
+      [text, "'b'"],
+      [text, "'a'"],
+      [text, "'c'"],
+      [text, "'b'"],
+    ],
+  },
+  {
     id: 'testid-lone',
     title: 'a lone test id makes no mutant',
     source: testIds("'a'"),

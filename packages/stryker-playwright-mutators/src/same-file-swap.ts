@@ -26,19 +26,24 @@ export function swapMutator<const TName extends string>(
     name,
     sample,
     *mutate(path, t) {
-      const node = fieldOf(path, 'node');
+      const program = programOf(path);
 
-      if (fieldOf(node, 'type') === 'Program' && isRecord(node)) {
-        indexed.set(node, replacementsBySite(callsOf(node).map(read)));
-
+      if (!isRecord(program)) {
         return;
       }
 
-      const program = programOf(path);
-      const replacements = isRecord(program) ? indexed.get(program) : undefined;
+      // Built on the first node Stryker shows of this file: Program for a whole file, the first node inside the
+      // range for a line range. Either way no mutant has been placed in the file yet.
+      const known = indexed.get(program);
+      const replacements =
+        known ?? replacementsBySite(callsOf(program).map(read));
 
-      yield* (replacements?.get(node) ?? []).map((replacement) =>
-        t.cloneNode(replacement),
+      if (known === undefined) {
+        indexed.set(program, replacements);
+      }
+
+      yield* (replacements.get(fieldOf(path, 'node')) ?? []).map(
+        (replacement) => t.cloneNode(replacement),
       );
     },
   };
@@ -47,7 +52,9 @@ export function swapMutator<const TName extends string>(
 function replacementsBySite(
   found: readonly (Site | undefined)[],
 ): ReadonlyMap<unknown, readonly unknown[]> {
-  const sites = found.filter((site) => site !== undefined);
+  const sites = found
+    .filter((site) => site !== undefined)
+    .toSorted((one, other) => startOf(one.node) - startOf(other.node));
 
   return new Map(
     sites.map((site, index) => [
@@ -64,6 +71,12 @@ function replacementsBySite(
         .map((neighbour) => neighbour.node),
     ]),
   );
+}
+
+function startOf(node: unknown): number {
+  const start = fieldOf(node, 'start');
+
+  return typeof start === 'number' ? start : 0;
 }
 
 function isReplacementFor(site: Site): (other: Site) => boolean {
@@ -89,6 +102,15 @@ function callsOf(program: object): readonly unknown[] {
   return calls;
 }
 
+const callTypes: readonly unknown[] = [
+  'CallExpression',
+  'OptionalCallExpression',
+];
+const memberTypes: readonly unknown[] = [
+  'MemberExpression',
+  'OptionalMemberExpression',
+];
+
 function callsIn(node: unknown): readonly unknown[] {
   const children: readonly unknown[] = isRecord(node)
     ? Object.values(node).flatMap((value): readonly unknown[] =>
@@ -97,7 +119,7 @@ function callsIn(node: unknown): readonly unknown[] {
     : [];
 
   return [
-    ...(fieldOf(node, 'type') === 'CallExpression' ? [node] : []),
+    ...(callTypes.includes(fieldOf(node, 'type')) ? [node] : []),
     ...children
       .filter((child) => typeof fieldOf(child, 'type') === 'string')
       .flatMap(callsIn),
@@ -107,7 +129,7 @@ function callsIn(node: unknown): readonly unknown[] {
 function methodOf(call: unknown): unknown {
   const callee = fieldOf(call, 'callee');
 
-  return fieldOf(callee, 'type') === 'MemberExpression' &&
+  return memberTypes.includes(fieldOf(callee, 'type')) &&
     fieldOf(callee, 'computed') === false
     ? fieldOf(fieldOf(callee, 'property'), 'name')
     : undefined;
