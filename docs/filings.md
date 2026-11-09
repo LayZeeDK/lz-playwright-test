@@ -767,6 +767,27 @@ warning line depends on whether an earlier test in the same file loaded that fol
 "pass the cache in" (a new parameter only tests use) and "defer", so the item was deferred to S3, where its callers
 exist. Evidence: `sb-s1/notes.md`, "After the reboot".
 
+**O100. Correction to O93: `(constant -> constant+)` names a list's later rows.** R7 round 3 added a decorator to
+the same argument-effect list O93 described, and the 14-item list fits it: a literal list that gains an entry is "a
+simple constant to a more complex constant". The same round turned one operator comparison into a list (`(scalar ->
+array)`, number 7) where the first attempt had added an `||` condition (`(case)`, number 14), and the next operator
+was `(constant -> constant+)` again, leaving nothing to refactor. O93's "no transformation name" came from not
+mapping the green to the list, not from a gap in `lz-tpp`. S86 stands only as a reminder to log the name.
+Evidence: `r7r3/cycles.log` and `r7r3/cycles-first-attempt.log`.
+
+**O101 (lz-tpp misfit). A change of representation has no rung.** In S2, cycles 2 to 6 passed by text replacement
+(`(constant -> scalar)`, then a table). "Leaves a stub inside a function alone" cannot pass on text at all: the only
+green is to parse the module, which rewrites the whole body and brings in behaviour no test asked for yet (the
+argument guard, because the parsed site has an optional argument). `lz-tpp`'s impasse check found no simpler test,
+and the text-replacement greens were thrown away. Picking the parsed-AST test before the method variants would have
+avoided the rewrite; `lz-red`'s test selection does not warn that a fake-it path can end at a change of
+representation. Evidence: `sb-s2/cycles.log` cycle 7, `sb-s2/notes.md`.
+
+**O102. One behaviour over four inputs costs three test-after edits.** In S2 the four `*Once` forms are one rule.
+After the first went red and green, the other three passed on their first run and went in as three test-after lines
+in three edits, to keep `test-first.md`'s one-test-per-edit check honest; one parameterised table would read better
+but counts as several tests in one edit. Evidence: `sb-s2/cycles.log`, the lines after cycle 6.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -1093,6 +1114,13 @@ exception to test-first.
 
 **S92 (from O99).** In `lz-red`, add a move for state shared across tests: a factory that returns a fresh cache per
 test, or a reset the module exports, with the price of each, before "defer".
+
+**S93 (from O101).** In `lz-red`'s test selection, put a test that forces the final representation (a parse, a
+structure) before the tests a cheaper representation could fake, when the list already holds one. In `lz-tpp`'s
+impasse check, name the change of representation as a case of its own.
+
+**S94 (from O102).** In `test-first.md` (Lars's user-scope rule, not the plugin), allow one table edit for test-after
+rows that pin inputs of a rule a single cycle drove, logged as one `test-after` line naming each row.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
