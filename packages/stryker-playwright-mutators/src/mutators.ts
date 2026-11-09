@@ -7,6 +7,8 @@ import type {
 import type { BabelTypes } from './install.ts';
 import { fulfillMutator, outcomeMutator } from './route-mocks.ts';
 import {
+  isSameStory,
+  mountStorySite,
   roleSite,
   swapMutator,
   testIdSite,
@@ -90,6 +92,12 @@ export const mutatorSets = roster({
     removalMutator(
       'LzPlaywrightClock',
       sampleOf('await page.clock.runFor(1000);'),
+    ),
+    swapMutator(
+      'LzPlaywrightMountStory',
+      sampleOf("await mount('a');\n  await mount('b');"),
+      mountStorySite,
+      isSameStory,
     ),
   ],
   experimental: [],

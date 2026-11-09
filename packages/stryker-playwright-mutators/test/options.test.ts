@@ -31,7 +31,7 @@ it('turns every opt-in mutator on with extended', async () => {
 
   assert.match(
     line,
-    / Opt-in or experimental: LzPlaywrightSleepWait, LzPlaywrightStateWait, LzPlaywrightNetworkWait, LzPlaywrightClock\.$/,
+    / Opt-in or experimental: LzPlaywrightSleepWait, LzPlaywrightStateWait, LzPlaywrightNetworkWait, LzPlaywrightClock, LzPlaywrightMountStory\.$/,
   );
 });
 
