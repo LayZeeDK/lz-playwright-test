@@ -670,6 +670,12 @@ failed. `lz-red`'s step 5 checks that the failure comes from the code under test
 reach the input at all. The row now pins "no mutant", and the README states the limit. Evidence:
 `step6-r6-wave2-notes.md`, cycles 14 and 15.
 
+**O86. A test that names two behaviours, only one of them missing, gets half a red.** The R6 round 2 brief asked for
+one test that a non-enumerable own option key is "neither validated nor read". Only "read" failed at the base, so the
+red covered that half; after the green, the worker widened the same test with the "validated" half, which never
+failed. `lz-red` would split the item into two tests, and says nothing about widening a test that has gone green with
+an assertion that was never red. The cycle log needed two lines for one test. Evidence: `step6-r6-round2-notes.md`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -946,6 +952,10 @@ Name the one-mutant-per-run rule.
 **S79 (from O85).** Add a question to `lz-red`'s step 5: "could any change to the code under test pass this?" When a
 harness or framework between the test and the code decides what the code sees, check that it delivers the input
 before handing the red to `lz-tpp`; if it cannot, the test pins a limit, not missing behaviour.
+
+**S80 (from O86).** In `lz-red`'s test-selection leaf, say what to do when a requested test names two behaviours and
+the code already has one: write the missing half as the red, and either add the present half as a separate pin or
+widen the test after green and log that half as test-after.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
