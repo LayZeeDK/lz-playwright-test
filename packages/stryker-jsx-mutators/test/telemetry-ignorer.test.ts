@@ -115,6 +115,13 @@ describe('lz-telemetry', () => {
     });
   });
 
+  it('keeps the mutants of a call to a parameter that shadows a captureException imported from @sentry', async () => {
+    await assertEvery(
+      "import { captureException } from '@sentry/node';\nexport function f(captureException) { captureException(on ? 'a' : 'b'); }",
+      'placed',
+    );
+  });
+
   [
     'window.gtag?.',
     'window.dataLayer?.push',

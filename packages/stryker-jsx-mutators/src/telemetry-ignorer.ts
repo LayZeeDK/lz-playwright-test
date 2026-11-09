@@ -1,10 +1,9 @@
-import { fieldOf } from '@layzee/stryker-mutator-install';
+import { bindingOf, fieldOf } from '@layzee/stryker-mutator-install';
 import type { Ignorer } from '@stryker-mutator/api/ignore';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
 import { packageName } from './package-name.ts';
 import { statementCallee } from './statement-call.ts';
-import { typeOf } from './type-of.ts';
 
 const calleePattern = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/;
 
@@ -139,32 +138,8 @@ function isCallList(value: unknown): value is readonly string[] {
 }
 
 function importsFromSentry(path: unknown, name: unknown): boolean {
-  const body = fieldOf(programOf(path), 'body');
+  const declaration = fieldOf(fieldOf(bindingOf(path, name), 'path'), 'parent');
+  const source = fieldOf(fieldOf(declaration, 'source'), 'value');
 
-  return (
-    Array.isArray(body) &&
-    body.some((statement: unknown) => {
-      const source = fieldOf(fieldOf(statement, 'source'), 'value');
-      const specifiers = fieldOf(statement, 'specifiers');
-
-      return (
-        typeOf(statement) === 'ImportDeclaration' &&
-        typeof source === 'string' &&
-        source.startsWith('@sentry/') &&
-        Array.isArray(specifiers) &&
-        specifiers.some(
-          (specifier: unknown) =>
-            fieldOf(fieldOf(specifier, 'local'), 'name') === name,
-        )
-      );
-    })
-  );
-}
-
-function programOf(path: unknown): unknown {
-  const node = fieldOf(path, 'node');
-
-  return typeOf(node) === 'Program'
-    ? node
-    : programOf(fieldOf(path, 'parentPath'));
+  return typeof source === 'string' && source.startsWith('@sentry/');
 }
