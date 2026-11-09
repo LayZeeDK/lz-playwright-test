@@ -182,6 +182,19 @@ describe('lz-telemetry', () => {
     });
   });
 
+  (
+    [
+      ['gtag', analyticsReason],
+      ['Sentry.flush', errorReason],
+    ] as const
+  ).forEach(([callee, reason]) => {
+    it(`gives a ${callee} call statement its built-in reason when lzTelemetry.calls lists it too`, async () => {
+      await assertEvery(`${callee}('event', on ? 'a' : 'b');`, reason, {
+        lzTelemetry: { calls: [callee] },
+      });
+    });
+  });
+
   [
     'track',
     null,

@@ -82,7 +82,7 @@ const callsReason =
   'lz-telemetry: telemetry call from lzTelemetry.calls; DOM tests do not observe what it sends';
 
 export function telemetryIgnorer(options: object): Ignorer {
-  const calls: readonly unknown[] = listOption(
+  const calls = listOption(
     options,
     'lzTelemetry',
     'calls',
@@ -90,28 +90,20 @@ export function telemetryIgnorer(options: object): Ignorer {
     isCallee,
     'an array of callee names such as track or analytics.track',
   );
+  const reasons = new Map<unknown, string>([
+    ...calls.map((callee) => [callee, callsReason] as const),
+    ...analyticsCalls.map((callee) => [callee, analyticsReason] as const),
+    ...errorCalls.map((callee) => [callee, errorReason] as const),
+  ]);
 
   return {
     shouldIgnore(path) {
       const callee = statementCallee(fieldOf(path, 'node'));
 
-      if (analyticsCalls.includes(callee)) {
-        return analyticsReason;
-      }
-
-      if (
-        errorCalls.includes(callee) ||
-        (sentryImportedFunctions.includes(callee) &&
-          importsFromSentry(path, callee))
-      ) {
-        return errorReason;
-      }
-
-      if (calls.includes(callee)) {
-        return callsReason;
-      }
-
-      return undefined;
+      return sentryImportedFunctions.includes(callee) &&
+        importsFromSentry(path, callee)
+        ? errorReason
+        : reasons.get(callee);
     },
   };
 }
