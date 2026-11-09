@@ -31,6 +31,9 @@ const click = 'LzPlaywrightClickAction';
 const input = 'LzPlaywrightInputAction';
 const focus = 'LzPlaywrightFocusAction';
 const navigation = 'LzPlaywrightNavigationAction';
+const sleep = 'LzPlaywrightSleepWait';
+const state = 'LzPlaywrightStateWait';
+const network = 'LzPlaywrightNetworkWait';
 
 /** The method an awaited call statement ends in, mapped to the one mutator that removes the statement. */
 export const statementRemovals = removalTable({
@@ -66,6 +69,14 @@ export const statementRemovals = removalTable({
   patch: requestRow(),
   post: requestRow(),
   put: requestRow(),
+  waitForTimeout: row(sleep),
+  waitForLoadState: row(state),
+  waitForURL: row(state),
+  waitFor: row(state),
+  waitForSelector: row(state),
+  waitForFunction: row(state),
+  waitForResponse: row(network),
+  waitForRequest: row(network),
 });
 
 const teardownHooks: readonly unknown[] = ['afterEach', 'afterAll'];

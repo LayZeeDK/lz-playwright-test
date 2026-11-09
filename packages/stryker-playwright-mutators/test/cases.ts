@@ -131,7 +131,7 @@ export const cases: readonly Case[] = [
   ),
   untouched(
     'an awaited call to a method not in the table',
-    inTest("await page.locator('#a').waitFor();"),
+    inTest("await page.locator('#a').highlight();"),
     'not-in-table',
   ),
   untouched(

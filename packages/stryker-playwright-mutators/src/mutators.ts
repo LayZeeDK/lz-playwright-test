@@ -63,7 +63,20 @@ export const mutatorSets = roster({
       textSite,
     ),
   ],
-  optIn: [],
+  optIn: [
+    removalMutator(
+      'LzPlaywrightSleepWait',
+      sampleOf('await page.waitForTimeout(100);'),
+    ),
+    removalMutator(
+      'LzPlaywrightStateWait',
+      sampleOf('await page.waitForLoadState();'),
+    ),
+    removalMutator(
+      'LzPlaywrightNetworkWait',
+      sampleOf("await page.waitForResponse('/a');"),
+    ),
+  ],
   experimental: [],
 });
 
