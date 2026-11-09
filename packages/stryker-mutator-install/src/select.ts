@@ -1,7 +1,7 @@
 import { inspect } from 'node:util';
 
 import type { NamedMutator } from './install.ts';
-import { fieldOf, isRecord } from './is-record.ts';
+import { isRecord } from './is-record.ts';
 
 /** The mutators a package installs: those that run unless a config leaves them out, and those a user turns on. */
 export interface MutatorSets<TMutator extends NamedMutator> {
@@ -96,7 +96,7 @@ export function selectMutators<TMutator extends NamedMutator>(
 
   if (options !== undefined && !isPlainObject(options)) {
     throw new Error(
-      `${packageName}: the options must be an object, not ${inspect(options)}.`,
+      `${packageName}: the options must be a plain object, not ${inspect(options)}.`,
     );
   }
 
@@ -115,7 +115,7 @@ export function selectMutators<TMutator extends NamedMutator>(
       );
     }
 
-    if (key === 'experimental' && isRecord(value)) {
+    if (key === 'experimental' && isPlainObject(value)) {
       for (const [name, member] of definedEntries(value)) {
         onlyTrue(`experimental.${name}`, member);
         checkTier('experimental', name);
@@ -129,23 +129,34 @@ export function selectMutators<TMutator extends NamedMutator>(
     }
   }
 
-  const extended = fieldOf(options, 'extended') === true;
-  const experimental = fieldOf(options, 'experimental');
+  const extended = ownFieldOf(options, 'extended') === true;
+  const experimental = ownFieldOf(options, 'experimental');
 
   return [
     ...sets.defaults,
     ...sets.optIn.filter(
-      ({ name }) => extended || fieldOf(options, name) === true,
+      ({ name }) => extended || ownFieldOf(options, name) === true,
     ),
     ...sets.experimental.filter(
       ({ name }) =>
-        experimental === true || fieldOf(experimental, name) === true,
+        experimental === true || ownFieldOf(experimental, name) === true,
     ),
   ];
 }
 
+function ownFieldOf(value: unknown, key: string): unknown {
+  return isRecord(value) && Object.hasOwn(value, key) ? value[key] : undefined;
+}
+
+/** An object literal or an object without a prototype, so that every key it has is its own. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return isRecord(value) && !Array.isArray(value);
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const prototype: unknown = Object.getPrototypeOf(value);
+
+  return prototype === Object.prototype || prototype === null;
 }
 
 /** The entries of `value` that hold something: a key holding undefined counts as absent. */

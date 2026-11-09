@@ -84,7 +84,8 @@ With opt-in or experimental mutators on, the line names them:
 @layzee/stryker-playwright-mutators: Stryker's 17 built-in mutators are off for every file in this run; 11 LzPlaywright mutators on. Opt-in or experimental: LzPlaywrightSleepWait, LzPlaywrightRequestUrl.
 ```
 
-The call throws, with a message that starts with the package name, on an unknown key, on a value other than `true`,
+The call throws, with a message that starts with the package name, on options that are not a plain object, such as
+a `Map` or an array, on an unknown key, on a value other than `true`,
 on the name of a default mutator, on an opt-in name inside `experimental`, and on an experimental name outside it.
 For example:
 
