@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -46,6 +46,16 @@ describe('storybookProject', () => {
       assert.equal(isStoryFile(project, file('src', 'Button.tsx')), false);
     });
 
+    it('names the config folder as an absolute path when given a relative one', () => {
+      const { project } = setup('no-main');
+      const relativeProject = storybookProject(
+        relative(process.cwd(), project.configDir),
+        { info: () => undefined, warn: () => undefined },
+      );
+
+      assert.equal(relativeProject.configDir, project.configDir);
+    });
+
     it('says once that it uses the file names', () => {
       const { lines, project } = setup('no-main');
 
@@ -71,6 +81,22 @@ describe('storybookProject', () => {
       );
     });
 
+    it('matches a path whose drive letter is lower case', () => {
+      const { project, file } = setup('globs');
+      const path = file('src', 'Button.stories.tsx');
+
+      assert.equal(
+        isStoryFile(project, path.charAt(0).toLowerCase() + path.slice(1)),
+        true,
+      );
+    });
+
+    it('does not see the mock transformer among other plugins', () => {
+      const { project } = setup('globs');
+
+      assert.equal(project.transformer, 'not-seen');
+    });
+
     it('does not count a *.stories.* file outside the globs', () => {
       const { project, file } = setup('globs');
 
@@ -78,6 +104,20 @@ describe('storybookProject', () => {
         isStoryFile(project, file('other', 'Outside.stories.tsx')),
         false,
       );
+    });
+  });
+
+  describe('with the mock transformer in viteFinal', () => {
+    it('sees the transformer', () => {
+      const { project } = setup('transformer');
+
+      assert.equal(project.transformer, 'seen');
+    });
+
+    it('sees the transformer inside nested plugin arrays', () => {
+      const { project } = setup('transformer-nested');
+
+      assert.equal(project.transformer, 'seen');
     });
   });
 
@@ -113,6 +153,12 @@ describe('storybookProject', () => {
         lines[0]?.includes('Error: main.ts of the failing fixture'),
         lines[0],
       );
+    });
+
+    it('leaves the stack trace out of the warning', () => {
+      const { lines } = setup('failing');
+
+      assert.doesNotMatch(lines.join('\n'), /^\s+at /m);
     });
   });
 });

@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { extname, join } from 'node:path';
+import { extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { isRecord } from './is-record.ts';
@@ -19,9 +19,15 @@ export interface StorybookProject {
 }
 
 type LoadResult =
-  | { readonly kind: 'loaded'; readonly storyFiles: readonly string[] }
+  | {
+      readonly kind: 'loaded';
+      readonly storyFiles: readonly string[];
+      readonly pluginNames: readonly string[];
+    }
   | { readonly kind: 'no-main' }
   | { readonly kind: 'failed'; readonly error: string };
+
+const mockTransformerPluginName = 'lz-storybook-mock-transformer';
 
 const childFile = fileURLToPath(
   new URL(
@@ -31,17 +37,20 @@ const childFile = fileURLToPath(
 );
 
 export function storybookProject(
-  configDir: string,
+  givenConfigDir: string,
   log: ProjectLog,
 ): StorybookProject {
+  const configDir = resolve(givenConfigDir);
   const result = loadStorybook(configDir);
 
   switch (result.kind) {
     case 'loaded': {
       return {
         configDir,
-        storyFiles: new Set(result.storyFiles),
-        transformer: 'not-seen',
+        storyFiles: new Set(result.storyFiles.map(normalizePath)),
+        transformer: result.pluginNames.includes(mockTransformerPluginName)
+          ? 'seen'
+          : 'not-seen',
       };
     }
     case 'no-main': {
@@ -69,7 +78,13 @@ export function isStoryFile(
     return fileName.includes('.stories.') || fileName.includes('.story.');
   }
 
-  return project.storyFiles.has(fileName.replaceAll('\\', '/'));
+  return project.storyFiles.has(normalizePath(fileName));
+}
+
+function normalizePath(path: string): string {
+  return path
+    .replaceAll('\\', '/')
+    .replace(/^[a-z]:/, (drive) => drive.toUpperCase());
 }
 
 function fallbackProject(configDir: string): StorybookProject {
@@ -92,27 +107,33 @@ function loadStorybook(configDir: string): LoadResult {
 }
 
 function parseResult(value: unknown): LoadResult {
-  const kind = isRecord(value) ? value['kind'] : undefined;
-  const storyFiles = isRecord(value) ? value['storyFiles'] : undefined;
-  const error = isRecord(value) ? value['error'] : undefined;
+  if (isRecord(value)) {
+    const { kind, storyFiles, pluginNames, error } = value;
 
-  if (
-    kind === 'loaded' &&
-    Array.isArray(storyFiles) &&
-    storyFiles.every((file) => typeof file === 'string')
-  ) {
-    return { kind, storyFiles };
-  }
+    if (
+      kind === 'loaded' &&
+      isStringArray(storyFiles) &&
+      isStringArray(pluginNames)
+    ) {
+      return { kind, storyFiles, pluginNames };
+    }
 
-  if (kind === 'no-main') {
-    return { kind };
-  }
+    if (kind === 'no-main') {
+      return { kind };
+    }
 
-  if (kind === 'failed' && typeof error === 'string') {
-    return { kind, error };
+    if (kind === 'failed' && typeof error === 'string') {
+      return { kind, error };
+    }
   }
 
   throw new Error(
     `${packageName}: the Storybook loader wrote a result of an unknown shape`,
+  );
+}
+
+function isStringArray(value: unknown): value is readonly string[] {
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === 'string')
   );
 }

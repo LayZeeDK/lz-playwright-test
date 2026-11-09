@@ -1,4 +1,7 @@
 import { writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+import { isRecord } from './is-record.ts';
 
 const [configDir, resultFile] = process.argv.slice(2);
 
@@ -21,8 +24,20 @@ async function load(configDir: string): Promise<object> {
       configDir,
       workingDir: process.cwd(),
     });
+    const viteConfig: unknown = await presets.apply('viteFinal', {
+      root: resolve(configDir, '..'),
+    });
+    const plugins =
+      isRecord(viteConfig) && Array.isArray(viteConfig['plugins'])
+        ? viteConfig['plugins'].flat(Infinity)
+        : [];
+    const pluginNames = plugins.flatMap((plugin: unknown) =>
+      isRecord(plugin) && typeof plugin['name'] === 'string'
+        ? [plugin['name']]
+        : [],
+    );
 
-    return { kind: 'loaded', storyFiles };
+    return { kind: 'loaded', storyFiles, pluginNames };
   } catch (error) {
     const { MainFileMissingError } = await import(
       'storybook/internal/server-errors'
@@ -30,6 +45,12 @@ async function load(configDir: string): Promise<object> {
 
     return error instanceof MainFileMissingError
       ? { kind: 'no-main' }
-      : { kind: 'failed', error: String(error) };
+      : {
+          kind: 'failed',
+          error: String(error)
+            .split('\n')
+            .filter((line) => !/^\s+at /.test(line))
+            .join('\n'),
+        };
   }
 }
