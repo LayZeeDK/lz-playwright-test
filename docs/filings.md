@@ -557,6 +557,13 @@ one `(unconditional -> if)` with a large body and gives no way to cut it into re
 red as an assertion on the removed fixtures, not as a compile error, because `node --test` strips types; the
 type-level part showed up only under `typecheck`. This adds to O64. Evidence: `step6-p2b-notes.md`.
 
+**O67. `lz-tpp` has no step for reusing a predicate the codebase already holds.** In chunk 2c the smallest green for
+"a top-level test call" by the list was "any top-level call is true", but an existing `isTestCallee` already carried
+the stopping conditions. Reusing it made the next rows (nested call, `foo.test()`, `describe()`, `expect()`) pass on
+their first run, so they were logged as test-after. A first green that deliberately over-warns (every `Program`) and
+is narrowed by later tests also fits `(nil -> constant)` only loosely. The reused predicate's own gap (one member
+level, so `test.describe.serial` missed) surfaced in review. Evidence: `step6-p2c-notes.md`; commit 544c4df.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -765,6 +772,10 @@ as separate tests: where the walk stops, where it must go on, and what it must s
 
 **S60 (from O66).** In `lz-red`'s Vitest and TypeScript mechanics, say that under type stripping the red of a
 signature change is a type-check run, and name the command beside the test command.
+
+**S61 (from O67).** Add a "reuse an existing function" option to the coach procedure, ranked with
+`(expression -> function)`, and have `lz-red` ask whether the reused function's own edge cases are pinned where it
+is reused.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
