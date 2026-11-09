@@ -720,6 +720,39 @@ dropping a wanted outcome (`route = fallback` keeps its mutant) is a test-after 
 pins only as characterization. Close to O86 and O89. Evidence: `install-rollback/cycles.log`, cycle 3 and the lines
 after it.
 
+**O93 (lz-tpp fit). After its first row, a growing data table needs no transformation.** The R7 fixes made lz-telemetry
+and lz-console keep a statement whose arguments act on the page. Ten greens in a row added one node type to a list
+(function expression, method, `new`, tagged template, and so on). `(array -> container)` and `(constant -> scalar)`
+describe a list's first step, not its later rows, so each green was logged as "one more entry" with no transformation
+name, and each red was settled by data, not by the shape of the code. The opposite case of O47. Evidence:
+`r7-fix/cycles.log`, cycles 5 to 14.
+
+**O94. A later, more general rule can leave an earlier driver test pinning nothing.** In the same work, cycle 2 drove
+the arrow-function entry with an arrow whose body held a call. Cycle 5 added the call rule, and from then on the call
+alone kept that test's mutants, so the test no longer pinned the arrow entry, and Stryker's mutant on it survived.
+`lz-red` picks a realistic example but has no step that asks whether a later rule will also make the test pass, and
+the refactor scan does not look back at earlier tests. A test-after with an arrow that holds no call killed it. Close
+to O89. Evidence: `r7-fix/notes.md`, commit b637c46.
+
+**O95. A list item the current code already passes can hide a requirement of the next green.** In Storybook chunk
+S1, "a file the globs match is a story file" passed under the fallback, so `lz-red` sent it to test-after. The next
+driver passed with a Set of Storybook's own paths, but those paths use forward slashes, so the test-after would have
+gone red against that minimal green. The separator handling went into the green only because the test-after was
+known. Neither `lz-red` (place a currently green item after the green that could break it) nor `lz-tpp` (check the
+test-after items against a green before taking it) covers this; the minimal green is defined against the red test
+only. Evidence: `sb-s1/notes.md`, cycle 6.
+
+**O96 (lz-tpp misfit). A minimal green that stands in for the engine lives one or two cycles.** In S1, `existsSync`
+on `main.ts` was the highest-priority green for "logs nothing", and it is wrong for `main.js`, `main.mts` and the rest
+of Storybook's list; a later cycle replaced it with Storybook's own `MainFileMissingError`. The reverse of O68, where
+the engine arrived as the first green. Evidence: `sb-s1/cycles.log`, cycles 5 and 9.
+
+**O97. On a slow seam every red costs a child process, and the cycle has no step for that.** Each S1 test that loads
+a config folder starts Node and loads Storybook (1 to 2.5 s each, measured in the spec output); the spec grew from
+0.2 s to 15 s over nine cycles. `test-first.md` says to cycle at the cheapest seam, but the cheapest seam that
+reaches Storybook's own story list is this child process; a pure seam would test the parser, not the discovery.
+Neither skill weighs run time per cycle. Evidence: `sb-s1/notes.md`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -1020,6 +1053,24 @@ as equivalent, and Remove Dead Code fixes it, as S6 describes for a surviving mu
 **S85 (from O92).** In `lz-red`'s test-list advice, say that when the green's rule is already known, the list should
 start with the rows that tell the rule apart from simpler candidates, and that rows the rule covers by construction
 are pins. Add "guard pin": a passing row placed before a green so that the green may not drop a wanted outcome.
+
+**S86 (from O93).** Add a note to `lz-tpp`: once a table-driven rule exists, a green that adds a row is data, not a
+transformation; log it as such, and pose the next test so that it needs a change of shape, or move the rows to a
+table-driven test.
+
+**S87 (from O94).** Add a look-back step to `lz-refactor`'s scan: after a green that generalises a rule, check each
+earlier test still fails without the code it drove; a test that now passes for another reason gets a second example
+that only its own code covers.
+
+**S88 (from O95).** In `lz-red`, place an item that passes today after the green it depends on, and in `lz-tpp` check
+the list's test-after items against a candidate green before taking it.
+
+**S89 (from O96).** In `lz-tpp`, when a library already provides the behaviour (a "missing file" error, a list of
+names), prefer calling it over a stand-in that a later test will replace, and say so as an exception to the priority
+order.
+
+**S90 (from O97).** In `lz-red`'s stance advice, name the slow-seam case: keep one test per slow call and drive the
+rest of the behaviour through a recorded result, so run time grows with the number of slow tests rather than cycles.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 

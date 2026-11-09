@@ -1,14 +1,25 @@
-import { fieldOf } from '@layzee/stryker-mutator-install';
+import {
+  callTypes,
+  fieldOf,
+  isRecord,
+  memberTypes,
+} from '@layzee/stryker-mutator-install';
 
 import { typeOf } from './type-of.ts';
 
-const callTypes: readonly unknown[] = [
-  'CallExpression',
-  'OptionalCallExpression',
-];
-const memberTypes: readonly unknown[] = [
-  'MemberExpression',
-  'OptionalMemberExpression',
+const effectTypes: readonly unknown[] = [
+  ...callTypes,
+  'ArrowFunctionExpression',
+  'AssignmentExpression',
+  'AwaitExpression',
+  'ClassMethod',
+  'ClassPrivateMethod',
+  'FunctionExpression',
+  'NewExpression',
+  'ObjectMethod',
+  'TaggedTemplateExpression',
+  'UpdateExpression',
+  'YieldExpression',
 ];
 
 export function statementCallee(node: unknown): string | undefined {
@@ -23,11 +34,22 @@ export function statementCallee(node: unknown): string | undefined {
       ? fieldOf(expression, 'argument')
       : expression;
 
-  if (!callTypes.includes(typeOf(call))) {
+  if (
+    !callTypes.includes(typeOf(call)) ||
+    holdsEffect(fieldOf(call, 'arguments'))
+  ) {
     return undefined;
   }
 
   return dottedName(fieldOf(call, 'callee'));
+}
+
+function holdsEffect(node: unknown): boolean {
+  return (
+    effectTypes.includes(typeOf(node)) ||
+    fieldOf(node, 'operator') === 'delete' ||
+    (isRecord(node) && Object.values(node).some(holdsEffect))
+  );
 }
 
 function dottedName(node: unknown): string | undefined {

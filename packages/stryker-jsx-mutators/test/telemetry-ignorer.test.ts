@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { strykerValidationSchema } from '../src/index.ts';
 import {
-  strykerValidationSchema,
+  lzTelemetrySchema,
   telemetryIgnorer,
 } from '../src/telemetry-ignorer.ts';
-import { assertEveryOutcome } from './support/ignorer-outcomes.ts';
+import {
+  assertEveryOutcome,
+  ignorerOutcomes,
+} from './support/ignorer-outcomes.ts';
 import { validateOptions } from './support/validate-options.ts';
 
 const analyticsReason =
@@ -19,13 +23,6 @@ const assertEvery = (code: string, outcome: string, options: object = {}) =>
   assertEveryOutcome(telemetryIgnorer(options), code, outcome);
 
 describe('lz-telemetry', () => {
-  it('ignores every mutant of a gtag call statement, with the analytics reason', async () => {
-    await assertEvery(
-      "gtag('event', 'sign_up', { method: on ? 'a' : 'b' });",
-      analyticsReason,
-    );
-  });
-
   [
     'gtag',
     'window.gtag',
@@ -115,6 +112,13 @@ describe('lz-telemetry', () => {
     });
   });
 
+  it('keeps the mutants of a call to a parameter that shadows a captureException imported from @sentry', async () => {
+    await assertEvery(
+      "import { captureException } from '@sentry/node';\nexport function f(captureException) { captureException(on ? 'a' : 'b'); }",
+      'placed',
+    );
+  });
+
   [
     'window.gtag?.',
     'window.dataLayer?.push',
@@ -162,7 +166,7 @@ describe('lz-telemetry', () => {
     'lib.analytics.track',
     'analytics.track.call',
   ].forEach((callee) => {
-    it(`keeps the mutants of a ${callee} statement`, async () => {
+    it(`keeps the mutants of a ${callee} statement, whose callee is constructed, computed or not a listed name`, async () => {
       await assertEvery(`${callee}('event', on ? 'a' : 'b');`, 'placed');
     });
   });
@@ -171,6 +175,19 @@ describe('lz-telemetry', () => {
     it(`ignores every mutant of a ${callee} call statement listed in lzTelemetry.calls, with the calls reason`, async () => {
       await assertEvery(`${callee}('event', on ? 'a' : 'b');`, callsReason, {
         lzTelemetry: { calls: ['track', 'telemetry.send'] },
+      });
+    });
+  });
+
+  (
+    [
+      ['gtag', analyticsReason],
+      ['Sentry.flush', errorReason],
+    ] as const
+  ).forEach(([callee, reason]) => {
+    it(`gives a ${callee} call statement its built-in reason when lzTelemetry.calls lists it too`, async () => {
+      await assertEvery(`${callee}('event', on ? 'a' : 'b');`, reason, {
+        lzTelemetry: { calls: [callee] },
       });
     });
   });
@@ -208,33 +225,60 @@ describe('lz-telemetry', () => {
     });
   });
 
+  it('keeps the mutants of a telemetry call statement whose arguments hold an arrow function, as the function can act on the page', async () => {
+    await assertEvery(
+      "analytics.track('Clicked', {}, {}, () => { navigate(on ? '/a' : '/b'); });",
+      'placed',
+    );
+  });
+
+  it('keeps the mutants of a telemetry call statement whose object argument holds a callback property', async () => {
+    await assertEvery(
+      "window.dataLayer.push({ event: 'x', eventCallback: () => { setDone(on && ok); } });",
+      'placed',
+    );
+  });
+
+  it('keeps the mutants of the statement beside an ignored telemetry call statement', async () => {
+    assert.deepEqual(
+      new Set(
+        await ignorerOutcomes(
+          telemetryIgnorer({}),
+          "gtag('event', on ? 'a' : 'b');\nsetOpen(on ? 1 : 2);",
+        ),
+      ),
+      new Set([analyticsReason, 'placed']),
+    );
+  });
+
+  it('keeps the mutants of a telemetry call that is the body of an arrow function, as it is no statement', async () => {
+    await assertEvery(
+      "export const view = <button onClick={() => gtag('event', on ? 'a' : 'b')}>Buy</button>;",
+      'placed',
+    );
+  });
+
   it('keeps the mutants of a call statement to an unknown callee', async () => {
     await assertEvery("format('a', on ? 'b' : 'c');", 'placed');
   });
 });
 
-describe('the lz-telemetry strykerValidationSchema', () => {
+describe('the lz-telemetry options schema', () => {
   it('describes lzTelemetry.calls as a list of callee names', () => {
-    assert.deepEqual(strykerValidationSchema, {
-      $schema: 'http://json-schema.org/draft-07/schema#',
+    assert.deepEqual(lzTelemetrySchema, {
       type: 'object',
+      additionalProperties: false,
+      description: 'Options of the lz-telemetry ignorer.',
       properties: {
-        lzTelemetry: {
-          type: 'object',
-          additionalProperties: false,
-          description: 'Options of the lz-telemetry ignorer.',
-          properties: {
-            calls: {
-              type: 'array',
-              items: {
-                type: 'string',
-                pattern: '^[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)*$',
-              },
-              description:
-                'Callees, such as track or analytics.track, added to the built-in ones. lz-telemetry hides the ' +
-                'mutants of a statement that only calls one of them.',
-            },
+        calls: {
+          type: 'array',
+          items: {
+            type: 'string',
+            pattern: '^[A-Za-z_$][\\w$]*(\\.[A-Za-z_$][\\w$]*)*$',
           },
+          description:
+            'Callees, such as track or analytics.track, added to the built-in ones. lz-telemetry hides the ' +
+            'mutants of a statement that only calls one of them.',
         },
       },
     });
