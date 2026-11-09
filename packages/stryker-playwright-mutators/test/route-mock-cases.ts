@@ -250,4 +250,53 @@ export const routeMockCases: readonly Case[] = [
       "test('case', async ({ page }) => {\n  await page.route('**/api', (route) => route.fallback());\n});",
     expect: [[outcome, 'route.abort()']],
   },
+  {
+    id: 'abort-in-nested-callback',
+    title:
+      'an abort in a callback with other parameters inside a handler becomes a continue',
+    source: inRoute('[1].forEach((item) => route.abort());'),
+    expect: [[outcome, 'route.continue()']],
+  },
+  {
+    id: 'abort-route-second-parameter',
+    title:
+      'an abort on the second parameter of a route callback makes no mutant',
+    source:
+      "test('case', async ({ page }) => {\n  await page.route('**/api', async (request, route) => {\n    await route.abort();\n  });\n});",
+    expect: [],
+  },
+  {
+    id: 'abort-callback-first-argument',
+    title:
+      'an abort in a callback passed as the first argument of route makes no mutant',
+    source:
+      "test('case', async ({ page }) => {\n  await page.route(async (route) => {\n    await route.abort();\n  });\n});",
+    expect: [],
+  },
+  {
+    id: 'abort-annotated-other-type',
+    title:
+      'an abort in a function whose parameter is annotated with another type makes no mutant',
+    source:
+      'const handle = async (route: Request) => {\n  await route.abort();\n};',
+    expect: [],
+  },
+  {
+    id: 'fulfill-status-399',
+    title: 'a status of 399 becomes 500',
+    source: inRoute('await route.fulfill({ status: 399 });'),
+    expect: [[fulfill, '500']],
+  },
+  {
+    id: 'fulfill-computed-json-key',
+    title: 'a computed key named json is not the json option',
+    source: inRoute('await route.fulfill({ [json]: { name: "a" } });'),
+    expect: [],
+  },
+  {
+    id: 'fulfill-new-expression',
+    title: 'a json property in new route.fulfill(...) makes no mutant',
+    source: inRoute('await new route.fulfill({ json: { name: "a" } });'),
+    expect: [],
+  },
 ];
