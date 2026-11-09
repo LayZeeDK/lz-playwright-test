@@ -51,10 +51,7 @@ function inPayload(path: unknown): boolean {
   for (;;) {
     const parentType = fieldOf(fieldOf(current, 'parent'), 'type');
 
-    if (
-      fieldOf(current, 'key') === 'value' &&
-      parentType === 'ObjectProperty'
-    ) {
+    if (fieldOf(current, 'key') === 'value') {
       const property = fieldOf(current, 'parentPath');
 
       if (
@@ -80,7 +77,6 @@ function isPayload(propertyPath: unknown): boolean {
 
   return (
     payloadKeys.includes(fieldOf(key, 'name') ?? fieldOf(key, 'value')) &&
-    fieldOf(optionsPath, 'listKey') === 'arguments' &&
     fieldOf(optionsPath, 'key') === 1 &&
     isPayloadCall(fieldOf(optionsPath, 'parent'))
   );
