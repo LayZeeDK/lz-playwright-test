@@ -47,6 +47,12 @@ export const waitCases: readonly Case[] = [
     expect: [[clock, ';']],
   },
   {
+    id: 'runFor-optional-page-clock',
+    title: 'an awaited runFor on page?.clock is removed',
+    source: inTest('await page?.clock.runFor(1_000);'),
+    expect: [[clock, ';']],
+  },
+  {
     id: 'runFor-other-receiver',
     title: 'an awaited runFor on a receiver that is no clock makes no mutant',
     source: inTest(

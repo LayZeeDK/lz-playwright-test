@@ -79,6 +79,12 @@ export const requestCases: readonly Case[] = [
     expect: [[data, '"nx"']],
   },
   {
+    id: 'data-optional-page-request',
+    title: 'a string in the data of a call on page?.request gets the suffix x',
+    source: readResult("page?.request.post('/a', { data: { name: 'n' } })"),
+    expect: [[data, '"nx"']],
+  },
+  {
     id: 'data-first-argument',
     title:
       'a string in the data of the first argument of a request call makes no mutant',
@@ -220,6 +226,12 @@ export const requestCases: readonly Case[] = [
     id: 'url-page-request',
     title: 'the URL of a page.request.get whose result is read becomes empty',
     source: readResult("page.request.get('/a')"),
+    expect: [[url, '""']],
+  },
+  {
+    id: 'url-optional-page-request',
+    title: 'the URL of a page?.request.get whose result is read becomes empty',
+    source: readResult("page?.request.get('/a')"),
     expect: [[url, '""']],
   },
   {
