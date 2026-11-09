@@ -151,9 +151,13 @@ export function hasProperty(object: unknown, key: string): boolean {
 
   return (
     Array.isArray(properties) &&
-    properties.some(
-      (property) => fieldOf(fieldOf(property, 'key'), 'name') === key,
-    )
+    properties.some((property) => {
+      const propertyKey = fieldOf(property, 'key');
+
+      return (
+        (fieldOf(propertyKey, 'name') ?? fieldOf(propertyKey, 'value')) === key
+      );
+    })
   );
 }
 

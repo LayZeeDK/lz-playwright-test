@@ -36,6 +36,13 @@ const dataMethods: readonly (readonly [string, Case['expect']])[] = [
   ['head', [[url, '""']]],
 ];
 
+// [id, options]: options that may name a method.
+const fetchOptions: readonly (readonly [string, string])[] = [
+  ['quoted-method', "{ 'method': 'POST' }"],
+  ['spread', '{ ...options }'],
+  ['variable', 'options'],
+];
+
 export const requestCases: readonly Case[] = [
   ...['form', 'params'].map(
     (key): Case => ({
@@ -193,6 +200,14 @@ export const requestCases: readonly Case[] = [
     source: readResult("request.fetch('/a', { method: 'POST' })"),
     expect: [],
   },
+  ...fetchOptions.map(
+    ([id, options]): Case => ({
+      id: `url-fetch-${id}`,
+      title: `the URL of a request.fetch with the options ${options} makes no mutant`,
+      source: readResult(`request.fetch('/a', ${options})`),
+      expect: [],
+    }),
+  ),
   {
     id: 'url-discarded',
     title:

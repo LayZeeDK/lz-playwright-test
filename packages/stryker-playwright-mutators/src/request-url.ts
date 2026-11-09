@@ -187,8 +187,22 @@ function bindingOf(path: unknown, name: unknown): unknown {
     : undefined;
 }
 
+/** The options argument names a method, or may: it is no object literal, or it holds a spread. */
 function hasMethodOption(call: unknown): boolean {
   const args = fieldOf(call, 'arguments');
+  const options: unknown = Array.isArray(args) ? args[1] : undefined;
 
-  return hasProperty(Array.isArray(args) ? args[1] : undefined, 'method');
+  if (options === undefined) {
+    return false;
+  }
+
+  const properties = fieldOf(options, 'properties');
+
+  return (
+    !Array.isArray(properties) ||
+    properties.some(
+      (property) => fieldOf(property, 'type') === 'SpreadElement',
+    ) ||
+    hasProperty(options, 'method')
+  );
 }
