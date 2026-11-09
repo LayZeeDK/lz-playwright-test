@@ -155,6 +155,7 @@ export function hasProperty(object: unknown, key: string): boolean {
       const propertyKey = fieldOf(property, 'key');
 
       return (
+        fieldOf(property, 'computed') !== true &&
         (fieldOf(propertyKey, 'name') ?? fieldOf(propertyKey, 'value')) === key
       );
     })
