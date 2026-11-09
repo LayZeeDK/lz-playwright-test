@@ -11,6 +11,7 @@ import {
   resolveInstrumenter,
   selectMutators,
   selfCheck,
+  undoOnThrow,
   warnUntested,
   type Instrumenter as CoreInstrumenter,
   type MutatorSets,
@@ -91,32 +92,25 @@ export async function install(
   const instrumenter = await resolve();
 
   const { allMutators } = instrumenter;
-  const before = [...allMutators];
 
   checkNames(packageName, mutators, allMutators);
-  removeBuiltIns(packageName, instrumenter, warn);
-  register(
-    packageName,
-    allMutators,
-    mutators.map(({ name, mutate }) => ({
-      name,
-      mutate: (path: unknown) => {
-        warnAboutProgram(path, warn);
+  await undoOnThrow([allMutators], async () => {
+    removeBuiltIns(packageName, instrumenter, warn);
+    register(
+      packageName,
+      allMutators,
+      mutators.map(({ name, mutate }) => ({
+        name,
+        mutate: (path: unknown) => {
+          warnAboutProgram(path, warn);
 
-        return mutate(path, instrumenter.types);
-      },
-    })),
-  );
-
-  // The two checks instrument through the changed list, so they run after the change and undo it when they throw.
-  try {
+          return mutate(path, instrumenter.types);
+        },
+      })),
+    );
     await selfCheck(packageName, instrumenter, mutators);
     await checkBuiltInsRemoved(packageName, instrumenter);
-  } catch (error) {
-    allMutators.splice(0, allMutators.length, ...before);
-
-    throw error;
-  }
+  });
 
   warnUntested(packageName, testedVersion, instrumenter, warn);
   info(startLine(sets, mutators));
