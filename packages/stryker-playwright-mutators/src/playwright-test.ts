@@ -1,6 +1,6 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
-import { isTestCallee } from './ast.ts';
+import { isCall, isTestCallee } from './ast.ts';
 
 export function looksLikePlaywrightTest(program: unknown): boolean {
   const body = fieldOf(program, 'body');
@@ -29,7 +29,7 @@ function isTopLevelTestCall(statement: unknown): boolean {
 
   return (
     fieldOf(statement, 'type') === 'ExpressionStatement' &&
-    fieldOf(call, 'type') === 'CallExpression' &&
+    isCall(call) &&
     isTestCallee(fieldOf(call, 'callee'))
   );
 }

@@ -264,6 +264,20 @@ export const routeMockCases: readonly Case[] = [
     expect: [],
   },
   {
+    id: 'fulfill-optional-call',
+    title: 'a fulfill on an optional chain gets its mutants',
+    source: inRoute('await route?.fulfill({ status: 404 });'),
+    expect: [[fulfill, '200']],
+  },
+  {
+    id: 'abort-new-route',
+    title:
+      'an abort in a callback of a constructor named route makes no mutant: a new expression is no call',
+    source:
+      "test('case', async ({ page }) => {\n  new router.route('**/api', (route) => route.abort());\n});",
+    expect: [],
+  },
+  {
     id: 'fallback-expression-body',
     title: 'a fallback as the expression body of a handler becomes an abort',
     source:

@@ -2,7 +2,7 @@ import { fieldOf } from '@layzee/stryker-mutator-install';
 
 import {
   ancestors,
-  callTypes,
+  isCall,
   isFunctionNode,
   isNamedReceiver,
   isTestCallee,
@@ -163,8 +163,7 @@ function awaitedCall(node: unknown): unknown {
   const awaited = fieldOf(node, 'expression');
   const call = fieldOf(awaited, 'argument');
 
-  return fieldOf(awaited, 'type') === 'AwaitExpression' &&
-    callTypes.includes(fieldOf(call, 'type'))
+  return fieldOf(awaited, 'type') === 'AwaitExpression' && isCall(call)
     ? call
     : undefined;
 }
@@ -214,7 +213,7 @@ function isFixtureFunction(path: unknown): boolean {
     return false;
   }
 
-  if (fieldOf(owner, 'type') === 'CallExpression') {
+  if (isCall(owner)) {
     return isTestCallee(fieldOf(owner, 'callee'));
   }
 
@@ -230,13 +229,7 @@ function isFixtureFunction(path: unknown): boolean {
 }
 
 function isExtendCall(node: unknown): boolean {
-  const callee = fieldOf(node, 'callee');
-
-  return (
-    fieldOf(node, 'type') === 'CallExpression' &&
-    fieldOf(callee, 'type') === 'MemberExpression' &&
-    methodOf(callee) === 'extend'
-  );
+  return isCall(node) && methodOf(fieldOf(node, 'callee')) === 'extend';
 }
 
 function isSkipped(path: unknown, skip: RemovalRow['skip']): boolean {
@@ -255,13 +248,7 @@ function isSkipped(path: unknown, skip: RemovalRow['skip']): boolean {
 }
 
 function isHookCall(node: unknown, hooks: readonly unknown[]): boolean {
-  const callee = fieldOf(node, 'callee');
-
-  return (
-    fieldOf(node, 'type') === 'CallExpression' &&
-    fieldOf(callee, 'type') === 'MemberExpression' &&
-    hooks.includes(methodOf(callee))
-  );
+  return isCall(node) && hooks.includes(methodOf(fieldOf(node, 'callee')));
 }
 
 /** `child` is the `finally` block of the try statement at `tryPath`. */
@@ -294,7 +281,7 @@ function isAwaitedUse(statement: unknown): boolean {
   return (
     fieldOf(statement, 'type') === 'ExpressionStatement' &&
     fieldOf(awaited, 'type') === 'AwaitExpression' &&
-    fieldOf(call, 'type') === 'CallExpression' &&
+    isCall(call) &&
     fieldOf(fieldOf(call, 'callee'), 'name') === 'use'
   );
 }

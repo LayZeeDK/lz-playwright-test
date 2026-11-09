@@ -1,6 +1,6 @@
 import { fieldOf, isRecord } from '@layzee/stryker-mutator-install';
 
-import { callTypes } from './ast.ts';
+import { isCall } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 
 /** A literal that a mutator may swap: the node, and the value that tells it from another literal of the same key. */
@@ -120,7 +120,7 @@ function callsIn(node: unknown): readonly unknown[] {
     : [];
 
   return [
-    ...(callTypes.includes(fieldOf(node, 'type')) ? [node] : []),
+    ...(isCall(node) ? [node] : []),
     ...children
       .filter((child) => typeof fieldOf(child, 'type') === 'string')
       .flatMap(callsIn),

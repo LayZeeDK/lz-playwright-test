@@ -1,12 +1,6 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
-import {
-  ancestors,
-  argumentOf,
-  callTypes,
-  hasProperty,
-  methodOf,
-} from './ast.ts';
+import { ancestors, argumentOf, hasProperty, isCall, methodOf } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 
 export function fulfillMutator<const TName extends string>(
@@ -71,7 +65,7 @@ export function outcomeMutator<const TName extends string>(
           : undefined;
 
       if (
-        callTypes.includes(fieldOf(node, 'type')) &&
+        isCall(node) &&
         flipped !== undefined &&
         typeof route === 'string' &&
         isInHandlerOf(path, route)
@@ -113,6 +107,7 @@ function paramsOf(functionPath: unknown): readonly unknown[] {
 /** `handler` is the second argument of `<x>.route(...)`. */
 function isRouteCallback(call: unknown, handler: unknown): boolean {
   return (
+    isCall(call) &&
     argumentOf(call, 1) === handler &&
     methodOf(fieldOf(call, 'callee')) === 'route'
   );
@@ -173,7 +168,7 @@ function isFulfillOption(path: unknown, key: string): boolean {
     fieldOf(property, 'value') === fieldOf(path, 'node') &&
     fieldOf(object, 'type') === 'ObjectExpression' &&
     !hasProperty(object, 'response') &&
-    fieldOf(call, 'type') === 'CallExpression' &&
+    isCall(call) &&
     methodOf(fieldOf(call, 'callee')) === 'fulfill'
   );
 }

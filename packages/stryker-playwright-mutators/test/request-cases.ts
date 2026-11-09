@@ -485,6 +485,15 @@ export const requestCases: readonly Case[] = [
     expect: [],
   },
   {
+    id: 'url-new-context-constructed',
+    title:
+      'the URL of a get on a name bound to a new expression named newContext makes no mutant: a new expression is no call',
+    source: inTest(
+      "const context = new request.newContext();\n  const response = await context.get('/a');\n\n  expect(response.ok()).toBe(true);",
+    ),
+    expect: [],
+  },
+  {
     id: 'url-goto',
     title: 'the URL of page.goto makes no RequestUrl mutant',
     source: inTest("await page.goto('/goto');"),

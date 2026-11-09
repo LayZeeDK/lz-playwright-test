@@ -337,6 +337,32 @@ export const cases: readonly Case[] = [
     expect: [[click, ';']],
   },
   {
+    id: 'navigate-optional-test',
+    title:
+      'an awaited navigate from the fixtures of a test called through an optional chain is removed',
+    source:
+      "test?.('case', async ({ navigate }) => {\n  await navigate('/');\n});",
+    expect: [[navigation, ';']],
+  },
+  {
+    id: 'navigate-optional-chain-extend',
+    title:
+      'an awaited navigate in a fixture of an extend called through an optional chain is removed',
+    source:
+      "const extended = test?.extend({\n  ready: async ({ navigate }, use) => {\n    await navigate('/');\n    await use(true);\n  },\n});",
+    expect: [[navigation, ';']],
+  },
+  untouched(
+    'a click in test.afterEach called through an optional chain',
+    "test?.afterEach(async ({ page }) => {\n  await page.locator('#a').click();\n});",
+    'afterEach-optional',
+  ),
+  untouched(
+    'a click after await use called through an optional chain',
+    "const extended = test.extend<{ ready: boolean }>({\n  ready: async ({ page }, use) => {\n    await use?.(true);\n    await page.locator('#a').click();\n  },\n});",
+    'after-optional-use',
+  ),
+  {
     id: 'sibling-of-afterEach',
     title: 'a click in a test next to test.afterEach is removed',
     source: `test.afterEach(async () => {});\n${inTest("await page.locator('#a').click();")}`,

@@ -5,6 +5,7 @@ import {
   argumentOf,
   bindingOf,
   hasProperty,
+  isCall,
   isNamedReceiver,
   methodOf,
 } from './ast.ts';
@@ -136,6 +137,7 @@ function isNewContextCall(node: unknown): boolean {
   const callee = fieldOf(call, 'callee');
 
   return (
+    isCall(call) &&
     methodOf(callee) === 'newContext' &&
     isNamedReceiver(fieldOf(callee, 'object'), 'request')
   );

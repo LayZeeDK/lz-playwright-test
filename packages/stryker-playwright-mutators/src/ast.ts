@@ -1,6 +1,6 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
-export const callTypes: readonly unknown[] = [
+const callTypes: readonly unknown[] = [
   'CallExpression',
   'OptionalCallExpression',
 ];
@@ -8,6 +8,11 @@ const memberTypes: readonly unknown[] = [
   'MemberExpression',
   'OptionalMemberExpression',
 ];
+
+/** `<x>(...)` or `<x>?.(...)`. */
+export function isCall(node: unknown): boolean {
+  return callTypes.includes(fieldOf(node, 'type'));
+}
 
 /** The property name of `<x>.<name>` or `<x>?.<name>`. */
 export function methodOf(member: unknown): unknown {
@@ -47,7 +52,7 @@ export function isNamedReceiver(node: unknown, name: string): boolean {
 
 /** `test`, or a member chain on it such as `test.describe.serial`. */
 export function isTestCallee(callee: unknown): boolean {
-  if (fieldOf(callee, 'type') === 'MemberExpression') {
+  if (memberTypes.includes(fieldOf(callee, 'type'))) {
     return isTestCallee(fieldOf(callee, 'object'));
   }
 
