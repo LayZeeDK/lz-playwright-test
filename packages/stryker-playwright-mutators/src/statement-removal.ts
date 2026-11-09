@@ -187,6 +187,7 @@ function isNavigationFixture(path: unknown, name: unknown): boolean {
   );
 }
 
+/** The first of a function's `params` is an object pattern that binds `name`. */
 function destructures(params: unknown, name: string): boolean {
   const pattern: unknown = Array.isArray(params) ? params[0] : undefined;
   const properties = fieldOf(pattern, 'properties');

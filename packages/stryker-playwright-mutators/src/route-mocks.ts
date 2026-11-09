@@ -138,12 +138,14 @@ function isRouteAnnotated(parameter: unknown): boolean {
   return fieldOf(fieldOf(annotation, 'typeName'), 'name') === 'Route';
 }
 
+/** A numeric literal from `min` to `max`. */
 function isNumberBetween(node: unknown, min: number, max: number): boolean {
   const value = fieldOf(node, 'value');
 
   return typeof value === 'number' && value >= min && value <= max;
 }
 
+/** A fulfill option value that is already empty: `{}`, `[]` or `''`. */
 function isEmptyValue(node: unknown): boolean {
   return (
     lengthOf(fieldOf(node, 'properties')) === 0 ||
