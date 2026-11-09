@@ -278,7 +278,7 @@ describe('the lz-telemetry options schema', () => {
           },
           description:
             'Callees, such as track or analytics.track, added to the built-in ones. lz-telemetry hides the ' +
-            'mutants of a statement that only calls one of them.',
+            'mutants of a statement that is just a call to one of them, unless an argument can act on the page.',
         },
       },
     });

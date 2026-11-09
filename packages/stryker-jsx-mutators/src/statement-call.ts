@@ -15,6 +15,7 @@ const effectTypes: readonly unknown[] = [
   'ClassMethod',
   'ClassPrivateMethod',
   'FunctionExpression',
+  'ImportExpression',
   'NewExpression',
   'ObjectMethod',
   'TaggedTemplateExpression',
@@ -22,7 +23,7 @@ const effectTypes: readonly unknown[] = [
   'YieldExpression',
 ];
 
-export function statementCallee(node: unknown): string | undefined {
+export function hideableCallee(node: unknown): string | undefined {
   if (typeOf(node) !== 'ExpressionStatement') {
     return undefined;
   }

@@ -191,13 +191,15 @@ too.
 
 The statement can be an optional call, such as `window.gtag?.('event', name)`, and can sit under `await` or
 `void`, such as `await Sentry.flush(2000)`. An optional call's own mutant, the one that removes the `?.`, is
-hidden with the rest of the statement, though a test that runs without the library loaded could kill it.
+hidden with the rest of the statement, though a test that runs without the library loaded could kill it. The
+same holds for a `?.` inside an argument, such as `user?.id` in `analytics.track('Bought', { id: user?.id })`:
+its mutant throws when `user` is undefined, but the ignorer hides it with the statement.
 
 The ignorer keeps the mutants in every other case:
 
 - An argument holds code that can act on the page: a function (arrow, function expression, object or class
-  method), a call, `new`, a tagged template, an assignment, an update such as `count++`, `await`, `yield`,
-  or `delete`. For example, the callback in `analytics.track('Clicked', {}, {}, () => navigate('/done'))`
+  method), a call, a dynamic `import()`, `new`, a tagged template, an assignment, an update such as
+  `count++`, `await`, `yield`, or `delete`. For example, the callback in `analytics.track('Clicked', {}, {}, () => navigate('/done'))`
   or the `eventCallback` in `dataLayer.push({ event: 'buy', eventCallback: () => setDone(true) })` runs
   in the page, and a DOM test can see what it does.
 - The call is not a statement of its own, such as the body of `onClick={() => gtag('event', 'buy')}`.

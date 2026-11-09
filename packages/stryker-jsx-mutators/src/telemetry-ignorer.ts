@@ -3,7 +3,7 @@ import type { Ignorer } from '@stryker-mutator/api/ignore';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
 import { listOption } from './list-option.ts';
-import { statementCallee } from './statement-call.ts';
+import { hideableCallee } from './statement-call.ts';
 
 const calleePattern = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/;
 
@@ -17,7 +17,7 @@ export const lzTelemetrySchema = {
       items: { type: 'string', pattern: calleePattern.source },
       description:
         'Callees, such as track or analytics.track, added to the built-in ones. lz-telemetry hides the ' +
-        'mutants of a statement that only calls one of them.',
+        'mutants of a statement that is just a call to one of them, unless an argument can act on the page.',
     },
   },
 };
@@ -92,7 +92,7 @@ export function telemetryIgnorer(options: object): Ignorer {
 
   return {
     shouldIgnore(path) {
-      const callee = statementCallee(fieldOf(path, 'node'));
+      const callee = hideableCallee(fieldOf(path, 'node'));
 
       return sentryImportedFunctions.includes(callee) &&
         importsFromSentry(path, callee)

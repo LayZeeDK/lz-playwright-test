@@ -3,7 +3,7 @@ import type { Ignorer } from '@stryker-mutator/api/ignore';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
 import { listOption } from './list-option.ts';
-import { statementCallee } from './statement-call.ts';
+import { hideableCallee } from './statement-call.ts';
 
 const consoleMethods: readonly unknown[] = [
   'assert',
@@ -37,8 +37,8 @@ export const lzConsoleSchema = {
       type: 'array',
       items: { enum: consoleMethods },
       description:
-        'The console methods whose call statements lz-console hides. Replaces the default list: log, ' +
-        'debug, info and trace.',
+        'The console methods whose call statements lz-console hides, unless an argument can act on the ' +
+        'page. Replaces the default list: log, debug, info and trace.',
     },
   },
 };
@@ -55,7 +55,7 @@ export function consoleIgnorer(options: object): Ignorer {
 
   return {
     shouldIgnore(path) {
-      if (callees.includes(statementCallee(fieldOf(path, 'node')))) {
+      if (callees.includes(hideableCallee(fieldOf(path, 'node')))) {
         return 'lz-console: console output; DOM tests do not observe it';
       }
 

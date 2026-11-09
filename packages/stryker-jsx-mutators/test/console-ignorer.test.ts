@@ -152,6 +152,7 @@ describe('lz-console', () => {
         "export function* steps() { console.log(yield on ? 'a' : 'b'); }",
       ],
       ['a delete', "console.log(delete cache[on ? 'a' : 'b']);"],
+      ['a dynamic import', "console.log(import(on ? './a' : './b'));"],
     ] as const
   ).forEach(([effect, code]) => {
     it(`keeps the mutants of a console.log statement whose argument holds ${effect}, as removing the statement changes what the page does`, async () => {
@@ -179,8 +180,8 @@ describe('the lz-console options schema', () => {
           type: 'array',
           items: { enum: consoleMethods },
           description:
-            'The console methods whose call statements lz-console hides. Replaces the default list: log, ' +
-            'debug, info and trace.',
+            'The console methods whose call statements lz-console hides, unless an argument can act on the ' +
+            'page. Replaces the default list: log, debug, info and trace.',
         },
       },
     });
