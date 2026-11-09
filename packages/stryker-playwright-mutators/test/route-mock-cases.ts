@@ -232,6 +232,31 @@ export const routeMockCases: readonly Case[] = [
     expect: [],
   },
   {
+    id: 'abort-shadowed-route-const',
+    title:
+      'an abort on a const in a block of the handler that shadows its parameter makes no mutant',
+    source: inRoute(
+      '{\n      const route = other;\n      await route.abort();\n    }',
+    ),
+    expect: [],
+  },
+  {
+    id: 'fulfill-shadowed-route-const',
+    title:
+      'a fulfill on a const in a block of the handler that shadows its parameter makes no mutant',
+    source: inRoute(
+      '{\n      const route = other;\n      await route.fulfill({ status: 404 });\n    }',
+    ),
+    expect: [],
+  },
+  {
+    id: 'abort-destructured-inner-route',
+    title:
+      'an abort on a route destructured from an inner callback parameter makes no mutant',
+    source: inRoute('[x].forEach(({ route }) => route.abort());'),
+    expect: [],
+  },
+  {
     id: 'abort-optional-call',
     title: 'an abort on an optional chain becomes a continue',
     source: inRoute('await route?.abort();'),

@@ -692,6 +692,13 @@ by hand failed no test. A rerun of every line with a Timeout at a 30 s `timeoutM
 real survivors. Nothing in the lz-tdd flow treats a Timeout as worth a look. Evidence: `final-stryker/notes.md`, slots
 P6 and P7.
 
+**O89. Two tests that read one shared lookup leave the second with nothing to drive.** In R6 round 3, a shadowed
+`route` had to give no mutant for both abort and fulfill, so the list held two tests, one cycle each. Both readers
+call the same handler-route lookup, so cycle 1's green made the fulfill test pass before it was written: it was red
+at the base, and became a test-after pin. Unlike O86, neither half held at the start. `lz-red`'s test list gives no
+way to see the shared code coming, or to choose between testing the lookup once and pinning each reader. Evidence:
+`step6-r6-round3-cycles.log`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current

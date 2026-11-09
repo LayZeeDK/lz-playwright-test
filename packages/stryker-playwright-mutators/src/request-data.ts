@@ -2,7 +2,6 @@ import { fieldOf } from '@layzee/stryker-mutator-install';
 
 import {
   isRequestContext,
-  isTypeWrapper,
   memberNameOf,
   outermost,
   propertyKey,
@@ -53,17 +52,13 @@ export function requestDataMutator<const TName extends string>(
 
 /** `path` sits, through object values and array elements, inside the object that is the value of a payload property. */
 function inPayload(path: unknown): boolean {
-  const parentType = fieldOf(fieldOf(path, 'parent'), 'type');
+  const outer = outermost(path);
 
-  if (isTypeWrapper(fieldOf(path, 'parent'))) {
-    return inPayload(fieldOf(path, 'parentPath'));
-  }
-
-  if (fieldOf(path, 'key') === 'value') {
-    const property = fieldOf(path, 'parentPath');
+  if (fieldOf(outer, 'key') === 'value') {
+    const property = fieldOf(outer, 'parentPath');
 
     return (
-      (fieldOf(unwrapped(fieldOf(path, 'node')), 'type') ===
+      (fieldOf(unwrapped(fieldOf(outer, 'node')), 'type') ===
         'ObjectExpression' &&
         isPayload(property)) ||
       inPayload(fieldOf(property, 'parentPath'))
@@ -71,7 +66,8 @@ function inPayload(path: unknown): boolean {
   }
 
   return (
-    parentType === 'ArrayExpression' && inPayload(fieldOf(path, 'parentPath'))
+    fieldOf(fieldOf(outer, 'parent'), 'type') === 'ArrayExpression' &&
+    inPayload(fieldOf(outer, 'parentPath'))
   );
 }
 
