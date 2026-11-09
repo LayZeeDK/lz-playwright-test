@@ -17,7 +17,7 @@ const typeWrappers: readonly unknown[] = [
 ];
 
 /** `<x> satisfies <T>`, `<x>!` or `<T><x>`. */
-export function isTypeWrapper(node: unknown): boolean {
+function isTypeWrapper(node: unknown): boolean {
   return typeWrappers.includes(fieldOf(node, 'type'));
 }
 
@@ -39,7 +39,7 @@ export function isCall(node: unknown): boolean {
 }
 
 /** `<x>.<y>`, `<x>[<y>]`, or either through `?.`. */
-export function isMember(node: unknown): boolean {
+function isMember(node: unknown): boolean {
   return memberTypes.includes(fieldOf(node, 'type'));
 }
 

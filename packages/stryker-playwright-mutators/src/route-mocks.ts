@@ -1,8 +1,8 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
 import {
-  ancestors,
   argumentOf,
+  bindingOf,
   hasProperty,
   isCall,
   memberNameOf,
@@ -95,31 +95,19 @@ function handlerRouteOf(path: unknown, call: unknown): string | undefined {
     : undefined;
 }
 
-/** The nearest function around `path` with a parameter named `route` is a route handler, and `route` is its first. */
+/** `route`, in the scope of `path`, is the first parameter of a route handler. */
 function isInHandlerOf(path: unknown, route: string): boolean {
-  const handlerPath = [...ancestors(path)].find((ancestor) => {
-    const params = paramsOf(ancestor);
-
-    return (
-      Array.isArray(params) &&
-      params.some((param) => fieldOf(param, 'name') === route)
-    );
-  });
-  const params = paramsOf(handlerPath);
-  const first: unknown = Array.isArray(params) ? params[0] : undefined;
+  const paramPath = fieldOf(bindingOf(path, route), 'path');
+  const handlerPath = fieldOf(paramPath, 'parentPath');
 
   return (
-    fieldOf(first, 'name') === route &&
-    (isRouteAnnotated(first) ||
+    fieldOf(paramPath, 'key') === 0 &&
+    (isRouteAnnotated(fieldOf(paramPath, 'node')) ||
       isRouteCallback(
         fieldOf(handlerPath, 'parent'),
         fieldOf(handlerPath, 'node'),
       ))
   );
-}
-
-function paramsOf(functionPath: unknown): unknown {
-  return fieldOf(fieldOf(functionPath, 'node'), 'params');
 }
 
 /** `handler` is the second argument of `<x>.route(...)`. */

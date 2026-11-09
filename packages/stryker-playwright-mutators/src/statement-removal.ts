@@ -43,7 +43,6 @@ const requestRow: RemovalRow = {
   receiver: isRequestContext,
   skip: 'setupAndTeardown',
 };
-/** On `clock` or `<x>.clock`. */
 const clockRow: RemovalRow = {
   mutator: clock,
   receiver: (_path, object) => isNamedReceiver(object, 'clock'),

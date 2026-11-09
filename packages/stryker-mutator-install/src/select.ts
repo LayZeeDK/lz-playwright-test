@@ -105,37 +105,38 @@ export function selectMutators<TMutator extends NamedMutator>(
   const named = new Set<string>();
 
   for (const [key, value] of definedEntries(options)) {
-    if (key === 'extended' && sets.optIn.length === 0) {
-      throw new Error(
-        `${packageName}: the package has no opt-in mutators yet, so ${installName}() takes no ` +
-          'extended option.',
-      );
-    }
+    if (key === 'extended') {
+      if (sets.optIn.length === 0) {
+        throw new Error(
+          `${packageName}: the package has no opt-in mutators yet, so ${installName}() takes no ` +
+            'extended option.',
+        );
+      }
 
-    if (key === 'experimental' && sets.experimental.length === 0) {
-      throw new Error(
-        `${packageName}: the package has no experimental mutators yet, so ${installName}() takes no ` +
-          'experimental option.',
-      );
-    }
+      onlyTrue(key, value);
+      extended = true;
+    } else if (key === 'experimental') {
+      if (sets.experimental.length === 0) {
+        throw new Error(
+          `${packageName}: the package has no experimental mutators yet, so ${installName}() takes no ` +
+            'experimental option.',
+        );
+      }
 
-    if (key === 'experimental' && isPlainObject(value)) {
-      for (const [name, member] of definedEntries(value)) {
-        onlyTrue(`experimental.${name}`, member);
-        checkTier('experimental', name);
-        named.add(name);
+      if (isPlainObject(value)) {
+        for (const [name, member] of definedEntries(value)) {
+          onlyTrue(`experimental.${name}`, member);
+          checkTier('experimental', name);
+          named.add(name);
+        }
+      } else {
+        onlyTrue(key, value);
+        allExperimental = true;
       }
     } else {
       onlyTrue(key, value);
-
-      if (key === 'extended') {
-        extended = true;
-      } else if (key === 'experimental') {
-        allExperimental = true;
-      } else {
-        checkTier('optIn', key);
-        named.add(key);
-      }
+      checkTier('optIn', key);
+      named.add(key);
     }
   }
 
