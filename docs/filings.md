@@ -673,8 +673,24 @@ reach the input at all. The row now pins "no mutant", and the README states the 
 **O86. A test that names two behaviours, only one of them missing, gets half a red.** The R6 round 2 brief asked for
 one test that a non-enumerable own option key is "neither validated nor read". Only "read" failed at the base, so the
 red covered that half; after the green, the worker widened the same test with the "validated" half, which never
-failed. `lz-red` would split the item into two tests, and says nothing about widening a test that has gone green with
-an assertion that was never red. The cycle log needed two lines for one test. Evidence: `step6-r6-round2-notes.md`.
+failed. The cycle log needed two lines for one test. The brief caused this: Lars's user-scope test-first rule already
+says a list item that names two behaviours is two tests, one cycle each, and the brief did not follow it. What remains
+for the plugin is that `lz-red` itself does not say it, nor what to do with a half that already holds. Evidence:
+`step6-r6-round2-notes.md`.
+
+**O87. A refactoring can make an equivalent mutant killable, and `lz-refactor` has no motive for it.** In step 6's
+final mutation run, the literal `'mount'` keyed MountStory's sites, and replacing it with `''` changed no outcome: each
+swap mutator compares keys only among its own sites. No check could be deleted. Extract Variable
+(`const key = 'mount'`, used for both the receiver match and the key) made the literal decide the match, and `''`
+there now fails 47 tests. `lz-refactor` names the move, but none of its motives (a smell, duplication, readability)
+covers "share a literal with code a test reaches". O83 covers versions that differ only on inputs the parser never
+builds; here they differ on no input at all. Evidence: `final-stryker/notes.md`.
+
+**O88. A test-after pass that trusts Stryker's "detected" misses survivors hidden as Timeouts.** In the same run,
+Stryker counted a Timeout as detected, but under load its default timeout fired on mutants no test kills: one applied
+by hand failed no test. A rerun of every line with a Timeout at a 30 s `timeoutMS` had no Timeout and showed three
+real survivors. Nothing in the lz-tdd flow treats a Timeout as worth a look. Evidence: `final-stryker/notes.md`, slots
+P6 and P7.
 
 ### Suggestions
 
@@ -956,6 +972,14 @@ before handing the red to `lz-tpp`; if it cannot, the test pins a limit, not mis
 **S80 (from O86).** In `lz-red`'s test-selection leaf, say what to do when a requested test names two behaviours and
 the code already has one: write the missing half as the red, and either add the present half as a separate pin or
 widen the test after green and log that half as test-after.
+
+**S81 (from O87).** Add "make a mutant observable" as a motive in `lz-refactor`, with Extract Variable as the usual
+move: when a constant decides nothing on its own, share it with code that a test reaches, so a mutated value fails a
+test.
+
+**S82 (from O88).** In the test-after route for closing a mutation gap (S51), add a step: rerun every line whose
+status is Timeout with a generous timeout before counting it detected, because load can turn a survivor into a
+Timeout.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
