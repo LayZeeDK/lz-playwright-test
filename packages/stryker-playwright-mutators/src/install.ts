@@ -33,17 +33,19 @@ export interface BabelTypes {
   identifier(name: string): unknown;
 }
 
-const babelTypeMembers: Readonly<Record<keyof BabelTypes, true>> = {
-  emptyStatement: true,
-  cloneNode: true,
-  objectExpression: true,
-  arrayExpression: true,
-  stringLiteral: true,
-  numericLiteral: true,
-  booleanLiteral: true,
-  callExpression: true,
-  memberExpression: true,
-  identifier: true,
+const babelTypeMembers: Readonly<{
+  [TMember in keyof BabelTypes]: TMember;
+}> = {
+  emptyStatement: 'emptyStatement',
+  cloneNode: 'cloneNode',
+  objectExpression: 'objectExpression',
+  arrayExpression: 'arrayExpression',
+  stringLiteral: 'stringLiteral',
+  numericLiteral: 'numericLiteral',
+  booleanLiteral: 'booleanLiteral',
+  callExpression: 'callExpression',
+  memberExpression: 'memberExpression',
+  identifier: 'identifier',
 };
 
 export type Instrumenter = CoreInstrumenter<BabelTypes>;
@@ -64,7 +66,7 @@ export function assertBabelTypes(
     throw missing('Babel types');
   }
 
-  const absent = Object.keys(babelTypeMembers).filter(
+  const absent = Object.values(babelTypeMembers).filter(
     (member) => typeof value[member] !== 'function',
   );
 
