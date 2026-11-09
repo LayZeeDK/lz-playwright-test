@@ -24,15 +24,19 @@ mutators from there, so build first (the Nx targets below do).
 - `packages/stryker-playwright-runner`: the runner, package `@layzee/stryker-playwright-runner`.
 - `packages/stryker-jsx-mutators`: the JSX mutators, package `@layzee/stryker-jsx-mutators`.
 - `packages/stryker-playwright-mutators`: the mutators for Playwright test code, package
-  `@layzee/stryker-playwright-mutators`. Its `stryker.config.mjs` mutates the package's own source.
+  `@layzee/stryker-playwright-mutators`.
 - `packages/stryker-mutator-install`: the private code that both mutator packages use to put their mutators into
   Stryker, package `@layzee/stryker-mutator-install`.
+- `packages/<package>/stryker.config.mjs`: in the JSX mutators, the Playwright mutators and the install code, a
+  Stryker config that mutates the package's own source.
 - `apps/demo-app` (Nx project `@layzee/demo-app`): the demo app and its Playwright component tests
   (`playwright.components.config.mts`).
 - `apps/demo-app-e2e`: the demo app's Playwright e2e tests.
 - `stryker.e2e.config.ts`, `stryker.ct.config.ts`: Stryker configs for the demo.
   `stryker.e2e.ui.config.ts` adds the JSX mutators to the e2e run.
-- `stryker.base.ts`: the settings that all four Stryker configs share.
+- `stryker.base.ts`: the settings that all four Stryker configs share. The package configs share its reporters
+  and ignore list.
+- `stryker.package.ts`: `packageConfig(name)`, the shared body of the three package `stryker.config.mjs` files.
 - `stryker.e2e.command.config.ts`: the demo baselines on Stryker's `command` runner, selected with
   `STRYKER_BASELINE=define` or `STRYKER_BASELINE=off`.
 - `oss/`: the configs, patches, and scripts that copies of four open-source repos needed for a Stryker
@@ -66,18 +70,19 @@ The JSX mutators' tests need no browser:
 npx nx run @layzee/stryker-jsx-mutators:test
 ```
 
-Neither do the Playwright mutators' tests. To check that those tests catch a change to the package's source, run
-Stryker on it with the package's own config:
+Neither do the Playwright mutators' tests nor the install code's. To check that a package's tests catch a change to
+its source, run Stryker on it with the package's own config, where `<package>` is `stryker-jsx-mutators`,
+`stryker-playwright-mutators` or `stryker-mutator-install`:
 
 ```sh
 npx nx run @layzee/stryker-playwright-mutators:test
-npx stryker run packages/stryker-playwright-mutators/stryker.config.mjs
+npx stryker run packages/<package>/stryker.config.mjs
 ```
 
-The config's thresholds are 100, so the run exits 1 when a mutant survives. To mutate only a change, add
-`--mutate "packages/stryker-playwright-mutators/src/<file>.ts:<startLine>-<endLine>"`. The config runs the tests with
+The configs' thresholds are 100, so the run exits 1 when a mutant survives. To mutate only a change, add
+`--mutate "packages/<package>/src/<file>.ts:<startLine>-<endLine>"`. Each config runs the tests with
 Stryker's `command` runner and `node --test --test-concurrency=1`. Run in parallel, each Stryker worker would start
-test files on every core, and mutants would time out without being killed. For the same reason the config sets
+test files on every core, and mutants would time out without being killed. For the same reason each config sets
 `timeoutMS` to 30000: on a loaded machine, Stryker's default of 5000 let mutants that no test kills pass as Timeouts.
 
 To run Stryker on the demo app, use `npx nx run @layzee/demo-app-e2e:mutate-e2e`,

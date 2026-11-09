@@ -95,19 +95,28 @@ function handlerRouteOf(path: unknown, call: unknown): string | undefined {
     : undefined;
 }
 
-/** `route`, in the scope of `path`, is the first parameter of a route handler. */
+/** `route`, in the scope of `path`, is the first parameter of a route handler, named on its own or with a default. */
 function isInHandlerOf(path: unknown, route: string): boolean {
   const paramPath = fieldOf(bindingOf(path, route), 'path');
   const handlerPath = fieldOf(paramPath, 'parentPath');
+  const param = withoutDefault(fieldOf(paramPath, 'node'));
 
   return (
+    fieldOf(param, 'type') === 'Identifier' &&
     fieldOf(paramPath, 'key') === 0 &&
-    (isRouteAnnotated(fieldOf(paramPath, 'node')) ||
+    (isRouteAnnotated(param) ||
       isRouteCallback(
         fieldOf(handlerPath, 'parent'),
         fieldOf(handlerPath, 'node'),
       ))
   );
+}
+
+/** The parameter `node` names: the left side of `<name> = <default>`, else `node` itself. */
+function withoutDefault(node: unknown): unknown {
+  return fieldOf(node, 'type') === 'AssignmentPattern'
+    ? fieldOf(node, 'left')
+    : node;
 }
 
 /** `handler` is the second argument of `<x>.route(...)`. */

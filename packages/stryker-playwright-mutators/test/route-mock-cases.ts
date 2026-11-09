@@ -257,6 +257,44 @@ export const routeMockCases: readonly Case[] = [
     expect: [],
   },
   {
+    id: 'abort-defaulted-param',
+    title: 'an abort on a handler parameter with a default becomes a continue',
+    source:
+      "test('case', async ({ page }) => {\n  await page.route('**', async (route = fallback) => {\n    await route.abort();\n  });\n});",
+    expect: [[outcome, 'route.continue()']],
+  },
+  {
+    id: 'abort-destructured-own-param',
+    title:
+      'an abort on a route destructured from the handler parameter makes no mutant',
+    source:
+      "test('case', async ({ page }) => {\n  await page.route('**', async ({ route }) => {\n    await route.abort();\n  });\n});",
+    expect: [],
+  },
+  {
+    id: 'abort-rest-own-param',
+    title: 'an abort on a rest handler parameter makes no mutant',
+    source:
+      "test('case', async ({ page }) => {\n  await page.route('**', async (...route) => {\n    await route.abort();\n  });\n});",
+    expect: [],
+  },
+  {
+    id: 'abort-array-own-param',
+    title:
+      'an abort on a route taken from an array handler parameter makes no mutant',
+    source:
+      "test('case', async ({ page }) => {\n  await page.route('**', async ([route]) => {\n    await route.abort();\n  });\n});",
+    expect: [],
+  },
+  {
+    id: 'abort-named-function-in-wrapper',
+    title:
+      'an abort on the name of a function expression passed through a wrapper makes no mutant',
+    source:
+      "test('case', async ({ page }) => {\n  await page.route('**', once(async function route() {\n    await route.abort();\n  }));\n});",
+    expect: [],
+  },
+  {
     id: 'abort-optional-call',
     title: 'an abort on an optional chain becomes a continue',
     source: inRoute('await route?.abort();'),
