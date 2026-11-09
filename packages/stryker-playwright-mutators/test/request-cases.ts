@@ -118,6 +118,12 @@ export const requestCases: readonly Case[] = [
     expect: [[data, 'true']],
   },
   {
+    id: 'data-boolean-true',
+    title: 'a true in the data of a request call flips to false',
+    source: readResult("request.put('/a', { data: { done: true } })"),
+    expect: [[data, 'false']],
+  },
+  {
     id: 'data-quoted-payload-key',
     title:
       'a string under a quoted data key of a request call gets the suffix x',
