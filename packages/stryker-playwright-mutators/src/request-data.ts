@@ -1,7 +1,7 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
 import {
-  isRequest,
+  isRequestContext,
   isTypeWrapper,
   methodOf,
   outermost,
@@ -90,7 +90,7 @@ function isPayloadCall(path: unknown, call: unknown): boolean {
   const callee = fieldOf(call, 'callee');
 
   return (
-    isRequest(path, fieldOf(callee, 'object')) &&
+    isRequestContext(path, fieldOf(callee, 'object')) &&
     payloadMethods.includes(methodOf(callee))
   );
 }

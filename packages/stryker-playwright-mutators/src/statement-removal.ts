@@ -5,7 +5,7 @@ import {
   isCall,
   isFunctionNode,
   isNamedReceiver,
-  isRequest,
+  isRequestContext,
   isTestCallee,
   methodOf,
 } from './ast.ts';
@@ -152,7 +152,7 @@ function removalOf(path: unknown): RemovalRow | undefined {
   const object = fieldOf(callee, 'object');
   const onReceiver =
     found.receiver === 'request'
-      ? isRequest(path, object)
+      ? isRequestContext(path, object)
       : isNamedReceiver(object, found.receiver);
 
   return onReceiver ? found : undefined;
