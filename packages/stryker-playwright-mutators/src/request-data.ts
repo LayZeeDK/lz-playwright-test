@@ -65,10 +65,7 @@ function inPayload(path: unknown): boolean {
       }
 
       current = fieldOf(property, 'parentPath');
-    } else if (
-      fieldOf(current, 'listKey') === 'elements' &&
-      parentType === 'ArrayExpression'
-    ) {
+    } else if (parentType === 'ArrayExpression') {
       current = fieldOf(current, 'parentPath');
     } else {
       return false;
