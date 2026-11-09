@@ -20,6 +20,9 @@
     },
     {
       "path": "./packages/stryker-playwright-mutators"
+    },
+    {
+      "path": "./packages/stryker-storybook"
     }
   ]
 }
