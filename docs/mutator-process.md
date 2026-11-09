@@ -175,9 +175,11 @@ ships.
 
 ## 6. Built-in mutators in a test-code configuration
 
-Decide per built-in mutator before you exclude any. In this repository that analysis ended with all 17 built-ins
-excluded from the test-code configurations, approved on 2026-11-05: each one's useful part is either a named custom
-mutator or not there at all. Run the steps below again for a new kind of test code instead of assuming that result.
+Decide per built-in mutator before you exclude any. In this repository the analyses turned all 17 built-ins off in
+the test-code configurations. For Storybook play functions that was approved on 2026-11-05. For Playwright test code
+the analysis drops them as built-ins and brings their useful parts back as named custom mutators; which of those parts
+become mutators, and whether test doubles keep the built-ins, still wait on measurements. Run the steps below again
+for a new kind of test code instead of assuming that result.
 
 1. **Classify the sites.** Run the instrumenter over the test files and sort each mutant by site class: action
    call, assertion, wait, mock or double, setup data, helper logic, hook. Note the test kind (browser e2e, component,

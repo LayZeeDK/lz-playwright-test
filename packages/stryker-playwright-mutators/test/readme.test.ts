@@ -31,6 +31,23 @@ function namesOf(
   return tier.map(({ name }) => name);
 }
 
+it('gives the size of each tier in the opening counts and in the default install line', () => {
+  const { defaults, optIn, experimental } = mutatorSets;
+  const total = defaults.length + optIn.length + experimental.length;
+  const readme = readmeLines.join(' ');
+
+  assert.ok(
+    readme.includes(
+      `adds ${total} of its own: ${defaults.length} run by default, ${optIn.length} are opt-in and ${experimental.length} are`,
+    ),
+    'the opening counts',
+  );
+  assert.ok(
+    readme.includes(`${defaults.length} LzPlaywright mutators on`),
+    'the default install line',
+  );
+});
+
 it('lists the mutators of each tier in the README table of that tier, in roster order', () => {
   assert.deepEqual(
     {

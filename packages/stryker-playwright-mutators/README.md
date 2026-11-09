@@ -11,7 +11,7 @@ are experimental. The package is private and not on npm yet.
 ## Requirements
 
 - `@stryker-mutator/core` 10.1, tested on 10.1.1. The install patches internals of that version's instrumenter, and
-  warns when it finds another version.
+  warns when `@stryker-mutator/instrumenter` is a version other than 10.1.1.
 - Node.js 22 or later.
 
 ## Turn the mutators on
@@ -140,13 +140,13 @@ file, so a site gets at most two mutants. They change locators in assertions too
 
 These run with `extended: true`, or each with its own name set to `true`.
 
-| Mutator                   | What it changes                                                                                                           | Example                                                       |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `LzPlaywrightSleepWait`   | Removes an awaited `waitForTimeout` statement.                                                                            | `await page.waitForTimeout(500);` is removed.                 |
-| `LzPlaywrightStateWait`   | Removes an awaited `waitForLoadState`, `waitForURL`, `waitFor`, `waitForSelector` or `waitForFunction` statement.         | `await page.waitForURL('/cart');` is removed.                 |
-| `LzPlaywrightNetworkWait` | Removes an awaited `waitForResponse` or `waitForRequest` statement.                                                       | `await page.waitForResponse('**/api/cart');` is removed.      |
-| `LzPlaywrightClock`       | Removes an awaited `runFor` or `fastForward` statement on `clock` or `<x>.clock`.                                         | `await page.clock.runFor(1000);` is removed.                  |
-| `LzPlaywrightMountStory`  | In a component test, replaces the story id of `mount(...)` or `<x>.mount(...)` with another id that the same file mounts. | `mount('Button/Primary')` becomes `mount('Button/Disabled')`. |
+| Mutator                   | What it changes                                                                                                   | Example                                                       |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `LzPlaywrightSleepWait`   | Removes an awaited `waitForTimeout` statement.                                                                    | `await page.waitForTimeout(500);` is removed.                 |
+| `LzPlaywrightStateWait`   | Removes an awaited `waitForLoadState`, `waitForURL`, `waitFor`, `waitForSelector` or `waitForFunction` statement. | `await page.waitForURL('/cart');` is removed.                 |
+| `LzPlaywrightNetworkWait` | Removes an awaited `waitForResponse` or `waitForRequest` statement.                                               | `await page.waitForResponse('**/api/cart');` is removed.      |
+| `LzPlaywrightClock`       | Removes an awaited `runFor` or `fastForward` statement on `clock` or `<x>.clock`.                                 | `await page.clock.runFor(1000);` is removed.                  |
+| `LzPlaywrightMountStory`  | Replaces the literal story id of `mount(...)` or `<x>.mount(...)` with another id that the same file mounts.      | `mount('Button/Primary')` becomes `mount('Button/Disabled')`. |
 
 The three Wait mutators and `LzPlaywrightClock` skip teardown, as the Action mutators do.
 
@@ -249,8 +249,7 @@ The ignorer hides every mutant inside a function or arrow function passed direct
 `evaluateHandle`, `evaluateAll`, `$eval`, `$$eval`, `addInitScript` or `waitForFunction`, on any receiver. A function
 nested in such a callback is hidden with it.
 
-What it hides beyond the target: it matches the method name only, so it also hides `page.evaluate` callbacks, which
-the runner could run.
+It matches the method name only, so it also hides `page.evaluate` callbacks, which the runner could run.
 
 What it misses:
 
@@ -291,6 +290,8 @@ These mutants survive or are missed by design. Each entry says what to do with i
 
 ### The Action mutators
 
+- A call on `keyboard`, `mouse` or `touchscreen`, such as `await page.keyboard.press('Enter');` or
+  `await page.mouse.click(10, 20);`, makes no mutant. Only calls on a locator or a page are removed.
 - A click right before a `fill` on the same element, or a value written and overwritten before any assertion, can
   survive. The survivor shows a line that the test does not need.
 - A removed `goto` or click makes the next action wait for an element that never appears. Without
@@ -343,7 +344,7 @@ These mutants survive or are missed by design. Each entry says what to do with i
 ### LzPlaywrightRequestUrl
 
 - Only `get`, `head`, and `fetch` without a `method` option get a mutant. A `fetch` with any `method` option, even
-  `method: 'GET'`, gets none.
+  `method: 'GET'`, or with options given as a variable or with a spread, gets none.
 - An absolute URL to a host other than `localhost`, `127.0.0.1`, `0.0.0.0` or `[::1]` gets no mutant. Other forms
   of the local address, such as `127.0.0.2`, `[::ffff:127.0.0.1]`, `[0:0:0:0:0:0:0:1]` or `[::]`, count as other
   hosts.
