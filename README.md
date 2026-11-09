@@ -77,7 +77,8 @@ npx stryker run packages/stryker-playwright-mutators/stryker.config.mjs
 The config's thresholds are 100, so the run exits 1 when a mutant survives. To mutate only a change, add
 `--mutate "packages/stryker-playwright-mutators/src/<file>.ts:<startLine>-<endLine>"`. The config runs the tests with
 Stryker's `command` runner and `node --test --test-concurrency=1`. Run in parallel, each Stryker worker would start
-test files on every core, and mutants would time out without being killed.
+test files on every core, and mutants would time out without being killed. For the same reason the config sets
+`timeoutMS` to 30000: on a loaded machine, Stryker's default of 5000 let mutants that no test kills pass as Timeouts.
 
 To run Stryker on the demo app, use `npx nx run @layzee/demo-app-e2e:mutate-e2e`,
 `npx nx run @layzee/demo-app-e2e:mutate-e2e-ui`, or `npx nx run @layzee/demo-app:mutate-ct`. Each

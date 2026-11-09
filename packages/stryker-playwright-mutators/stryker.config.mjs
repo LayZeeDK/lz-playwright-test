@@ -8,6 +8,7 @@ export default {
       'node --conditions=@layzee/source --test --test-concurrency=1 packages/stryker-playwright-mutators/test/*.test.ts',
   },
   coverageAnalysis: 'off',
+  timeoutMS: 30000,
   checkers: ['typescript'],
   tsconfigFile: 'packages/stryker-playwright-mutators/tsconfig.lib.json',
   thresholds: { high: 100, low: 100, break: 100 },
