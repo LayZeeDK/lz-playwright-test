@@ -1,6 +1,7 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
 import {
+  argumentOf,
   isRequestContext,
   memberNameOf,
   outermost,
@@ -74,11 +75,12 @@ function inPayload(path: unknown): boolean {
 /** A payload property of the options argument of a request call. */
 function isPayload(propertyPath: unknown): boolean {
   const optionsPath = outermost(fieldOf(propertyPath, 'parentPath'));
+  const call = fieldOf(optionsPath, 'parent');
 
   return (
     payloadKeys.includes(propertyKey(fieldOf(propertyPath, 'node'))) &&
-    fieldOf(optionsPath, 'key') === 1 &&
-    isPayloadCall(optionsPath, fieldOf(optionsPath, 'parent'))
+    argumentOf(call, 1) === fieldOf(optionsPath, 'node') &&
+    isPayloadCall(optionsPath, call)
   );
 }
 
