@@ -270,6 +270,18 @@ export const routeMockCases: readonly Case[] = [
     expect: [[fulfill, '200']],
   },
   {
+    id: 'fulfill-options-satisfies',
+    title: 'a status in fulfill options under satisfies becomes 200',
+    source: inRoute('await route.fulfill({ status: 404 } satisfies object);'),
+    expect: [[fulfill, '200']],
+  },
+  {
+    id: 'fulfill-options-non-null-angle',
+    title: 'a status in fulfill options under ! and <T> becomes 200',
+    source: inRoute('await route.fulfill((<Options>{ status: 404 })!);'),
+    expect: [[fulfill, '200']],
+  },
+  {
     id: 'abort-new-route',
     title:
       'an abort in a callback of a constructor named route makes no mutant: a new expression is no call',

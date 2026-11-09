@@ -6,6 +6,7 @@ import {
   hasProperty,
   isCall,
   methodOf,
+  outermost,
   propertyKey,
 } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
@@ -147,21 +148,21 @@ function lengthOf(list: unknown): number | undefined {
   return Array.isArray(list) ? list.length : undefined;
 }
 
-/** The value of the property `key` in the object literal that is the first argument of `<route>.fulfill(...)` in a
- * handler of `<route>`. */
+/** The value of the property `key` in the object literal that is the first argument of `<route>.fulfill(...)`, under
+ * any type wrapper, in a handler of `<route>`. */
 function isFulfillOption(path: unknown, key: string): boolean {
   const property = fieldOf(path, 'parent');
   const object = fieldOf(fieldOf(path, 'parentPath'), 'parent');
-  const call = fieldOf(
+  const optionsPath = outermost(
     fieldOf(fieldOf(path, 'parentPath'), 'parentPath'),
-    'parent',
   );
+  const call = fieldOf(optionsPath, 'parent');
   const route = fieldOf(fieldOf(fieldOf(call, 'callee'), 'object'), 'name');
 
   return (
     propertyKey(property) === key &&
     fieldOf(property, 'value') === fieldOf(path, 'node') &&
-    argumentOf(call, 0) === object &&
+    argumentOf(call, 0) === fieldOf(optionsPath, 'node') &&
     !hasProperty(object, 'response') &&
     isCall(call) &&
     methodOf(fieldOf(call, 'callee')) === 'fulfill' &&
