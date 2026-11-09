@@ -355,6 +355,9 @@ These mutants survive or are missed by design. Each entry says what to do with i
 
 ### LzPlaywrightRequestUrl
 
+- It follows `<x>.request`, a bare `request` that a parameter binds, and a context from `request.newContext()`. An
+  imported `request`, such as superagent's, gets no mutant, but a context from its `newContext()` does: a bare
+  `request` counts there however it is bound.
 - Only `get`, `head`, and `fetch` without a `method` option get a mutant. A `fetch` with any `method` option, even
   `method: 'GET'`, or with options given as a variable or with a spread, gets none.
 - An absolute URL to a host other than `localhost`, `127.0.0.1`, `0.0.0.0` or `[::1]` gets no mutant. Other forms
