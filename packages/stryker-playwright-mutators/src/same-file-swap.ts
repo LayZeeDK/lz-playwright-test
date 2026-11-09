@@ -39,13 +39,11 @@ export function swapMutator<const TName extends string>(
 
       // Built on the first node Stryker shows of this file: Program for a whole file, the first node inside the
       // range for a line range. Either way no mutant has been placed in the file yet.
-      const known = indexed.get(program);
       const replacements =
-        known ?? replacementsBySite(callsOf(program).map(read), excludes);
+        indexed.get(program) ??
+        replacementsBySite(callsOf(program).map(read), excludes);
 
-      if (known === undefined) {
-        indexed.set(program, replacements);
-      }
+      indexed.set(program, replacements);
 
       yield* (replacements.get(fieldOf(path, 'node')) ?? []).map(
         (replacement) => t.cloneNode(replacement),
@@ -104,25 +102,22 @@ const callLists = new WeakMap<object, readonly unknown[]>();
 
 /** The calls of a file in the order of the walk, read once for every mutator that asks. */
 function callsOf(program: object): readonly unknown[] {
-  const known = callLists.get(program);
-  const calls = known ?? callsIn(program);
+  const calls = callLists.get(program) ?? recordsIn(program).filter(isCall);
 
   callLists.set(program, calls);
 
   return calls;
 }
 
-function callsIn(node: unknown): readonly unknown[] {
-  const children: readonly unknown[] = isRecord(node)
-    ? Object.values(node).flatMap((value): readonly unknown[] =>
+/** `record` and every record under it, depth first. */
+function recordsIn(record: object): readonly object[] {
+  return [
+    record,
+    ...Object.values(record)
+      .flatMap((value): readonly unknown[] =>
         Array.isArray(value) ? value : [value],
       )
-    : [];
-
-  return [
-    ...(isCall(node) ? [node] : []),
-    ...children
-      .filter((child) => typeof fieldOf(child, 'type') === 'string')
-      .flatMap(callsIn),
+      .filter(isRecord)
+      .flatMap(recordsIn),
   ];
 }

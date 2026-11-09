@@ -140,11 +140,10 @@ function removalOf(path: unknown): RemovalRow | undefined {
       : undefined;
   }
 
-  const method = awaitedMethod(callee);
-  const found =
-    typeof method === 'string' && Object.hasOwn(statementRemovals, method)
-      ? statementRemovals[method]
-      : undefined;
+  const method = String(awaitedMethod(callee));
+  const found = Object.hasOwn(statementRemovals, method)
+    ? statementRemovals[method]
+    : undefined;
 
   if (found === undefined || found.receiver === 'any') {
     return found;
@@ -201,7 +200,6 @@ function destructures(params: unknown, name: string): boolean {
   const properties = fieldOf(pattern, 'properties');
 
   return (
-    fieldOf(pattern, 'type') === 'ObjectPattern' &&
     Array.isArray(properties) &&
     properties.some(
       (property) => fieldOf(fieldOf(property, 'value'), 'name') === name,
@@ -213,10 +211,6 @@ function destructures(params: unknown, name: string): boolean {
 function isFixtureFunction(path: unknown): boolean {
   const owner = fieldOf(path, 'parent');
   const ownerPath = fieldOf(path, 'parentPath');
-
-  if (!isFunctionNode(fieldOf(path, 'node'))) {
-    return false;
-  }
 
   if (isCall(owner)) {
     return isTestCallee(fieldOf(owner, 'callee'));
@@ -258,12 +252,7 @@ function isHookCall(node: unknown, hooks: readonly unknown[]): boolean {
 
 /** `child` is the `finally` block of the try statement at `tryPath`. */
 function isFinalizer(tryPath: unknown, child: unknown): boolean {
-  const node = fieldOf(tryPath, 'node');
-
-  return (
-    fieldOf(node, 'type') === 'TryStatement' &&
-    fieldOf(node, 'finalizer') === child
-  );
+  return fieldOf(fieldOf(tryPath, 'node'), 'finalizer') === child;
 }
 
 /** `child` sits in a function body, after a statement of that body that is `await use(...)`. */
@@ -272,7 +261,6 @@ function followsUse(blockPath: unknown, child: unknown): boolean {
   const body = fieldOf(block, 'body');
 
   return (
-    fieldOf(block, 'type') === 'BlockStatement' &&
     Array.isArray(body) &&
     isFunctionNode(fieldOf(fieldOf(blockPath, 'parentPath'), 'node')) &&
     body.slice(0, body.indexOf(child)).some(isAwaitedUse)
@@ -284,7 +272,6 @@ function isAwaitedUse(statement: unknown): boolean {
   const call = fieldOf(awaited, 'argument');
 
   return (
-    fieldOf(statement, 'type') === 'ExpressionStatement' &&
     fieldOf(awaited, 'type') === 'AwaitExpression' &&
     isCall(call) &&
     fieldOf(fieldOf(call, 'callee'), 'name') === 'use'

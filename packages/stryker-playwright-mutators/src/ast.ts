@@ -16,8 +16,7 @@ export function isCall(node: unknown): boolean {
 
 /** The property name of `<x>.<name>` or `<x>?.<name>`. */
 export function methodOf(member: unknown): unknown {
-  return memberTypes.includes(fieldOf(member, 'type')) &&
-    fieldOf(member, 'computed') === false
+  return fieldOf(member, 'computed') === false
     ? fieldOf(fieldOf(member, 'property'), 'name')
     : undefined;
 }
@@ -70,10 +69,7 @@ export function isTestCallee(callee: unknown): boolean {
     return isTestCallee(fieldOf(callee, 'object'));
   }
 
-  return (
-    fieldOf(callee, 'type') === 'Identifier' &&
-    fieldOf(callee, 'name') === 'test'
-  );
+  return fieldOf(callee, 'name') === 'test';
 }
 
 /** A node whose type names a function or a method, such as `ArrowFunctionExpression` or `ObjectMethod`. */
@@ -87,7 +83,7 @@ export function isFunctionNode(node: unknown): boolean {
 export function* ancestors(path: unknown): Generator<unknown, void, void> {
   for (
     let current = fieldOf(path, 'parentPath');
-    current !== undefined && current !== null;
+    current != null;
     current = fieldOf(current, 'parentPath')
   ) {
     yield current;

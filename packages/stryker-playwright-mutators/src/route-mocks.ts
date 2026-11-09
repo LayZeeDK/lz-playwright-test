@@ -95,7 +95,6 @@ function isInHandlerOf(path: unknown, route: string): boolean {
 
   return (
     handlerPath !== undefined &&
-    fieldOf(first, 'type') === 'Identifier' &&
     fieldOf(first, 'name') === route &&
     (isRouteAnnotated(first) ||
       isRouteCallback(
@@ -127,31 +126,20 @@ function isRouteAnnotated(parameter: unknown): boolean {
     'typeAnnotation',
   );
 
-  return (
-    fieldOf(annotation, 'type') === 'TSTypeReference' &&
-    fieldOf(fieldOf(annotation, 'typeName'), 'name') === 'Route'
-  );
+  return fieldOf(fieldOf(annotation, 'typeName'), 'name') === 'Route';
 }
 
 function isNumberBetween(node: unknown, min: number, max: number): boolean {
   const value = fieldOf(node, 'value');
 
-  return (
-    fieldOf(node, 'type') === 'NumericLiteral' &&
-    typeof value === 'number' &&
-    value >= min &&
-    value <= max
-  );
+  return typeof value === 'number' && value >= min && value <= max;
 }
 
 function isEmptyValue(node: unknown): boolean {
-  const type = fieldOf(node, 'type');
-
   return (
-    (type === 'ObjectExpression' &&
-      lengthOf(fieldOf(node, 'properties')) === 0) ||
-    (type === 'ArrayExpression' && lengthOf(fieldOf(node, 'elements')) === 0) ||
-    (type === 'StringLiteral' && fieldOf(node, 'value') === '')
+    lengthOf(fieldOf(node, 'properties')) === 0 ||
+    lengthOf(fieldOf(node, 'elements')) === 0 ||
+    fieldOf(node, 'value') === ''
   );
 }
 
@@ -171,7 +159,6 @@ function isFulfillOption(path: unknown, key: string): boolean {
   const route = fieldOf(fieldOf(fieldOf(call, 'callee'), 'object'), 'name');
 
   return (
-    fieldOf(property, 'type') === 'ObjectProperty' &&
     propertyKey(property) === key &&
     fieldOf(property, 'value') === fieldOf(path, 'node') &&
     argumentOf(call, 0) === object &&

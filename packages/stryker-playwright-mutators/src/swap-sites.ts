@@ -15,14 +15,8 @@ function valueOf(node: unknown): string | undefined {
 
       return text === undefined ? undefined : `string:${text}`;
     }
-    case 'RegExpLiteral': {
-      const pattern = fieldOf(node, 'pattern');
-      const flags = fieldOf(node, 'flags');
-
-      return typeof pattern === 'string' && typeof flags === 'string'
-        ? `regex:/${pattern}/${flags}`
-        : undefined;
-    }
+    case 'RegExpLiteral':
+      return `regex:/${String(fieldOf(node, 'pattern'))}/${String(fieldOf(node, 'flags'))}`;
     default:
       return undefined;
   }

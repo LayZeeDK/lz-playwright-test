@@ -99,7 +99,7 @@ function urlText(node: unknown): string | undefined {
 
   const quasis = fieldOf(node, 'quasis');
 
-  return type === 'TemplateLiteral' && Array.isArray(quasis)
+  return Array.isArray(quasis)
     ? String(fieldOf(fieldOf(quasis[0], 'value'), 'cooked'))
     : undefined;
 }
