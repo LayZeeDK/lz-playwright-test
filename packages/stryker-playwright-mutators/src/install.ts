@@ -20,10 +20,11 @@ import type { LzPlaywrightMutator } from './mutators.ts';
 import { packageName } from './package-name.ts';
 import { looksLikePlaywrightTest } from './playwright-test.ts';
 
-const babelTypeMembers: readonly string[] = ['emptyStatement'];
+const babelTypeMembers: readonly string[] = ['emptyStatement', 'cloneNode'];
 
 export interface BabelTypes {
   emptyStatement(): unknown;
+  cloneNode(node: unknown): unknown;
 }
 
 export type Instrumenter = CoreInstrumenter<BabelTypes>;

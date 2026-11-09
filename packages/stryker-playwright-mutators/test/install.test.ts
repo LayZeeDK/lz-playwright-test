@@ -17,14 +17,19 @@ describe('assertBabelTypes', () => {
 
   it('accepts an object with the members the mutators call', () => {
     assert.doesNotThrow(() =>
-      assertBabelTypes({ emptyStatement: () => ({}) }, missing),
+      assertBabelTypes(
+        { emptyStatement: () => ({}), cloneNode: () => ({}) },
+        missing,
+      ),
     );
   });
 
   it('names the members an object lacks, through the missing-member error', () => {
-    assert.throws(() => assertBabelTypes({ emptyStatement: 1 }, missing), {
-      message: 'no Babel types with emptyStatement',
-    });
+    assert.throws(
+      () =>
+        assertBabelTypes({ emptyStatement: () => ({}), cloneNode: 1 }, missing),
+      { message: 'no Babel types with cloneNode' },
+    );
   });
 
   it('rejects a value that is no object, through the missing-member error', () => {

@@ -56,7 +56,7 @@ export function fakeInstrumenter({
   const instrumenter: Instrumenter = {
     dir: '/stryker/instrumenter',
     version,
-    types: { emptyStatement: () => ({}) },
+    types: { emptyStatement: () => ({}), cloneNode: (node) => node },
     allMutators,
     async instrument(files) {
       instrumented.push([...files]);
