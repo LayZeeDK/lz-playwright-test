@@ -49,12 +49,14 @@ export async function startSession(
   configFile: string,
   sandboxFileName: string,
   log: Logger,
+  afterInit?: () => Promise<void>,
 ): Promise<Session> {
   const runner = new LzPlaywrightTestRunner(
     { lzPlaywright: { configFile }, timeoutMS: 10_000 },
     log,
   );
   await runner.init();
+  await afterInit?.();
 
   const dryRun = await runner.dryRun({
     timeout: 60_000,

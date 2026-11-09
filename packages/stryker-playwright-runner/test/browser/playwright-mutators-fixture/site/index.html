@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Shop</title>
+  </head>
+  <body>
+    <h1>Shop</h1>
+    <button type="button" id="add">Add</button>
+    <output data-testid="count">0</output>
+    <label>Name <input id="name" /></label>
+    <p data-testid="greeting"></p>
+    <span id="help">Help</span>
+    <p id="tips" hidden>Tips</p>
+    <button type="button" id="load">Load user</button>
+    <p data-testid="user"></p>
+    <button type="button" id="ping">Ping</button>
+    <p data-testid="network"></p>
+    <button type="button" id="start">Start</button>
+    <p id="ready" hidden>Ready</p>
+    <button type="button" id="visit">Visit</button>
+    <p id="expired" hidden>Expired</p>
+    <script>
+      const byId = (id) => document.getElementById(id);
+      const byTestId = (id) => document.querySelector(`[data-testid="${id}"]`);
+      let count = 0;
+
+      byId('add').addEventListener('click', () => {
+        count += 1;
+        byTestId('count').textContent = String(count);
+      });
+      byId('name').addEventListener('input', (event) => {
+        byTestId('greeting').textContent = `Hello, ${event.target.value}`;
+      });
+      byId('help').addEventListener('mouseenter', () => {
+        byId('tips').hidden = false;
+      });
+      byId('load').addEventListener('click', async () => {
+        const user = await (await fetch('/api/user')).json();
+        byTestId('user').textContent = user.name ?? '';
+      });
+      byId('ping').addEventListener('click', () => {
+        fetch('/api/ping').then(
+          () => {
+            byTestId('network').textContent = 'online';
+          },
+          () => {
+            byTestId('network').textContent = 'offline';
+          },
+        );
+      });
+      byId('start').addEventListener('click', () => {
+        setTimeout(() => {
+          byId('ready').hidden = false;
+          document.title = 'Done';
+        }, 300);
+      });
+      byId('visit').addEventListener('click', () => {
+        setTimeout(() => fetch('/api/visit', { method: 'POST' }), 300);
+      });
+      setTimeout(() => {
+        byId('expired').hidden = false;
+      }, 5000);
+    </script>
+  </body>
+</html>
