@@ -1,4 +1,3 @@
-// Reaches into @stryker-mutator/instrumenter's dist because its exports map exposes only `.` and `./package.json`.
 import { realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -59,12 +58,6 @@ export interface Instrumenter<TTypes> {
   readonly allMutators: MutatorList;
   instrument(files: readonly SourceFile[]): Promise<readonly MutantOrigin[]>;
 }
-
-/** What an error message says about the instrumenter in use. */
-export type InstrumenterLocation<TTypes = unknown> = Pick<
-  Instrumenter<TTypes>,
-  'dir' | 'version'
->;
 
 /**
  * `target` is the first entry of the frozen `allMutantPlacers`; the array is frozen, this object is not
@@ -202,6 +195,7 @@ export async function resolveExpressionPlacer(
   };
 }
 
+/** What an error message says: the mutator package, and the instrumenter in use. */
 export interface Located {
   readonly packageName: string;
   readonly dir: string;
@@ -262,6 +256,7 @@ function isMutantOrigin(value: unknown): value is MutantOrigin {
   );
 }
 
+/** Imports by path: the instrumenter's exports map exposes only `.` and `./package.json`, not its dist files. */
 function importFile(path: string): Promise<unknown> {
   return import(pathToFileURL(path).href);
 }
