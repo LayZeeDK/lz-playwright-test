@@ -74,7 +74,24 @@ export const mutatorSets = roster({
       sampleOf("await page.route('**/api', (route) => route.abort());"),
     ),
   ],
-  optIn: [],
+  optIn: [
+    removalMutator(
+      'LzPlaywrightSleepWait',
+      sampleOf('await page.waitForTimeout(100);'),
+    ),
+    removalMutator(
+      'LzPlaywrightStateWait',
+      sampleOf('await page.waitForLoadState();'),
+    ),
+    removalMutator(
+      'LzPlaywrightNetworkWait',
+      sampleOf("await page.waitForResponse('/a');"),
+    ),
+    removalMutator(
+      'LzPlaywrightClock',
+      sampleOf('await page.clock.runFor(1000);'),
+    ),
+  ],
   experimental: [],
 });
 
