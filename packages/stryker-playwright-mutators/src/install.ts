@@ -20,19 +20,6 @@ import type { LzPlaywrightMutator } from './mutators.ts';
 import { packageName } from './package-name.ts';
 import { looksLikePlaywrightTest } from './playwright-test.ts';
 
-const babelTypeMembers: readonly string[] = [
-  'emptyStatement',
-  'cloneNode',
-  'objectExpression',
-  'arrayExpression',
-  'stringLiteral',
-  'numericLiteral',
-  'booleanLiteral',
-  'callExpression',
-  'memberExpression',
-  'identifier',
-];
-
 export interface BabelTypes {
   emptyStatement(): unknown;
   cloneNode(node: unknown): unknown;
@@ -45,6 +32,19 @@ export interface BabelTypes {
   memberExpression(object: unknown, property: unknown): unknown;
   identifier(name: string): unknown;
 }
+
+const babelTypeMembers: Readonly<Record<keyof BabelTypes, true>> = {
+  emptyStatement: true,
+  cloneNode: true,
+  objectExpression: true,
+  arrayExpression: true,
+  stringLiteral: true,
+  numericLiteral: true,
+  booleanLiteral: true,
+  callExpression: true,
+  memberExpression: true,
+  identifier: true,
+};
 
 export type Instrumenter = CoreInstrumenter<BabelTypes>;
 
@@ -64,7 +64,7 @@ export function assertBabelTypes(
     throw missing('Babel types');
   }
 
-  const absent = babelTypeMembers.filter(
+  const absent = Object.keys(babelTypeMembers).filter(
     (member) => typeof value[member] !== 'function',
   );
 
