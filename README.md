@@ -24,7 +24,9 @@ mutators from there, so build first (the Nx targets below do).
 - `packages/stryker-playwright-runner`: the runner, package `@layzee/stryker-playwright-runner`.
 - `packages/stryker-jsx-mutators`: the JSX mutators, package `@layzee/stryker-jsx-mutators`.
 - `packages/stryker-playwright-mutators`: the mutators for Playwright test code, package
-  `@layzee/stryker-playwright-mutators`.
+  `@layzee/stryker-playwright-mutators`. Its `stryker.config.mjs` mutates the package's own source.
+- `packages/stryker-mutator-install`: the private code that both mutator packages use to put their mutators into
+  Stryker, package `@layzee/stryker-mutator-install`.
 - `apps/demo-app` (Nx project `@layzee/demo-app`): the demo app and its Playwright component tests
   (`playwright.components.config.mts`).
 - `apps/demo-app-e2e`: the demo app's Playwright e2e tests.
@@ -63,6 +65,19 @@ The JSX mutators' tests need no browser:
 ```sh
 npx nx run @layzee/stryker-jsx-mutators:test
 ```
+
+Neither do the Playwright mutators' tests. To check that those tests catch a change to the package's source, run
+Stryker on it with the package's own config:
+
+```sh
+npx nx run @layzee/stryker-playwright-mutators:test
+npx stryker run packages/stryker-playwright-mutators/stryker.config.mjs
+```
+
+The config's thresholds are 100, so the run exits 1 when a mutant survives. To mutate only a change, add
+`--mutate "packages/stryker-playwright-mutators/src/<file>.ts:<startLine>-<endLine>"`. The config runs the tests with
+Stryker's `command` runner and `node --test --test-concurrency=1`. Run in parallel, each Stryker worker would start
+test files on every core, and mutants would time out without being killed.
 
 To run Stryker on the demo app, use `npx nx run @layzee/demo-app-e2e:mutate-e2e`,
 `npx nx run @layzee/demo-app-e2e:mutate-e2e-ui`, or `npx nx run @layzee/demo-app:mutate-ct`. Each
