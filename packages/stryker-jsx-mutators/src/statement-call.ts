@@ -1,15 +1,10 @@
-import { fieldOf } from '@layzee/stryker-mutator-install';
+import {
+  callTypes,
+  fieldOf,
+  memberTypes,
+} from '@layzee/stryker-mutator-install';
 
 import { typeOf } from './type-of.ts';
-
-const callTypes: readonly unknown[] = [
-  'CallExpression',
-  'OptionalCallExpression',
-];
-const memberTypes: readonly unknown[] = [
-  'MemberExpression',
-  'OptionalMemberExpression',
-];
 
 export function statementCallee(node: unknown): string | undefined {
   if (typeOf(node) !== 'ExpressionStatement') {

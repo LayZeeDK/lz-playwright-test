@@ -1,3 +1,4 @@
+export { bindingOf, callTypes, memberTypes } from './ast.ts';
 export {
   builtInNames,
   builtInSample,
