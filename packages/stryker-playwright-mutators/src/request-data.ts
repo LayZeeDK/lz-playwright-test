@@ -12,10 +12,11 @@ const payloadMethods: readonly unknown[] = [
   'delete',
   'fetch',
 ];
-// Stryker's instrumenter visits nothing inside `as`, so only these two wrappers can hold a mutated value.
+// Stryker's instrumenter visits nothing inside `as`, but it visits inside these wrappers.
 const typeWrappers: readonly unknown[] = [
   'TSSatisfiesExpression',
   'TSNonNullExpression',
+  'TSTypeAssertion',
 ];
 
 export function requestDataMutator<const TName extends string>(
@@ -73,14 +74,14 @@ function inPayload(path: unknown): boolean {
   );
 }
 
-/** The expression inside any `satisfies` and `!` around `node`. */
+/** The expression inside any type wrapper around `node`. */
 function unwrapped(node: unknown): unknown {
   return typeWrappers.includes(fieldOf(node, 'type'))
     ? unwrapped(fieldOf(node, 'expression'))
     : node;
 }
 
-/** The path of the outermost `satisfies` or `!` around `path`, or `path` itself. */
+/** The path of the outermost type wrapper around `path`, or `path` itself. */
 function outermost(path: unknown): unknown {
   return typeWrappers.includes(fieldOf(fieldOf(path, 'parent'), 'type'))
     ? outermost(fieldOf(path, 'parentPath'))

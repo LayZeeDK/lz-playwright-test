@@ -347,8 +347,8 @@ These mutants survive or are missed by design. Each entry says what to do with i
   argument. An imported `request`, such as superagent's, gets no mutant, and neither does a context from
   `request.newContext()`, although `LzPlaywrightRequestUrl` follows one.
 - It never empties a value or drops a key. Identifiers, raw string bodies and negative numbers get no mutant.
-- A payload or options object under `satisfies` or `!` keeps its mutants. One under `as` gets none: Stryker's
-  instrumenter mutates nothing inside a type assertion.
+- A payload or options object under `satisfies`, `!` or `<T>` keeps its mutants. One under `as` gets none: Stryker's
+  instrumenter mutates nothing under `as`.
 - Values that set up data or pick a page, such as a page size, often survive. Leave them with a disable comment.
 
 ### LzPlaywrightRequestUrl
@@ -362,8 +362,8 @@ These mutants survive or are missed by design. Each entry says what to do with i
   can make the request time out, and that kills the mutant even when no check would have. Warm the server before
   the run, or rerun such a kill before you trust it.
 - A survivor means the test's checks also pass on the root's response, such as a status-only `toBeOK()`.
-- A result that the test stores and never reads gets no mutant. A request inside a type assertion, such as
-  `(await request.get('/a')) as Health`, gets none either, read or not: Stryker's instrumenter mutates nothing inside
+- A result that the test stores and never reads gets no mutant. A request under `as`, such as
+  `(await request.get('/a')) as Health`, gets none either, read or not: Stryker's instrumenter mutates nothing under
   `as`.
 
 ## Set a short actionTimeout

@@ -160,12 +160,26 @@ export const requestCases: readonly Case[] = [
     }),
   ),
   {
+    id: 'data-wrapped-angle',
+    title:
+      'a string in a data object under a <T> type assertion gets the suffix x: Stryker visits inside <T>, unlike as',
+    source: readResult("request.post('/a', { data: <Payload>{ name: 'n' } })"),
+    expect: [[data, '"nx"']],
+  },
+  {
     id: 'data-wrapped-options',
     title:
       'a string in the data of request options under satisfies gets the suffix x',
     source: readResult(
       "request.post('/a', { data: { name: 'n' } } satisfies Options)",
     ),
+    expect: [[data, '"nx"']],
+  },
+  {
+    id: 'data-wrapped-angle-options',
+    title:
+      'a string in the data of request options under a <T> type assertion gets the suffix x',
+    source: readResult("request.post('/a', <Options>{ data: { name: 'n' } })"),
     expect: [[data, '"nx"']],
   },
   {
