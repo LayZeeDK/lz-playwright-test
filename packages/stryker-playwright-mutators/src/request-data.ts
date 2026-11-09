@@ -57,7 +57,7 @@ function inPayload(path: unknown): boolean {
     return inPayload(fieldOf(path, 'parentPath'));
   }
 
-  if (fieldOf(path, 'key') === 'value' && parentType === 'ObjectProperty') {
+  if (fieldOf(path, 'key') === 'value') {
     const property = fieldOf(path, 'parentPath');
 
     return (
@@ -69,9 +69,7 @@ function inPayload(path: unknown): boolean {
   }
 
   return (
-    fieldOf(path, 'listKey') === 'elements' &&
-    parentType === 'ArrayExpression' &&
-    inPayload(fieldOf(path, 'parentPath'))
+    parentType === 'ArrayExpression' && inPayload(fieldOf(path, 'parentPath'))
   );
 }
 
@@ -95,7 +93,6 @@ function isPayload(propertyPath: unknown): boolean {
 
   return (
     payloadKeys.includes(propertyKey(fieldOf(propertyPath, 'node'))) &&
-    fieldOf(optionsPath, 'listKey') === 'arguments' &&
     fieldOf(optionsPath, 'key') === 1 &&
     isPayloadCall(optionsPath, fieldOf(optionsPath, 'parent'))
   );

@@ -643,6 +643,18 @@ table cells, and the test's pattern, which expected a single space before a cell
 (inferred from the padded row; the test was not run between the format and the fix). The cycle has no step that
 formats the changed files and runs the tests again before the refactor step. Evidence: `step6-c12-notes.md`.
 
+**O82. The loop audit has no outcome for a walk whose next step depends on the branch taken.** In the R6 refactor wave,
+`inPayload` climbs out of an object value by skipping the property path, but climbs out of an array element by one
+step. No collection pipeline expresses that, none of `lz-refactor`'s "mark no" criteria fits, and the catalog has no
+Replace Loop with Recursion target. The worker chose a recursion with one case per node kind. Evidence:
+`step6-r6-wave1-notes.md`.
+
+**O83. A refactoring that differs only on inputs the parser never produces has no name.** Code typed `unknown` over a
+Babel tree let the worker merge `functionTypes.includes(type)` into a regex test, and `String(type)` into a `typeof`
+check. The two forms differ only on node shapes Babel never builds. `lz-refactor` treats any difference as a behaviour
+change and routes it to `lz-tpp`, with no way to record the argument that the difference cannot be reached. This is
+the converse of O56. Evidence: `step6-r6-wave1-notes.md`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -903,6 +915,14 @@ that the test reads.
 
 **S75 (from O81).** End each green with "run the project's formatter on the changed files, then run the tests again",
 so that a formatter rewrite is caught before the refactor step starts.
+
+**S76 (from O82).** Add a loop-audit outcome "stateful walk": when each step depends on the branch taken, a recursion
+with one case per node kind is the target. Add Replace Loop with Recursion to the catalog, with the TCO caveat the
+TypeScript overlay already gives.
+
+**S77 (from O83).** Give `lz-refactor` a "reachable inputs" note: a change that keeps the output for every input the
+producer can build (a parser, a schema) counts as behaviour-preserving when the note names the producer and the
+shapes it never builds.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 

@@ -58,6 +58,21 @@ for (const name of ['LzPlaywrightRequestData', 'LzPlaywrightRequestUrl']) {
   });
 }
 
+it('names lzPlaywrightMutators when options reach a roster with no opt-in or experimental mutators', async () => {
+  const { instrumenter } = fakeInstrumenter();
+
+  await assert.rejects(
+    install(
+      { defaults: mutatorSets.defaults, optIn: [], experimental: [] },
+      { extended: true },
+      async () => instrumenter,
+      () => undefined,
+      () => undefined,
+    ),
+    { message: /, so lzPlaywrightMutators\(\) takes no options\./ },
+  );
+});
+
 it('leaves every experimental mutator off with extended', async () => {
   const line = await startLineWith({ extended: true });
 

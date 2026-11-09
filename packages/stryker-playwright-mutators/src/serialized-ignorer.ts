@@ -22,12 +22,10 @@ export const serializedIgnorer: Ignorer = {
     const method = methodOf(callee);
 
     if (
-      fieldOf(path, 'listKey') === 'arguments' &&
       isFunctionNode(fieldOf(path, 'node')) &&
-      typeof method === 'string' &&
       serializingMethods.includes(method)
     ) {
-      return `lz-playwright-serialized: Playwright's ${method} runs this function's source text where Stryker's helpers do not exist`;
+      return `lz-playwright-serialized: Playwright's ${String(method)} runs this function's source text where Stryker's helpers do not exist`;
     }
 
     return undefined;
