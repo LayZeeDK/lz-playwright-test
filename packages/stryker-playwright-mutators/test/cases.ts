@@ -322,4 +322,94 @@ export const cases: readonly Case[] = [
     source: `test.afterEach(async () => {});\n${inTest("await page.locator('#a').click();")}`,
     expect: [[click, ';']],
   },
+  {
+    id: 'after-other-statement',
+    title: 'a click after another statement of the test is removed',
+    source: inTest("expect(1).toBe(1);\n  await page.locator('#a').click();"),
+    expect: [[click, ';']],
+  },
+  untouched(
+    'an awaited click through a computed member',
+    inTest("await page.locator('#a')[click]();"),
+    'computed-method',
+  ),
+  untouched(
+    'an awaited click in export =',
+    "export = await page.locator('#a').click();",
+    'export-assignment',
+  ),
+  untouched(
+    'a request call on a computed member named request',
+    "test('case', async ({ api, request }) => {\n  await api[request].get('/api');\n});",
+    'request-computed-member',
+  ),
+  {
+    id: 'navigate-among-fixtures',
+    title:
+      'an awaited navigate destructured after another fixture of the test is removed',
+    source:
+      "test('case', async ({ page, navigate }) => {\n  await navigate('/');\n});",
+    expect: [[navigation, ';']],
+  },
+  untouched(
+    'an awaited navigate in a function of a plain object',
+    "const fixtures = {\n  ready: async ({ navigate }) => {\n    await navigate('/');\n  },\n};",
+    'navigate-plain-object',
+  ),
+  untouched(
+    'an awaited navigate in a function in an array passed to test.extend',
+    "const extended = test.extend([\n  async ({ navigate }) => {\n    await navigate('/');\n  },\n]);",
+    'navigate-extend-array',
+  ),
+  untouched(
+    'an awaited navigate in a fixture of new test.extend',
+    "const extended = new test.extend({\n  ready: async ({ navigate }, use) => {\n    await navigate('/');\n    await use(true);\n  },\n});",
+    'navigate-new-extend',
+  ),
+  untouched(
+    'an awaited navigate in a fixture of (test?.extend)(...)',
+    "const extended = (test?.extend)({\n  ready: async ({ navigate }, use) => {\n    await navigate('/');\n    await use(true);\n  },\n});",
+    'navigate-optional-extend',
+  ),
+  untouched(
+    'an awaited navigate in a function passed to a method other than extend',
+    "const extended = test.with({\n  ready: async ({ navigate }, use) => {\n    await navigate('/');\n    await use(true);\n  },\n});",
+    'navigate-not-extend',
+  ),
+  {
+    id: 'before-use-not-last',
+    title:
+      'a click before await use in a fixture is removed when a statement follows the use',
+    source:
+      "const extended = test.extend<{ ready: boolean }>({\n  ready: async ({ page }, use) => {\n    await page.locator('#a').click();\n    await use(true);\n    expect(1).toBe(1);\n  },\n});",
+    expect: [[click, ';']],
+  },
+  {
+    id: 'after-void-use',
+    title: 'a click after an unawaited void use in a fixture is removed',
+    source:
+      "const extended = test.extend<{ ready: boolean }>({\n  ready: async ({ page }, use) => {\n    void use(true);\n    await page.locator('#a').click();\n  },\n});",
+    expect: [[click, ';']],
+  },
+  {
+    id: 'after-await-new-use',
+    title: 'a click after await new use(...) in a fixture is removed',
+    source:
+      "const extended = test.extend<{ ready: boolean }>({\n  ready: async ({ page }, use) => {\n    await new use(true);\n    await page.locator('#a').click();\n  },\n});",
+    expect: [[click, ';']],
+  },
+  {
+    id: 'new-afterEach',
+    title: 'a click in a function passed to new test.afterEach is removed',
+    source:
+      "new test.afterEach(async ({ page }) => {\n  await page.locator('#a').click();\n});",
+    expect: [[click, ';']],
+  },
+  {
+    id: 'optional-afterEach',
+    title: 'a click in a function passed to (test?.afterEach)(...) is removed',
+    source:
+      "(test?.afterEach)(async ({ page }) => {\n  await page.locator('#a').click();\n});",
+    expect: [[click, ';']],
+  },
 ];
