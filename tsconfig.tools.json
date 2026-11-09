@@ -8,5 +8,10 @@
     "rootDir": ".",
     "allowImportingTsExtensions": true
   },
-  "include": ["tools/**/*.ts", "stryker.*.config.ts", "oss/**/*.ts"]
+  "include": [
+    "tools/**/*.ts",
+    "stryker.*.config.ts",
+    "stryker.package.ts",
+    "oss/**/*.ts"
+  ]
 }
