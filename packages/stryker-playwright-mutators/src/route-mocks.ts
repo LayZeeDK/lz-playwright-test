@@ -39,6 +39,11 @@ export function fulfillMutator<const TName extends string>(
   };
 }
 
+const callTypes: readonly unknown[] = [
+  'CallExpression',
+  'OptionalCallExpression',
+];
+
 /** The Route method that ends a request, mapped to the one that lets it go on, and the reverse. */
 const outcomeFlips: Readonly<Record<string, string>> = {
   abort: 'continue',
@@ -64,7 +69,7 @@ export function outcomeMutator<const TName extends string>(
           : undefined;
 
       if (
-        fieldOf(node, 'type') === 'CallExpression' &&
+        callTypes.includes(fieldOf(node, 'type')) &&
         flipped !== undefined &&
         isInHandlerOf(path, fieldOf(object, 'name'))
       ) {
@@ -80,7 +85,7 @@ export function outcomeMutator<const TName extends string>(
   };
 }
 
-/** A route handler around `path` has `route` as the name of its first parameter. */
+/** The nearest function around `path` with a parameter named `route` is a route handler, and `route` is its first. */
 function isInHandlerOf(path: unknown, route: unknown): boolean {
   for (
     let current = fieldOf(path, 'parentPath');
@@ -89,15 +94,17 @@ function isInHandlerOf(path: unknown, route: unknown): boolean {
   ) {
     const handler = fieldOf(current, 'node');
     const params = fieldOf(handler, 'params');
-    const first: unknown = Array.isArray(params) ? params[0] : undefined;
+    const list: readonly unknown[] = Array.isArray(params) ? params : [];
 
-    if (
-      fieldOf(first, 'type') === 'Identifier' &&
-      fieldOf(first, 'name') === route &&
-      (isRouteAnnotated(first) ||
-        isRouteCallback(fieldOf(current, 'parent'), handler))
-    ) {
-      return true;
+    if (list.some((param) => fieldOf(param, 'name') === route)) {
+      const first = list[0];
+
+      return (
+        fieldOf(first, 'type') === 'Identifier' &&
+        fieldOf(first, 'name') === route &&
+        (isRouteAnnotated(first) ||
+          isRouteCallback(fieldOf(current, 'parent'), handler))
+      );
     }
   }
 

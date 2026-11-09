@@ -216,6 +216,21 @@ export const routeMockCases: readonly Case[] = [
     expect: [],
   },
   {
+    id: 'continue-shadowed-route',
+    title:
+      'a continue on an inner function parameter that shadows the handler parameter makes no mutant',
+    source: inRoute(
+      'const go = (route) => route.continue();\n    await go(other);',
+    ),
+    expect: [],
+  },
+  {
+    id: 'abort-optional-call',
+    title: 'an abort on an optional chain becomes a continue',
+    source: inRoute('await route?.abort();'),
+    expect: [[outcome, 'route.continue()']],
+  },
+  {
     id: 'abort-returned',
     title: 'a returned abort becomes a continue',
     source: inRoute('return route.abort();'),
