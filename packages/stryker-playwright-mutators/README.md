@@ -316,6 +316,9 @@ These mutants survive or are missed by design. Each entry says what to do with i
 
 ### LzPlaywrightFulfill
 
+- It takes `fulfill` only on the route parameter of a handler, found as `LzPlaywrightRouteOutcome` finds it, and
+  only the object literal that is its first argument. A `fulfill` on another receiver, such as a deferred promise,
+  gets no mutant.
 - `status` gets a mutant only as a numeric literal from 200 to 599. A string or an expression gets none.
 - A fulfill with a `response` option gets no mutant at all, its `status` included.
 - A `json` value that is not a literal, such as a variable or a number, becomes `{}`.

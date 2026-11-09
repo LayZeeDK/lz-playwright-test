@@ -284,6 +284,27 @@ export const routeMockCases: readonly Case[] = [
     expect: [[fulfill, '200']],
   },
   {
+    id: 'fulfill-outside-handler',
+    title: 'a fulfill outside any route handler makes no mutant',
+    source:
+      "test('case', async ({ page }) => {\n  deferred.fulfill({ body: 'done', status: 200 });\n});",
+    expect: [],
+  },
+  {
+    id: 'fulfill-other-receiver',
+    title:
+      'a fulfill on a receiver that is not the handler parameter makes no mutant',
+    source: inRoute("deferred.fulfill({ body: 'done', status: 200 });"),
+    expect: [],
+  },
+  {
+    id: 'fulfill-second-argument',
+    title:
+      'an object literal in the second argument of a fulfill makes no mutant',
+    source: inRoute('await route.fulfill(options, { json: { a: 1 } });'),
+    expect: [],
+  },
+  {
     id: 'fallback-expression-body',
     title: 'a fallback as the expression body of a handler becomes an abort',
     source:

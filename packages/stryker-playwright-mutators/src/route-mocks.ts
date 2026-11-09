@@ -159,7 +159,8 @@ function lengthOf(list: unknown): number | undefined {
   return Array.isArray(list) ? list.length : undefined;
 }
 
-/** The value of the property `key` in the object literal that is the first argument of `<x>.fulfill(...)`. */
+/** The value of the property `key` in the object literal that is the first argument of `<route>.fulfill(...)` in a
+ * handler of `<route>`. */
 function isFulfillOption(path: unknown, key: string): boolean {
   const property = fieldOf(path, 'parent');
   const object = fieldOf(fieldOf(path, 'parentPath'), 'parent');
@@ -167,14 +168,17 @@ function isFulfillOption(path: unknown, key: string): boolean {
     fieldOf(fieldOf(path, 'parentPath'), 'parentPath'),
     'parent',
   );
+  const route = fieldOf(fieldOf(fieldOf(call, 'callee'), 'object'), 'name');
 
   return (
     fieldOf(property, 'type') === 'ObjectProperty' &&
     propertyKey(property) === key &&
     fieldOf(property, 'value') === fieldOf(path, 'node') &&
-    fieldOf(object, 'type') === 'ObjectExpression' &&
+    argumentOf(call, 0) === object &&
     !hasProperty(object, 'response') &&
     isCall(call) &&
-    methodOf(fieldOf(call, 'callee')) === 'fulfill'
+    methodOf(fieldOf(call, 'callee')) === 'fulfill' &&
+    typeof route === 'string' &&
+    isInHandlerOf(path, route)
   );
 }
