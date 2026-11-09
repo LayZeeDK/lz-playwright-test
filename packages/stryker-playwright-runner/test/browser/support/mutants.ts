@@ -136,7 +136,9 @@ export function playwrightMutatorRows(
     const { mutator, original, replacement, killer, bystander } = row;
     const change = `${original} -> ${replacement === ';' ? 'removed' : replacement}`;
 
-    test(`${mutator}: "${bystander}" does not run ${change}, so it survives`, async () => {
+    // The bystander's test body never reaches the mutant, so this pins the runner's test filter and its Survived
+    // report, not the mutator.
+    test(`${mutator}: "${bystander}" never reaches ${change}, so the runner reports it Survived`, async () => {
       const result = await mutantRun(row, bystander);
 
       assert.equal(

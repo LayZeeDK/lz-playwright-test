@@ -56,7 +56,7 @@
         }, 300);
       });
       byId('visit').addEventListener('click', () => {
-        setTimeout(() => fetch('/api/visit', { method: 'POST' }), 300);
+        setTimeout(() => fetch('/api/visit', { method: 'POST' }), 1000);
       });
       setTimeout(() => {
         byId('expired').hidden = false;

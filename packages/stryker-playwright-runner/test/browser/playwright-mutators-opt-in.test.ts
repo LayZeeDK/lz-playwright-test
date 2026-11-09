@@ -18,7 +18,7 @@ playwrightMutatorRows(
   [
     {
       mutator: 'LzPlaywrightSleepWait',
-      original: 'await page.waitForTimeout(1_000);',
+      original: 'await page.waitForTimeout(2_000);',
       replacement: ';',
       killer: 'is ready after a sleep',
       bystander: 'shows the heading',

@@ -12,7 +12,7 @@ test.describe('shop', () => {
   test('is ready after a sleep', async ({ page }) => {
     await page.getByRole('button', { name: 'Start' }).click();
     // eslint-disable-next-line playwright/no-wait-for-timeout -- the statement LzPlaywrightSleepWait removes
-    await page.waitForTimeout(1_000);
+    await page.waitForTimeout(2_000);
 
     // eslint-disable-next-line playwright/prefer-web-first-assertions -- a check that does not retry, so it fails without the wait
     expect(await page.getByText('Ready').isVisible()).toBe(true);
