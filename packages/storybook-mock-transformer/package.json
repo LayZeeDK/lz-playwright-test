@@ -1,0 +1,89 @@
+{
+  "name": "@layzee/storybook-mock-transformer",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Vite plugin that keeps Storybook's definition-time spy stubs through the default mock reset",
+  "keywords": [
+    "storybook",
+    "vite",
+    "vitest",
+    "mocks",
+    "spies"
+  ],
+  "homepage": "https://github.com/LayZeeDK/lz-playwright-test/tree/main/packages/storybook-mock-transformer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LayZeeDK/lz-playwright-test.git",
+    "directory": "packages/storybook-mock-transformer"
+  },
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "@layzee/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "@babel/parser": "7.29.11",
+    "magic-string": "1.4.4"
+  },
+  "peerDependencies": {
+    "vite": "^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
+  "nx": {
+    "tags": [
+      "type:lib"
+    ],
+    "targets": {
+      "build": {
+        "dependsOn": [
+          "^build"
+        ]
+      },
+      "typecheck": {
+        "dependsOn": [
+          "build",
+          "^typecheck"
+        ]
+      },
+      "test": {
+        "dependsOn": [
+          "^build"
+        ],
+        "inputs": [
+          "default",
+          "^default",
+          "{workspaceRoot}/packages/stryker-storybook/src/stub-shape.ts",
+          "{workspaceRoot}/packages/stryker-storybook/src/stryker-record.ts"
+        ]
+      },
+      "lint": {
+        "inputs": [
+          "...",
+          "{workspaceRoot}/tsconfig.base.json"
+        ]
+      }
+    }
+  },
+  "scripts": {
+    "test": "node --conditions=@layzee/source --test test/*.test.ts"
+  }
+}
