@@ -96,6 +96,31 @@ export function register(
   );
 }
 
+/**
+ * Runs `change`; when it throws, gives each target back exactly the own properties it had before, and rethrows.
+ */
+export async function undoOnThrow(
+  targets: readonly object[],
+  change: () => Promise<void>,
+): Promise<void> {
+  const snapshots = targets.map(
+    (target) => [target, Object.getOwnPropertyDescriptors(target)] as const,
+  );
+
+  try {
+    await change();
+  } catch (error) {
+    snapshots.forEach(([target, before]) => {
+      Reflect.ownKeys(target).forEach((key) =>
+        Reflect.deleteProperty(target, key),
+      );
+      Object.defineProperties(target, before);
+    });
+
+    throw error;
+  }
+}
+
 export async function selfCheck(
   packageName: string,
   instrumenter: Pick<Located, 'dir' | 'version'> &

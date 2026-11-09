@@ -26,6 +26,7 @@ export {
   register,
   selfCheck,
   selfCheckFile,
+  undoOnThrow,
   warnUntested,
   type NamedMutator,
   type SampledMutator,

@@ -12,6 +12,7 @@ import {
   markOf,
   register,
   selfCheck,
+  undoOnThrow,
   warnUntested,
 } from '../src/install.ts';
 
@@ -213,6 +214,56 @@ describe('selfCheck', () => {
     await assert.rejects(selfCheck(packageName, instrumenter, samples), {
       message: /made no mutants of LzOne, LzTwo from/,
     });
+  });
+});
+
+describe('undoOnThrow', () => {
+  const mark = markOf(packageName);
+  const failure = new Error('check failed');
+
+  it('keeps the changes when the change resolves', async () => {
+    const list = [listed('Regex')];
+    const placer: { [key: symbol]: unknown } = {};
+
+    await undoOnThrow([list, placer], async () => {
+      list.push(listed('LzOne'));
+      placer[mark] = mark;
+    });
+
+    assert.deepEqual(
+      list.map(({ name }) => name),
+      ['Regex', 'LzOne'],
+    );
+    assert.equal(placer[mark], mark);
+  });
+
+  it('rethrows and gives every target back exactly its own properties when the change throws', async () => {
+    const regex = listed('Regex');
+    const literal = listed('StringLiteral');
+    const list = [regex, literal];
+    const longer = [regex];
+    const canPlace = () => false;
+    const placer: {
+      name: string;
+      canPlace: () => boolean;
+      [key: symbol]: unknown;
+    } = { name: 'placer', canPlace };
+
+    await assert.rejects(
+      undoOnThrow([list, longer, placer], async () => {
+        list.splice(0, list.length, listed('LzOne'));
+        longer.push(literal, listed('LzTwo'));
+        placer.canPlace = () => true;
+        placer[mark] = mark;
+        throw failure;
+      }),
+      (error) => error === failure,
+    );
+
+    assert.deepEqual(list, [regex, literal]);
+    assert.deepEqual(longer, [regex]);
+    assert.deepEqual(Reflect.ownKeys(placer), ['name', 'canPlace']);
+    assert.equal(placer.canPlace, canPlace);
   });
 });
 
