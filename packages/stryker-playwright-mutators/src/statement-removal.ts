@@ -1,94 +1,115 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
+import {
+  ancestors,
+  callTypes,
+  isFunctionNode,
+  isNamedReceiver,
+  isTestCallee,
+  methodOf,
+  propertyNameOf,
+} from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
-import { callTypes, memberTypes } from './same-file-swap.ts';
 import { navigationFixtures } from './settings.ts';
 
 export interface RemovalRow {
   readonly mutator: string;
-  /** What the method is called on: anything but an input device, or `<receiver>` / `<x>.<receiver>`. */
+  /**
+   * What the method is called on: anything, or `<receiver>` / `<x>.<receiver>`. No row takes a call on an input
+   * device or a test runner global.
+   */
   readonly receiver: 'any' | 'request' | 'clock';
   /** The positions that make no mutant: teardown, or setup hooks and `finally` blocks as well. */
   readonly skip: 'teardown' | 'setupAndTeardown';
 }
 
-// In place of `as const`: Stryker mutates nothing inside an `as` expression, which would leave every row out of a
-// mutation run.
-function removalTable<const T extends Readonly<Record<string, RemovalRow>>>(
-  table: T,
-): T {
-  return table;
-}
+export const clickAction = 'LzPlaywrightClickAction';
+export const inputAction = 'LzPlaywrightInputAction';
+export const focusAction = 'LzPlaywrightFocusAction';
+export const navigationAction = 'LzPlaywrightNavigationAction';
+export const sleepWait = 'LzPlaywrightSleepWait';
+export const stateWait = 'LzPlaywrightStateWait';
+export const networkWait = 'LzPlaywrightNetworkWait';
+export const clock = 'LzPlaywrightClock';
 
 function row(mutator: string): RemovalRow {
   return { mutator, receiver: 'any', skip: 'teardown' };
 }
 
-function requestRow(): RemovalRow {
-  return { mutator: input, receiver: 'request', skip: 'setupAndTeardown' };
-}
-
-function clockRow(): RemovalRow {
-  return { mutator: clock, receiver: 'clock', skip: 'teardown' };
-}
-
-const click = 'LzPlaywrightClickAction';
-const input = 'LzPlaywrightInputAction';
-const focus = 'LzPlaywrightFocusAction';
-const navigation = 'LzPlaywrightNavigationAction';
-const sleep = 'LzPlaywrightSleepWait';
-const state = 'LzPlaywrightStateWait';
-const network = 'LzPlaywrightNetworkWait';
-const clock = 'LzPlaywrightClock';
+const navigationRow = row(navigationAction);
+const requestRow: RemovalRow = {
+  mutator: inputAction,
+  receiver: 'request',
+  skip: 'setupAndTeardown',
+};
+const clockRow: RemovalRow = {
+  mutator: clock,
+  receiver: 'clock',
+  skip: 'teardown',
+};
 
 /** The method an awaited call statement ends in, mapped to the one mutator that removes the statement. */
-export const statementRemovals = removalTable({
-  click: row(click),
-  dblclick: row(click),
-  tap: row(click),
-  dragTo: row(click),
-  dispatchEvent: row(click),
-  dragAndDrop: row(click),
-  fill: row(input),
-  clear: row(input),
-  press: row(input),
-  pressSequentially: row(input),
-  type: row(input),
-  selectOption: row(input),
-  selectText: row(input),
-  setInputFiles: row(input),
-  drop: row(input),
-  check: row(input),
-  uncheck: row(input),
-  setChecked: row(input),
-  focus: row(focus),
-  blur: row(focus),
-  hover: row(focus),
-  goto: row(navigation),
-  reload: row(navigation),
-  goBack: row(navigation),
-  goForward: row(navigation),
-  delete: requestRow(),
-  fetch: requestRow(),
-  get: requestRow(),
-  head: requestRow(),
-  patch: requestRow(),
-  post: requestRow(),
-  put: requestRow(),
-  waitForTimeout: row(sleep),
-  waitForLoadState: row(state),
-  waitForURL: row(state),
-  waitFor: row(state),
-  waitForSelector: row(state),
-  waitForFunction: row(state),
-  waitForResponse: row(network),
-  waitForRequest: row(network),
-  runFor: clockRow(),
-  fastForward: clockRow(),
-});
+export const statementRemovals: Readonly<Record<string, RemovalRow>> = {
+  click: row(clickAction),
+  dblclick: row(clickAction),
+  tap: row(clickAction),
+  dragTo: row(clickAction),
+  dispatchEvent: row(clickAction),
+  dragAndDrop: row(clickAction),
+  fill: row(inputAction),
+  clear: row(inputAction),
+  press: row(inputAction),
+  pressSequentially: row(inputAction),
+  type: row(inputAction),
+  selectOption: row(inputAction),
+  selectText: row(inputAction),
+  setInputFiles: row(inputAction),
+  drop: row(inputAction),
+  check: row(inputAction),
+  uncheck: row(inputAction),
+  setChecked: row(inputAction),
+  focus: row(focusAction),
+  blur: row(focusAction),
+  hover: row(focusAction),
+  goto: navigationRow,
+  reload: navigationRow,
+  goBack: navigationRow,
+  goForward: navigationRow,
+  delete: requestRow,
+  fetch: requestRow,
+  get: requestRow,
+  head: requestRow,
+  patch: requestRow,
+  post: requestRow,
+  put: requestRow,
+  waitForTimeout: row(sleepWait),
+  waitForLoadState: row(stateWait),
+  waitForURL: row(stateWait),
+  waitFor: row(stateWait),
+  waitForSelector: row(stateWait),
+  waitForFunction: row(stateWait),
+  waitForResponse: row(networkWait),
+  waitForRequest: row(networkWait),
+  runFor: clockRow,
+  fastForward: clockRow,
+};
 
 const teardownHooks: readonly unknown[] = ['afterEach', 'afterAll'];
 const setupHooks: readonly unknown[] = ['beforeEach', 'beforeAll'];
+
+interface SkipPolicy {
+  readonly hooks: readonly unknown[];
+  readonly finallyBlocks: boolean;
+}
+
+const skipPolicies: Readonly<Record<RemovalRow['skip'], SkipPolicy>> = {
+  teardown: { hooks: teardownHooks, finallyBlocks: false },
+  setupAndTeardown: {
+    hooks: [...teardownHooks, ...setupHooks],
+    finallyBlocks: true,
+  },
+};
+
 const inputDevices: readonly unknown[] = ['keyboard', 'mouse', 'touchscreen'];
 // The globals of Vitest and Jest, whose waitFor and friends share Playwright's method names.
 const testRunners: readonly unknown[] = ['vi', 'jest'];
@@ -110,38 +131,28 @@ export function removalMutator<const TName extends string>(
   };
 }
 
-const rows: Readonly<Record<string, RemovalRow>> = statementRemovals;
-
 function removalOf(path: unknown): RemovalRow | undefined {
   const callee = fieldOf(awaitedCall(fieldOf(path, 'node')), 'callee');
 
   if (fieldOf(callee, 'type') === 'Identifier') {
     return isNavigationFixture(path, fieldOf(callee, 'name'))
-      ? row(navigation)
+      ? navigationRow
       : undefined;
   }
 
   const method = awaitedMethod(callee);
   const found =
-    typeof method === 'string' && Object.hasOwn(rows, method)
-      ? rows[method]
+    typeof method === 'string' && Object.hasOwn(statementRemovals, method)
+      ? statementRemovals[method]
       : undefined;
 
-  return found !== undefined &&
-    found.receiver !== 'any' &&
-    !isNamedReceiver(fieldOf(callee, 'object'), found.receiver)
-    ? undefined
-    : found;
-}
+  if (found === undefined || found.receiver === 'any') {
+    return found;
+  }
 
-/** `<name>`, `<x>.<name>` or `<x>?.<name>`. */
-export function isNamedReceiver(node: unknown, name: string): boolean {
-  return (
-    fieldOf(node, 'name') === name ||
-    (memberTypes.includes(fieldOf(node, 'type')) &&
-      fieldOf(node, 'computed') === false &&
-      fieldOf(fieldOf(node, 'property'), 'name') === name)
-  );
+  return isNamedReceiver(fieldOf(callee, 'object'), found.receiver)
+    ? found
+    : undefined;
 }
 
 /** The call of an `await <call>;` statement. */
@@ -163,11 +174,9 @@ function awaitedCall(node: unknown): unknown {
 function awaitedMethod(callee: unknown): unknown {
   const object = fieldOf(callee, 'object');
 
-  return memberTypes.includes(fieldOf(callee, 'type')) &&
-    fieldOf(callee, 'computed') === false &&
-    !inputDevices.includes(fieldOf(fieldOf(object, 'property'), 'name')) &&
+  return !inputDevices.includes(propertyNameOf(object)) &&
     !testRunners.includes(fieldOf(object, 'name'))
-    ? fieldOf(fieldOf(callee, 'property'), 'name')
+    ? methodOf(callee)
     : undefined;
 }
 
@@ -177,20 +186,11 @@ function isNavigationFixture(path: unknown, name: unknown): boolean {
     return false;
   }
 
-  for (
-    let current = fieldOf(path, 'parentPath');
-    current !== undefined && current !== null;
-    current = fieldOf(current, 'parentPath')
-  ) {
-    if (
-      isFixtureFunction(current) &&
-      destructures(fieldOf(fieldOf(current, 'node'), 'params'), name)
-    ) {
-      return true;
-    }
-  }
-
-  return false;
+  return [...ancestors(path)].some(
+    (ancestor) =>
+      isFixtureFunction(ancestor) &&
+      destructures(fieldOf(fieldOf(ancestor, 'node'), 'params'), name),
+  );
 }
 
 function destructures(params: unknown, name: string): boolean {
@@ -211,7 +211,7 @@ function isFixtureFunction(path: unknown): boolean {
   const owner = fieldOf(path, 'parent');
   const ownerPath = fieldOf(path, 'parentPath');
 
-  if (!/Function|Method/.test(String(fieldOf(fieldOf(path, 'node'), 'type')))) {
+  if (!isFunctionNode(fieldOf(path, 'node'))) {
     return false;
   }
 
@@ -230,52 +230,29 @@ function isFixtureFunction(path: unknown): boolean {
   );
 }
 
-/** `test`, or a member chain on it such as `test.describe.serial`. */
-export function isTestCallee(callee: unknown): boolean {
-  if (fieldOf(callee, 'type') === 'MemberExpression') {
-    return isTestCallee(fieldOf(callee, 'object'));
-  }
-
-  return (
-    fieldOf(callee, 'type') === 'Identifier' &&
-    fieldOf(callee, 'name') === 'test'
-  );
-}
-
 function isExtendCall(node: unknown): boolean {
   const callee = fieldOf(node, 'callee');
 
   return (
     fieldOf(node, 'type') === 'CallExpression' &&
     fieldOf(callee, 'type') === 'MemberExpression' &&
-    fieldOf(fieldOf(callee, 'property'), 'name') === 'extend'
+    propertyNameOf(callee) === 'extend'
   );
 }
 
 function isSkipped(path: unknown, skip: RemovalRow['skip']): boolean {
-  const setup = skip === 'setupAndTeardown';
-  let child = path;
+  const { hooks, finallyBlocks } = skipPolicies[skip];
+  const chain = [path, ...ancestors(path)];
 
-  for (
-    let current = fieldOf(path, 'parentPath');
-    current !== undefined && current !== null;
-    current = fieldOf(current, 'parentPath')
-  ) {
-    if (
-      isHookCall(
-        fieldOf(current, 'node'),
-        setup ? [...teardownHooks, ...setupHooks] : teardownHooks,
-      ) ||
-      followsUse(current, fieldOf(child, 'node')) ||
-      (setup && isFinalizer(current, fieldOf(child, 'node')))
-    ) {
-      return true;
-    }
+  return chain.slice(1).some((current, index) => {
+    const child = fieldOf(chain[index], 'node');
 
-    child = current;
-  }
-
-  return false;
+    return (
+      isHookCall(fieldOf(current, 'node'), hooks) ||
+      followsUse(current, child) ||
+      (finallyBlocks && isFinalizer(current, child))
+    );
+  });
 }
 
 function isHookCall(node: unknown, hooks: readonly unknown[]): boolean {
@@ -284,7 +261,7 @@ function isHookCall(node: unknown, hooks: readonly unknown[]): boolean {
   return (
     fieldOf(node, 'type') === 'CallExpression' &&
     fieldOf(callee, 'type') === 'MemberExpression' &&
-    hooks.includes(fieldOf(fieldOf(callee, 'property'), 'name'))
+    hooks.includes(propertyNameOf(callee))
   );
 }
 
@@ -302,16 +279,11 @@ function isFinalizer(tryPath: unknown, child: unknown): boolean {
 function followsUse(blockPath: unknown, child: unknown): boolean {
   const block = fieldOf(blockPath, 'node');
   const body = fieldOf(block, 'body');
-  const owner = fieldOf(
-    fieldOf(fieldOf(blockPath, 'parentPath'), 'node'),
-    'type',
-  );
 
   return (
     fieldOf(block, 'type') === 'BlockStatement' &&
     Array.isArray(body) &&
-    typeof owner === 'string' &&
-    /Function|Method/.test(owner) &&
+    isFunctionNode(fieldOf(fieldOf(blockPath, 'parentPath'), 'node')) &&
     body.slice(0, body.indexOf(child)).some(isAwaitedUse)
   );
 }

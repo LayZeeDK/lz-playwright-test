@@ -1,7 +1,7 @@
 import type {
   Instrumenter,
-  InstrumenterLocation,
   ListedMutator,
+  Located,
   MutatorList,
 } from './instrumenter.ts';
 
@@ -50,7 +50,7 @@ export function checkNames(
     );
   }
 
-  // Stryker's directives match mutator names ignoring case (directive-bookkeeper.ts:63, :73).
+  // Stryker's directives match mutator names ignoring case (directive-bookkeeper.ts).
   // Stryker disable next-line MethodExpression: names hold ASCII letters only, so upper-casing groups the same names
   const keyOf = (name: string): string => name.toLowerCase();
   const keys = names.map(keyOf);
@@ -98,7 +98,7 @@ export function register(
 
 export async function selfCheck(
   packageName: string,
-  instrumenter: InstrumenterLocation &
+  instrumenter: Pick<Located, 'dir' | 'version'> &
     Pick<Instrumenter<unknown>, 'instrument'>,
   mutators: readonly SampledMutator[],
 ): Promise<void> {
@@ -130,7 +130,7 @@ export async function selfCheck(
 export function warnUntested(
   packageName: string,
   testedVersion: string,
-  instrumenter: InstrumenterLocation,
+  instrumenter: Pick<Located, 'dir' | 'version'>,
   warn: (message: string) => void,
 ): void {
   if (instrumenter.version !== testedVersion) {

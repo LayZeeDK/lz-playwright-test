@@ -1,5 +1,5 @@
 import { selfCheckFile } from './install.ts';
-import type { Instrumenter, InstrumenterLocation } from './instrumenter.ts';
+import type { Instrumenter, Located } from './instrumenter.ts';
 
 export const builtInNames: readonly string[] = [
   'ArithmeticOperator',
@@ -44,7 +44,7 @@ export const builtInSample = `export function sample(a: number, b: number, text:
 
 export async function checkBuiltInsRemoved(
   packageName: string,
-  instrumenter: InstrumenterLocation &
+  instrumenter: Pick<Located, 'dir' | 'version'> &
     Pick<Instrumenter<unknown>, 'instrument'>,
 ): Promise<void> {
   const mutants = await instrumenter.instrument([
@@ -65,15 +65,16 @@ export async function checkBuiltInsRemoved(
 
 export function removeBuiltIns(
   packageName: string,
-  instrumenter: InstrumenterLocation &
+  instrumenter: Pick<Located, 'dir' | 'version'> &
     Pick<Instrumenter<unknown>, 'allMutators'>,
   warn: (message: string) => void,
 ): void {
   const { allMutators } = instrumenter;
   const present = allMutators.map(({ name }) => name);
   const missing = builtInNames.filter((name) => !present.includes(name));
+  const alreadyRemoved = missing.length === builtInNames.length;
 
-  if (missing.length === builtInNames.length) {
+  if (alreadyRemoved) {
     return;
   }
 

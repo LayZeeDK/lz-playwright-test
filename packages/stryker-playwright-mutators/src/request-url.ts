@@ -1,12 +1,18 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
+import {
+  ancestors,
+  argumentOf,
+  bindingOf,
+  hasProperty,
+  isNamedReceiver,
+  propertyNameOf,
+} from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
-import { hasProperty } from './route-mocks.ts';
-import { isNamedReceiver } from './statement-removal.ts';
 
 /** The methods that send a GET or HEAD request; `fetch` sends a GET unless it has a method option. */
 const getMethods: readonly unknown[] = ['get', 'head', 'fetch'];
-// The URL parser reads any two of `/` and `\` at the start of a URL as the start of a host.
+/** The URL parser reads any two of `/` and `\` at the start of a URL as the start of a host. */
 const absolute = /^([a-z][a-z0-9+.-]*:|[\\/]{2})/i;
 const localHost =
   /^(https?:)?[\\/]{2}(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])([:/?#]|$)/i;
@@ -49,7 +55,7 @@ function isCandidate(node: unknown): boolean {
 function isReadUrlArgument(path: unknown): boolean {
   const call = fieldOf(path, 'parent');
   const callee = fieldOf(call, 'callee');
-  const method = fieldOf(fieldOf(callee, 'property'), 'name');
+  const method = propertyNameOf(callee);
 
   return (
     fieldOf(path, 'listKey') === 'arguments' &&
@@ -130,7 +136,7 @@ function isNewContextCall(node: unknown): boolean {
   const callee = fieldOf(call, 'callee');
 
   return (
-    fieldOf(fieldOf(callee, 'property'), 'name') === 'newContext' &&
+    propertyNameOf(callee) === 'newContext' &&
     isNamedReceiver(fieldOf(callee, 'object'), 'request')
   );
 }
@@ -142,62 +148,60 @@ function resultIsRead(callPath: unknown): boolean {
       ? fieldOf(parentPath, 'parentPath')
       : parentPath;
   const user = fieldOf(userPath, 'node');
-  const type = fieldOf(user, 'type');
-  const target = fieldOf(user, type === 'AssignmentExpression' ? 'left' : 'id');
-  const assignmentIsRead =
-    type === 'AssignmentExpression' &&
-    fieldOf(fieldOf(userPath, 'parent'), 'type') !== 'ExpressionStatement';
 
-  if (fieldOf(target, 'type') === 'Identifier' && !assignmentIsRead) {
-    const references = fieldOf(
-      bindingOf(userPath, fieldOf(target, 'name')),
-      'referencePaths',
-    );
+  switch (fieldOf(user, 'type')) {
+    case 'ExpressionStatement':
+      return false;
+    case 'UnaryExpression':
+      return fieldOf(user, 'operator') !== 'void';
+    case 'AssignmentExpression': {
+      const left = fieldOf(user, 'left');
 
-    return (
-      Array.isArray(references) &&
-      references.some((reference) => !isInConsoleCall(reference))
-    );
+      return (
+        fieldOf(fieldOf(userPath, 'parent'), 'type') !==
+          'ExpressionStatement' ||
+        fieldOf(left, 'type') !== 'Identifier' ||
+        isReadVariable(userPath, left)
+      );
+    }
+    default: {
+      const id = fieldOf(user, 'id');
+
+      return (
+        fieldOf(id, 'type') !== 'Identifier' || isReadVariable(userPath, id)
+      );
+    }
   }
+}
+
+/** The variable that `identifier` names has a reference outside a console call. */
+function isReadVariable(path: unknown, identifier: unknown): boolean {
+  const references = fieldOf(
+    bindingOf(path, fieldOf(identifier, 'name')),
+    'referencePaths',
+  );
 
   return (
-    type !== 'ExpressionStatement' &&
-    !(type === 'UnaryExpression' && fieldOf(user, 'operator') === 'void')
+    Array.isArray(references) &&
+    references.some((reference) => !isInConsoleCall(reference))
   );
 }
 
 /** Some call around `path` is `console.<x>(...)`. */
 function isInConsoleCall(path: unknown): boolean {
-  for (
-    let current = fieldOf(path, 'parentPath');
-    current !== undefined && current !== null;
-    current = fieldOf(current, 'parentPath')
-  ) {
-    const callee = fieldOf(fieldOf(current, 'node'), 'callee');
-
-    if (fieldOf(fieldOf(callee, 'object'), 'name') === 'console') {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/** The Babel binding that `name` refers to in the scope of `path`. */
-function bindingOf(path: unknown, name: unknown): unknown {
-  const scope = fieldOf(path, 'scope');
-  const getBinding = fieldOf(scope, 'getBinding');
-
-  return typeof getBinding === 'function'
-    ? Reflect.apply(getBinding, scope, [name])
-    : undefined;
+  return [...ancestors(path)].some(
+    (ancestor) =>
+      fieldOf(
+        fieldOf(fieldOf(fieldOf(ancestor, 'node'), 'callee'), 'object'),
+        'name',
+      ) === 'console',
+  );
 }
 
 /** The options argument names a method, or may: it is no object literal, or it holds a spread. `get` and `head` set
  * their own method over any option, so only `fetch` asks. */
 function hasMethodOption(call: unknown): boolean {
-  const args = fieldOf(call, 'arguments');
-  const options: unknown = Array.isArray(args) ? args[1] : undefined;
+  const options = argumentOf(call, 1);
 
   if (options === undefined) {
     return false;

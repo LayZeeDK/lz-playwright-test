@@ -12,6 +12,7 @@ export interface ResolvedSettings {
   readonly navigationFixtures: readonly string[];
 }
 
+const fixturesKey = 'navigationFixtures';
 const identifier = /^[\p{ID_Start}$_][\p{ID_Continue}$\u{200C}\u{200D}]*$/u;
 
 function isIdentifierList(value: unknown): value is readonly string[] {
@@ -42,22 +43,22 @@ export function parseSettings(settings: unknown): ResolvedSettings {
     );
   }
 
-  const unknown = Object.keys(settings ?? {}).find(
-    (key) => key !== 'navigationFixtures',
+  const extraKey = Object.keys(settings ?? {}).find(
+    (key) => key !== fixturesKey,
   );
 
-  if (unknown !== undefined) {
+  if (extraKey !== undefined) {
     throw new Error(
-      `${packageName}: the settings have no key ${unknown}; the keys are navigationFixtures.`,
+      `${packageName}: the settings have no key ${extraKey}; the keys are ${fixturesKey}.`,
     );
   }
 
-  const given = fieldOf(settings, 'navigationFixtures');
+  const given = fieldOf(settings, fixturesKey);
   const list = given === undefined ? ['navigate'] : given;
 
   if (!isIdentifierList(list)) {
     throw new Error(
-      `${packageName}: navigationFixtures takes an array of identifier names, not ${inspect(list)}.`,
+      `${packageName}: ${fixturesKey} takes an array of identifier names, not ${inspect(list)}.`,
     );
   }
 

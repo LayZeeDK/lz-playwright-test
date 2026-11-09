@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 
-import { coreInstrument, fieldOf } from '@layzee/stryker-mutator-install';
+import { fieldOf } from '@layzee/stryker-mutator-install';
 import type { Ignorer } from '@stryker-mutator/api/ignore';
 
 import { resolveFromCore } from '../../src/install.ts';
-import { packageName } from '../../src/package-name.ts';
+import { instrumentedMutants } from './mutants.ts';
 
 const instrumenter = resolveFromCore();
 
@@ -13,20 +13,13 @@ export async function ignorerOutcomes(
   ignorer: Ignorer,
   code: string,
 ): Promise<string[]> {
-  const instrument = await coreInstrument({
-    packageName,
-    ...(await instrumenter),
-  });
-  const mutants = fieldOf(
-    await instrument([{ name: 'a.ts', content: code }], [], [ignorer]),
-    'mutants',
+  const mutants = await instrumentedMutants(
+    await instrumenter,
+    [{ name: 'a.ts', content: code }],
+    [ignorer],
   );
 
-  if (!Array.isArray(mutants)) {
-    throw new Error('Instrumenter.instrument() gave no mutants');
-  }
-
-  return mutants.map((mutant: unknown) => {
+  return mutants.map((mutant) => {
     const reason = fieldOf(mutant, 'statusReason');
 
     if (fieldOf(mutant, 'status') !== 'Ignored') {

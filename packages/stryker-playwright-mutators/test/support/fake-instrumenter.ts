@@ -14,6 +14,7 @@ import {
   type Instrumenter,
 } from '../../src/install.ts';
 import type { LzPlaywrightMutator } from '../../src/mutators.ts';
+import { packageName } from '../../src/package-name.ts';
 
 export const fakeTypes: BabelTypes = {
   emptyStatement: () => ({}),
@@ -28,7 +29,7 @@ export const fakeTypes: BabelTypes = {
   identifier: () => ({}),
 };
 
-export const ownMark = markOf('@layzee/stryker-playwright-mutators');
+export const ownMark = markOf(packageName);
 
 export function mutator(name: string): LzPlaywrightMutator {
   return {

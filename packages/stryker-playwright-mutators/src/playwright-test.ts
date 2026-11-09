@@ -1,6 +1,6 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
-import { isTestCallee } from './statement-removal.ts';
+import { isTestCallee } from './ast.ts';
 
 export function looksLikePlaywrightTest(program: unknown): boolean {
   const body = fieldOf(program, 'body');

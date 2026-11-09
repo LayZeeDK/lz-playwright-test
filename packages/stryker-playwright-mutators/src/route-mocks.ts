@@ -1,5 +1,12 @@
 import { fieldOf } from '@layzee/stryker-mutator-install';
 
+import {
+  ancestors,
+  argumentOf,
+  callTypes,
+  hasProperty,
+  propertyNameOf,
+} from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 
 export function fulfillMutator<const TName extends string>(
@@ -39,12 +46,7 @@ export function fulfillMutator<const TName extends string>(
   };
 }
 
-const callTypes: readonly unknown[] = [
-  'CallExpression',
-  'OptionalCallExpression',
-];
-
-/** The Route method that ends a request, mapped to the one that lets it go on, and the reverse. */
+/** A Route method that settles a request, mapped to the one with the opposite outcome. */
 const outcomeFlips: Readonly<Record<string, string>> = {
   abort: 'continue',
   continue: 'abort',
@@ -61,8 +63,8 @@ export function outcomeMutator<const TName extends string>(
     *mutate(path, t) {
       const node = fieldOf(path, 'node');
       const callee = fieldOf(node, 'callee');
-      const object = fieldOf(callee, 'object');
-      const method = fieldOf(fieldOf(callee, 'property'), 'name');
+      const route = fieldOf(fieldOf(callee, 'object'), 'name');
+      const method = propertyNameOf(callee);
       const flipped =
         typeof method === 'string' && Object.hasOwn(outcomeFlips, method)
           ? outcomeFlips[method]
@@ -71,13 +73,11 @@ export function outcomeMutator<const TName extends string>(
       if (
         callTypes.includes(fieldOf(node, 'type')) &&
         flipped !== undefined &&
-        isInHandlerOf(path, fieldOf(object, 'name'))
+        typeof route === 'string' &&
+        isInHandlerOf(path, route)
       ) {
         yield t.callExpression(
-          t.memberExpression(
-            t.identifier(String(fieldOf(object, 'name'))),
-            t.identifier(flipped),
-          ),
+          t.memberExpression(t.identifier(route), t.identifier(flipped)),
           [],
         );
       }
@@ -86,39 +86,35 @@ export function outcomeMutator<const TName extends string>(
 }
 
 /** The nearest function around `path` with a parameter named `route` is a route handler, and `route` is its first. */
-function isInHandlerOf(path: unknown, route: unknown): boolean {
-  for (
-    let current = fieldOf(path, 'parentPath');
-    current !== undefined && current !== null;
-    current = fieldOf(current, 'parentPath')
-  ) {
-    const handler = fieldOf(current, 'node');
-    const params = fieldOf(handler, 'params');
-    const list: readonly unknown[] = Array.isArray(params) ? params : [];
+function isInHandlerOf(path: unknown, route: string): boolean {
+  const handlerPath = [...ancestors(path)].find((ancestor) =>
+    paramsOf(ancestor).some((param) => fieldOf(param, 'name') === route),
+  );
+  const first = paramsOf(handlerPath)[0];
 
-    if (list.some((param) => fieldOf(param, 'name') === route)) {
-      const first = list[0];
+  return (
+    handlerPath !== undefined &&
+    fieldOf(first, 'type') === 'Identifier' &&
+    fieldOf(first, 'name') === route &&
+    (isRouteAnnotated(first) ||
+      isRouteCallback(
+        fieldOf(handlerPath, 'parent'),
+        fieldOf(handlerPath, 'node'),
+      ))
+  );
+}
 
-      return (
-        fieldOf(first, 'type') === 'Identifier' &&
-        fieldOf(first, 'name') === route &&
-        (isRouteAnnotated(first) ||
-          isRouteCallback(fieldOf(current, 'parent'), handler))
-      );
-    }
-  }
+function paramsOf(functionPath: unknown): readonly unknown[] {
+  const params = fieldOf(fieldOf(functionPath, 'node'), 'params');
 
-  return false;
+  return Array.isArray(params) ? params : [];
 }
 
 /** `handler` is the second argument of `<x>.route(...)`. */
 function isRouteCallback(call: unknown, handler: unknown): boolean {
-  const args = fieldOf(call, 'arguments');
-
   return (
-    Array.isArray(args) &&
-    args[1] === handler &&
-    fieldOf(fieldOf(fieldOf(call, 'callee'), 'property'), 'name') === 'route'
+    argumentOf(call, 1) === handler &&
+    propertyNameOf(fieldOf(call, 'callee')) === 'route'
   );
 }
 
@@ -143,22 +139,6 @@ function isNumberBetween(node: unknown, min: number, max: number): boolean {
     typeof value === 'number' &&
     value >= min &&
     value <= max
-  );
-}
-
-export function hasProperty(object: unknown, key: string): boolean {
-  const properties = fieldOf(object, 'properties');
-
-  return (
-    Array.isArray(properties) &&
-    properties.some((property) => {
-      const propertyKey = fieldOf(property, 'key');
-
-      return (
-        fieldOf(property, 'computed') !== true &&
-        (fieldOf(propertyKey, 'name') ?? fieldOf(propertyKey, 'value')) === key
-      );
-    })
   );
 }
 
@@ -194,6 +174,6 @@ function isFulfillOption(path: unknown, key: string): boolean {
     fieldOf(object, 'type') === 'ObjectExpression' &&
     !hasProperty(object, 'response') &&
     fieldOf(call, 'type') === 'CallExpression' &&
-    fieldOf(fieldOf(fieldOf(call, 'callee'), 'property'), 'name') === 'fulfill'
+    propertyNameOf(fieldOf(call, 'callee')) === 'fulfill'
   );
 }
