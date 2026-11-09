@@ -16,7 +16,17 @@ import {
 } from './same-file-swap.ts';
 import { requestDataMutator } from './request-data.ts';
 import { requestUrlMutator } from './request-url.ts';
-import { removalMutator } from './statement-removal.ts';
+import {
+  clickAction,
+  clock,
+  focusAction,
+  inputAction,
+  navigationAction,
+  networkWait,
+  removalMutator,
+  sleepWait,
+  stateWait,
+} from './statement-removal.ts';
 
 export interface LzPlaywrightMutator extends SampledMutator {
   mutate(path: unknown, t: BabelTypes): Iterable<unknown>;
@@ -34,22 +44,13 @@ function roster<const T extends MutatorSets<LzPlaywrightMutator>>(sets: T): T {
 
 export const mutatorSets = roster({
   defaults: [
+    removalMutator(clickAction, sampleOf("await page.locator('#a').click();")),
     removalMutator(
-      'LzPlaywrightClickAction',
-      sampleOf("await page.locator('#a').click();"),
-    ),
-    removalMutator(
-      'LzPlaywrightInputAction',
+      inputAction,
       sampleOf("await page.locator('#a').fill('x');"),
     ),
-    removalMutator(
-      'LzPlaywrightFocusAction',
-      sampleOf("await page.locator('#a').hover();"),
-    ),
-    removalMutator(
-      'LzPlaywrightNavigationAction',
-      sampleOf("await page.goto('/');"),
-    ),
+    removalMutator(focusAction, sampleOf("await page.locator('#a').hover();")),
+    removalMutator(navigationAction, sampleOf("await page.goto('/');")),
     swapMutator(
       'LzPlaywrightTestIdLocator',
       sampleOf("page.getByTestId('a');\n  page.getByTestId('b');"),
@@ -79,22 +80,10 @@ export const mutatorSets = roster({
     ),
   ],
   optIn: [
-    removalMutator(
-      'LzPlaywrightSleepWait',
-      sampleOf('await page.waitForTimeout(100);'),
-    ),
-    removalMutator(
-      'LzPlaywrightStateWait',
-      sampleOf('await page.waitForLoadState();'),
-    ),
-    removalMutator(
-      'LzPlaywrightNetworkWait',
-      sampleOf("await page.waitForResponse('/a');"),
-    ),
-    removalMutator(
-      'LzPlaywrightClock',
-      sampleOf('await page.clock.runFor(1000);'),
-    ),
+    removalMutator(sleepWait, sampleOf('await page.waitForTimeout(100);')),
+    removalMutator(stateWait, sampleOf('await page.waitForLoadState();')),
+    removalMutator(networkWait, sampleOf("await page.waitForResponse('/a');")),
+    removalMutator(clock, sampleOf('await page.clock.runFor(1000);')),
     swapMutator(
       'LzPlaywrightMountStory',
       sampleOf("await mount('a');\n  await mount('b');"),
