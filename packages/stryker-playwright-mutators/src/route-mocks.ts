@@ -46,7 +46,7 @@ export function fulfillMutator<const TName extends string>(
   };
 }
 
-/** The Route method that ends a request, mapped to the one that lets it go on, and the reverse. */
+/** A Route method that settles a request, mapped to the one with the opposite outcome. */
 const outcomeFlips: Readonly<Record<string, string>> = {
   abort: 'continue',
   continue: 'abort',
@@ -63,7 +63,7 @@ export function outcomeMutator<const TName extends string>(
     *mutate(path, t) {
       const node = fieldOf(path, 'node');
       const callee = fieldOf(node, 'callee');
-      const object = fieldOf(callee, 'object');
+      const route = fieldOf(fieldOf(callee, 'object'), 'name');
       const method = propertyNameOf(callee);
       const flipped =
         typeof method === 'string' && Object.hasOwn(outcomeFlips, method)
@@ -73,13 +73,11 @@ export function outcomeMutator<const TName extends string>(
       if (
         callTypes.includes(fieldOf(node, 'type')) &&
         flipped !== undefined &&
-        isInHandlerOf(path, fieldOf(object, 'name'))
+        typeof route === 'string' &&
+        isInHandlerOf(path, route)
       ) {
         yield t.callExpression(
-          t.memberExpression(
-            t.identifier(String(fieldOf(object, 'name'))),
-            t.identifier(flipped),
-          ),
+          t.memberExpression(t.identifier(route), t.identifier(flipped)),
           [],
         );
       }
@@ -88,7 +86,7 @@ export function outcomeMutator<const TName extends string>(
 }
 
 /** The nearest function around `path` with a parameter named `route` is a route handler, and `route` is its first. */
-function isInHandlerOf(path: unknown, route: unknown): boolean {
+function isInHandlerOf(path: unknown, route: string): boolean {
   const handlerPath = [...ancestors(path)].find((ancestor) =>
     paramsOf(ancestor).some((param) => fieldOf(param, 'name') === route),
   );

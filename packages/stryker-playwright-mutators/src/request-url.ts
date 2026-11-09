@@ -12,7 +12,7 @@ import type { LzPlaywrightMutator } from './mutators.ts';
 
 /** The methods that send a GET or HEAD request; `fetch` sends a GET unless it has a method option. */
 const getMethods: readonly unknown[] = ['get', 'head', 'fetch'];
-// The URL parser reads any two of `/` and `\` at the start of a URL as the start of a host.
+/** The URL parser reads any two of `/` and `\` at the start of a URL as the start of a host. */
 const absolute = /^([a-z][a-z0-9+.-]*:|[\\/]{2})/i;
 const localHost =
   /^(https?:)?[\\/]{2}(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])([:/?#]|$)/i;
@@ -148,27 +148,42 @@ function resultIsRead(callPath: unknown): boolean {
       ? fieldOf(parentPath, 'parentPath')
       : parentPath;
   const user = fieldOf(userPath, 'node');
-  const type = fieldOf(user, 'type');
-  const target = fieldOf(user, type === 'AssignmentExpression' ? 'left' : 'id');
-  const assignmentIsRead =
-    type === 'AssignmentExpression' &&
-    fieldOf(fieldOf(userPath, 'parent'), 'type') !== 'ExpressionStatement';
 
-  if (fieldOf(target, 'type') === 'Identifier' && !assignmentIsRead) {
-    const references = fieldOf(
-      bindingOf(userPath, fieldOf(target, 'name')),
-      'referencePaths',
-    );
+  switch (fieldOf(user, 'type')) {
+    case 'ExpressionStatement':
+      return false;
+    case 'UnaryExpression':
+      return fieldOf(user, 'operator') !== 'void';
+    case 'AssignmentExpression': {
+      const left = fieldOf(user, 'left');
 
-    return (
-      Array.isArray(references) &&
-      references.some((reference) => !isInConsoleCall(reference))
-    );
+      return (
+        fieldOf(fieldOf(userPath, 'parent'), 'type') !==
+          'ExpressionStatement' ||
+        fieldOf(left, 'type') !== 'Identifier' ||
+        isReadVariable(userPath, left)
+      );
+    }
+    default: {
+      const id = fieldOf(user, 'id');
+
+      return (
+        fieldOf(id, 'type') !== 'Identifier' || isReadVariable(userPath, id)
+      );
+    }
   }
+}
+
+/** The variable that `identifier` names has a reference outside a console call. */
+function isReadVariable(path: unknown, identifier: unknown): boolean {
+  const references = fieldOf(
+    bindingOf(path, fieldOf(identifier, 'name')),
+    'referencePaths',
+  );
 
   return (
-    type !== 'ExpressionStatement' &&
-    !(type === 'UnaryExpression' && fieldOf(user, 'operator') === 'void')
+    Array.isArray(references) &&
+    references.some((reference) => !isInConsoleCall(reference))
   );
 }
 
