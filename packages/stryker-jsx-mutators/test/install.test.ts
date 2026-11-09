@@ -273,6 +273,28 @@ describe('install', () => {
     });
   });
 
+  it('leaves the list as it was when the self-check throws', async () => {
+    const { run, instrumenter } = setup({ silent: ['Alpha'] });
+    const list = instrumenter.allMutators;
+    const before = [...list];
+
+    await assert.rejects(run([mutator('Alpha')]), /made no mutants of Alpha/);
+
+    assert.equal(instrumenter.allMutators, list);
+    assert.deepEqual(list, before);
+  });
+
+  it('leaves the placer unwrapped and unmarked when the self-check throws', async () => {
+    const { run, expressionPlacer } = setup({ silent: ['Alpha'] });
+    const { canPlace, place } = expressionPlacer;
+
+    await assert.rejects(run([mutator('Alpha')]), /made no mutants of Alpha/);
+
+    assert.equal(expressionPlacer.canPlace, canPlace);
+    assert.equal(expressionPlacer.place, place);
+    assert.equal(ownMark in expressionPlacer, false);
+  });
+
   ['10.1.2', '10.2.0', '110.1.1'].forEach((version) => {
     it(`warns about the instrumenter version ${version} after the self-check passed`, async () => {
       const { run, names, warnings } = setup({ version });

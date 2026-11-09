@@ -7,6 +7,7 @@ import {
   resolveExpressionPlacer,
   resolveInstrumenter,
   selfCheck,
+  undoOnThrow,
   warnUntested,
   type ExpressionPlacer,
   type Instrumenter as CoreInstrumenter,
@@ -44,21 +45,24 @@ export async function install(
   const { allMutators, expressionPlacer, types } = instrumenter;
 
   checkNames(packageName, mutators, allMutators);
-  register(
-    packageName,
-    allMutators,
-    mutators.map((mutator) => toNodeMutator(mutator, types)),
-  );
-
-  if (!(ownMark in expressionPlacer.target)) {
-    Object.assign(
-      expressionPlacer.target,
-      withJsxPlacement(expressionPlacer.original, types),
-      { [ownMark]: ownMark },
+  await undoOnThrow([allMutators, expressionPlacer.target], async () => {
+    register(
+      packageName,
+      allMutators,
+      mutators.map((mutator) => toNodeMutator(mutator, types)),
     );
-  }
 
-  await selfCheck(packageName, instrumenter, mutators);
+    if (!(ownMark in expressionPlacer.target)) {
+      Object.assign(
+        expressionPlacer.target,
+        withJsxPlacement(expressionPlacer.original, types),
+        { [ownMark]: ownMark },
+      );
+    }
+
+    await selfCheck(packageName, instrumenter, mutators);
+  });
+
   warnUntested(packageName, testedVersion, instrumenter, warn);
 }
 
