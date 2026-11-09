@@ -12,6 +12,11 @@ const payloadMethods: readonly unknown[] = [
   'delete',
   'fetch',
 ];
+// Stryker's instrumenter visits nothing inside `as`, so only these two wrappers can hold a mutated value.
+const typeWrappers: readonly unknown[] = [
+  'TSSatisfiesExpression',
+  'TSNonNullExpression',
+];
 
 export function requestDataMutator<const TName extends string>(
   name: TName,
@@ -48,11 +53,16 @@ export function requestDataMutator<const TName extends string>(
 function inPayload(path: unknown): boolean {
   const parentType = fieldOf(fieldOf(path, 'parent'), 'type');
 
+  if (typeWrappers.includes(parentType)) {
+    return inPayload(fieldOf(path, 'parentPath'));
+  }
+
   if (fieldOf(path, 'key') === 'value' && parentType === 'ObjectProperty') {
     const property = fieldOf(path, 'parentPath');
 
     return (
-      (fieldOf(fieldOf(path, 'node'), 'type') === 'ObjectExpression' &&
+      (fieldOf(unwrapped(fieldOf(path, 'node')), 'type') ===
+        'ObjectExpression' &&
         isPayload(property)) ||
       inPayload(fieldOf(property, 'parentPath'))
     );
@@ -65,9 +75,24 @@ function inPayload(path: unknown): boolean {
   );
 }
 
+/** The expression inside any `satisfies` and `!` around `node`. */
+function unwrapped(node: unknown): unknown {
+  return typeWrappers.includes(fieldOf(node, 'type'))
+    ? unwrapped(fieldOf(node, 'expression'))
+    : node;
+}
+
+/** The path of the outermost `satisfies` or `!` around `path`, or `path` itself. */
+function outermost(path: unknown): unknown {
+  return typeWrappers.includes(fieldOf(fieldOf(path, 'parent'), 'type'))
+    ? outermost(fieldOf(path, 'parentPath'))
+    : path;
+}
+
 /** A payload property of the options argument of a request call. */
 function isPayload(propertyPath: unknown): boolean {
-  const optionsPath = fieldOf(propertyPath, 'parentPath');
+  const optionsPath = outermost(fieldOf(propertyPath, 'parentPath'));
+
   return (
     payloadKeys.includes(propertyKey(fieldOf(propertyPath, 'node'))) &&
     fieldOf(optionsPath, 'listKey') === 'arguments' &&

@@ -132,6 +132,37 @@ export const requestCases: readonly Case[] = [
     expect: [],
   },
   {
+    id: 'data-wrapped-as',
+    title:
+      "a string in a data object under as makes no mutant: Stryker's instrumenter skips everything inside a type assertion",
+    source: readResult(
+      "request.post('/a', { data: { name: 'n' } as Payload })",
+    ),
+    expect: [],
+  },
+  ...(
+    [
+      ['satisfies', "{ name: 'n' } satisfies Payload"],
+      ['non-null', "{ name: 'n' }!"],
+    ] as const
+  ).map(
+    ([id, payload]): Case => ({
+      id: `data-wrapped-${id}`,
+      title: `a string in a data object under ${id} gets the suffix x`,
+      source: readResult(`request.post('/a', { data: ${payload} })`),
+      expect: [[data, '"nx"']],
+    }),
+  ),
+  {
+    id: 'data-wrapped-options',
+    title:
+      'a string in the data of request options under satisfies gets the suffix x',
+    source: readResult(
+      "request.post('/a', { data: { name: 'n' } } satisfies Options)",
+    ),
+    expect: [[data, '"nx"']],
+  },
+  {
     id: 'data-nested-object',
     title:
       'a string in an object inside the data of a request call gets the suffix x',
