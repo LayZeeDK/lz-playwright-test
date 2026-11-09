@@ -8,6 +8,7 @@ import {
   methodOf,
   outermost,
   propertyKey,
+  rowOf,
 } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 
@@ -64,11 +65,7 @@ export function outcomeMutator<const TName extends string>(
     sample,
     *mutate(path, t) {
       const node = fieldOf(path, 'node');
-      const method = methodOf(fieldOf(node, 'callee'));
-      const flipped =
-        typeof method === 'string' && Object.hasOwn(outcomeFlips, method)
-          ? outcomeFlips[method]
-          : undefined;
+      const flipped = rowOf(outcomeFlips, methodOf(fieldOf(node, 'callee')));
 
       if (!isCall(node) || flipped === undefined) {
         return;

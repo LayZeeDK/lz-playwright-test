@@ -45,6 +45,16 @@ export function methodOf(member: unknown): unknown {
     : undefined;
 }
 
+/** The row of `table` under `key`, or undefined when `key` is no string or no own key of it. */
+export function rowOf<T>(
+  table: Readonly<Record<string, T>>,
+  key: unknown,
+): T | undefined {
+  return typeof key === 'string' && Object.hasOwn(table, key)
+    ? table[key]
+    : undefined;
+}
+
 export function argumentOf(call: unknown, index: number): unknown {
   const args = fieldOf(call, 'arguments');
 

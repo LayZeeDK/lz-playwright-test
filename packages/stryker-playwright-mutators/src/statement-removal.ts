@@ -8,6 +8,7 @@ import {
   isRequestContext,
   isTestCallee,
   methodOf,
+  rowOf,
 } from './ast.ts';
 import type { LzPlaywrightMutator } from './mutators.ts';
 import { navigationFixtures } from './settings.ts';
@@ -141,10 +142,7 @@ function removalOf(path: unknown): RemovalRow | undefined {
       : undefined;
   }
 
-  const method = String(awaitedMethod(callee));
-  const found = Object.hasOwn(statementRemovals, method)
-    ? statementRemovals[method]
-    : undefined;
+  const found = rowOf(statementRemovals, awaitedMethod(callee));
 
   return found?.receiver === undefined ||
     found.receiver(path, fieldOf(callee, 'object'))
