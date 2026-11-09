@@ -60,7 +60,7 @@ function isReadUrlArgument(path: unknown): boolean {
   const method = memberNameOf(callee);
 
   return (
-    fieldOf(path, 'key') === 0 &&
+    argumentOf(call, 0) === fieldOf(path, 'node') &&
     isRequestReceiver(path, fieldOf(callee, 'object')) &&
     getMethods.includes(method) &&
     !(method === 'fetch' && hasMethodOption(call)) &&
