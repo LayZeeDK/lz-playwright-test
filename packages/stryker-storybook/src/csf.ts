@@ -121,6 +121,7 @@ export function defaultExport(body: readonly unknown[]): unknown {
 
 export interface CsfFile {
   readonly metaObjects: readonly unknown[];
+  readonly metaTags: readonly string[];
   readonly isFactory: boolean;
   readonly stories: readonly StoryExport[];
 }
@@ -135,6 +136,7 @@ export function csfFile(body: readonly unknown[], bindings: Bindings): CsfFile {
 
   return {
     metaObjects,
+    metaTags: stringList(propertyValue(metaObjects[0], 'tags'), bindings),
     isFactory,
     stories: storyExports(body, bindings, metaObjects, isFactory),
   };
@@ -174,15 +176,41 @@ function storyExports(
         isStory(named.name) &&
         (!isFactoryFile || isFactoryStory(named)),
     )
-    .map(({ name, local, init, form }) => ({
-      name,
-      local,
-      init,
-      tested:
-        form === 'declaration' ||
-        (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
-      assignments: assignments.filter(({ target }) => target === local),
-    }));
+    .map(({ name, local, init, form }) => {
+      const storyAssignments = assignments.filter(
+        ({ target }) => target === local,
+      );
+      const assignedTags = storyAssignments.findLast(
+        ({ path }) => path.length === 1 && path[0] === 'tags',
+      );
+
+      return {
+        name,
+        local,
+        init,
+        tested:
+          form === 'declaration' ||
+          (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
+        tags: stringList(
+          assignedTags === undefined
+            ? propertyValue(storyArgument(init), 'tags')
+            : assignedTags.value,
+          bindings,
+        ),
+        assignments: storyAssignments,
+      };
+    });
+}
+
+/** Storybook 10.6.5 CsfFile `parseTags`, after `findVarInitialization` for a name. */
+function stringList(node: unknown, bindings: Bindings): readonly string[] {
+  return list(field(followed(node, bindings), 'elements')).flatMap(
+    (element) => {
+      const value = field(element, 'value');
+
+      return typeof value === 'string' ? [value] : [];
+    },
+  );
 }
 
 export interface StoryExport {
@@ -191,6 +219,7 @@ export interface StoryExport {
   readonly init: unknown;
   /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
   readonly tested: boolean;
+  readonly tags: readonly string[];
   readonly assignments: readonly Assignment[];
 }
 

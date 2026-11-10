@@ -14,12 +14,11 @@ import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 import type { Reporter } from '@stryker-mutator/api/report';
 
 import { field, list } from './node-field.ts';
-import { lzStorybookOptions } from './options.ts';
 import { packageName } from './package-name.ts';
 import {
   isStoryFile,
   storyFilePaths,
-  storybookProject,
+  strykerStorybookProject,
   type ProjectLog,
   type StorybookProject,
 } from './storybook-project.ts';
@@ -89,7 +88,7 @@ export function storybookReporter(options: object, log: ProjectLog) {
   );
   process.env[recordVariable] = recordFile;
   const storybook = (): StorybookProject =>
-    storybookProject(lzStorybookOptions(options).configDir, log);
+    strykerStorybookProject(options, log);
 
   return {
     onDryRunCompleted(): void {

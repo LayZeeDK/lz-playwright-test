@@ -42,7 +42,13 @@
   },
   "peerDependencies": {
     "@stryker-mutator/core": "~10.1.0",
-    "storybook": "^10.6.0"
+    "storybook": "^10.6.0",
+    "vitest": "^4.0.0 || ^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@storybook/addon-vitest": "10.6.5",

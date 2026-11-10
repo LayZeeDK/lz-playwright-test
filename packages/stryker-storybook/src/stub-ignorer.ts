@@ -2,10 +2,9 @@ import type { Ignorer } from '@stryker-mutator/api/ignore';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
 import { field } from './node-field.ts';
-import { lzStorybookOptions } from './options.ts';
 import {
   isStoryFile,
-  storybookProject,
+  strykerStorybookProject,
   type ProjectLog,
 } from './storybook-project.ts';
 import { reasonSites, spyStubReason, type ReasonSite } from './stub-verdict.ts';
@@ -19,10 +18,7 @@ export function stubIgnorer(options: object, log: ProjectLog): Ignorer {
 
       if (field(node, 'type') === 'Program') {
         const fileName = field(path, 'hub', 'file', 'opts', 'filename');
-        const project = storybookProject(
-          lzStorybookOptions(options).configDir,
-          log,
-        );
+        const project = strykerStorybookProject(options, log);
         sites =
           typeof fileName === 'string' && isStoryFile(project, fileName)
             ? reasonSites(node, project)
