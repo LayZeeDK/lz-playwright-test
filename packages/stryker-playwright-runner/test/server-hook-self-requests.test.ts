@@ -239,6 +239,24 @@ test('a request the server sends itself with fetch and the test id header name a
   );
 });
 
+test("messages without a request on undici's request channel leave the server answering, and its next fetch still names the test", async (t) => {
+  const selfRequesting = await startServer(t, { server });
+  const outDir = selfRequesting.run({ perTest: true });
+
+  assert.equal(
+    await selfRequesting.ask({
+      n: 2,
+      testId: 'big',
+      via: 'fetch-after-odd-undici-messages',
+    }),
+    'hi many',
+  );
+  assert.deepEqual(
+    mutantIdsOf(coverageOf(outDir).perTest['big']),
+    bigRequestIds,
+  );
+});
+
 test(
   'a request the server sends with http.get to an IPv6 loopback host of the run carries the test id',
   {

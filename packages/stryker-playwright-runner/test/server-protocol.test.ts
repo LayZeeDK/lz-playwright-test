@@ -41,6 +41,7 @@ test('a missing or invalid control file reads as none', (t) => {
 
   [
     '{"outDir":"o"',
+    'null',
     '[]',
     '{"perTest":true}',
     '{"outDir":"o","perTest":"yes"}',
