@@ -28,11 +28,9 @@ mutators from there, so build first (the Nx targets below do).
 - `packages/stryker-mutator-install`: the private code that both mutator packages use to put their mutators into
   Stryker, package `@layzee/stryker-mutator-install`.
 - `packages/<package>/stryker.config.mjs`: in each of the five packages, a Stryker config that mutates the
-  package's own source. In the runner, its config leaves out the hooks and the files they import (`worker-hook`,
-  `server-hook`, `is-record`, `namespace`, `playwright-internals`, `protocol`, `server-protocol`,
-  `server-run-switch`), and `page-helpers`, which reaches the page through `addInitScript`. They run inside the
-  worker, page and server processes whose Stryker namespace the hooks manage: instrumented hook code would mark
-  those processes instrumented and record coverage of its own mutants, and its unit tests would fail.
+  package's own source. The runner's hooks' tests install the hooks under test on their own global,
+  `__stryker_hook_test__`, named by `LZ_STRYKER_PLAYWRIGHT_HOOK_TEST_NAMESPACE`, so an instrumented copy of a hook
+  keeps Stryker's `__stryker__`. The runner never sets that variable.
 - `apps/demo-app` (Nx project `@layzee/demo-app`): the demo app and its Playwright component tests
   (`playwright.components.config.mts`).
 - `apps/demo-app-e2e`: the demo app's Playwright e2e tests.

@@ -1,8 +1,9 @@
 # Mutating the runner's hooks
 
 Can Stryker mutate the code that this runner loads into the processes it tests, as `@layzee/stryker-node-test-runner`
-does for its own hook? Short answer: not with the hooks as they are. The runner's Stryker config keeps excluding
-them.
+does for its own hook? Short answer: yes, once the hooks' tests install the hooks under test on a global of their
+own. The spike at the end of this note measured it, and the runner's Stryker config now mutates all of `src`. The
+sections before the spike describe the state that led to it.
 
 ## How lz-node-test mutates its hook
 
@@ -65,3 +66,36 @@ Keep the nine files excluded. To mutate the hooks later, first build a small spi
 
 That spike would cost about half a day of test changes plus one Stryker slot. It is worth doing only when the hooks
 change often enough that unit tests alone stop catching regressions.
+
+## Spike result, 2026-11-10
+
+They did. From 2026-10-24 to 2026-11-10 the nine files held 41% of the runner's source lines, and took 51% of its
+commits and 52% of its fix commits.
+
+What changed:
+
+- Both hooks take the global's name from `LZ_STRYKER_PLAYWRIGHT_HOOK_TEST_NAMESPACE` when they install on import,
+  and keep `__stryker__` when it is unset or empty. The runner never sets it.
+- The hooks' tests set it to `__stryker_hook_test__`, and instrument their test app onto that name, with its own
+  active-mutant variable `__STRYKER_HOOK_TEST_ACTIVE_MUTANT__`.
+- The tests' servers exit when their stdin ends instead of being killed. On Windows a kill runs no exit listener, so
+  the lz-node-test hook in a server lost the coverage it writes on exit: before, 3 of 31 server processes in
+  `server-hook.test.ts` left a record; after, 31 of 31.
+- The coverage assertions compare exact mutant ids, so a hook's own mutants showing up as the app's fails a test.
+
+Measured on copies of the package with files replaced by `@stryker-mutator/instrumenter` 10.1.1 output, without
+Stryker:
+
+- Before the change, with `server-hook.ts` instrumented: `server-hook.test.ts` 29 of 29 fail
+  (`Maximum call stack size exceeded`).
+- After it, with `server-hook.ts` instrumented: `server-hook.test.ts` 29 of 29 pass,
+  `server-hook-self-requests.test.ts` 26 of 26.
+- Positive control, `__STRYKER_ACTIVE_MUTANT__` set to one of the hook's mutants: 2 tests fail, so the variable
+  reaches the hook under test.
+- After it, with all nine files instrumented (`page-helpers.ts` included): 611 of 611 pass.
+
+`page-helpers.ts` needed no exclusion: it runs only in the runner's main process, and none of its own code reaches the
+page. The earlier reason for leaving it out was wrong. The code that does reach the page as source text is in
+`worker-hook.ts`: `initPage`, which `addInitScript` hands to each page, and the callback that reads the page's
+global. It is mutated safely only while no test in the Stryker run opens a real page; the browser tests are a
+separate target.
