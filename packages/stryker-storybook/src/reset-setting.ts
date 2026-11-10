@@ -144,52 +144,67 @@ export function classifyStubs(
 
       return tested && tags !== undefined && isTestedByTags(testTags, tags);
     })
-    .flatMap(({ name, init, runtimeAssignments, extendsBase, children }) => {
-      const story = runtimeAssignments.reduce(
-        (value, assignment) =>
-          written(value, assignment.path, evaluate(assignment.value, bindings)),
-        extendsBase ? unknownValue : evaluate(storyArgument(init), bindings),
-      );
-      const isSkipped = storySkipped(
-        testTags,
-        member(metaValue, 'tags'),
-        story,
-        children.map((child) => {
-          if (child === 'unmatched') {
-            return unknownValue;
-          }
+    .flatMap(
+      ({
+        name,
+        init,
+        runtimeAssignments,
+        extendsBase,
+        children,
+        referencedElsewhere,
+      }) => {
+        const story = runtimeAssignments.reduce(
+          (value, assignment) =>
+            written(
+              value,
+              assignment.path,
+              evaluate(assignment.value, bindings),
+            ),
+          extendsBase ? unknownValue : evaluate(storyArgument(init), bindings),
+        );
+        const isSkipped = referencedElsewhere
+          ? 'unknown'
+          : storySkipped(
+              testTags,
+              member(metaValue, 'tags'),
+              story,
+              children.map((child) => {
+                if (child === 'unmatched') {
+                  return unknownValue;
+                }
 
-          return child.options === undefined
-            ? undefined
-            : evaluate(child.options, bindings);
-        }),
-      );
+                return child.options === undefined
+                  ? undefined
+                  : evaluate(child.options, bindings);
+              }),
+            );
 
-      if (isSkipped === true) {
-        return [];
-      }
+        if (isSkipped === true) {
+          return [];
+        }
 
-      // Storybook 10.6.5 normalizeStory: { ...story.story?.parameters, ...story.parameters }
-      const storyTest = testSettings(
-        spread([
-          member(member(story, 'story'), 'parameters'),
-          member(story, 'parameters'),
-        ]),
-      );
+        // Storybook 10.6.5 normalizeStory: { ...story.story?.parameters, ...story.parameters }
+        const storyTest = testSettings(
+          spread([
+            member(member(story, 'story'), 'parameters'),
+            member(story, 'parameters'),
+          ]),
+        );
 
-      return [
-        {
-          story: {
-            name,
-            branch:
-              isSkipped === 'unknown'
-                ? 'unknown'
-                : branchOf([previewTest, metaTest, storyTest]),
+        return [
+          {
+            story: {
+              name,
+              branch:
+                isSkipped === 'unknown'
+                  ? 'unknown'
+                  : branchOf([previewTest, metaTest, storyTest]),
+            },
+            init,
           },
-          init,
-        },
-      ];
-    });
+        ];
+      },
+    );
   const stories = declared.map(({ story }) => story);
   const stubs = definitionTimeStubs(program).map(
     ({ start, end, line, once }) => {

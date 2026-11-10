@@ -1,6 +1,6 @@
 import { loadCsf } from 'storybook/internal/csf-tools';
 
-import { isStringArray } from './is-record.ts';
+import { isRecord, isStringArray } from './is-record.ts';
 import { field, list } from './node-field.ts';
 
 export interface IndexedStory {
@@ -248,6 +248,7 @@ function storyExports(
 ): readonly StoryExport[] {
   const assignments = body.flatMap(assignmentOf);
   const testCalls = body.flatMap(testCallOf);
+  const otherReferences = namesReadElsewhere(body);
 
   return namedExports(body, bindings)
     .filter(isStory)
@@ -269,6 +270,7 @@ function storyExports(
         tested:
           form === 'declaration' ||
           (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
+        referencedElsewhere: otherReferences.has(local),
         assignments: storyAssignments,
         runtimeAssignments: runtimeAssignments(storyAssignments, isFactoryFile),
         extendsBase:
@@ -285,6 +287,8 @@ export interface StoryExport {
   readonly children: readonly TestChild[];
   /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
   readonly tested: boolean;
+  /** The file names the story outside its declaration, its export, the `.test()` calls Storybook 10.6.5 CsfFile indexes, member assignments and spreads, so what runs can differ from what the package reads. */
+  readonly referencedElsewhere: boolean;
   readonly assignments: readonly Assignment[];
   /** The writes that the story Storybook runs is composed from, with a factory story's `input` stripped from the path. */
   readonly runtimeAssignments: readonly Assignment[];
@@ -594,6 +598,76 @@ function testCallOf(statement: unknown): readonly TestCall[] {
         },
       ]
     : [];
+}
+
+/** Storybook 10.6.5 CsfFile indexes a `B.test('name', ...)` statement that is a plain call with a string-literal name and two or more arguments. */
+function isIndexedTestCall(statement: unknown): boolean {
+  const call = field(statement, 'expression');
+  const args = list(field(call, 'arguments'));
+
+  return (
+    field(call, 'type') === 'CallExpression' &&
+    field(call, 'callee', 'property', 'name') === 'test' &&
+    args.length >= 2 &&
+    field(args[0], 'type') === 'StringLiteral'
+  );
+}
+
+function identifiersInReadForms(statement: unknown): readonly unknown[] {
+  const declaration =
+    field(statement, 'type') === 'ExportNamedDeclaration'
+      ? field(statement, 'declaration')
+      : statement;
+
+  return [
+    field(declaration, 'id'),
+    ...list(field(declaration, 'declarations')).map((declarator) =>
+      field(declarator, 'id'),
+    ),
+    ...list(field(statement, 'specifiers')).flatMap((specifier) => [
+      field(specifier, 'local'),
+      field(specifier, 'exported'),
+    ]),
+    ...(isIndexedTestCall(statement)
+      ? [field(statement, 'expression', 'callee', 'object')]
+      : []),
+    ...(field(statement, 'expression', 'operator') === '='
+      ? [rootObject(field(statement, 'expression', 'left', 'object'))]
+      : []),
+  ];
+}
+
+function rootObject(node: unknown): unknown {
+  return field(node, 'type') === 'MemberExpression'
+    ? rootObject(field(node, 'object'))
+    : node;
+}
+
+/** The names the file uses outside the forms the package reads, a spread excepted; a shadowing local or an object key counts too, as no scopes are resolved. */
+function namesReadElsewhere(body: readonly unknown[]): ReadonlySet<unknown> {
+  const read = new Set(body.flatMap(identifiersInReadForms));
+
+  return new Set(
+    identifiersIn(body)
+      .filter((identifier) => !read.has(identifier))
+      .map((identifier) => field(identifier, 'name')),
+  );
+}
+
+function identifiersIn(node: unknown): readonly unknown[] {
+  if (
+    !isRecord(node) ||
+    (node['type'] === 'SpreadElement' &&
+      field(node, 'argument', 'type') === 'Identifier')
+  ) {
+    return [];
+  }
+
+  if (node['type'] === 'Identifier') {
+    return [node];
+  }
+
+  return Object.values(node).flatMap(identifiersIn);
 }
 
 function propertyValue(object: unknown, key: string): unknown {
