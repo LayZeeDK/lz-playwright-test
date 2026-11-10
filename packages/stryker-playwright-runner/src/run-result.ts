@@ -211,7 +211,7 @@ export function missingCoverageError(
   if (
     !anyRan(tests) ||
     anyTestFailed(tests) ||
-    snapshots.some((snapshot) => snapshot.coverage)
+    snapshots.some((snapshot) => snapshot.coverage || snapshot.instrumented)
   ) {
     return undefined;
   }

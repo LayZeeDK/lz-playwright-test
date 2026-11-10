@@ -237,6 +237,37 @@ test('a flush writes static coverage without per-test coverage', (t) => {
   );
 });
 
+test('a flush tells the run that the server loaded instrumented code, though no mutant was reached', (t) => {
+  const { namespace, run, write } = switched(t);
+  namespace.instrumented = true;
+  const outDir = write({ perTest: false });
+  run.startRequest();
+  run.flush();
+
+  assert.deepEqual(
+    readSnapshotDir(outDir).snapshots.map(({ instrumented }) => instrumented),
+    [true],
+  );
+});
+
+test('each run hears once that the server loaded instrumented code', (t) => {
+  const { namespace, run, write } = switched(t);
+  namespace.instrumented = true;
+  const runs = [write({ perTest: false })];
+  run.startRequest();
+  run.flush();
+  run.flush();
+  runs.push(write({ perTest: false }));
+  run.startRequest();
+  run.flush();
+  run.flush();
+
+  assert.deepEqual(
+    runs.map((outDir) => readSnapshotDir(outDir).snapshots.length),
+    [1, 1],
+  );
+});
+
 test('a run folder that is gone drops the coverage without a throw', (t) => {
   const { dir, namespace, run } = switched(t);
   writeServerControl(dir, { outDir: path.join(dir, 'gone'), perTest: true });

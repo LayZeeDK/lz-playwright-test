@@ -10,7 +10,7 @@ import path from 'node:path';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
 import { isRecord } from './is-record.ts';
-import { globalNamespace } from './namespace.ts';
+import { globalNamespace, markInstrumentedReads } from './namespace.ts';
 import { snapshotSuffix } from './protocol.ts';
 import {
   hookedPrefix,
@@ -48,6 +48,7 @@ export function installServerHook(
   now: () => number = Date.now,
 ): void {
   const namespace = globalNamespace(ns);
+  markInstrumentedReads(namespace);
   const requests = new AsyncLocalStorage<RequestTag>();
   const run = runSwitch(
     dir,

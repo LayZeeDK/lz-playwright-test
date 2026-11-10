@@ -27,6 +27,7 @@ export function runSwitch(
   let text: string | undefined;
   let issued: ReadonlySet<string> = new Set();
   let writtenHits = 0;
+  let writtenInstrumented = false;
   let warnedRead = false;
 
   function currentControl(): ServerControl | undefined {
@@ -72,6 +73,7 @@ export function runSwitch(
         namespace.hitLimit = next?.hitLimit;
         namespace.hitCount = next?.hitLimit === undefined ? undefined : 0;
         writtenHits = 0;
+        writtenInstrumented = false;
       }
 
       control = next;
@@ -88,8 +90,13 @@ export function runSwitch(
       const hits =
         typeof namespace.hitCount === 'number' ? namespace.hitCount : 0;
       const coverage = takeCoverage(namespace);
+      const instrumented = namespace.instrumented === true;
 
-      if (coverage === undefined && hits === writtenHits) {
+      if (
+        coverage === undefined &&
+        hits === writtenHits &&
+        instrumented === writtenInstrumented
+      ) {
         return;
       }
 
@@ -100,6 +107,7 @@ export function runSwitch(
             mutantCoverage: coverage,
             hitCount: hits - writtenHits,
             outlivedItsTest: false,
+            instrumented: namespace.instrumented,
           }) + '\n',
         );
       } catch {
@@ -107,6 +115,7 @@ export function runSwitch(
       }
 
       writtenHits = hits;
+      writtenInstrumented = instrumented;
     },
   };
 }

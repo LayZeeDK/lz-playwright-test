@@ -54,6 +54,7 @@ type ServerProgram =
   | 'assign-namespace'
   | 'fails-to-listen'
   | 'lazy-answer'
+  | 'load-only'
   | 'outside-any-request'
   | 'self-request'
   | 'vm-realm-answer'

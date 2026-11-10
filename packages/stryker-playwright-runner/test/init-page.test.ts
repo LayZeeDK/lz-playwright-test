@@ -123,6 +123,17 @@ test('the init script sets nothing it was not given', (t) => {
   assert.deepEqual({ ...s }, {});
 });
 
+// Stryker's header reads activeMutant as each instrumented file loads.
+test('outside a mutant run a read of the active mutant marks the page instrumented, and a write does not', (t) => {
+  const { s } = pageRun(t, {});
+
+  s.activeMutant = '5';
+
+  assert.equal(s.instrumented, undefined);
+  assert.equal(s.activeMutant, '5');
+  assert.equal(s.instrumented, true);
+});
+
 test('the init script keeps a namespace the page already has', (t) => {
   const existing = { kept: true };
   const { s } = pageRun(

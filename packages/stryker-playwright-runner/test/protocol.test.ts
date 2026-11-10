@@ -44,16 +44,24 @@ test('a parsed line sets every flag and a valid hit count', () => {
     hitCount: 0,
     outlivedItsTest: false,
     lost: false,
+    instrumented: false,
   });
   assert.equal(parseSnapshotLine('{"hitCount":-1}')?.hitCount, 0);
   assert.equal(parseSnapshotLine('{"hitCount":"3"}')?.hitCount, 0);
   assert.equal(parseSnapshotLine('{"hitCount":7}')?.hitCount, 7);
-  assert.deepEqual(parseSnapshotLine('{"lost":true,"outlivedItsTest":true}'), {
-    coverage: undefined,
-    hitCount: 0,
-    outlivedItsTest: true,
-    lost: true,
-  });
+  assert.equal(parseSnapshotLine('{"instrumented":1}')?.instrumented, false);
+  assert.deepEqual(
+    parseSnapshotLine(
+      '{"lost":true,"outlivedItsTest":true,"instrumented":true}',
+    ),
+    {
+      coverage: undefined,
+      hitCount: 0,
+      outlivedItsTest: true,
+      lost: true,
+      instrumented: true,
+    },
+  );
 });
 
 test('a parsed line keeps no coverage that is not a map', () => {

@@ -36,6 +36,7 @@ export interface SnapshotLine {
   readonly hitCount?: unknown;
   readonly outlivedItsTest: boolean;
   readonly lost?: boolean;
+  readonly instrumented?: unknown;
 }
 
 export interface Snapshot {
@@ -43,6 +44,8 @@ export interface Snapshot {
   readonly hitCount: number;
   readonly outlivedItsTest: boolean;
   readonly lost: boolean;
+  /** Instrumented code loaded where the snapshot comes from, whether or not it reached a mutant. */
+  readonly instrumented: boolean;
 }
 
 export interface SnapshotDir {
@@ -134,6 +137,7 @@ export function parseSnapshotLine(line: string): Snapshot | undefined {
     hitCount: isHitCount(raw['hitCount']) ? raw['hitCount'] : 0,
     outlivedItsTest: raw['outlivedItsTest'] === true,
     lost: raw['lost'] === true,
+    instrumented: raw['instrumented'] === true,
   };
 }
 

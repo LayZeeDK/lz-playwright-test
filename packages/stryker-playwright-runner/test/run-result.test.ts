@@ -790,6 +790,18 @@ test('the missing-coverage error blames the webServer when pages answered withou
   );
 });
 
+test('a dry run whose instrumented code loaded but reached no mutant completes with no coverage', () => {
+  const { result } = dryRunResult(
+    passedRun([{ instrumented: true, outlivedItsTest: false }]),
+    dryRequest(),
+  );
+
+  assert.deepEqual(withoutPrototypes(completed(result).mutantCoverage), {
+    static: {},
+    perTest: {},
+  });
+});
+
 test('a run with errors and no failed test is an error, with every error', () => {
   const reporter = new LzPlaywrightCollectingReporter();
   attempt(reporter, 'a', 'expected', 'passed');

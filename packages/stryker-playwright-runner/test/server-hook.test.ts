@@ -248,6 +248,30 @@ test('coverage goes to the run folder per test id header, with what ran before t
   );
 });
 
+test('a run whose requests reach no mutant still hears that the server loaded instrumented code', async (t) => {
+  const server = await startServer(t, { server: 'load-only' });
+  server.run({ perTest: true });
+  await server.ask({ n: 0 });
+  const second = server.run({ perTest: true });
+  await server.ask({ n: 0 });
+
+  assert.deepEqual(
+    readSnapshotDir(second).snapshots.map(({ coverage, instrumented }) => ({
+      coverage,
+      instrumented,
+    })),
+    [{ coverage: undefined, instrumented: true }],
+  );
+});
+
+test('a server that reads the namespace without instrumented code tells the run nothing', async (t) => {
+  const server = await startServer(t, { server: 'outside-any-request' });
+  const outDir = server.run({ perTest: true });
+  await server.ask({ n: 0 });
+
+  assert.deepEqual(readSnapshotDir(outDir).snapshots, []);
+});
+
 test('hits a request makes after its response ended reach the run folder when the server exits', async (t) => {
   const server = await startServer(t, { server: 'answer-then-exit' });
   const outDir = server.run({ perTest: true });
