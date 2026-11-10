@@ -11,7 +11,7 @@ import { isAbsolute, join } from 'node:path';
 import { describe, it, type TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { PlanKind } from '@stryker-mutator/api/core';
+import { PlanKind, type schema } from '@stryker-mutator/api/core';
 
 import { isRecord } from '../src/is-record.ts';
 import { storybookReporter } from '../src/reporter.ts';
@@ -20,6 +20,42 @@ import { parseSpyStubReason, spyStubReason } from '../src/stub-verdict.ts';
 import recorded from './fixtures/reporter/mutation.json' with { type: 'json' };
 
 const fixtures = fileURLToPath(new URL('fixtures/', import.meta.url));
+
+const mutantStatuses = [
+  'Killed',
+  'Survived',
+  'NoCoverage',
+  'CompileError',
+  'RuntimeError',
+  'Timeout',
+  'Ignored',
+  'Pending',
+] as const satisfies readonly schema.MutantStatus[];
+
+function mutantStatus(value: string): schema.MutantStatus {
+  const status = mutantStatuses.find((candidate) => candidate === value);
+
+  if (status === undefined) {
+    throw new Error(`mutation.json has an unknown mutant status: ${value}`);
+  }
+
+  return status;
+}
+
+const recordedReport = {
+  files: Object.fromEntries(
+    Object.entries(recorded.files).map(([file, { source, mutants }]) => [
+      file,
+      {
+        source,
+        mutants: mutants.map((mutant) => ({
+          ...mutant,
+          status: mutantStatus(mutant.status),
+        })),
+      },
+    ]),
+  ),
+};
 
 const erasedStub = [
   "import { fn } from 'storybook/test';",
@@ -84,7 +120,7 @@ function runPlan(fileName: string, line: number, isStatic = true) {
       fileName,
       mutatorName: 'LzStorybookSpyStub',
       static: isStatic,
-      location: { start: { line } },
+      location: { start: { line, column: 1 }, end: { line, column: 2 } },
     },
   } as const;
 }
@@ -148,7 +184,7 @@ describe('storybookReporter', () => {
   it('reports an Ignored mutant with the erased reason as an erased stub', (t) => {
     const { reporter, findings } = setup(t);
 
-    reporter.onMutationTestReportReady(recorded);
+    reporter.onMutationTestReportReady(recordedReport);
 
     assert.deepEqual(
       findings().filter(
@@ -167,7 +203,7 @@ describe('storybookReporter', () => {
   it('reports the order-dependent and unknown reasons with their files and lines', (t) => {
     const { reporter, findings } = setup(t);
 
-    reporter.onMutationTestReportReady(recorded);
+    reporter.onMutationTestReportReady(recordedReport);
 
     assert.deepEqual(
       findings().filter(
@@ -255,7 +291,7 @@ describe('storybookReporter', () => {
   it('reports a Survived spy stub mutant as an unchecked stub', (t) => {
     const { reporter, findings } = setup(t);
 
-    reporter.onMutationTestReportReady(recorded);
+    reporter.onMutationTestReportReady(recordedReport);
 
     assert.deepEqual(
       findings().filter(
@@ -276,7 +312,7 @@ describe('storybookReporter', () => {
   it('reports no finding for a Killed spy stub or a mutant ignored for another reason', (t) => {
     const { reporter, findings } = setup(t);
 
-    reporter.onMutationTestReportReady(recorded);
+    reporter.onMutationTestReportReady(recordedReport);
 
     assert.deepEqual(
       findings().map((finding) => isRecord(finding) && finding['verdict']),
@@ -353,7 +389,7 @@ describe('storybookReporter', () => {
   it('opens its console block with the finding counts per verdict', (t) => {
     const { reporter, consoleBlock } = setup(t);
 
-    reporter.onMutationTestReportReady(recorded);
+    reporter.onMutationTestReportReady(recordedReport);
 
     assert.equal(
       consoleBlock()[0],
@@ -365,7 +401,7 @@ describe('storybookReporter', () => {
     const { reporter, consoleBlock } = setup(t);
     const erased = parseSpyStubReason(spyStubReason('erased'));
 
-    reporter.onMutationTestReportReady(recorded);
+    reporter.onMutationTestReportReady(recordedReport);
 
     assert.equal(
       consoleBlock()[3],
@@ -382,7 +418,7 @@ describe('storybookReporter', () => {
         runPlan(join(projectDir, 'src', 'SpyStubMetaOff.stories.tsx'), 23),
       ],
     });
-    reporter.onMutationTestReportReady(recorded);
+    reporter.onMutationTestReportReady(recordedReport);
 
     assert.equal(
       consoleBlock().at(-1),
@@ -403,7 +439,7 @@ describe('storybookReporter', () => {
   it('leaves the static line out when the run has no static story mutant', (t) => {
     const { reporter, consoleBlock } = setup(t);
 
-    reporter.onMutationTestReportReady(recorded);
+    reporter.onMutationTestReportReady(recordedReport);
 
     assert.equal(consoleBlock().length, 5);
   });

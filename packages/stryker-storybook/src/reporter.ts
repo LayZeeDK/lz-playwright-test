@@ -3,7 +3,13 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 
-import { PlanKind } from '@stryker-mutator/api/core';
+import {
+  PlanKind,
+  type MutantEarlyResultPlan,
+  type MutantRunPlan,
+  type MutantTestCoverage,
+  type schema,
+} from '@stryker-mutator/api/core';
 import type { Reporter } from '@stryker-mutator/api/report';
 
 import { isRecord } from './is-record.ts';
@@ -43,20 +49,18 @@ interface StubFinding {
   readonly fix: string;
 }
 
-interface ReportMutant {
-  readonly mutatorName: string;
-  readonly status: string;
-  readonly statusReason?: string | undefined;
-  readonly location: {
-    readonly start: { readonly line: number; readonly column: number };
-  };
-}
+type ReportMutant = Pick<
+  schema.MutantResult,
+  'mutatorName' | 'status' | 'statusReason' | 'location'
+>;
 
 interface ReportInput {
   readonly files: Readonly<
     Record<
       string,
-      { readonly source: string; readonly mutants: readonly ReportMutant[] }
+      Pick<schema.FileResult, 'source'> & {
+        readonly mutants: readonly ReportMutant[];
+      }
     >
   >;
 }
@@ -68,20 +72,15 @@ interface StaticStoryMutant {
   readonly netTime: number;
 }
 
-interface PlanMutant {
-  readonly fileName: string;
-  readonly mutatorName: string;
-  readonly static?: boolean | undefined;
-  readonly location: { readonly start: { readonly line: number } };
-}
-
-type MutantPlan =
-  | {
-      readonly plan: PlanKind.Run;
-      readonly netTime: number;
-      readonly mutant: PlanMutant;
-    }
-  | { readonly plan: PlanKind.EarlyResult; readonly mutant: PlanMutant };
+type MutantPlan = (
+  | Pick<MutantRunPlan, 'plan' | 'netTime'>
+  | Pick<MutantEarlyResultPlan, 'plan'>
+) & {
+  readonly mutant: Pick<
+    MutantTestCoverage,
+    'fileName' | 'mutatorName' | 'static' | 'location'
+  >;
+};
 
 interface PlanEvent {
   readonly mutantPlans: readonly MutantPlan[];
@@ -232,10 +231,7 @@ function reportFindings(
 }
 
 // Babel's line terminators; report columns are 1-based
-function offsetOf(
-  source: string,
-  { line, column }: { readonly line: number; readonly column: number },
-): number {
+function offsetOf(source: string, { line, column }: schema.Position): number {
   const previousBreak = [...source.matchAll(/\r\n?|[\n\p{Zl}\p{Zp}]/gu)]
     .slice(0, line - 1)
     .at(-1);
