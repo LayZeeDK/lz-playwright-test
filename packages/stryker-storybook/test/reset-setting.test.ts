@@ -910,6 +910,124 @@ export const B = A.extend({ args: { g: fn().mockReturnValue(1) } });`,
 
     assert.deepEqual(verdicts, ['unknown']);
   });
+
+  it('leaves out a factory story whose input is assigned a tag that skip names', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ parameters: { test: { mockReset: true } } });
+A.input.tags = ['slow'];
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('keeps a story with a play when skip names play-fn, a tag only the index gives it', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { play: async () => undefined, parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ skip: ['play-fn'] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('leaves out the stories of a meta with a tag that skip names', () => {
+    const verdicts = verdictsOf(
+      `export default { tags: ['slow'] };
+export const A = { parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it("leaves out the stories when the preview's tags hold a tag that skip names", () => {
+    const verdicts = verdictsOf(
+      `export default {};
+export const A = { parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ previewTags: ['slow'], skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it("keeps a story that negates its meta's tag that skip names", () => {
+    const verdicts = verdictsOf(
+      `export default { tags: ['slow'] };
+export const A = { tags: ['!slow'], parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('reads a story as unknown when skip is set and its run-time tags cannot be read', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+import { sharedTags } from './tags';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ parameters: { test: { mockReset: true } } });
+A.input.tags = sharedTags;
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story whose run-time tags cannot be read when skip is empty', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+import { sharedTags } from './tags';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ parameters: { test: { mockReset: true } } });
+A.input.tags = sharedTags;
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it("reads a story as unknown when skip is set and its meta's run-time tags cannot be read", () => {
+    const verdicts = verdictsOf(
+      `import { shared } from './shared';
+export default { ...shared, parameters: { test: { restoreMocks: false } } };
+export const A = { parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('leaves out every story when skip names dev, a tag every story starts with', () => {
+    const verdicts = verdictsOf(
+      `export default {};
+export const A = { parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ skip: ['dev'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('leaves out every story when skip names test, a tag every story starts with', () => {
+    const verdicts = verdictsOf(
+      `export default {};
+export const A = { parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ skip: ['test'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
 });
 
 describe('classifyStubs', () => {
