@@ -793,7 +793,8 @@ binding lookup, an unwrap of `satisfies` and `as`, and a small evaluator for boo
 named `(unconditional -> if)` on `restoreMocks` could see its value. The named transformation is the branch; the
 plumbing under it is several transformations' worth with no list entry. The prediction-table seam (story outcomes from
 recorded runs) sits far from the AST walk, so one row drives much code. Evidence: `sb-s3/cycles.log` cycle 2,
-`sb-s3/notes.md`.
+`sb-s3/notes.md`. Seen again in S3 part (a), cycle 13: the order-dependent verdict needed the site-owner lookup first
+(`sb-s3b/cycles.log`).
 
 **O104. The three skills and the spec filled a worker's context before its first cycle.** In S3 the three lz-tdd
 SKILL.md files, the design sections, the prototypes and one `pstack:how` report used most of a 150k-token budget, and
@@ -808,6 +809,17 @@ The fix moved cycle 1's test to the other mode, where only the title rule applie
 `lz-tpp` says to undo and re-pick; no transformation covers a green that narrows an earlier test's scope. The core is
 O76; new here is the cause, an ignorer rule over a subtree that holds an earlier rule's node. Evidence:
 `sb-s4/cycles.log` cycle 4, `sb-s4/notes.md`.
+
+**O106 (lz-tpp misfit). A new value kind has no transformation.** In S3 part (a), cycle 4's row (an imported setting
+reads as unknown) needed a marker the evaluator returns and the field reader passes on, plus one check. The closest
+name, `(constant -> constant)`, covers the changed fallback but not the new kind. What helped was `lz-tpp` step 6(b): a
+refactoring first turned the three setting checks into one table, so the one check covered all three settings instead
+of `mockReset` alone. Evidence: `sb-s3b/cycles.log` cycle 4, `sb-s3b/notes.md`.
+
+**O107. "With this test skipped" does not fit a row table.** `test-first.md` runs a refactoring that `lz-tpp` asks for
+before Green with the red test skipped. In a spec built by `rows.forEach`, skipping one row means editing the row list
+or adding a skip flag for one run. The S3 part (a) worker ran the refactoring with the row failing and checked that it
+stayed the one failure. Evidence: `sb-s3b/notes.md`, cycle 4.
 
 ### Suggestions
 
@@ -1146,6 +1158,10 @@ rows that pin inputs of a rule a single cycle drove, logged as one `test-after` 
 **S95 (from O103).** In `lz-tpp`, say how to name a green whose branch needs reading code first: name the branch's
 transformation and list the reading as preparatory refactorings, or pose a simpler test that reaches the value with
 less reading.
+
+**S96 (from O107).** In `test-first.md` (Lars's user-scope rule, not the plugin), allow a refactoring before Green to
+run with the one red row still failing, when the spec is a row table that cannot skip one row without an edit: the
+check is that the same row stays the only failure.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
