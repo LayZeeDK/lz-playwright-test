@@ -40,6 +40,19 @@ test('a mutant run selects every test of a describe.serial group, not one test a
   ]);
 });
 
+test('a mutant run selects a test outside describe.serial alone, not with the other such tests', () => {
+  const file = { _parallelMode: 'none', parent: undefined };
+  const groups = serialGroups(
+    [
+      fakeTestCase('alone', { parent: file }),
+      fakeTestCase('other', { parent: file }),
+    ],
+    isSerial,
+  );
+
+  assert.deepEqual(withSerialGroups(['alone'], groups), ['alone']);
+});
+
 test('serial grouping fails loudly when Playwright suites lose _parallelMode', () => {
   assert.throws(
     () =>
