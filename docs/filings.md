@@ -869,6 +869,25 @@ first run), the only evidence it compares anything was a control run without the
 `lz-red` nor `test-first.md` names that control, or says whether 133 data rows are 133 `test-after` lines or one (logged
 as one). Evidence: `sb-s4/notes.md` F6, `sb-s4/cycles.log` part (e) line.
 
+**O116. A correct green broke earlier tests through the log they share.** S3 part (c2), cycles 1 and 11 (adds to O76
+and O105). Cycle 1's scan loads Storybook when the report is ready, so its info line came before the console block that
+four tests read as log line 0. Cycle 11's memo meant only the first load of a fixture logs, so two log tests saw
+nothing. Both times the worker undid the green, refactored the tests with the new test skipped (`lz-tpp` step 6(b)),
+and reapplied the same green. O99 had deferred the memo for this reason; copying the fixture to a temporary folder per
+log test is the move `lz-red` did not offer. Evidence: `sb-s3e/cycles.log` cycles 1 and 11.
+
+**O117 (lz-tpp). No move for "port the oracle's rule".** S3 part (c2), cycles 2-5: the behaviour had to match Stryker's
+disable and restore comments. The highest-priority greens built a text heuristic (a substring on the previous line,
+then a regex, then a scan of earlier lines), and cycle 5's restore test replaced it with Stryker's own rule chain over
+the AST, so three greens' code did not survive. `lz-tpp` ranks by the test in hand and has no step that says: when an
+existing implementation is the oracle, port its rule at the first test that touches it. Evidence: `sb-s3e/cycles.log`
+cycles 2-5.
+
+**O118. A red for the wrong reason that only the green exposed.** S3 part (c2), cycle 7: the test's working folder (a
+temporary folder on C:) made Storybook list no story file under D:, so the red would have stayed red after a correct
+green; it showed when the green did not turn it green. `lz-red` step 5 checks where a failure originates, not whether
+the environment can ever pass. Evidence: `sb-s3e/cycles.log` cycle 7.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
