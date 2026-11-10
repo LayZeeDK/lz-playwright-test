@@ -1119,6 +1119,35 @@ export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
     assert.deepEqual(verdicts, ['unknown']);
   });
 
+  it('reads a story with a tag that skip names as unknown when a nested .test() call comes before a top-level call of the same name', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ tags: ['slow'], parameters: { test: { mockReset: true } } });
+{ A.test('runs', { tags: ['!slow'] }, async () => undefined); }
+A.test('runs', async () => undefined);
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story with a tag that skip names as unknown when a .test() call in a function that runs comes before a top-level call of the same name', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ tags: ['slow'], parameters: { test: { mockReset: true } } });
+function addSmoke() { A.test('runs', { tags: ['!slow'] }, async () => undefined); }
+addSmoke();
+A.test('runs', async () => undefined);
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
   it('reads a factory story as unknown when a .test() call sets parameters and the story itself runs', () => {
     const verdicts = verdictsOf(
       `import preview from '../.storybook/preview';
