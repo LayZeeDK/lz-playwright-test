@@ -821,6 +821,18 @@ before Green with the red test skipped. In a spec built by `rows.forEach`, skipp
 or adding a skip flag for one run. The S3 part (a) worker ran the refactoring with the row failing and checked that it
 stayed the one failure. Evidence: `sb-s3b/notes.md`, cycle 4.
 
+**O108. An includes-style assertion hides why a red stays red.** In S4 part (b) the red "keeps a story object under
+`as` as written" failed with `The expression evaluated to a falsy value:`, and a green attempt stayed red: Stryker
+places no mutant inside `as` at all (the core is O85). `assert.ok(list.includes(x))` printed no actual value, so the red
+could not show that the mutant was absent rather than placed; `assert.deepEqual` on a filtered list shows `actual: []`.
+`lz-red` step 5 calls an AssertionError the sharpest red without saying that some assertion forms drop the actual.
+Evidence: `sb-s4/notes.md` F2.
+
+**O109. A row table split across workers makes a test's filter depend on what is built.** In S4 part (b) cycle 18 the
+`.test()` body red also listed the test-name mutant, which a value row in a later part will keep. Asserting the whole
+line would have kept the green red, so the filter was narrowed to the two body mutators before Green. `lz-red` has no
+word for asserting only the rows built so far. Evidence: `sb-s4/notes.md` F3, `sb-s4/cycles.log` cycle 18.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
