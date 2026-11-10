@@ -580,6 +580,19 @@ export const __namedExportsOrder = ['A'];`,
     assert.deepEqual(verdicts, ['kept']);
   });
 
+  it('reads a value of a CSF factory file exported by specifier as a story, unknown when made by a call', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+import { make } from './make';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ args: { g: fn().mockReturnValue(1) } });
+const helper = make();
+export { helper };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
   it('leaves a non-factory export of a CSF factory file out of the stories', () => {
     const verdicts = verdictsOf(
       `import preview from '../.storybook/preview';

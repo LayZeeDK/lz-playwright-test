@@ -170,22 +170,34 @@ export interface CsfFile {
   readonly stories: readonly StoryExport[];
 }
 
-export function csfFile(body: readonly unknown[], bindings: Bindings): CsfFile {
+/** `isIndexed` picks the stories, as Storybook's story index lists them, in place of the package's own reading of the exports. */
+export function csfFile(
+  body: readonly unknown[],
+  bindings: Bindings,
+  isIndexed?: (named: NamedExport) => boolean,
+): CsfFile {
   const metas = factoryMetas(body, bindings);
   const metaObjects = [
     defaultExport(body),
     ...metas.map((init) => list(field(init, 'arguments'))[0]),
   ].flatMap((meta) => objectOf(meta, bindings));
+  const isFactoryFile = metas.length > 0;
 
   return {
     metaObjects,
-    stories: storyExports(body, bindings, metaObjects, metas.length > 0),
+    stories: storyExports(
+      body,
+      bindings,
+      isFactoryFile,
+      isIndexed ?? storyFilter(metaObjects, isFactoryFile),
+    ),
   };
 }
 
 function storyFilter(
   metaObjects: readonly unknown[],
-): (name: unknown) => boolean {
+  isFactoryFile: boolean,
+): (named: NamedExport) => boolean {
   const [includeStories, excludeStories] = [
     'includeStories',
     'excludeStories',
@@ -195,28 +207,22 @@ function storyFilter(
       .find((value) => value !== undefined),
   );
 
-  return (name) => isExportStory(name, includeStories, excludeStories);
+  return ({ name, init }) =>
+    name !== '__namedExportsOrder' &&
+    isExportStory(name, includeStories, excludeStories) &&
+    (!isFactoryFile || isStoryFactoryCall(unwrap(init)));
 }
 
 function storyExports(
   body: readonly unknown[],
   bindings: Bindings,
-  metaObjects: readonly unknown[],
   isFactoryFile: boolean,
+  isStory: (named: NamedExport) => boolean,
 ): readonly StoryExport[] {
-  const isStory = storyFilter(metaObjects);
-  const exports = namedExports(body, bindings);
-  const isFactoryStory = ({ init }: NamedExport): boolean =>
-    isStoryFactoryCall(unwrap(init));
   const assignments = body.flatMap(assignmentOf);
 
-  return exports
-    .filter(
-      (named) =>
-        named.name !== '__namedExportsOrder' &&
-        isStory(named.name) &&
-        (!isFactoryFile || isFactoryStory(named)),
-    )
+  return namedExports(body, bindings)
+    .filter(isStory)
     .map(({ name, local, init, form }) => {
       const storyAssignments = assignments.filter(
         ({ target }) => target === local,

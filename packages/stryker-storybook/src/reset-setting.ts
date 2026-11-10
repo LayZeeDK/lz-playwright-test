@@ -128,11 +128,11 @@ export function classifyStubs(
 ): StubClassification {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
+  const tagsByStory = storyTags(code, fileName);
   const {
     metaObjects: [meta],
     stories: exported,
-  } = csfFile(body, bindings);
-  const tagsByStory = storyTags(code, fileName);
+  } = csfFile(body, bindings, ({ name }) => tagsByStory.has(name));
   const metaValue = evaluate(meta, bindings);
   const metaTest = testSettings(member(metaValue, 'parameters'));
   const declared = exported
