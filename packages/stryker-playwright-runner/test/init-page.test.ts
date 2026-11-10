@@ -134,6 +134,19 @@ test('outside a mutant run a read of the active mutant marks the page instrument
   assert.equal(s.instrumented, true);
 });
 
+test('a window that kept the namespace of an earlier document starts this document unmarked', (t) => {
+  const { s } = pageRun(t, {}, { prepare: (ns) => runEarlierDocument(t, ns) });
+
+  assert.equal(s.instrumented, undefined);
+});
+
+/** Runs the init script for a document whose window the next document reuses, as a same-origin about:blank is. */
+function runEarlierDocument(t: TestContext, ns: string) {
+  const { s } = pageRun(t, {});
+  const scope: Record<string, unknown> = globalThis;
+  scope[ns] = s;
+}
+
 test('the init script keeps a namespace the page already has', (t) => {
   const existing = { kept: true };
   const { s } = pageRun(
@@ -250,6 +263,21 @@ test('the top frame stores its coverage and hit count when the page goes away', 
     stored.get(`${ns}:carry`),
     '{"mutantCoverage":{"static":{"2":1}},"hitCount":3}',
   );
+});
+
+test('the top frame stores that it loaded instrumented code when the page goes away', (t) => {
+  const { ns, s, stored, fire } = pageRun(t, {});
+  assert.equal(s.activeMutant, undefined);
+
+  fire('pagehide');
+
+  assert.equal(stored.get(`${ns}:carry`), '{"instrumented":true}');
+});
+
+test('the top frame takes over the mark of a page that loaded instrumented code', (t) => {
+  const { s } = pageRun(t, {}, { carried: '{"instrumented":true}' });
+
+  assert.equal(s.instrumented, true);
 });
 
 test('a page without session storage still gets its namespace', (t) => {

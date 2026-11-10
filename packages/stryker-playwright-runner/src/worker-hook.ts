@@ -502,6 +502,7 @@ export function initPage({
     s.activeMutant = activeMutant;
   } else {
     let value = s.activeMutant;
+    delete s.instrumented;
     Object.defineProperty(s, 'activeMutant', {
       configurable: true,
       get: () => {
@@ -532,8 +533,13 @@ export function initPage({
     const carried: unknown = JSON.parse(sessionStorage.getItem(key) ?? 'null');
 
     if (typeof carried === 'object' && carried !== null) {
-      const { mutantCoverage, hitCount }: StrykerNamespace = carried;
+      const { mutantCoverage, hitCount, instrumented }: StrykerNamespace =
+        carried;
       s.mutantCoverage = mutantCoverage;
+
+      if (instrumented === true) {
+        s.instrumented = true;
+      }
 
       if (hitLimit !== undefined) {
         s.hitCount = hitCount ?? 0;
@@ -546,6 +552,7 @@ export function initPage({
         JSON.stringify({
           mutantCoverage: s.mutantCoverage,
           hitCount: s.hitCount,
+          instrumented: s.instrumented,
         }),
       );
     });
