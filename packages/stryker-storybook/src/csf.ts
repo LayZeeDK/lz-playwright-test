@@ -659,7 +659,7 @@ function rootObject(node: unknown): unknown {
     : node;
 }
 
-/** The names the file uses outside the forms the package reads, plus every name in a family of two or more that has a written member, and every name in a written family; a shadowing local or an object key counts too, as no scopes are resolved. The meta joins the families as the default export and as each factory meta. */
+/** `elsewhere` holds the names the file uses outside the forms the package reads, plus every name in a family of two or more that has a written member; `written` holds every name in a written family. A shadowing local or an object key counts too, as no scopes are resolved. The meta joins the families as the default export and as each factory meta. */
 function namesReadElsewhere(
   body: readonly unknown[],
   bindings: Bindings,

@@ -138,7 +138,7 @@ export function classifyStubs(
     stories: exported,
     written: writtenNames,
   } = csfFile(body, topLevel, index);
-  const bindings = new Map(
+  const bindings: ReadonlyMap<string, unknown> = new Map(
     [...topLevel].filter(([name]) => !writtenNames.has(name)),
   );
   const isSelfImported = mayImportItself(body, fileName);
