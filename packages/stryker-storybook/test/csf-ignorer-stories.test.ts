@@ -181,6 +181,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('places the object passed to a .story() call on a member', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = lib.presets.story({\n  args: { a: 1 },\n});",
+        )
+      ).filter((outcome) => outcome.startsWith('2 ')),
+      ['2 ObjectLiteral placed'],
+    );
+  });
+
   it('places the mutants of a non-factory export of a CSF factory file', async () => {
     const { outcomes } = setup();
 

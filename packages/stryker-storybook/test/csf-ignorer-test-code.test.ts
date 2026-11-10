@@ -74,6 +74,23 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it("ignores a play function assigned to X['play']", async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nA['play'] = async () => {\n  await x(1 + 1);\n};",
+        )
+      ).filter((outcome) => /^[34] /.test(outcome)),
+      [
+        '3 StringLiteral placed',
+        `3 BlockStatement ${testReason}`,
+        `4 ArithmeticOperator ${testReason}`,
+      ],
+    );
+  });
+
   it('ignores the play function that X.play names', async () => {
     const { outcomes } = setup();
 
@@ -84,6 +101,32 @@ describe('lz-storybook-csf', () => {
         )
       ).filter((outcome) => /^[23] /.test(outcome)),
       [`2 BlockStatement ${testReason}`, `3 ArithmeticOperator ${testReason}`],
+    );
+  });
+
+  it('ignores a play function assigned to the local binding of a renamed story', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nconst Local = {};\nLocal.play = async () => {\n  await x(1 + 1);\n};\nexport { Local as A };",
+        )
+      ).filter((outcome) => /^[34] /.test(outcome)),
+      [`3 BlockStatement ${testReason}`, `4 ArithmeticOperator ${testReason}`],
+    );
+  });
+
+  it('ignores the play function of a story in a file that exports a schema made by .extend()', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b', excludeStories: /Schema$/ };\nexport const A = {\n  play: async () => {\n    await x(1 + 1);\n  },\n};\nexport const userSchema = z.object({}).extend({ name: z.string() });",
+        )
+      ).filter((outcome) => /^[34] /.test(outcome)),
+      [`3 BlockStatement ${testReason}`, `4 ArithmeticOperator ${testReason}`],
     );
   });
 

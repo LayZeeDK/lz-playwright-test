@@ -29,39 +29,32 @@ export function csfShapes(program: unknown): CsfShapes {
     list(field(statement, 'specifiers')),
   );
   const metaObjects = metaObjectsOf(body, bindings);
-  const isStory = storyFilter(metaObjects);
-  const assignments = body.flatMap(assignmentOf);
-  const storyInits = [
-    ...storyExports(body, bindings),
-    ...assignments
-      .filter(({ target, key }) => key === 'story' && isStory(target))
-      .map(({ target, value }) => ({ name: target, init: value })),
-  ];
-  const storyNames = storyInits.map(({ name }) => name);
-  const stories = storyInits
-    .map(({ init }) => storyNode(unwrap(init), bindings))
+  const exported = storyExports(body, bindings, metaObjects);
+  const assignments = exported.flatMap((story) => story.assignments);
+  const assigned = (key: string): readonly unknown[] =>
+    assignments
+      .filter(({ path }) => path.length === 1 && path[0] === key)
+      .map(({ value }) => value);
+  const stories = [...exported.map(({ init }) => init), ...assigned('story')]
+    .map((init) => storyNode(unwrap(init), bindings))
     .filter(
       (init) =>
         (field(init, 'type') === 'ObjectExpression' ||
           field(init, 'type') === 'ArrowFunctionExpression') &&
         !metaObjects.includes(init),
     );
-  const storyAssignments = assignments.filter(({ target }) =>
-    storyNames.includes(target),
-  );
   const annotations = (key: string): readonly unknown[] =>
     [
       ...[...metaObjects, ...stories].map((owner) => propertyValue(owner, key)),
-      ...storyAssignments
-        .filter((assignment) => assignment.key === key)
-        .map(({ value }) => value),
+      ...assigned(key),
     ].flatMap((value) => withInit(value, bindings));
+  const locals = exported.map(({ local }) => local);
   const idParameters = stories
     .map((story) => propertyValue(story, 'parameters'))
     .filter((parameters) => propertyValue(parameters, '__id') !== undefined);
   const testCalls = body
     .flatMap(testCallOf)
-    .filter(({ target }) => storyNames.includes(target))
+    .filter(({ target }) => locals.includes(target))
     .flatMap(({ statement, args: [name, ...rest] }) =>
       name === undefined
         ? []
@@ -112,19 +105,7 @@ function nodeSet(values: readonly unknown[]): ReadonlySet<unknown> {
   return new Set(values.filter((value) => value !== undefined));
 }
 
-function metaObjectsOf(
-  body: readonly unknown[],
-  bindings: Bindings,
-): readonly unknown[] {
-  return metaExpressions(body, bindings).flatMap((meta) =>
-    objectOf(meta, bindings),
-  );
-}
-
-export function metaExpressions(
-  body: readonly unknown[],
-  bindings: Bindings,
-): readonly unknown[] {
+export function defaultExport(body: readonly unknown[]): unknown {
   const declaration = field(
     body.find(
       (statement) => field(statement, 'type') === 'ExportDefaultDeclaration',
@@ -135,12 +116,19 @@ export function metaExpressions(
     .flatMap((statement) => list(field(statement, 'specifiers')))
     .find((specifier) => field(specifier, 'exported', 'name') === 'default');
 
+  return declaration ?? field(defaultSpecifier, 'local');
+}
+
+export function metaObjectsOf(
+  body: readonly unknown[],
+  bindings: Bindings,
+): readonly unknown[] {
   return [
-    declaration ?? field(defaultSpecifier, 'local'),
-    ...[...bindings.values()]
-      .filter(isFactoryMeta)
-      .map((init) => list(field(init, 'arguments'))[0]),
-  ].filter((meta) => meta !== undefined);
+    defaultExport(body),
+    ...factoryMetas(body, bindings).map(
+      (init) => list(field(init, 'arguments'))[0],
+    ),
+  ].flatMap((meta) => objectOf(meta, bindings));
 }
 
 function storyFilter(
@@ -161,12 +149,14 @@ function storyFilter(
 export function storyExports(
   body: readonly unknown[],
   bindings: Bindings,
+  metaObjects: readonly unknown[],
 ): readonly StoryExport[] {
-  const isStory = storyFilter(metaObjectsOf(body, bindings));
+  const isStory = storyFilter(metaObjects);
   const exports = namedExports(body, bindings);
   const isFactoryStory = ({ init }: NamedExport): boolean =>
     isStoryFactoryCall(unwrap(init));
-  const isFactoryFile = exports.some(isFactoryStory);
+  const isFactoryFile = factoryMetas(body, bindings).length > 0;
+  const assignments = body.flatMap(assignmentOf);
 
   return exports
     .filter(
@@ -182,6 +172,18 @@ export function storyExports(
       tested:
         form === 'declaration' ||
         (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
+      assignments: assignments
+        .filter(({ target }) => target === local)
+        .flatMap((assignment) => {
+          if (!isFactoryFile) {
+            return [assignment];
+          }
+
+          // Storybook 10.6.5 composeStory reads a factory story's annotations from its input.
+          return assignment.path[0] === 'input'
+            ? [{ ...assignment, path: assignment.path.slice(1) }]
+            : [];
+        }),
     }));
 }
 
@@ -191,17 +193,55 @@ export interface StoryExport {
   readonly init: unknown;
   /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
   readonly tested: boolean;
+  readonly assignments: readonly Assignment[];
 }
 
 const storyFactories: readonly unknown[] = ['story', 'extend'];
 
-/** Storybook 10.6.5 `isCsfFactoryCall`: a `.story()` or `.extend()` call. */
+/** Storybook 10.6.5 `isCsfFactoryCall`: a `.story()` or `.extend()` call on a plain name. */
 function isStoryFactoryCall(node: unknown): boolean {
-  return storyFactories.includes(field(node, 'callee', 'property', 'name'));
+  return (
+    field(node, 'callee', 'object', 'type') === 'Identifier' &&
+    storyFactories.includes(field(node, 'callee', 'property', 'name'))
+  );
 }
 
-function isFactoryMeta(init: unknown): boolean {
-  return field(init, 'callee', 'property', 'name') === 'meta';
+const previewPath = /\/preview(.(js|jsx|mjs|ts|tsx))?$/;
+
+/** Storybook 10.6.5 CsfFile: a top-level `X.meta()` or `X.type().meta()` call, where no module but a preview file exports `X`. */
+function factoryMetas(
+  body: readonly unknown[],
+  bindings: Bindings,
+): readonly unknown[] {
+  const importSources = new Map(
+    body
+      .filter((statement) => field(statement, 'type') === 'ImportDeclaration')
+      .flatMap((statement) =>
+        list(field(statement, 'specifiers')).map(
+          (specifier) =>
+            [
+              field(specifier, 'local', 'name'),
+              field(statement, 'source', 'value'),
+            ] as const,
+        ),
+      ),
+  );
+
+  return [...bindings.values()].filter((init) => {
+    const object = field(init, 'callee', 'object');
+    const root =
+      field(object, 'type') === 'CallExpression'
+        ? field(object, 'callee', 'object')
+        : object;
+    const source = importSources.get(field(root, 'name'));
+
+    return (
+      field(init, 'callee', 'property', 'name') === 'meta' &&
+      field(root, 'type') === 'Identifier' &&
+      (source === undefined ||
+        (typeof source === 'string' && previewPath.test(source)))
+    );
+  });
 }
 
 export interface NamedExport {
@@ -252,7 +292,9 @@ export function namedExports(
         })),
     ])
     .flatMap(({ name, ...named }) =>
-      typeof name === 'string' && name !== 'default' ? [{ name, ...named }] : [],
+      typeof name === 'string' && name !== 'default'
+        ? [{ name, ...named }]
+        : [],
     );
 }
 
@@ -347,18 +389,14 @@ function matchesStories(name: unknown, descriptor: unknown): boolean {
   );
 }
 
-interface Assignment {
+export interface Assignment {
   readonly target: unknown;
-  /** The one key of a `Target.key = value` assignment. */
-  readonly key: unknown;
   readonly path: readonly unknown[];
   readonly value: unknown;
 }
 
-export function assignmentOf(statement: unknown): readonly Assignment[] {
-  const [target, ...path] = memberChain(
-    field(statement, 'expression', 'left'),
-  );
+function assignmentOf(statement: unknown): readonly Assignment[] {
+  const [target, ...path] = memberChain(field(statement, 'expression', 'left'));
 
   if (
     field(statement, 'expression', 'operator') !== '=' ||
@@ -370,7 +408,6 @@ export function assignmentOf(statement: unknown): readonly Assignment[] {
   return [
     {
       target,
-      key: path.length === 1 ? path[0] : undefined,
       path,
       value: field(statement, 'expression', 'right'),
     },
@@ -379,8 +416,19 @@ export function assignmentOf(statement: unknown): readonly Assignment[] {
 
 function memberChain(node: unknown): readonly unknown[] {
   return field(node, 'type') === 'MemberExpression'
-    ? [...memberChain(field(node, 'object')), field(node, 'property', 'name')]
+    ? [...memberChain(field(node, 'object')), keyOf(node)]
     : [field(node, 'name')];
+}
+
+/** Storybook 10.6.5 `keyOf`: a member's name, or `undefined` when only running the file gives it. */
+function keyOf(member: unknown): unknown {
+  if (field(member, 'property', 'type') === 'StringLiteral') {
+    return field(member, 'property', 'value');
+  }
+
+  return field(member, 'computed') === true
+    ? undefined
+    : field(member, 'property', 'name');
 }
 
 interface TestCall {
@@ -413,20 +461,11 @@ function propertyValue(object: unknown, key: string): unknown {
     : field(property, 'value');
 }
 
-const annotationFactories: readonly unknown[] = [
-  'definePreview',
-  'meta',
-  'story',
-];
-
-export function annotationFactoryArgument(node: unknown): unknown {
+export function definePreviewArgument(node: unknown): unknown {
   const current = unwrap(node);
 
   return field(current, 'type') === 'CallExpression' &&
-    annotationFactories.includes(
-      field(current, 'callee', 'name') ??
-        field(current, 'callee', 'property', 'name'),
-    )
+    field(current, 'callee', 'name') === 'definePreview'
     ? field(current, 'arguments', '0')
     : current;
 }
@@ -436,7 +475,15 @@ function storyNode(init: unknown, bindings: Bindings): unknown {
     return followed(field(init, 'callee', 'object'), bindings);
   }
 
-  return isStoryFactoryCall(init) ? list(field(init, 'arguments'))[0] : init;
+  return storyArgument(init);
+}
+
+export function storyArgument(init: unknown): unknown {
+  const current = unwrap(init);
+
+  return isStoryFactoryCall(current)
+    ? list(field(current, 'arguments'))[0]
+    : current;
 }
 
 export function isTemplateBind(init: unknown): boolean {

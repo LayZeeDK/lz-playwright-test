@@ -1,9 +1,10 @@
 import {
-  annotationFactoryArgument,
-  assignmentOf,
+  defaultExport,
+  definePreviewArgument,
   isTemplateBind,
-  metaExpressions,
+  metaObjectsOf,
   namedExports,
+  storyArgument,
   storyExports,
   topLevelBindings,
   unwrap,
@@ -50,11 +51,11 @@ export const unreadableSettings: ResetSettings = {
 export function readPreviewTest(program: unknown): ResetSettings {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
-  const [exported] = metaExpressions(body, bindings);
+  const exported = defaultExport(body);
 
   if (exported !== undefined) {
     return testSettings(
-      member(evaluate(annotationFactoryArgument(exported), bindings), 'parameters'),
+      member(evaluate(definePreviewArgument(exported), bindings), 'parameters'),
     );
   }
 
@@ -89,25 +90,17 @@ export function classifyStubs(
 ): StubClassification {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
-  const [meta] = metaExpressions(body, bindings);
-  const metaTest = testSettings(
-    member(evaluate(annotationFactoryArgument(meta), bindings), 'parameters'),
-  );
-  const assignments = body.flatMap(assignmentOf);
-  const declared = storyExports(body, bindings)
+  const metaObjects = metaObjectsOf(body, bindings);
+  const [meta] = metaObjects;
+  const metaTest = testSettings(member(evaluate(meta, bindings), 'parameters'));
+  const declared = storyExports(body, bindings, metaObjects)
     .filter(({ tested }) => tested)
-    .map(({ name, local, init }) => {
-      const story = assignments
-        .filter(({ target }) => target === local)
-        .reduce(
-          (value, assignment) =>
-            written(
-              value,
-              assignment.path,
-              evaluate(assignment.value, bindings),
-            ),
-          evaluate(annotationFactoryArgument(init), bindings),
-        );
+    .map(({ name, init, assignments }) => {
+      const story = assignments.reduce(
+        (value, assignment) =>
+          written(value, assignment.path, evaluate(assignment.value, bindings)),
+        evaluate(storyArgument(init), bindings),
+      );
       // Storybook 10.6.5 normalizeStory: { ...story.story?.parameters, ...story.parameters }
       const storyTest = testSettings(
         spread([
@@ -136,19 +129,22 @@ export function classifyStubs(
 
 function written(
   object: unknown,
-  [key, ...rest]: readonly unknown[],
+  path: readonly unknown[],
   value: unknown,
 ): unknown {
-  if (key === undefined) {
+  const [key, ...rest] = path;
+
+  if (path.length === 0) {
     return value;
+  }
+
+  if (typeof key !== 'string') {
+    return unknownValue;
   }
 
   const base = isRecord(object) ? object : {};
 
-  return {
-    ...base,
-    [String(key)]: written(member(base, String(key)), rest, value),
-  };
+  return { ...base, [key]: written(member(base, key), rest, value) };
 }
 
 function siteVerdict(
