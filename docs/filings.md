@@ -976,6 +976,26 @@ the branch changes behaviour for inputs no test names, so it is not a refactorin
 to. The worker deleted the branch and reported the behaviour change. Neither skill names that choice or says who makes
 it. Evidence: `g1r4fix/cycles.log`, the item 5 line.
 
+**O132. Measured cases that share one cause cannot all fail first (adds to O95 and O112).** In the fifth review fixes
+for the spy-stub path, items 1, 2 and 3 each came with two measured cases from one cause (a `.meta()` and a
+`.type().meta()` call on a local schema; `.extend()` on a local and on an exported story; a static `A.storyName` and a
+non-static `A.input.storyName`). The first case's green fixed the cause, so the second passed on its first run and went
+in as `test-after`. Writing both reds first would have put two failing tests in one red step. Neither `lz-red` nor its
+test-list guidance says how to order cases that share a cause, or that the later ones are expected `test-after` pins.
+Evidence: `g12r5fix/cycles.log` cycles 1, 3 and 4 and their `test-after` lines.
+
+**O133. A red made by rewriting a test that pinned the bug has no log or count shape.** In the same fixes, item 4's
+red was an existing test that asserted the behaviour the fix removes (a test-key assignment's key placed). A new test
+beside it would have contradicted it, so the worker rewrote it. The cycle gained no test, so an acceptance check that
+counts one cycle line per test the spec gained reads it as a cycle without a test, and the log line has no field to
+name the test it replaced. Evidence: `g12r5fix/cycles.log` cycle 5.
+
+**O134. Test-side preparation before a behaviour change has no step.** In the same fixes, item 1 made a factory meta
+need a preview import, which would break six existing tests that called `preview.meta()` with no import. The worker
+first gave those tests the import (green before and after), then wrote the red. That edit is neither a red, a
+`test-after` pin, nor a source refactoring (O126). Evidence: the main checkout's commit 2f3e9cf, its six rewritten
+tests.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
