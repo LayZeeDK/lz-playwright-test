@@ -1058,6 +1058,19 @@ stories at all and the new branch never ran. Only predicting the value the new c
 `lz-red` has no check that a test's input is one the mirrored upstream accepts. Evidence: `r7fix/notes.md`, "lz-tdd
 friction"; `r7fix/cycles.log` cycle 5.
 
+**O145. A red test that can only observe the API the planned fix replaces.** In the round 8 fixes, a differential row
+compared the `.test()` children the package counts, which no public function returns, so the test read them through
+an internal API that the triage's fix was known to reshape. The green had to rewrite the test's helper in the same
+step as the source. `lz-red` step 4 says to assert behaviour, not implementation, but has no case for a test whose
+only seam is one the fix replaces, and `test-first.md`'s cycle log has no place for a test edited at green. Evidence:
+`r8fix/notes.md`, "lz-tdd friction"; `r8fix/cycles.log` cycle 1.
+
+**O146. `lz-tpp` ranks a transformation that an outside ruling excludes (adds to O125).** In the same fixes,
+`lz-tpp`'s highest-priority green was `(unconditional -> if)`, copying Storybook's conditions, which the triage had
+ruled out in favour of reading Storybook's index. `lz-tpp` step 4 recommends the top candidate, and step 6 only
+offers simpler tests or refactorings; it has no step for a candidate a ruling forbids before any attempt. Evidence:
+`r8fix/notes.md`, "lz-tdd friction".
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
