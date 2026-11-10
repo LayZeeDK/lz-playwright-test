@@ -13,7 +13,7 @@ import {
 } from '../../src/protocol.ts';
 import { LzPlaywrightCollectingReporter } from '../../src/reporter.ts';
 import { testIdHeader } from '../../src/server-protocol.ts';
-import { hookNamespace, tempTree } from './doubles.ts';
+import { hookTestNamespace, tempTree } from './doubles.ts';
 
 const packageJson = fileURLToPath(
   new URL('../../package.json', import.meta.url),
@@ -68,7 +68,7 @@ export async function headersOfRun(
       NODE_OPTIONS:
         `--import "${workerHookUrl}" ${process.env['NODE_OPTIONS'] ?? ''}`.trim(),
       [runSettingsEnv]: JSON.stringify(settings),
-      [hookTestNamespaceEnv]: hookNamespace,
+      [hookTestNamespaceEnv]: hookTestNamespace,
     },
     () =>
       playwright.runTests(reporter, {

@@ -15,9 +15,11 @@ import {
   untaggedArrival,
   writeServerControl,
 } from '../src/server-protocol.ts';
-import { withoutPrototypes } from './support/doubles.ts';
 import {
-  appActiveMutantEnv,
+  hookTestActiveMutantEnv,
+  withoutPrototypes,
+} from './support/doubles.ts';
+import {
   bigRequestIds,
   coverageOf,
   instrumentApp,
@@ -182,7 +184,7 @@ test('a mutant run once at module scope is active only in a server started with 
   assert.equal(await switched.ask({ n: 2 }), 'hi many');
 
   const started = await startServer(t, {
-    env: { [appActiveMutantEnv]: '0' },
+    env: { [hookTestActiveMutantEnv]: '0' },
   });
   started.run({ perTest: false, activeMutant: '0' });
 
@@ -202,7 +204,7 @@ test('code the server runs in a vm realm reports no coverage and gets only the m
 
   const started = await startServer(t, {
     server: 'vm-realm-answer',
-    env: { [appActiveMutantEnv]: '2' },
+    env: { [hookTestActiveMutantEnv]: '2' },
   });
   started.run({ perTest: false });
 
