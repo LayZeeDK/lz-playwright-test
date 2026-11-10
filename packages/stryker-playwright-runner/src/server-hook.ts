@@ -109,6 +109,7 @@ export function installServerHook(
     .forEach((prototype) => {
       const emit: unknown = Reflect.get(prototype, 'emit');
 
+      // Stryker disable next-line BlockStatement: each of these server prototypes inherits emit from EventEmitter
       if (typeof emit !== 'function') {
         return;
       }
@@ -223,18 +224,21 @@ export function installServerHook(
 }
 
 function agentTarget(options: unknown): URL | undefined {
+  // Stryker disable next-line BlockStatement: ClientRequest passes an options object, and the legacy host string has no host field, so the check below turns it away too
   if (!isRecord(options)) {
     return undefined;
   }
 
   const { host, port } = options;
 
+  // Stryker disable BlockStatement: ClientRequest always sets host to a string, and a port of another type makes a URL that fails to parse below
   if (
     typeof host !== 'string' ||
     (typeof port !== 'number' && typeof port !== 'string')
   ) {
     return undefined;
   }
+  // Stryker restore BlockStatement
 
   const url = `http://${host.includes(':') ? `[${host}]` : host}:${port}`;
 
@@ -256,6 +260,7 @@ function hasUndiciHeader(headers: readonly unknown[], name: string): boolean {
 function flushBeforeEnd(response: object, flush: () => void) {
   const end: unknown = Reflect.get(response, 'end');
 
+  // Stryker disable next-line BlockStatement: ServerResponse and Http2ServerResponse both define end
   if (typeof end !== 'function') {
     return;
   }

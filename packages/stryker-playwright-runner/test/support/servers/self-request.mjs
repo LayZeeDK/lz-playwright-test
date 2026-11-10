@@ -1,3 +1,4 @@
+import diagnosticsChannel from 'node:diagnostics_channel';
 import { readFileSync } from 'node:fs';
 import http, { get as namedGet } from 'node:http';
 import https from 'node:https';
@@ -89,6 +90,13 @@ const clients = {
   },
   'http-request-array-headers': (url) =>
     textOf(sent(http.request(url, { headers: ['host', new URL(url).host] }))),
+  'fetch-after-odd-undici-messages': async (url) => {
+    const channel = diagnosticsChannel.channel('undici:request:create');
+    channel.publish(42);
+    channel.publish({ request: 42 });
+
+    return (await fetch(url)).text();
+  },
 };
 
 const server = http.createServer(async (request, response) => {
