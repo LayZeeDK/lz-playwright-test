@@ -20,22 +20,52 @@ export interface StubClassification {
   readonly stubs: readonly ClassifiedStub[];
 }
 
-export function readPreviewTest(program: unknown): unknown {
+export type ResetSetting = boolean | 'unreadable';
+
+export type ResetSettings =
+  | 'unreadable'
+  | Readonly<Partial<Record<ResetKey, ResetSetting>>>;
+
+type ResetKey = (typeof decisiveSettings)[number][0];
+
+export function readPreviewTest(program: unknown): ResetSettings {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
   const exported = defaultExport(body, bindings);
 
   if (exported !== undefined) {
-    return field(exported, 'parameters', 'test');
+    return testSettings(member(exported, 'parameters'));
   }
 
   const parameters = namedExports(body).find(
     (declarator) => field(declarator, 'id', 'name') === 'parameters',
   );
 
-  return parameters === undefined
-    ? undefined
-    : field(evaluate(field(parameters, 'init'), bindings), 'test');
+  return testSettings(
+    parameters === undefined
+      ? undefined
+      : evaluate(field(parameters, 'init'), bindings),
+  );
+}
+
+function testSettings(parameters: unknown): ResetSettings {
+  const test = member(parameters, 'test');
+
+  if (test === unknownValue) {
+    return 'unreadable';
+  }
+
+  return Object.fromEntries(
+    decisiveSettings.flatMap(([key]) => {
+      const value = member(test, key);
+
+      if (value === undefined) {
+        return [];
+      }
+
+      return [[key, typeof value === 'boolean' ? value : 'unreadable']];
+    }),
+  );
 }
 
 function namedExports(body: readonly unknown[]): readonly unknown[] {
@@ -48,26 +78,25 @@ function namedExports(body: readonly unknown[]): readonly unknown[] {
 
 export function classifyStubs(
   program: unknown,
-  previewTest: unknown,
+  previewTest: ResetSettings,
 ): StubClassification {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
   const factoryMeta = [...bindings.values()].find(
     (init) => field(unwrap(init), 'callee', 'property', 'name') === 'meta',
   );
-  const metaTest = field(
-    defaultExport(body, bindings) ??
-      evaluate(annotations(factoryMeta), bindings),
-    'parameters',
-    'test',
+  const metaTest = testSettings(
+    member(
+      defaultExport(body, bindings) ??
+        evaluate(annotations(factoryMeta), bindings),
+      'parameters',
+    ),
   );
   const declared = namedExports(body).flatMap((declarator) => {
     const name = field(declarator, 'id', 'name');
     const init = field(declarator, 'init');
-    const storyTest = field(
-      evaluate(annotations(init), bindings),
-      'parameters',
-      'test',
+    const storyTest = testSettings(
+      member(evaluate(annotations(init), bindings), 'parameters'),
     );
 
     return typeof name === 'string'
@@ -131,16 +160,17 @@ const decisiveSettings = [
   ['restoreMocks', false, 'none'],
 ] as const;
 
-function branchOf(levels: readonly unknown[]): ResetBranch {
+function branchOf(levels: readonly ResetSettings[]): ResetBranch {
   return (
     decisiveSettings
       .map(([key, decisive, branch]) => {
-        const setting = levels.reduce<unknown>(
-          (value, level) => field(level, key) ?? value,
+        const setting = levels.reduce<ResetSetting | undefined>(
+          (value, level) =>
+            level === 'unreadable' ? level : (level[key] ?? value),
           undefined,
         );
 
-        if (setting === unknownValue) {
+        if (setting === 'unreadable') {
           return 'unknown';
         }
 
@@ -261,14 +291,17 @@ function evaluate(
 
 const unknownValue = Symbol('unknown');
 
+function member(value: unknown, key: string): unknown {
+  if (value === unknownValue) {
+    return unknownValue;
+  }
+
+  return isRecord(value) ? value[key] : undefined;
+}
+
 function field(node: unknown, ...keys: readonly string[]): unknown {
   return keys.reduce<unknown>(
-    (value, key) =>
-      value === unknownValue
-        ? unknownValue
-        : isRecord(value)
-          ? value[key]
-          : undefined,
+    (value, key) => (isRecord(value) ? value[key] : undefined),
     node,
   );
 }

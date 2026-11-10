@@ -156,7 +156,7 @@ describe('storybookProject', () => {
     it('has no preview settings without a preview file', () => {
       const { project } = setup('transformer');
 
-      assert.equal(project.previewTest, undefined);
+      assert.deepEqual(project.previewTest, {});
     });
   });
 

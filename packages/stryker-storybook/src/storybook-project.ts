@@ -9,7 +9,7 @@ import { getInterpretedFile } from 'storybook/internal/common';
 import { isRecord } from './is-record.ts';
 import { packageName } from './package-name.ts';
 import { parseProgram } from './parse.ts';
-import { readPreviewTest } from './reset-setting.ts';
+import { readPreviewTest, type ResetSettings } from './reset-setting.ts';
 import { mockTransformerPluginName } from './stryker-record.ts';
 
 export interface ProjectLog {
@@ -21,7 +21,7 @@ export interface StorybookProject {
   readonly configDir: string;
   readonly storyFiles: ReadonlySet<string> | 'fallback';
   readonly transformer: 'seen' | 'not-seen';
-  readonly previewTest: unknown;
+  readonly previewTest: ResetSettings;
 }
 
 type LoadResult =
@@ -55,6 +55,7 @@ export function storybookProject(
 
 function loadProject(configDir: string, log: ProjectLog): StorybookProject {
   const result = loadStorybook(configDir);
+  const previewTest = readPreview(configDir);
 
   switch (result.kind) {
     case 'loaded': {
@@ -64,7 +65,7 @@ function loadProject(configDir: string, log: ProjectLog): StorybookProject {
         transformer: result.pluginNames.includes(mockTransformerPluginName)
           ? 'seen'
           : 'not-seen',
-        previewTest: readPreview(configDir),
+        previewTest,
       };
     }
     case 'no-main': {
@@ -72,14 +73,14 @@ function loadProject(configDir: string, log: ProjectLog): StorybookProject {
         `${packageName}: no Storybook main file in ${configDir}; story files are the files named *.stories.* or *.story.*`,
       );
 
-      return fallbackProject(configDir);
+      return fallbackProject(configDir, previewTest);
     }
     case 'failed': {
       log.warn(
         `${packageName}: Storybook could not load ${configDir}, so story files are the files named *.stories.* or *.story.*: ${result.error}`,
       );
 
-      return fallbackProject(configDir);
+      return fallbackProject(configDir, previewTest);
     }
   }
 }
@@ -101,20 +102,23 @@ function normalizePath(path: string): string {
     .replace(/^[a-z]:/, (drive) => drive.toUpperCase());
 }
 
-function fallbackProject(configDir: string): StorybookProject {
+function fallbackProject(
+  configDir: string,
+  previewTest: ResetSettings,
+): StorybookProject {
   return {
     configDir,
     storyFiles: 'fallback',
     transformer: 'not-seen',
-    previewTest: readPreview(configDir),
+    previewTest,
   };
 }
 
-function readPreview(configDir: string): unknown {
+function readPreview(configDir: string): ResetSettings {
   const file = getInterpretedFile(join(configDir, 'preview'));
 
   return file === undefined
-    ? undefined
+    ? {}
     : readPreviewTest(parseProgram(readFileSync(file, 'utf8'), file));
 }
 

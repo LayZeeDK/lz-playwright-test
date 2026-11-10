@@ -7,6 +7,7 @@ import { parseProgram } from '../src/parse.ts';
 import {
   classifyStubs,
   readPreviewTest,
+  type ResetSettings,
   type StoryReset,
   type StubVerdict,
 } from '../src/reset-setting.ts';
@@ -55,7 +56,7 @@ function fixture(name: string): URL {
   return new URL(`fixtures/reset-cases/${name}`, import.meta.url);
 }
 
-function previewTest(preview: keyof typeof previews): unknown {
+function previewTest(preview: keyof typeof previews): ResetSettings {
   return readPreviewTest(parseProgram(previews[preview].source, 'preview.ts'));
 }
 
