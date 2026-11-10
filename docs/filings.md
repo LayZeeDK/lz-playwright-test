@@ -911,6 +911,33 @@ process resolves a module, so there was no production symbol to stub; the red ca
 the loader already returned a wrong value (its fallback). `lz-red` step 5's "add the production symbol with a
 not-implemented body" reads as if every red needs one. Close to O113. Evidence: `sb-s3g/notes.md`.
 
+**O123. Which spec carries the red when an oracle spec and a unit spec cover the same change.** Review fixes for the
+CSF ignorer, cycle 8. A CSF2 `Template.bind({})` story was wrong only in Storybook's index, which only the oracle spec
+compares. So the red came from a new oracle fixture, and the ignorer-level test that pins the mechanism passed on its
+first run and went in as test-after. `test-first.md` speaks of "the spec" per cycle, and `lz-red` picks the next test
+from one test list. Neither says which spec should carry the red, or that the other spec then counts as test-after.
+Evidence: `g2fix/cycles.log` cycle 8.
+
+**O124. A refactoring whose target a review already chose.** Review fixes for the CSF ignorer, five findings. The
+triage named each refactoring, for example "decide the reasons once at `Program`" or "move `field` and `list` to a
+shared module". `lz-refactor` starts from recognising a smell and choosing a refactoring with its APPLY/DECLINE count
+(steps 2-4). With the choice already made, those steps only restate it. The skill does not say whether to check a given
+target against its own verdict, or how to split a change across several files into behaviour-preserving steps. The
+worker applied each as one step, with the specs and the gate green after it. Evidence: `g2fix/notes.md`.
+
+**O125. A rule from the brief breaks pinned outcomes at green.** Review fixes for the spy-stub path, cycle 2. The brief
+named the result of the change ("an object with a spread element reads as unknown"). Applying it made the new test
+pass and turned 5 recorded-outcome tests red. `lz-tpp` says to undo and pick again from the failure the attempt
+produced, and that led to a different behaviour: merge readable spreads. Neither `lz-tpp` nor `test-first.md` says
+whether an outside rule (a brief, a ruling) or the pinned tests win, or that the worker must report the departure to
+whoever wrote the rule. The worker took the pinned outcomes as the stronger evidence and reported the departure.
+Evidence: `g1fix/notes.md`, `g1fix/cycles.log` cycle 2.
+
+**O126. No cycle-log line for refactor-only work that a later red depends on.** Review fixes for the spy-stub path,
+three findings. These were refactorings with the tests green and no cycle. The log in `test-first.md` has only `<n> |`
+and `test-after |` rows, so the worker added a `refactor-only |` row. Close to O12, which is about the route, but this
+one is about the log format that the acceptance checks in `test-first.md` count. Evidence: `g1fix/cycles.log`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
