@@ -1,5 +1,5 @@
 import {
-  annotationFactories,
+  annotationFactoryArgument,
   assignmentOf,
   isTemplateBind,
   metaExpressions,
@@ -54,7 +54,7 @@ export function readPreviewTest(program: unknown): ResetSettings {
 
   if (exported !== undefined) {
     return testSettings(
-      member(evaluate(factoryArgument(exported), bindings), 'parameters'),
+      member(evaluate(annotationFactoryArgument(exported), bindings), 'parameters'),
     );
   }
 
@@ -91,9 +91,9 @@ export function classifyStubs(
   const bindings = topLevelBindings(body);
   const [meta] = metaExpressions(body, bindings);
   const metaTest = testSettings(
-    member(evaluate(factoryArgument(meta), bindings), 'parameters'),
+    member(evaluate(annotationFactoryArgument(meta), bindings), 'parameters'),
   );
-  const assignments = body.map(assignmentOf);
+  const assignments = body.flatMap(assignmentOf);
   const declared = storyExports(body, bindings)
     .filter(({ tested }) => tested)
     .map(({ name, local, init }) => {
@@ -106,7 +106,7 @@ export function classifyStubs(
               assignment.path,
               evaluate(assignment.value, bindings),
             ),
-          evaluate(factoryArgument(init), bindings),
+          evaluate(annotationFactoryArgument(init), bindings),
         );
       // Storybook 10.6.5 normalizeStory: { ...story.story?.parameters, ...story.parameters }
       const storyTest = testSettings(
@@ -206,18 +206,6 @@ function branchOf(levels: readonly ResetSettings[]): ResetBranch {
       })
       .find((branch) => branch !== undefined) ?? 'restore'
   );
-}
-
-function factoryArgument(node: unknown): unknown {
-  const current = unwrap(node);
-
-  return field(current, 'type') === 'CallExpression' &&
-    annotationFactories.includes(
-      field(current, 'callee', 'name') ??
-        field(current, 'callee', 'property', 'name'),
-    )
-    ? field(current, 'arguments', '0')
-    : current;
 }
 
 function evaluate(

@@ -32,6 +32,7 @@ export function csfIgnorer(options: object, log: ProjectLog): Ignorer {
           lzStorybookOptions(options).configDir,
           log,
         );
+
         if (typeof fileName !== 'string' || !isStoryFile(project, fileName)) {
           reasons = new Map();
         } else if (ignoreMode) {
@@ -40,7 +41,7 @@ export function csfIgnorer(options: object, log: ProjectLog): Ignorer {
           shapes.literalContainers.forEach(keepLiteralContainer);
           reasons = ignoreModeReasons(shapes);
         } else {
-          reasons = new Map(staticReasons(csfShapes(node)));
+          reasons = staticReasons(csfShapes(node));
         }
       }
 
@@ -51,8 +52,10 @@ export function csfIgnorer(options: object, log: ProjectLog): Ignorer {
 
 csfIgnorer.inject = tokens(commonTokens.options, commonTokens.logger);
 
-function staticReasons(shapes: CsfShapes) {
-  return [...shapes.staticValues].map((node) => [node, staticReason] as const);
+function staticReasons(shapes: CsfShapes): ReadonlyMap<unknown, string> {
+  return new Map(
+    [...shapes.staticValues].map((node) => [node, staticReason] as const),
+  );
 }
 
 function ignoreModeReasons(shapes: CsfShapes): ReadonlyMap<unknown, string> {

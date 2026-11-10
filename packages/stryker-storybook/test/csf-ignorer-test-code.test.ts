@@ -327,6 +327,80 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('ignores the msw value that a story names', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nconst msw = {\n  handlers: [h('/a')],\n};\nexport const A = { parameters: { msw } };",
+        )
+      ).filter((outcome) => /^[23] /.test(outcome)),
+      [
+        `2 ObjectLiteral ${mswReason}`,
+        `3 ArrayDeclaration ${mswReason}`,
+        `3 StringLiteral ${mswReason}`,
+      ],
+    );
+  });
+
+  it('ignores the msw value in the parameters that the meta names', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "const params = {\n  msw: {\n    handlers: [h('/a')],\n  },\n};\nexport default { title: 'a/b', parameters: params };",
+        )
+      ).filter((outcome) => /^[1-3] /.test(outcome)),
+      [
+        '1 ObjectLiteral placed',
+        `2 ObjectLiteral ${mswReason}`,
+        `3 ArrayDeclaration ${mswReason}`,
+        `3 StringLiteral ${mswReason}`,
+      ],
+    );
+  });
+
+  it('places the value that a statement reads from X.play without assigning it', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nconst x = 1 + 1;\nA.play || x;",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      ['3 ArithmeticOperator placed'],
+    );
+  });
+
+  it('places a value given to X.play by a compound assignment', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nA.play ??= 1 + 1;",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      ['3 AssignmentOperator placed', '3 ArithmeticOperator placed'],
+    );
+  });
+
+  it('places a play function assigned to this.play after this.story', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nthis.story = {};\nthis.play = 1 + 1;",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      ['3 ArithmeticOperator placed'],
+    );
+  });
+
   it('places the msw value in parameters assigned to an object that is not a story', async () => {
     const { outcomes } = setup();
 

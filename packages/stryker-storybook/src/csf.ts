@@ -30,7 +30,7 @@ export function csfShapes(program: unknown): CsfShapes {
   );
   const metaObjects = metaObjectsOf(body, bindings);
   const isStory = storyFilter(metaObjects);
-  const assignments = body.map(assignmentOf);
+  const assignments = body.flatMap(assignmentOf);
   const storyInits = [
     ...storyExports(body, bindings),
     ...assignments
@@ -49,19 +49,13 @@ export function csfShapes(program: unknown): CsfShapes {
   const storyAssignments = assignments.filter(({ target }) =>
     storyNames.includes(target),
   );
-  const storyAnnotations = (key: string): readonly unknown[] =>
+  const annotations = (key: string): readonly unknown[] =>
     [
-      ...stories.map((story) => propertyValue(story, key)),
+      ...[...metaObjects, ...stories].map((owner) => propertyValue(owner, key)),
       ...storyAssignments
         .filter((assignment) => assignment.key === key)
         .map(({ value }) => value),
     ].flatMap((value) => withInit(value, bindings));
-  const annotations = (key: string): readonly unknown[] => [
-    ...metaObjects.flatMap((meta) =>
-      withInit(propertyValue(meta, key), bindings),
-    ),
-    ...storyAnnotations(key),
-  ];
   const idParameters = stories
     .map((story) => propertyValue(story, 'parameters'))
     .filter((parameters) => propertyValue(parameters, '__id') !== undefined);
@@ -97,8 +91,8 @@ export function csfShapes(program: unknown): CsfShapes {
       ]),
     ]),
     mswValues: nodeSet(
-      storyAnnotations('parameters').map((parameters) =>
-        propertyValue(parameters, 'msw'),
+      annotations('parameters').flatMap((parameters) =>
+        withInit(propertyValue(parameters, 'msw'), bindings),
       ),
     ),
     staticValues: nodeSet([
@@ -171,7 +165,7 @@ export function storyExports(
   const isStory = storyFilter(metaObjectsOf(body, bindings));
   const exports = namedExports(body, bindings);
   const isFactoryStory = ({ init }: NamedExport): boolean =>
-    storyFactories.includes(field(unwrap(init), 'callee', 'property', 'name'));
+    isStoryFactoryCall(unwrap(init));
   const isFactoryFile = exports.some(isFactoryStory);
 
   return exports
@@ -200,6 +194,11 @@ export interface StoryExport {
 }
 
 const storyFactories: readonly unknown[] = ['story', 'extend'];
+
+/** Storybook 10.6.5 `isCsfFactoryCall`: a `.story()` or `.extend()` call. */
+function isStoryFactoryCall(node: unknown): boolean {
+  return storyFactories.includes(field(node, 'callee', 'property', 'name'));
+}
 
 function isFactoryMeta(init: unknown): boolean {
   return field(init, 'callee', 'property', 'name') === 'meta';
@@ -356,17 +355,26 @@ interface Assignment {
   readonly value: unknown;
 }
 
-export function assignmentOf(statement: unknown): Assignment {
+export function assignmentOf(statement: unknown): readonly Assignment[] {
   const [target, ...path] = memberChain(
     field(statement, 'expression', 'left'),
   );
 
-  return {
-    target,
-    key: path.length === 1 ? path[0] : undefined,
-    path,
-    value: field(statement, 'expression', 'right'),
-  };
+  if (
+    field(statement, 'expression', 'operator') !== '=' ||
+    typeof target !== 'string'
+  ) {
+    return [];
+  }
+
+  return [
+    {
+      target,
+      key: path.length === 1 ? path[0] : undefined,
+      path,
+      value: field(statement, 'expression', 'right'),
+    },
+  ];
 }
 
 function memberChain(node: unknown): readonly unknown[] {
@@ -405,22 +413,30 @@ function propertyValue(object: unknown, key: string): unknown {
     : field(property, 'value');
 }
 
-export const annotationFactories: readonly unknown[] = [
+const annotationFactories: readonly unknown[] = [
   'definePreview',
   'meta',
   'story',
 ];
+
+export function annotationFactoryArgument(node: unknown): unknown {
+  const current = unwrap(node);
+
+  return field(current, 'type') === 'CallExpression' &&
+    annotationFactories.includes(
+      field(current, 'callee', 'name') ??
+        field(current, 'callee', 'property', 'name'),
+    )
+    ? field(current, 'arguments', '0')
+    : current;
+}
 
 function storyNode(init: unknown, bindings: Bindings): unknown {
   if (isTemplateBind(init)) {
     return followed(field(init, 'callee', 'object'), bindings);
   }
 
-  const method = field(init, 'callee', 'property', 'name');
-
-  return method === 'extend' || annotationFactories.includes(method)
-    ? list(field(init, 'arguments'))[0]
-    : init;
+  return isStoryFactoryCall(init) ? list(field(init, 'arguments'))[0] : init;
 }
 
 export function isTemplateBind(init: unknown): boolean {
