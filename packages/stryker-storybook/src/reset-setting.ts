@@ -1,7 +1,8 @@
 import {
-  annotationFactoryArgument,
+  defaultExport,
+  definePreviewArgument,
   isTemplateBind,
-  metaExpressions,
+  metaObjectsOf,
   namedExports,
   storyArgument,
   storyExports,
@@ -50,14 +51,11 @@ export const unreadableSettings: ResetSettings = {
 export function readPreviewTest(program: unknown): ResetSettings {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
-  const [exported] = metaExpressions(body, bindings);
+  const exported = defaultExport(body);
 
   if (exported !== undefined) {
     return testSettings(
-      member(
-        evaluate(annotationFactoryArgument(exported), bindings),
-        'parameters',
-      ),
+      member(evaluate(definePreviewArgument(exported), bindings), 'parameters'),
     );
   }
 
@@ -92,11 +90,10 @@ export function classifyStubs(
 ): StubClassification {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
-  const [meta] = metaExpressions(body, bindings);
-  const metaTest = testSettings(
-    member(evaluate(annotationFactoryArgument(meta), bindings), 'parameters'),
-  );
-  const declared = storyExports(body, bindings)
+  const metaObjects = metaObjectsOf(body, bindings);
+  const [meta] = metaObjects;
+  const metaTest = testSettings(member(evaluate(meta, bindings), 'parameters'));
+  const declared = storyExports(body, bindings, metaObjects)
     .filter(({ tested }) => tested)
     .map(({ name, init, assignments }) => {
       const story = assignments.reduce(

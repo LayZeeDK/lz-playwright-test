@@ -29,7 +29,7 @@ export function csfShapes(program: unknown): CsfShapes {
     list(field(statement, 'specifiers')),
   );
   const metaObjects = metaObjectsOf(body, bindings);
-  const exported = storyExports(body, bindings);
+  const exported = storyExports(body, bindings, metaObjects);
   const assignments = exported.flatMap((story) => story.assignments);
   const assigned = (key: string): readonly unknown[] =>
     assignments
@@ -105,19 +105,7 @@ function nodeSet(values: readonly unknown[]): ReadonlySet<unknown> {
   return new Set(values.filter((value) => value !== undefined));
 }
 
-function metaObjectsOf(
-  body: readonly unknown[],
-  bindings: Bindings,
-): readonly unknown[] {
-  return metaExpressions(body, bindings).flatMap((meta) =>
-    objectOf(meta, bindings),
-  );
-}
-
-export function metaExpressions(
-  body: readonly unknown[],
-  bindings: Bindings,
-): readonly unknown[] {
+export function defaultExport(body: readonly unknown[]): unknown {
   const declaration = field(
     body.find(
       (statement) => field(statement, 'type') === 'ExportDefaultDeclaration',
@@ -128,12 +116,19 @@ export function metaExpressions(
     .flatMap((statement) => list(field(statement, 'specifiers')))
     .find((specifier) => field(specifier, 'exported', 'name') === 'default');
 
+  return declaration ?? field(defaultSpecifier, 'local');
+}
+
+export function metaObjectsOf(
+  body: readonly unknown[],
+  bindings: Bindings,
+): readonly unknown[] {
   return [
-    declaration ?? field(defaultSpecifier, 'local'),
+    defaultExport(body),
     ...factoryMetas(body, bindings).map(
       (init) => list(field(init, 'arguments'))[0],
     ),
-  ].filter((meta) => meta !== undefined);
+  ].flatMap((meta) => objectOf(meta, bindings));
 }
 
 function storyFilter(
@@ -154,8 +149,9 @@ function storyFilter(
 export function storyExports(
   body: readonly unknown[],
   bindings: Bindings,
+  metaObjects: readonly unknown[],
 ): readonly StoryExport[] {
-  const isStory = storyFilter(metaObjectsOf(body, bindings));
+  const isStory = storyFilter(metaObjects);
   const exports = namedExports(body, bindings);
   const isFactoryStory = ({ init }: NamedExport): boolean =>
     isStoryFactoryCall(unwrap(init));
@@ -465,16 +461,11 @@ function propertyValue(object: unknown, key: string): unknown {
     : field(property, 'value');
 }
 
-const annotationFactories: readonly unknown[] = ['definePreview', 'meta'];
-
-export function annotationFactoryArgument(node: unknown): unknown {
+export function definePreviewArgument(node: unknown): unknown {
   const current = unwrap(node);
 
   return field(current, 'type') === 'CallExpression' &&
-    annotationFactories.includes(
-      field(current, 'callee', 'name') ??
-        field(current, 'callee', 'property', 'name'),
-    )
+    field(current, 'callee', 'name') === 'definePreview'
     ? field(current, 'arguments', '0')
     : current;
 }
