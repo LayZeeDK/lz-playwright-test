@@ -178,7 +178,9 @@ export function namedExports(
 ): readonly NamedExport[] {
   return body
     .filter(
-      (statement) => field(statement, 'type') === 'ExportNamedDeclaration',
+      (statement) =>
+        field(statement, 'type') === 'ExportNamedDeclaration' &&
+        field(statement, 'exportKind') !== 'type',
     )
     .flatMap((statement) => [
       ...list(field(statement, 'declaration', 'declarations')).map(
@@ -187,12 +189,27 @@ export function namedExports(
           init: field(declarator, 'init'),
         }),
       ),
-      ...list(field(statement, 'specifiers')).map((specifier) => ({
-        name:
-          field(specifier, 'exported', 'name') ??
-          field(specifier, 'exported', 'value'),
-        init: followed(field(specifier, 'local'), bindings),
-      })),
+      ...(field(statement, 'declaration', 'type') === 'FunctionDeclaration'
+        ? [
+            {
+              name: field(statement, 'declaration', 'id', 'name'),
+              init: field(statement, 'declaration'),
+            },
+          ]
+        : []),
+      ...list(field(statement, 'specifiers'))
+        .filter((specifier) => field(specifier, 'exportKind') !== 'type')
+        .map((specifier) => {
+          const init = followed(field(specifier, 'local'), bindings);
+
+          return {
+            name:
+              field(specifier, 'exported', 'name') ??
+              field(specifier, 'exported', 'value'),
+            init:
+              field(init, 'type') === 'FunctionDeclaration' ? undefined : init,
+          };
+        }),
     ])
     .flatMap(({ name, init }) =>
       typeof name === 'string' && name !== 'default' ? [{ name, init }] : [],

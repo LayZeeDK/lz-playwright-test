@@ -236,6 +236,93 @@ export const A = { args: { g: fn().mockReturnValue(1) } };`,
 
     assert.deepEqual(verdicts, ['kept']);
   });
+
+  it('leaves a type-only export out of the stories', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+export type { Props } from './props';`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('leaves a type-only export specifier out of the stories', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+type Props = { label: string };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+export { type Props };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads the meta and preview settings for a function story', () => {
+    const verdicts = verdictsOf(
+      `export default {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+export function Primary() {
+  return null;
+}`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads a function story with parameters assigned after it as unknown', () => {
+    const verdicts = verdictsOf(
+      `export default {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+export function Primary() {
+  return null;
+}
+Primary.parameters = { test: { mockReset: true } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads an object story with parameters assigned after it as unknown', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+A.parameters = { test: { mockReset: true } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('leaves a re-exported import out of the stories', () => {
+    const verdicts = verdictsOf(
+      `import { Other } from './other.stories';
+export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+export { Other };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('leaves a function declaration exported by specifier out of the stories', () => {
+    const verdicts = verdictsOf(
+      `export default {};
+function helper() {
+  return null;
+}
+export { helper };
+export const A = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
 });
 
 describe('classifyStubs', () => {

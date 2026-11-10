@@ -87,16 +87,24 @@ export function classifyStubs(
       'parameters',
     ),
   );
-  const declared = storyExports(body, bindings).map(({ name, init }) => {
-    const storyTest = testSettings(
-      member(evaluate(annotations(init), bindings), 'parameters'),
-    );
+  // Storybook 10.6.5's Vitest transform makes no test of an export without a local variable or function
+  const declared = storyExports(body, bindings)
+    .filter(({ init }) => init !== undefined)
+    .map(({ name, init }) => {
+      const storyTest = testSettings(
+        member(
+          assignsParameters(body, name)
+            ? unknownValue
+            : evaluate(annotations(init), bindings),
+          'parameters',
+        ),
+      );
 
-    return {
-      story: { name, branch: branchOf([previewTest, metaTest, storyTest]) },
-      init,
-    };
-  });
+      return {
+        story: { name, branch: branchOf([previewTest, metaTest, storyTest]) },
+        init,
+      };
+    });
   const stories = declared.map(({ story }) => story);
   const stubs = definitionTimeStubs(program).map(
     ({ start, end, line, once }) => {
@@ -108,6 +116,16 @@ export function classifyStubs(
   );
 
   return { stories, stubs };
+}
+
+function assignsParameters(body: readonly unknown[], name: string): boolean {
+  return body.some(
+    (statement) =>
+      field(statement, 'expression', 'type') === 'AssignmentExpression' &&
+      field(statement, 'expression', 'left', 'object', 'name') === name &&
+      field(statement, 'expression', 'left', 'property', 'name') ===
+        'parameters',
+  );
 }
 
 function siteVerdict(
@@ -215,6 +233,9 @@ function evaluate(
   switch (field(current, 'type')) {
     case 'BooleanLiteral': {
       return field(current, 'value');
+    }
+    case 'FunctionDeclaration': {
+      return undefined;
     }
     case 'Identifier': {
       const name = field(current, 'name');
