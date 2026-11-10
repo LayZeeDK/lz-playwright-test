@@ -938,6 +938,20 @@ three findings. These were refactorings with the tests green and no cycle. The l
 and `test-after |` rows, so the worker added a `refactor-only |` row. Close to O12, which is about the route, but this
 one is about the log format that the acceptance checks in `test-first.md` count. Evidence: `g1fix/cycles.log`.
 
+**O127. No check that a test move is only a move.** Second review fixes for the CSF ignorer: one spec was split into
+three. `lz-refactor`'s only check is to run the tests after each step, and an equal test count (69 before, 69 after)
+does not show that the bodies moved unchanged. The worker compared the old and new `it()` blocks as a multiset with a
+throwaway script. Close to O25, which is about refactorings that change a test's killing power. Evidence:
+`g2r2fix/check-split.mjs`.
+
+**O128. An Extract Function in the refactor step dropped a condition, and the suite stayed green.** Second review
+fixes for the CSF ignorer, cycle 7. One example drove the green (`.bind()` counts only with no arguments or one empty
+object literal). Extracting `isTemplateBind` lost the empty-object check, and every test still passed, because no test
+pinned each part of the condition. `lz-refactor` step 5 trusts the green suite as the guard, and it does not warn that a
+condition the last green added from one example may have parts no test pins. The worker caught the loss by reading the
+diff, restored the check, and added two test-after pins. Related to O94. Evidence: `g2r2fix/cycles.log` cycle 7 and
+the test-after lines after it.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
