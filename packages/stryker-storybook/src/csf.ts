@@ -28,16 +28,9 @@ export function csfShapes(program: unknown): CsfShapes {
   const specifiers = body.flatMap((statement) =>
     list(field(statement, 'specifiers')),
   );
-  const { metaObjects, isFactory, stories: exported } = csfFile(body, bindings);
+  const { metaObjects, stories: exported } = csfFile(body, bindings);
   const assignments = exported.flatMap((story) => story.assignments);
-  const runtime = exported.flatMap((story) =>
-    runtimeAssignments(story.assignments, isFactory),
-  );
-  const assignedIn = (
-    from: readonly Assignment[],
-    key: string,
-  ): readonly Assignment[] =>
-    from.filter(({ path }) => path.length === 1 && path[0] === key);
+  const runtime = exported.flatMap((story) => story.runtimeAssignments);
   const stories = [
     ...exported.map(({ init }) => init),
     ...assignedIn(assignments, 'story').map(({ value }) => value),
@@ -57,8 +50,6 @@ export function csfShapes(program: unknown): CsfShapes {
       ...[...metaObjects, ...stories].map((owner) => propertyValue(owner, key)),
       ...assignedIn(from, key).map(({ value }) => value),
     ].flatMap((value) => withInit(value, bindings));
-  const annotations = (key: string): readonly unknown[] =>
-    annotationsIn(assignments, key);
   const testCodeOf = (key: string): readonly unknown[] => [
     ...annotationsIn(runtime, key),
     ...assignedIn(runtime, key).map(({ statement }) => statement),
@@ -99,12 +90,12 @@ export function csfShapes(program: unknown): CsfShapes {
       ]),
     ]),
     mswValues: nodeSet(
-      annotations('parameters').flatMap((parameters) =>
+      annotationsIn(runtime, 'parameters').flatMap((parameters) =>
         withInit(propertyValue(parameters, 'msw'), bindings),
       ),
     ),
     staticValues: nodeSet([
-      ...staticKeys.flatMap(annotations),
+      ...staticKeys.flatMap((key) => annotationsIn(assignments, key)),
       ...idParameters.map((parameters) => propertyValue(parameters, '__id')),
       bindings.get('__namedExportsOrder'),
       ...testCalls.flatMap(({ name, options }) => [
@@ -114,6 +105,13 @@ export function csfShapes(program: unknown): CsfShapes {
       ...specifiers.map((specifier) => field(specifier, 'exported')),
     ]),
   };
+}
+
+function assignedIn(
+  from: readonly Assignment[],
+  key: string,
+): readonly Assignment[] {
+  return from.filter(({ path }) => path.length === 1 && path[0] === key);
 }
 
 function nodeSet(values: readonly unknown[]): ReadonlySet<unknown> {
@@ -137,7 +135,6 @@ export function defaultExport(body: readonly unknown[]): unknown {
 export interface CsfFile {
   readonly metaObjects: readonly unknown[];
   readonly metaTags: readonly string[];
-  readonly isFactory: boolean;
   readonly stories: readonly StoryExport[];
 }
 
@@ -147,13 +144,11 @@ export function csfFile(body: readonly unknown[], bindings: Bindings): CsfFile {
     defaultExport(body),
     ...metas.map((init) => list(field(init, 'arguments'))[0]),
   ].flatMap((meta) => objectOf(meta, bindings));
-  const isFactory = metas.length > 0;
 
   return {
     metaObjects,
     metaTags: stringList(propertyValue(metaObjects[0], 'tags'), bindings),
-    isFactory,
-    stories: storyExports(body, bindings, metaObjects, isFactory),
+    stories: storyExports(body, bindings, metaObjects, metas.length > 0),
   };
 }
 
@@ -213,6 +208,9 @@ function storyExports(
           bindings,
         ),
         assignments: storyAssignments,
+        runtimeAssignments: runtimeAssignments(storyAssignments, isFactoryFile),
+        extendsBase:
+          field(unwrap(init), 'callee', 'property', 'name') === 'extend',
       };
     });
 }
@@ -236,6 +234,10 @@ export interface StoryExport {
   readonly tested: boolean;
   readonly tags: readonly string[];
   readonly assignments: readonly Assignment[];
+  /** The writes that the story Storybook runs is composed from, with a factory story's `input` stripped from the path. */
+  readonly runtimeAssignments: readonly Assignment[];
+  /** Storybook 10.6.5 `extend()` merges the base story into the new input at run time, so the argument is only part of the story. */
+  readonly extendsBase: boolean;
 }
 
 const storyFactories: readonly unknown[] = ['story', 'extend'];
@@ -438,7 +440,7 @@ export interface Assignment {
 }
 
 /** Storybook 10.6.5 composes a factory story from the keys of the `input` that `defineStory` closed over, so only writes below `input` count. */
-export function runtimeAssignments(
+function runtimeAssignments(
   assignments: readonly Assignment[],
   isFactory: boolean,
 ): readonly Assignment[] {

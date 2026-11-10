@@ -813,6 +813,41 @@ export const B = { args: { g: fn().mockReturnValue(1) } };`,
 
     assert.deepEqual(verdicts, ['kept']);
   });
+
+  it('keeps a factory story whose input is assigned the tag !test', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ parameters: { test: { mockReset: true } } });
+A.input.tags = ['!test'];
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('leaves out a factory story assigned the tag !test', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ parameters: { test: { mockReset: true } } });
+A.tags = ['!test'];
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it("keeps a story made by .extend() on a story tagged !test, as Storybook's Vitest transform reads only the extend argument's tags", () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({});
+export const A = meta.story({ tags: ['!test'] });
+export const B = A.extend({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
 });
 
 describe('classifyStubs', () => {

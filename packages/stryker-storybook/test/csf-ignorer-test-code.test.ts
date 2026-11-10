@@ -530,6 +530,40 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('ignores the msw value in parameters assigned to X.input.parameters in a factory file', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "import preview from '#.storybook/preview';\nconst meta = preview.meta({ component: B });\nexport const A = meta.story({});\nA.input.parameters = {\n  msw: { handlers: [h(1 + 1)] },\n};",
+        )
+      ).filter((outcome) => outcome.startsWith('5 ')),
+      [
+        `5 ObjectLiteral ${mswReason}`,
+        `5 ArrayDeclaration ${mswReason}`,
+        `5 ArithmeticOperator ${mswReason}`,
+      ],
+    );
+  });
+
+  it('places the msw value in parameters assigned to X.parameters in a factory file', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "import preview from '#.storybook/preview';\nconst meta = preview.meta({ component: B });\nexport const A = meta.story({});\nA.parameters = {\n  msw: { handlers: [h(1 + 1)] },\n};",
+        )
+      ).filter((outcome) => outcome.startsWith('5 ')),
+      [
+        '5 ObjectLiteral placed',
+        '5 ArrayDeclaration placed',
+        '5 ArithmeticOperator placed',
+      ],
+    );
+  });
+
   it('ignores a play function assigned to X.input.play in a factory file', async () => {
     const { outcomes } = setup();
 

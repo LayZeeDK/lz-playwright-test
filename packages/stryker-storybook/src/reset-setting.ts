@@ -5,7 +5,6 @@ import {
   defaultExport,
   isTemplateBind,
   namedExports,
-  runtimeAssignments,
   storyArgument,
   topLevelBindings,
   unwrap,
@@ -119,7 +118,6 @@ export function classifyStubs(
   const {
     metaObjects: [meta],
     metaTags,
-    isFactory,
     stories: exported,
   } = csfFile(body, bindings);
   const metaTest = testSettings(member(evaluate(meta, bindings), 'parameters'));
@@ -128,11 +126,11 @@ export function classifyStubs(
       ({ tested, tags }) =>
         tested && isTestedByTags(testTags, [...metaTags, ...tags]),
     )
-    .map(({ name, init, assignments }) => {
-      const story = runtimeAssignments(assignments, isFactory).reduce(
+    .map(({ name, init, runtimeAssignments, extendsBase }) => {
+      const story = runtimeAssignments.reduce(
         (value, assignment) =>
           written(value, assignment.path, evaluate(assignment.value, bindings)),
-        storyValue(init, bindings),
+        extendsBase ? unknownValue : evaluate(storyArgument(init), bindings),
       );
       // Storybook 10.6.5 normalizeStory: { ...story.story?.parameters, ...story.parameters }
       const storyTest = testSettings(
@@ -171,16 +169,6 @@ function isTestedByTags(
     include.some((tag) => tags.includes(tag)) &&
     ![...exclude, ...skip].some((tag) => tags.includes(tag))
   );
-}
-
-/** Storybook 10.6.5 `extend()` merges the base story's parameters into the new input, and this reader does not follow the base. */
-function storyValue(
-  init: unknown,
-  bindings: ReadonlyMap<string, unknown>,
-): unknown {
-  return field(unwrap(init), 'callee', 'property', 'name') === 'extend'
-    ? unknownValue
-    : evaluate(storyArgument(init), bindings);
 }
 
 function written(
