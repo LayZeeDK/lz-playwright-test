@@ -130,9 +130,9 @@ export function metaExpressions(
 
   return [
     declaration ?? field(defaultSpecifier, 'local'),
-    ...[...bindings.values()]
-      .filter(isFactoryMeta)
-      .map((init) => list(field(init, 'arguments'))[0]),
+    ...factoryMetas(body, bindings).map(
+      (init) => list(field(init, 'arguments'))[0],
+    ),
   ].filter((meta) => meta !== undefined);
 }
 
@@ -159,7 +159,7 @@ export function storyExports(
   const exports = namedExports(body, bindings);
   const isFactoryStory = ({ init }: NamedExport): boolean =>
     isStoryFactoryCall(unwrap(init));
-  const isFactoryFile = exports.some(isFactoryStory);
+  const isFactoryFile = factoryMetas(body, bindings).length > 0;
   const assignments = body.flatMap(assignmentOf);
 
   return exports
@@ -191,13 +191,50 @@ export interface StoryExport {
 
 const storyFactories: readonly unknown[] = ['story', 'extend'];
 
-/** Storybook 10.6.5 `isCsfFactoryCall`: a `.story()` or `.extend()` call. */
+/** Storybook 10.6.5 `isCsfFactoryCall`: a `.story()` or `.extend()` call on a plain name. */
 function isStoryFactoryCall(node: unknown): boolean {
-  return storyFactories.includes(field(node, 'callee', 'property', 'name'));
+  return (
+    field(node, 'callee', 'object', 'type') === 'Identifier' &&
+    storyFactories.includes(field(node, 'callee', 'property', 'name'))
+  );
 }
 
-function isFactoryMeta(init: unknown): boolean {
-  return field(init, 'callee', 'property', 'name') === 'meta';
+const previewPath = /\/preview(.(js|jsx|mjs|ts|tsx))?$/;
+
+/** Storybook 10.6.5 CsfFile: a top-level `X.meta()` or `X.type().meta()` call, where no module but a preview file exports `X`. */
+function factoryMetas(
+  body: readonly unknown[],
+  bindings: Bindings,
+): readonly unknown[] {
+  const importSources = new Map(
+    body
+      .filter((statement) => field(statement, 'type') === 'ImportDeclaration')
+      .flatMap((statement) =>
+        list(field(statement, 'specifiers')).map(
+          (specifier) =>
+            [
+              field(specifier, 'local', 'name'),
+              field(statement, 'source', 'value'),
+            ] as const,
+        ),
+      ),
+  );
+
+  return [...bindings.values()].filter((init) => {
+    const object = field(init, 'callee', 'object');
+    const root =
+      field(object, 'type') === 'CallExpression'
+        ? field(object, 'callee', 'object')
+        : object;
+    const source = importSources.get(field(root, 'name'));
+
+    return (
+      field(init, 'callee', 'property', 'name') === 'meta' &&
+      field(root, 'type') === 'Identifier' &&
+      (source === undefined ||
+        (typeof source === 'string' && previewPath.test(source)))
+    );
+  });
 }
 
 export interface NamedExport {
@@ -406,11 +443,7 @@ function propertyValue(object: unknown, key: string): unknown {
     : field(property, 'value');
 }
 
-const annotationFactories: readonly unknown[] = [
-  'definePreview',
-  'meta',
-  'story',
-];
+const annotationFactories: readonly unknown[] = ['definePreview', 'meta'];
 
 export function annotationFactoryArgument(node: unknown): unknown {
   const current = unwrap(node);
@@ -429,7 +462,15 @@ function storyNode(init: unknown, bindings: Bindings): unknown {
     return followed(field(init, 'callee', 'object'), bindings);
   }
 
-  return isStoryFactoryCall(init) ? list(field(init, 'arguments'))[0] : init;
+  return storyArgument(init);
+}
+
+export function storyArgument(init: unknown): unknown {
+  const current = unwrap(init);
+
+  return isStoryFactoryCall(current)
+    ? list(field(current, 'arguments'))[0]
+    : current;
 }
 
 export function isTemplateBind(init: unknown): boolean {

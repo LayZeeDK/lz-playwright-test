@@ -427,6 +427,17 @@ A.parameters.test = { mockReset: true };`,
     assert.deepEqual(verdicts, ['erased']);
   });
 
+  it('reads a story made by a .story() call on a member as unknown', () => {
+    const verdicts = verdictsOf(
+      `import { lib } from './lib';
+export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+export const B = lib.presets.story({});`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
   it('keeps an unreadable story unknown when args are assigned to it', () => {
     const verdicts = verdictsOf(
       `import { makeStory } from './make-story';
@@ -511,6 +522,31 @@ export const A = {
   parameters: { test: { mockReset: true } },
   args: { g: fn().mockReturnValue(1) },
 };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('keeps the stories of a file that exports a schema made by .extend()', () => {
+    const verdicts = verdictsOf(
+      `import { z } from 'zod';
+export default {
+  excludeStories: /Schema$/,
+  parameters: { test: { mockReset: true } },
+};
+export const A = { args: { g: fn().mockReturnValue(1) } };
+export const userSchema = z.object({}).extend({ name: z.string() });`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('keeps the stories of a file with a meta() call on a value that no name holds', () => {
+    const verdicts = verdictsOf(
+      `import { Schema } from './schema';
+const schema = new Schema().meta({ id: 'label' });
+export default { parameters: { test: { mockReset: true } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };`,
     );
 
     assert.deepEqual(verdicts, ['erased']);

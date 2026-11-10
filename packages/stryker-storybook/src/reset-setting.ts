@@ -3,6 +3,7 @@ import {
   isTemplateBind,
   metaExpressions,
   namedExports,
+  storyArgument,
   storyExports,
   topLevelBindings,
   unwrap,
@@ -101,7 +102,7 @@ export function classifyStubs(
       const story = assignments.reduce(
         (value, assignment) =>
           written(value, assignment.path, evaluate(assignment.value, bindings)),
-        evaluate(annotationFactoryArgument(init), bindings),
+        evaluate(storyArgument(init), bindings),
       );
       // Storybook 10.6.5 normalizeStory: { ...story.story?.parameters, ...story.parameters }
       const storyTest = testSettings(

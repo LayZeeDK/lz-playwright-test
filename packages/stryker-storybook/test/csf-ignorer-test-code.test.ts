@@ -100,6 +100,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('ignores the play function of a story in a file that exports a schema made by .extend()', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b', excludeStories: /Schema$/ };\nexport const A = {\n  play: async () => {\n    await x(1 + 1);\n  },\n};\nexport const userSchema = z.object({}).extend({ name: z.string() });",
+        )
+      ).filter((outcome) => /^[34] /.test(outcome)),
+      [`3 BlockStatement ${testReason}`, `4 ArithmeticOperator ${testReason}`],
+    );
+  });
+
   it('places a play function assigned to an export that excludeStories matches', async () => {
     const { outcomes } = setup();
 
