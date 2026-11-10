@@ -74,7 +74,7 @@ describe('lz-storybook-csf', () => {
     );
   });
 
-  it("ignores a play function assigned to X['play']", async () => {
+  it("ignores a play function assigned to X['play'] and its key", async () => {
     const { outcomes } = setup();
 
     assert.deepEqual(
@@ -84,7 +84,7 @@ describe('lz-storybook-csf', () => {
         )
       ).filter((outcome) => /^[34] /.test(outcome)),
       [
-        '3 StringLiteral placed',
+        `3 StringLiteral ${testReason}`,
         `3 BlockStatement ${testReason}`,
         `4 ArithmeticOperator ${testReason}`,
       ],
@@ -127,6 +127,45 @@ describe('lz-storybook-csf', () => {
         )
       ).filter((outcome) => /^[34] /.test(outcome)),
       [`3 BlockStatement ${testReason}`, `4 ArithmeticOperator ${testReason}`],
+    );
+  });
+
+  it('ignores the play function of a story in a file with a .meta() call on a local schema', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "import { z } from 'zod';\nexport default { title: 'a/b' };\nexport const A = {\n  play: async () => {\n    await x(1 + 1);\n  },\n};\nconst schema = z.object({});\nconst described = schema.meta({ title: 'S' });",
+        )
+      ).filter((outcome) => /^[45] /.test(outcome)),
+      [`4 BlockStatement ${testReason}`, `5 ArithmeticOperator ${testReason}`],
+    );
+  });
+
+  it('ignores the play function of a story in a file with a .type().meta() call on a local schema', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {\n  play: async () => {\n    await x(1 + 1);\n  },\n};\nconst schema = make();\nconst described = schema.type().meta({ title: 'S' });",
+        )
+      ).filter((outcome) => /^[34] /.test(outcome)),
+      [`3 BlockStatement ${testReason}`, `4 ArithmeticOperator ${testReason}`],
+    );
+  });
+
+  it('ignores the play function of a story in a file with a preview call other than .meta()', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "import preview from '#.storybook/preview';\nexport default { title: 'a/b' };\nexport const A = {\n  play: async () => {\n    await x(1 + 1);\n  },\n};\nconst typed = preview.type({ title: 'S' });",
+        )
+      ).filter((outcome) => /^[45] /.test(outcome)),
+      [`4 BlockStatement ${testReason}`, `5 ArithmeticOperator ${testReason}`],
     );
   });
 
@@ -179,6 +218,23 @@ describe('lz-storybook-csf', () => {
         )
       ).filter((outcome) => /^[34] /.test(outcome)),
       ['3 BlockStatement placed', '4 ArithmeticOperator placed'],
+    );
+  });
+
+  it("places a play function assigned to X['play'] and its key in 'mutate' mode", async () => {
+    const { outcomes } = setup('mutate');
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nA['play'] = async () => {\n  await x(1 + 1);\n};",
+        )
+      ).filter((outcome) => /^[34] /.test(outcome)),
+      [
+        '3 StringLiteral placed',
+        '3 BlockStatement placed',
+        '4 ArithmeticOperator placed',
+      ],
     );
   });
 
@@ -463,13 +519,13 @@ describe('lz-storybook-csf', () => {
     assert.deepEqual(
       (
         await outcomes(
-          "const meta = preview.meta({ component: B });\nexport const A = meta.story({\n  parameters: {\n    msw: {\n      handlers: [h('/a')],\n    },\n  },\n});",
+          "import preview from '#.storybook/preview';\nconst meta = preview.meta({ component: B });\nexport const A = meta.story({\n  parameters: {\n    msw: {\n      handlers: [h('/a')],\n    },\n  },\n});",
         )
-      ).filter((outcome) => /^[4-5] /.test(outcome)),
+      ).filter((outcome) => /^[5-6] /.test(outcome)),
       [
-        `4 ObjectLiteral ${mswReason}`,
-        `5 ArrayDeclaration ${mswReason}`,
-        `5 StringLiteral ${mswReason}`,
+        `5 ObjectLiteral ${mswReason}`,
+        `6 ArrayDeclaration ${mswReason}`,
+        `6 StringLiteral ${mswReason}`,
       ],
     );
   });

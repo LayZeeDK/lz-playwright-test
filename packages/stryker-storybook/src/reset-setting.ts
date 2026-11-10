@@ -1,11 +1,10 @@
 import {
+  type Assignment,
+  csfFile,
   defaultExport,
-  definePreviewArgument,
   isTemplateBind,
-  metaObjectsOf,
   namedExports,
   storyArgument,
-  storyExports,
   topLevelBindings,
   unwrap,
   withoutBinding,
@@ -68,6 +67,15 @@ export function readPreviewTest(program: unknown): ResetSettings {
   );
 }
 
+function definePreviewArgument(node: unknown): unknown {
+  const current = unwrap(node);
+
+  return field(current, 'type') === 'CallExpression' &&
+    field(current, 'callee', 'name') === 'definePreview'
+    ? field(current, 'arguments', '0')
+    : current;
+}
+
 function testSettings(parameters: unknown): ResetSettings {
   const test = member(parameters, 'test');
 
@@ -90,16 +98,19 @@ export function classifyStubs(
 ): StubClassification {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
-  const metaObjects = metaObjectsOf(body, bindings);
-  const [meta] = metaObjects;
+  const {
+    metaObjects: [meta],
+    isFactory,
+    stories: exported,
+  } = csfFile(body, bindings);
   const metaTest = testSettings(member(evaluate(meta, bindings), 'parameters'));
-  const declared = storyExports(body, bindings, metaObjects)
+  const declared = exported
     .filter(({ tested }) => tested)
     .map(({ name, init, assignments }) => {
-      const story = assignments.reduce(
+      const story = runtimeAssignments(assignments, isFactory).reduce(
         (value, assignment) =>
           written(value, assignment.path, evaluate(assignment.value, bindings)),
-        evaluate(storyArgument(init), bindings),
+        storyValue(init, bindings),
       );
       // Storybook 10.6.5 normalizeStory: { ...story.story?.parameters, ...story.parameters }
       const storyTest = testSettings(
@@ -125,6 +136,32 @@ export function classifyStubs(
   );
 
   return { stories, stubs };
+}
+
+/** Storybook 10.6.5 `extend()` merges the base story's parameters into the new input, and this reader does not follow the base. */
+function storyValue(
+  init: unknown,
+  bindings: ReadonlyMap<string, unknown>,
+): unknown {
+  return field(unwrap(init), 'callee', 'property', 'name') === 'extend'
+    ? unknownValue
+    : evaluate(storyArgument(init), bindings);
+}
+
+/** Storybook 10.6.5 composes a factory story from the keys of the `input` that `defineStory` closed over, so only writes below `input` count. */
+function runtimeAssignments(
+  assignments: readonly Assignment[],
+  isFactory: boolean,
+): readonly Assignment[] {
+  if (!isFactory) {
+    return assignments;
+  }
+
+  return assignments.flatMap((assignment) =>
+    assignment.path[0] === 'input' && assignment.path.length > 1
+      ? [{ ...assignment, path: assignment.path.slice(1) }]
+      : [],
+  );
 }
 
 function written(

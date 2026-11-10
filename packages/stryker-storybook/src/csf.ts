@@ -28,13 +28,12 @@ export function csfShapes(program: unknown): CsfShapes {
   const specifiers = body.flatMap((statement) =>
     list(field(statement, 'specifiers')),
   );
-  const metaObjects = metaObjectsOf(body, bindings);
-  const exported = storyExports(body, bindings, metaObjects);
+  const { metaObjects, stories: exported } = csfFile(body, bindings);
   const assignments = exported.flatMap((story) => story.assignments);
+  const assignedTo = (key: string): readonly Assignment[] =>
+    assignments.filter(({ path }) => path.length === 1 && path[0] === key);
   const assigned = (key: string): readonly unknown[] =>
-    assignments
-      .filter(({ path }) => path.length === 1 && path[0] === key)
-      .map(({ value }) => value);
+    assignedTo(key).map(({ value }) => value);
   const stories = [...exported.map(({ init }) => init), ...assigned('story')]
     .map((init) => storyNode(unwrap(init), bindings))
     .filter(
@@ -78,6 +77,7 @@ export function csfShapes(program: unknown): CsfShapes {
     ]),
     testCode: nodeSet([
       ...testKeys.flatMap(annotations),
+      ...testKeys.flatMap(assignedTo).map(({ statement }) => statement),
       ...testCalls.flatMap(({ statement, testFunction }) => [
         statement,
         testFunction,
@@ -119,16 +119,25 @@ export function defaultExport(body: readonly unknown[]): unknown {
   return declaration ?? field(defaultSpecifier, 'local');
 }
 
-export function metaObjectsOf(
-  body: readonly unknown[],
-  bindings: Bindings,
-): readonly unknown[] {
-  return [
+export interface CsfFile {
+  readonly metaObjects: readonly unknown[];
+  readonly isFactory: boolean;
+  readonly stories: readonly StoryExport[];
+}
+
+export function csfFile(body: readonly unknown[], bindings: Bindings): CsfFile {
+  const metas = factoryMetas(body, bindings);
+  const metaObjects = [
     defaultExport(body),
-    ...factoryMetas(body, bindings).map(
-      (init) => list(field(init, 'arguments'))[0],
-    ),
+    ...metas.map((init) => list(field(init, 'arguments'))[0]),
   ].flatMap((meta) => objectOf(meta, bindings));
+  const isFactory = metas.length > 0;
+
+  return {
+    metaObjects,
+    isFactory,
+    stories: storyExports(body, bindings, metaObjects, isFactory),
+  };
 }
 
 function storyFilter(
@@ -146,16 +155,16 @@ function storyFilter(
   return (name) => isExportStory(name, includeStories, excludeStories);
 }
 
-export function storyExports(
+function storyExports(
   body: readonly unknown[],
   bindings: Bindings,
   metaObjects: readonly unknown[],
+  isFactoryFile: boolean,
 ): readonly StoryExport[] {
   const isStory = storyFilter(metaObjects);
   const exports = namedExports(body, bindings);
   const isFactoryStory = ({ init }: NamedExport): boolean =>
     isStoryFactoryCall(unwrap(init));
-  const isFactoryFile = factoryMetas(body, bindings).length > 0;
   const assignments = body.flatMap(assignmentOf);
 
   return exports
@@ -172,18 +181,7 @@ export function storyExports(
       tested:
         form === 'declaration' ||
         (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
-      assignments: assignments
-        .filter(({ target }) => target === local)
-        .flatMap((assignment) => {
-          if (!isFactoryFile) {
-            return [assignment];
-          }
-
-          // Storybook 10.6.5 composeStory reads a factory story's annotations from its input.
-          return assignment.path[0] === 'input'
-            ? [{ ...assignment, path: assignment.path.slice(1) }]
-            : [];
-        }),
+      assignments: assignments.filter(({ target }) => target === local),
     }));
 }
 
@@ -208,7 +206,7 @@ function isStoryFactoryCall(node: unknown): boolean {
 
 const previewPath = /\/preview(.(js|jsx|mjs|ts|tsx))?$/;
 
-/** Storybook 10.6.5 CsfFile: a top-level `X.meta()` or `X.type().meta()` call, where no module but a preview file exports `X`. */
+/** Storybook 10.6.5 CsfFile: a top-level `X.meta()` or `X.type().meta()` call, where `X` is imported from a preview file. */
 function factoryMetas(
   body: readonly unknown[],
   bindings: Bindings,
@@ -237,9 +235,8 @@ function factoryMetas(
 
     return (
       field(init, 'callee', 'property', 'name') === 'meta' &&
-      field(root, 'type') === 'Identifier' &&
-      (source === undefined ||
-        (typeof source === 'string' && previewPath.test(source)))
+      typeof source === 'string' &&
+      previewPath.test(source)
     );
   });
 }
@@ -390,6 +387,7 @@ function matchesStories(name: unknown, descriptor: unknown): boolean {
 }
 
 export interface Assignment {
+  readonly statement: unknown;
   readonly target: unknown;
   readonly path: readonly unknown[];
   readonly value: unknown;
@@ -407,6 +405,7 @@ function assignmentOf(statement: unknown): readonly Assignment[] {
 
   return [
     {
+      statement,
       target,
       path,
       value: field(statement, 'expression', 'right'),
@@ -459,15 +458,6 @@ function propertyValue(object: unknown, key: string): unknown {
   return field(property, 'type') === 'ObjectMethod'
     ? property
     : field(property, 'value');
-}
-
-export function definePreviewArgument(node: unknown): unknown {
-  const current = unwrap(node);
-
-  return field(current, 'type') === 'CallExpression' &&
-    field(current, 'callee', 'name') === 'definePreview'
-    ? field(current, 'arguments', '0')
-    : current;
 }
 
 function storyNode(init: unknown, bindings: Bindings): unknown {

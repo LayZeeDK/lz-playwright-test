@@ -579,6 +579,39 @@ A.input.parameters = { test: { mockReset: true } };`,
     assert.deepEqual(verdicts, ['erased']);
   });
 
+  it('reads a story made by .extend() on a local story as unknown', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+const Base = meta.story({ parameters: { test: { mockReset: true } } });
+export const B = Base.extend({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story made by .extend() on an exported story as unknown', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({});
+export const A = meta.story({ parameters: { test: { restoreMocks: false } } });
+export const B = A.extend({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('leaves out an object assigned to the input of a factory story', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({});
+export const A = meta.story({ args: { g: fn().mockReturnValue(1) } });
+A.input = { parameters: { test: { restoreMocks: false } } };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
   it('leaves out the parameters assigned to a factory story itself', () => {
     const verdicts = verdictsOf(
       `import preview from '../.storybook/preview';
@@ -599,6 +632,18 @@ export const A = {
   parameters: { test: { mockReset: true } },
   args: { g: fn().mockReturnValue(1) },
 };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('keeps the stories of a file with a meta() call on a local schema', () => {
+    const verdicts = verdictsOf(
+      `import { z } from 'zod';
+export default { parameters: { test: { mockReset: true } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+const schema = z.object({});
+const described = schema.meta({ title: 'S' });`,
     );
 
     assert.deepEqual(verdicts, ['erased']);
