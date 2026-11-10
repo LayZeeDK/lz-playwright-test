@@ -784,11 +784,20 @@ export function mayImportItself(
   ].some((source) => {
     const specifier = field(source, 'value');
 
+    if (field(source, 'type') !== 'StringLiteral') {
+      return true;
+    }
+
+    if (typeof specifier !== 'string' || !specifier.startsWith('.')) {
+      return false;
+    }
+
+    const target = resolve(dirname(file), specifier);
+
+    // Vite resolves a .js, .jsx, .mjs or .cjs specifier to the TypeScript file of the same name.
     return (
-      field(source, 'type') !== 'StringLiteral' ||
-      (typeof specifier === 'string' &&
-        specifier.startsWith('.') &&
-        [file, withoutExtension].includes(resolve(dirname(file), specifier)))
+      [file, withoutExtension].includes(target) ||
+      target.replace(/\.[cm]?jsx?$/, '') === withoutExtension
     );
   });
 }
