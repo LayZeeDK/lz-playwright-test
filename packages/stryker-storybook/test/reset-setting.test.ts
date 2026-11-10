@@ -1336,6 +1336,19 @@ export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
     assert.deepEqual(verdicts, ['unknown']);
   });
 
+  it('reads a factory story with a tag that skip names as unknown when its .test() call spreads its arguments', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ tags: ['slow'], parameters: { test: { mockReset: true } } });
+A.test('runs', ...[{ tags: ['!slow'] }, async () => undefined]);
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
   it("leaves out a factory story with a tag that skip names when another story's .test() call of the same name negates that tag", () => {
     const verdicts = verdictsOf(
       `import preview from '../.storybook/preview';

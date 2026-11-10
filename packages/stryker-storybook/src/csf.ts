@@ -584,7 +584,7 @@ function testCallOf(statement: unknown): readonly TestCall[] {
     : [];
 }
 
-/** Storybook 10.6.5 CsfFile indexes a `B.test('name', ...)` statement that is a plain call with a string-literal name and two or more arguments. */
+/** Storybook 10.6.5 CsfFile indexes a `B.test('name', ...)` statement that is a plain call with a string-literal name and two or more arguments; this check also needs no spread argument, as only running the file tells which argument a spread fills. */
 function isIndexedTestCall(statement: unknown): boolean {
   const call = field(statement, 'expression');
   const args = list(field(call, 'arguments'));
@@ -593,7 +593,8 @@ function isIndexedTestCall(statement: unknown): boolean {
     field(call, 'type') === 'CallExpression' &&
     field(call, 'callee', 'property', 'name') === 'test' &&
     args.length >= 2 &&
-    field(args[0], 'type') === 'StringLiteral'
+    field(args[0], 'type') === 'StringLiteral' &&
+    !args.some((arg) => field(arg, 'type') === 'SpreadElement')
   );
 }
 
