@@ -798,7 +798,16 @@ recorded runs) sits far from the AST walk, so one row drives much code. Evidence
 **O104. The three skills and the spec filled a worker's context before its first cycle.** In S3 the three lz-tdd
 SKILL.md files, the design sections, the prototypes and one `pstack:how` report used most of a 150k-token budget, and
 the worker handed back after 3 cycles of a 52-row table. One cycle per driving row does not fit one worker when the
-setup reading is that large. Evidence: `sb-s3/notes.md`, the worker's hand-back on 2026-11-10.
+setup reading is that large. Evidence: `sb-s3/notes.md`, the worker's hand-back on 2026-11-10. Correction, same day:
+the 150k budget was a hand-back line in the coordinator's brief, not a limit of the session, so the early hand-back
+says nothing about the plugin; what stands is the share of the context the setup reading took.
+
+**O105 (lz-tpp misfit). A wider rule swallows a narrower rule's test.** In S4, cycle 4's rule (keep the whole meta
+object) covers the node that cycle 1's rule (keep the meta title) pins, so its first green turned cycle 1's test red.
+The fix moved cycle 1's test to the other mode, where only the title rule applies, and guarded the new rule by mode.
+`lz-tpp` says to undo and re-pick; no transformation covers a green that narrows an earlier test's scope. The core is
+O76; new here is the cause, an ignorer rule over a subtree that holds an earlier rule's node. Evidence:
+`sb-s4/cycles.log` cycle 4, `sb-s4/notes.md`.
 
 ### Suggestions
 
