@@ -431,7 +431,8 @@ describe('storybookProject', () => {
       t.after(() => {
         process.env['NODE_OPTIONS'] = nodeOptions;
       });
-      process.env['NODE_OPTIONS'] = `--import=${pathToFileURL(join(fixtures, 'no-vitest', 'register.mjs')).href}`;
+      process.env['NODE_OPTIONS'] =
+        `--import=${pathToFileURL(join(fixtures, 'no-vitest', 'register.mjs')).href}`;
       const lines: string[] = [];
 
       const project = storybookProject(

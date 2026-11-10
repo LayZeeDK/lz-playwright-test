@@ -95,8 +95,11 @@ function storiesOf(
   file: string,
   preview: keyof typeof previews,
 ): readonly StoryReset[] {
-  return classifyStubs(storyProgram(file), previewTest(preview), defaultTestTags)
-    .stories;
+  return classifyStubs(
+    storyProgram(file),
+    previewTest(preview),
+    defaultTestTags,
+  ).stories;
 }
 
 function storyProgram(file: string): unknown {
