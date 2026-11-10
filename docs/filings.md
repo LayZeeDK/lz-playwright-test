@@ -842,7 +842,13 @@ name every case, so the parse side spent two cycles on scaffolding. Evidence: `s
 **O111. A red test's own wrong expectation has no rule.** In S3 part (b) cycle 12 the red expected one string mutant on
 the play line where the instrumenter places two. The worker fixed the expectation while the test was still red and ran
 it again. `test-first.md` says the source never changes to make a test fail, but says nothing about correcting a red
-test before Green. Evidence: `sb-s3c/cycles.log` cycle 12.
+test before Green. Evidence: `sb-s3c/cycles.log` cycle 12. Seen again in S3 part (c1) cycle 12: the first red came from
+the test reading the project loader's log line instead of the header (`sb-s3d/cycles.log`).
+
+**O112 (lz-tpp misfit). The input type can force a branch before a test asks for it.** In S3 part (c1), Stryker's plan
+type is a union where only `Run` plans carry `netTime`, so the first green that lists static story mutants had to check
+the plan kind to read `netTime`. The later early-result test passed on its first run and went in as test-after. Close to
+O63, where an oracle forced the condition; here the type checker does. Evidence: `sb-s3d/cycles.log` cycle 4.
 
 ### Suggestions
 
