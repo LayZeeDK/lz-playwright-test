@@ -45,6 +45,7 @@
     "storybook": "^10.6.0"
   },
   "devDependencies": {
+    "ajv": "8.20.0",
     "storybook": "10.6.5"
   },
   "nx": {
