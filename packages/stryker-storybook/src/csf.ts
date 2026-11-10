@@ -29,39 +29,32 @@ export function csfShapes(program: unknown): CsfShapes {
     list(field(statement, 'specifiers')),
   );
   const metaObjects = metaObjectsOf(body, bindings);
-  const isStory = storyFilter(metaObjects);
-  const assignments = body.flatMap(assignmentOf);
-  const storyInits = [
-    ...storyExports(body, bindings),
-    ...assignments
-      .filter(({ target, key }) => key === 'story' && isStory(target))
-      .map(({ target, value }) => ({ name: target, init: value })),
-  ];
-  const storyNames = storyInits.map(({ name }) => name);
-  const stories = storyInits
-    .map(({ init }) => storyNode(unwrap(init), bindings))
+  const exported = storyExports(body, bindings);
+  const assignments = exported.flatMap((story) => story.assignments);
+  const assigned = (key: string): readonly unknown[] =>
+    assignments
+      .filter(({ path }) => path.length === 1 && path[0] === key)
+      .map(({ value }) => value);
+  const stories = [...exported.map(({ init }) => init), ...assigned('story')]
+    .map((init) => storyNode(unwrap(init), bindings))
     .filter(
       (init) =>
         (field(init, 'type') === 'ObjectExpression' ||
           field(init, 'type') === 'ArrowFunctionExpression') &&
         !metaObjects.includes(init),
     );
-  const storyAssignments = assignments.filter(({ target }) =>
-    storyNames.includes(target),
-  );
   const annotations = (key: string): readonly unknown[] =>
     [
       ...[...metaObjects, ...stories].map((owner) => propertyValue(owner, key)),
-      ...storyAssignments
-        .filter((assignment) => assignment.key === key)
-        .map(({ value }) => value),
+      ...assigned(key),
     ].flatMap((value) => withInit(value, bindings));
+  const locals = exported.map(({ local }) => local);
   const idParameters = stories
     .map((story) => propertyValue(story, 'parameters'))
     .filter((parameters) => propertyValue(parameters, '__id') !== undefined);
   const testCalls = body
     .flatMap(testCallOf)
-    .filter(({ target }) => storyNames.includes(target))
+    .filter(({ target }) => locals.includes(target))
     .flatMap(({ statement, args: [name, ...rest] }) =>
       name === undefined
         ? []
@@ -167,6 +160,7 @@ export function storyExports(
   const isFactoryStory = ({ init }: NamedExport): boolean =>
     isStoryFactoryCall(unwrap(init));
   const isFactoryFile = exports.some(isFactoryStory);
+  const assignments = body.flatMap(assignmentOf);
 
   return exports
     .filter(
@@ -182,6 +176,7 @@ export function storyExports(
       tested:
         form === 'declaration' ||
         (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
+      assignments: assignments.filter(({ target }) => target === local),
     }));
 }
 
@@ -191,6 +186,7 @@ export interface StoryExport {
   readonly init: unknown;
   /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
   readonly tested: boolean;
+  readonly assignments: readonly Assignment[];
 }
 
 const storyFactories: readonly unknown[] = ['story', 'extend'];
@@ -252,7 +248,9 @@ export function namedExports(
         })),
     ])
     .flatMap(({ name, ...named }) =>
-      typeof name === 'string' && name !== 'default' ? [{ name, ...named }] : [],
+      typeof name === 'string' && name !== 'default'
+        ? [{ name, ...named }]
+        : [],
     );
 }
 
@@ -347,18 +345,14 @@ function matchesStories(name: unknown, descriptor: unknown): boolean {
   );
 }
 
-interface Assignment {
+export interface Assignment {
   readonly target: unknown;
-  /** The one key of a `Target.key = value` assignment. */
-  readonly key: unknown;
   readonly path: readonly unknown[];
   readonly value: unknown;
 }
 
-export function assignmentOf(statement: unknown): readonly Assignment[] {
-  const [target, ...path] = memberChain(
-    field(statement, 'expression', 'left'),
-  );
+function assignmentOf(statement: unknown): readonly Assignment[] {
+  const [target, ...path] = memberChain(field(statement, 'expression', 'left'));
 
   if (
     field(statement, 'expression', 'operator') !== '=' ||
@@ -370,7 +364,6 @@ export function assignmentOf(statement: unknown): readonly Assignment[] {
   return [
     {
       target,
-      key: path.length === 1 ? path[0] : undefined,
       path,
       value: field(statement, 'expression', 'right'),
     },

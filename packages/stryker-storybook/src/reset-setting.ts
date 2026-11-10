@@ -1,6 +1,5 @@
 import {
   annotationFactoryArgument,
-  assignmentOf,
   isTemplateBind,
   metaExpressions,
   namedExports,
@@ -54,7 +53,10 @@ export function readPreviewTest(program: unknown): ResetSettings {
 
   if (exported !== undefined) {
     return testSettings(
-      member(evaluate(annotationFactoryArgument(exported), bindings), 'parameters'),
+      member(
+        evaluate(annotationFactoryArgument(exported), bindings),
+        'parameters',
+      ),
     );
   }
 
@@ -93,21 +95,14 @@ export function classifyStubs(
   const metaTest = testSettings(
     member(evaluate(annotationFactoryArgument(meta), bindings), 'parameters'),
   );
-  const assignments = body.flatMap(assignmentOf);
   const declared = storyExports(body, bindings)
     .filter(({ tested }) => tested)
-    .map(({ name, local, init }) => {
-      const story = assignments
-        .filter(({ target }) => target === local)
-        .reduce(
-          (value, assignment) =>
-            written(
-              value,
-              assignment.path,
-              evaluate(assignment.value, bindings),
-            ),
-          evaluate(annotationFactoryArgument(init), bindings),
-        );
+    .map(({ name, init, assignments }) => {
+      const story = assignments.reduce(
+        (value, assignment) =>
+          written(value, assignment.path, evaluate(assignment.value, bindings)),
+        evaluate(annotationFactoryArgument(init), bindings),
+      );
       // Storybook 10.6.5 normalizeStory: { ...story.story?.parameters, ...story.parameters }
       const storyTest = testSettings(
         spread([

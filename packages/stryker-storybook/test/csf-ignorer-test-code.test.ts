@@ -87,6 +87,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('ignores a play function assigned to the local binding of a renamed story', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nconst Local = {};\nLocal.play = async () => {\n  await x(1 + 1);\n};\nexport { Local as A };",
+        )
+      ).filter((outcome) => /^[34] /.test(outcome)),
+      [`3 BlockStatement ${testReason}`, `4 ArithmeticOperator ${testReason}`],
+    );
+  });
+
   it('places a play function assigned to an export that excludeStories matches', async () => {
     const { outcomes } = setup();
 
