@@ -4,11 +4,10 @@ import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 import { csfShapes, type CsfShapes } from './csf.ts';
 import { isRecord } from './is-record.ts';
 import { field, list } from './node-field.ts';
-import { lzStorybookOptions } from './options.ts';
 import { packageName } from './package-name.ts';
 import {
   isStoryFile,
-  storybookProject,
+  strykerStorybookProject,
   type ProjectLog,
 } from './storybook-project.ts';
 
@@ -28,10 +27,7 @@ export function csfIgnorer(options: object, log: ProjectLog): Ignorer {
 
       if (field(node, 'type') === 'Program') {
         const fileName = field(path, 'hub', 'file', 'opts', 'filename');
-        const project = storybookProject(
-          lzStorybookOptions(options).configDir,
-          log,
-        );
+        const project = strykerStorybookProject(options, log);
 
         if (typeof fileName !== 'string' || !isStoryFile(project, fileName)) {
           reasons = new Map();

@@ -529,4 +529,30 @@ describe('lz-storybook-csf', () => {
       ],
     );
   });
+
+  it('ignores a play function assigned to X.input.play in a factory file', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "import preview from '#.storybook/preview';\nconst meta = preview.meta({ component: B });\nexport const A = meta.story({});\nA.input.play = async () => {\n  await x(1 + 1);\n};",
+        )
+      ).filter((outcome) => /^[45] /.test(outcome)),
+      [`4 BlockStatement ${testReason}`, `5 ArithmeticOperator ${testReason}`],
+    );
+  });
+
+  it('places a play function assigned to X.play in a factory file', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "import preview from '#.storybook/preview';\nconst meta = preview.meta({ component: B });\nexport const A = meta.story({});\nA.play = async () => {\n  await x(1 + 1);\n};",
+        )
+      ).filter((outcome) => /^[45] /.test(outcome)),
+      ['4 BlockStatement placed', '5 ArithmeticOperator placed'],
+    );
+  });
 });

@@ -11,6 +11,7 @@ import {
   type ResetSettings,
   type StoryReset,
   type StubVerdict,
+  type TestTags,
 } from '../src/reset-setting.ts';
 import { definitionTimeStubs } from '../src/stub-shape.ts';
 
@@ -685,6 +686,129 @@ export const A = {
   parameters: { test: { restoreMocks: false } },
   args: { g: fn().mockReturnValue(1) },
 };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+});
+
+describe('classifyStubs tag filter', () => {
+  function verdictsOf(
+    source: string,
+    testTags?: TestTags,
+  ): readonly StubVerdict[] {
+    return classifyStubs(
+      parseProgram(
+        `import { fn } from 'storybook/test';\n${source}`,
+        'X.stories.ts',
+      ),
+      {},
+      testTags,
+    ).stubs.map(({ verdict }) => verdict);
+  }
+
+  function testTags(rule: Partial<TestTags>): TestTags {
+    return {
+      previewTags: [],
+      include: ['test'],
+      exclude: [],
+      skip: [],
+      ...rule,
+    };
+  }
+
+  it('leaves out a story without a tag that include names', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { parameters: { test: { mockReset: true } } };
+export const B = { tags: ['smoke'], args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ include: ['smoke'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('leaves out a story with a tag that exclude names', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { tags: ['flaky'], parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ exclude: ['flaky'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('leaves out a story with a tag that skip names', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { tags: ['slow'], parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it("leaves out a story the preview's tags take out of the test tag", () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { parameters: { test: { mockReset: true } } };
+export const B = { tags: ['test'], args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ previewTags: ['!test'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('gives every story the dev tag', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ include: ['dev'] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('reads tags that a story names', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+const untested = ['!test'];
+export const A = { tags: untested, parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('leaves out a story tagged !test', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { tags: ['!test'], parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('leaves out the stories of a meta tagged !test', () => {
+    const verdicts = verdictsOf(
+      `export default { tags: ['!test'] };
+export const A = { parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('leaves out a story assigned the tag !test', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { parameters: { test: { mockReset: true } } };
+A.tags = ['!test'];
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
     );
 
     assert.deepEqual(verdicts, ['kept']);

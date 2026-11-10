@@ -180,4 +180,35 @@ describe('stubIgnorer', () => {
 
     assert.deepEqual(reasonsOf("mockReturnValue('stubbed')"), [undefined]);
   });
+
+  it("counts the stories that the tag filter of Stryker's Vitest config tests", async () => {
+    const content = [
+      "import { fn } from 'storybook/test';",
+      'export default { parameters: { test: { restoreMocks: false } } };',
+      "export const A = { tags: ['flaky'], parameters: { test: { mockReset: true } } };",
+      "export const B = { args: { g: fn().mockReturnValue('stubbed') } };",
+    ].join('\n');
+    const ignorer = stubIgnorer(
+      {
+        lzStorybook: { configDir: join(fixtures, 'vitest-tags', '.storybook') },
+        vitest: {
+          configFile: join(fixtures, 'vitest-tags', 'vitest.config.ts'),
+        },
+      },
+      { info: () => undefined, warn: () => undefined },
+    );
+
+    const { mutants } = await instrument(
+      join(fixtures, 'vitest-tags', 'src', 'Button.stories.tsx'),
+      content,
+      [ignorer],
+    );
+
+    assert.deepEqual(
+      mutants
+        .filter((mutant) => mutant.line === 4 && mutant.replacement === '""')
+        .map((mutant) => mutant.ignoreReason),
+      [undefined],
+    );
+  });
 });

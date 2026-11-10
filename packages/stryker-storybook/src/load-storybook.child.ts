@@ -4,11 +4,14 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { isRecord } from './is-record.ts';
+import { field, list } from './node-field.ts';
 
-const [configDir, resultFile] = process.argv.slice(2);
+const [configDir, resultFile, vitestConfigFile] = process.argv.slice(2);
 
 if (configDir === undefined || resultFile === undefined) {
-  throw new Error('Usage: load-storybook.child <configDir> <resultFile>');
+  throw new Error(
+    'Usage: load-storybook.child <configDir> <resultFile> [vitestConfigFile]',
+  );
 }
 
 const projectFirstResolve = `
@@ -42,7 +45,69 @@ register(`data:text/javascript,${encodeURIComponent(projectFirstResolve)}`, {
   },
 });
 
-writeFileSync(resultFile, JSON.stringify(await load(configDir, projectDir)));
+const storybook = await load(configDir, projectDir);
+
+writeFileSync(
+  resultFile,
+  JSON.stringify({
+    ...storybook,
+    testTags: await testTags(
+      vitestConfigFile,
+      list(field(storybook, 'storyFiles')),
+    ),
+  }),
+);
+
+/** Storybook 10.6.5 addon-vitest: storybookTest() puts the tag filter in its project's test.env (vitest-plugin/index.ts 424-426). */
+async function testTags(
+  configFile: string | undefined,
+  storyFiles: readonly unknown[],
+): Promise<object> {
+  // Only the Vitest CLI sets VITEST, and storybookTest() returns no plugins without it.
+  process.env['VITEST'] = 'true';
+  process.env['STORYBOOK_DISABLE_TELEMETRY'] = '1';
+
+  try {
+    const { createVitest } = await import('vitest/node');
+    const vitest = await createVitest('test', {
+      config: configFile,
+      watch: false,
+    });
+
+    try {
+      // Storybook 10.6.5 addon-vitest vitest-manager.ts 612 finds its projects by this key.
+      const storybookProjects = vitest.projects.filter(
+        (project) =>
+          field(project.config.env, '__STORYBOOK_URL__') !== undefined,
+      );
+      const env: unknown = (
+        storybookProjects.find((project) =>
+          storyFiles.some(
+            (file) => typeof file === 'string' && project.matchesTestGlob(file),
+          ),
+        ) ?? storybookProjects[0]
+      )?.config.env;
+
+      return {
+        kind: 'resolved',
+        include: field(env, '__VITEST_INCLUDE_TAGS__'),
+        exclude: field(env, '__VITEST_EXCLUDE_TAGS__'),
+        skip: field(env, '__VITEST_SKIP_TAGS__'),
+      };
+    } finally {
+      await vitest.close();
+    }
+  } catch (error) {
+    return { kind: 'failed', error: withoutStack(error) };
+  }
+}
+
+function withoutStack(error: unknown): string {
+  return String(error)
+    .split('\n')
+    .filter((line) => !/^\s+at /.test(line))
+    .join('\n');
+}
 
 async function load(configDir: string, projectDir: string): Promise<object> {
   try {
@@ -78,12 +143,6 @@ async function load(configDir: string, projectDir: string): Promise<object> {
 
     return error instanceof MainFileMissingError
       ? { kind: 'no-main' }
-      : {
-          kind: 'failed',
-          error: String(error)
-            .split('\n')
-            .filter((line) => !/^\s+at /.test(line))
-            .join('\n'),
-        };
+      : { kind: 'failed', error: withoutStack(error) };
   }
 }

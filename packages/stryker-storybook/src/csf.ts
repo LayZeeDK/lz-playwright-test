@@ -28,13 +28,20 @@ export function csfShapes(program: unknown): CsfShapes {
   const specifiers = body.flatMap((statement) =>
     list(field(statement, 'specifiers')),
   );
-  const { metaObjects, stories: exported } = csfFile(body, bindings);
+  const { metaObjects, isFactory, stories: exported } = csfFile(body, bindings);
   const assignments = exported.flatMap((story) => story.assignments);
-  const assignedTo = (key: string): readonly Assignment[] =>
-    assignments.filter(({ path }) => path.length === 1 && path[0] === key);
-  const assigned = (key: string): readonly unknown[] =>
-    assignedTo(key).map(({ value }) => value);
-  const stories = [...exported.map(({ init }) => init), ...assigned('story')]
+  const runtime = exported.flatMap((story) =>
+    runtimeAssignments(story.assignments, isFactory),
+  );
+  const assignedIn = (
+    from: readonly Assignment[],
+    key: string,
+  ): readonly Assignment[] =>
+    from.filter(({ path }) => path.length === 1 && path[0] === key);
+  const stories = [
+    ...exported.map(({ init }) => init),
+    ...assignedIn(assignments, 'story').map(({ value }) => value),
+  ]
     .map((init) => storyNode(unwrap(init), bindings))
     .filter(
       (init) =>
@@ -42,11 +49,20 @@ export function csfShapes(program: unknown): CsfShapes {
           field(init, 'type') === 'ArrowFunctionExpression') &&
         !metaObjects.includes(init),
     );
-  const annotations = (key: string): readonly unknown[] =>
+  const annotationsIn = (
+    from: readonly Assignment[],
+    key: string,
+  ): readonly unknown[] =>
     [
       ...[...metaObjects, ...stories].map((owner) => propertyValue(owner, key)),
-      ...assigned(key),
+      ...assignedIn(from, key).map(({ value }) => value),
     ].flatMap((value) => withInit(value, bindings));
+  const annotations = (key: string): readonly unknown[] =>
+    annotationsIn(assignments, key);
+  const testCodeOf = (key: string): readonly unknown[] => [
+    ...annotationsIn(runtime, key),
+    ...assignedIn(runtime, key).map(({ statement }) => statement),
+  ];
   const locals = exported.map(({ local }) => local);
   const idParameters = stories
     .map((story) => propertyValue(story, 'parameters'))
@@ -76,8 +92,7 @@ export function csfShapes(program: unknown): CsfShapes {
       ...testCalls.map(({ options }) => options),
     ]),
     testCode: nodeSet([
-      ...testKeys.flatMap(annotations),
-      ...testKeys.flatMap(assignedTo).map(({ statement }) => statement),
+      ...testKeys.flatMap((key) => testCodeOf(key)),
       ...testCalls.flatMap(({ statement, testFunction }) => [
         statement,
         testFunction,
@@ -121,6 +136,7 @@ export function defaultExport(body: readonly unknown[]): unknown {
 
 export interface CsfFile {
   readonly metaObjects: readonly unknown[];
+  readonly metaTags: readonly string[];
   readonly isFactory: boolean;
   readonly stories: readonly StoryExport[];
 }
@@ -135,6 +151,7 @@ export function csfFile(body: readonly unknown[], bindings: Bindings): CsfFile {
 
   return {
     metaObjects,
+    metaTags: stringList(propertyValue(metaObjects[0], 'tags'), bindings),
     isFactory,
     stories: storyExports(body, bindings, metaObjects, isFactory),
   };
@@ -174,15 +191,41 @@ function storyExports(
         isStory(named.name) &&
         (!isFactoryFile || isFactoryStory(named)),
     )
-    .map(({ name, local, init, form }) => ({
-      name,
-      local,
-      init,
-      tested:
-        form === 'declaration' ||
-        (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
-      assignments: assignments.filter(({ target }) => target === local),
-    }));
+    .map(({ name, local, init, form }) => {
+      const storyAssignments = assignments.filter(
+        ({ target }) => target === local,
+      );
+      const assignedTags = storyAssignments.findLast(
+        ({ path }) => path.length === 1 && path[0] === 'tags',
+      );
+
+      return {
+        name,
+        local,
+        init,
+        tested:
+          form === 'declaration' ||
+          (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
+        tags: stringList(
+          assignedTags === undefined
+            ? propertyValue(storyArgument(init), 'tags')
+            : assignedTags.value,
+          bindings,
+        ),
+        assignments: storyAssignments,
+      };
+    });
+}
+
+/** Storybook 10.6.5 CsfFile `parseTags`, after `findVarInitialization` for a name. */
+function stringList(node: unknown, bindings: Bindings): readonly string[] {
+  return list(field(followed(node, bindings), 'elements')).flatMap(
+    (element) => {
+      const value = field(element, 'value');
+
+      return typeof value === 'string' ? [value] : [];
+    },
+  );
 }
 
 export interface StoryExport {
@@ -191,6 +234,7 @@ export interface StoryExport {
   readonly init: unknown;
   /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
   readonly tested: boolean;
+  readonly tags: readonly string[];
   readonly assignments: readonly Assignment[];
 }
 
@@ -391,6 +435,22 @@ export interface Assignment {
   readonly target: unknown;
   readonly path: readonly unknown[];
   readonly value: unknown;
+}
+
+/** Storybook 10.6.5 composes a factory story from the keys of the `input` that `defineStory` closed over, so only writes below `input` count. */
+export function runtimeAssignments(
+  assignments: readonly Assignment[],
+  isFactory: boolean,
+): readonly Assignment[] {
+  if (!isFactory) {
+    return assignments;
+  }
+
+  return assignments.flatMap((assignment) =>
+    assignment.path[0] === 'input' && assignment.path.length > 1
+      ? [{ ...assignment, path: assignment.path.slice(1) }]
+      : [],
+  );
 }
 
 function assignmentOf(statement: unknown): readonly Assignment[] {

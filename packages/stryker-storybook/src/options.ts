@@ -1,8 +1,16 @@
 import { isRecord } from './is-record.ts';
+import { field } from './node-field.ts';
 import { packageName } from './package-name.ts';
 
 export interface LzStorybookOptions {
   readonly configDir: string;
+}
+
+/** Stryker's Vitest runner passes `vitest.configFile` to `createVitest` as `config` (vitest-test-runner.ts 207-208 at v10.1.1). */
+export function vitestConfigFile(options: object): string | undefined {
+  const configFile = field(options, 'vitest', 'configFile');
+
+  return typeof configFile === 'string' ? configFile : undefined;
 }
 
 export function lzStorybookOptions(options: object): LzStorybookOptions {

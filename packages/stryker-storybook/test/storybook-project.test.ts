@@ -94,6 +94,12 @@ describe('storybookProject', () => {
 
       assert.deepEqual(project.previewTest, { restoreMocks: false });
     });
+
+    it("reads the preview's tags", () => {
+      const { project } = setup('preview-tags');
+
+      assert.deepEqual(project.testTags.previewTags, ['!test', 'smoke']);
+    });
   });
 
   it('reads a preview it cannot parse as unreadable', (t) => {
@@ -212,6 +218,138 @@ describe('storybookProject', () => {
       const { project, file } = setup('own-storybook');
 
       assert.equal(isStoryFile(project, file('src', 'Picked.ts')), true);
+    });
+  });
+
+  describe('with a Vitest config that runs the stories', () => {
+    function vitestSetup(fixture: string, configFile: string) {
+      const lines: string[] = [];
+      const project = storybookProject(
+        join(fixtures, fixture, '.storybook'),
+        {
+          info: (message: string) => lines.push(`info: ${message}`),
+          warn: (message: string) => lines.push(`warn: ${message}`),
+        },
+        join(fixtures, fixture, configFile),
+      );
+
+      return { lines, project };
+    }
+
+    it("reads the tag filter of the config's storybookTest plugin", () => {
+      const { project } = vitestSetup('vitest-tags', 'vitest.config.ts');
+
+      assert.deepEqual(
+        [
+          project.testTags.include,
+          project.testTags.exclude,
+          project.testTags.skip,
+        ],
+        [['test', 'smoke'], ['flaky'], ['slow']],
+      );
+    });
+
+    it('reads the tag filter of the Storybook project in test.projects', () => {
+      const { project } = vitestSetup(
+        'vitest-tags',
+        'vitest.projects.config.ts',
+      );
+
+      assert.deepEqual(
+        [
+          project.testTags.include,
+          project.testTags.exclude,
+          project.testTags.skip,
+        ],
+        [['test'], ['flaky'], []],
+      );
+    });
+
+    it('reads the tag filter of the Storybook project that tests the story files', () => {
+      const { project } = vitestSetup(
+        'vitest-tags',
+        'vitest.several.config.ts',
+      );
+
+      assert.deepEqual(project.testTags.exclude, ['flaky']);
+    });
+
+    it('reads the tag filter of the Storybook project when Storybook lists no story file', () => {
+      const project = storybookProject(
+        join(fixtures, 'no-main', '.storybook'),
+        { info: () => undefined, warn: () => undefined },
+        join(fixtures, 'vitest-tags', 'vitest.config.ts'),
+      );
+
+      assert.deepEqual(project.testTags.exclude, ['flaky']);
+    });
+  });
+
+  describe('with a Vitest config that fails to load', () => {
+    it('counts the stories tagged test and warns once, naming the config and the error', () => {
+      const lines: string[] = [];
+      const configFile = join(
+        fixtures,
+        'vitest-tags',
+        'vitest.broken.config.ts',
+      );
+
+      const project = storybookProject(
+        join(fixtures, 'vitest-tags', '.storybook'),
+        {
+          info: (message: string) => lines.push(`info: ${message}`),
+          warn: (message: string) => lines.push(`warn: ${message}`),
+        },
+        configFile,
+      );
+
+      assert.deepEqual(
+        [
+          project.testTags.include,
+          project.testTags.exclude,
+          project.testTags.skip,
+        ],
+        [['test'], [], []],
+      );
+      assert.equal(lines.length, 1);
+      assert.ok(
+        lines[0]?.startsWith(
+          `warn: @layzee/stryker-storybook: Vitest could not load ${configFile}, so the tested stories are the stories tagged test: `,
+        ),
+        lines[0],
+      );
+      assert.ok(
+        lines[0]?.includes(
+          'vitest.broken.config.ts of the vitest-tags fixture',
+        ),
+        lines[0],
+      );
+    });
+
+    it('counts the stories tagged test and warns once when the config file is missing', () => {
+      const lines: string[] = [];
+      const configFile = join(
+        fixtures,
+        'vitest-tags',
+        'vitest.missing.config.ts',
+      );
+
+      const project = storybookProject(
+        join(fixtures, 'vitest-tags', '.storybook'),
+        {
+          info: (message: string) => lines.push(`info: ${message}`),
+          warn: (message: string) => lines.push(`warn: ${message}`),
+        },
+        configFile,
+      );
+
+      assert.deepEqual(project.testTags.include, ['test']);
+      assert.deepEqual(
+        lines.map((line) => line.split(', so ')[0]),
+        [
+          `warn: @layzee/stryker-storybook: Vitest could not load ${configFile}`,
+        ],
+      );
     });
   });
 

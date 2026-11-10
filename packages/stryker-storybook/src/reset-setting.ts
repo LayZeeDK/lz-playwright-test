@@ -1,9 +1,11 @@
+import { combineTags } from 'storybook/internal/csf';
+
 import {
-  type Assignment,
   csfFile,
   defaultExport,
   isTemplateBind,
   namedExports,
+  runtimeAssignments,
   storyArgument,
   topLevelBindings,
   unwrap,
@@ -92,20 +94,40 @@ function testSettings(parameters: unknown): ResetSettings {
   );
 }
 
+/** The tag filter of Storybook's Vitest plugin, and the preview's tags that every story starts from. */
+export interface TestTags {
+  readonly previewTags: readonly string[];
+  readonly include: readonly string[];
+  readonly exclude: readonly string[];
+  readonly skip: readonly string[];
+}
+
+export const defaultTestTags: TestTags = {
+  previewTags: [],
+  include: ['test'],
+  exclude: [],
+  skip: [],
+};
+
 export function classifyStubs(
   program: unknown,
   previewTest: ResetSettings,
+  testTags = defaultTestTags,
 ): StubClassification {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
   const {
     metaObjects: [meta],
+    metaTags,
     isFactory,
     stories: exported,
   } = csfFile(body, bindings);
   const metaTest = testSettings(member(evaluate(meta, bindings), 'parameters'));
   const declared = exported
-    .filter(({ tested }) => tested)
+    .filter(
+      ({ tested, tags }) =>
+        tested && isTestedByTags(testTags, [...metaTags, ...tags]),
+    )
     .map(({ name, init, assignments }) => {
       const story = runtimeAssignments(assignments, isFactory).reduce(
         (value, assignment) =>
@@ -138,6 +160,19 @@ export function classifyStubs(
   return { stories, stubs };
 }
 
+/** Storybook 10.6.5 vitest-plugin transformer.ts `isValidTest`, plus test-utils.ts `testStory`, which skips a story before it runs. */
+function isTestedByTags(
+  { previewTags, include, exclude, skip }: TestTags,
+  fileTags: readonly string[],
+): boolean {
+  const tags = combineTags('test', 'dev', ...previewTags, ...fileTags);
+
+  return (
+    include.some((tag) => tags.includes(tag)) &&
+    ![...exclude, ...skip].some((tag) => tags.includes(tag))
+  );
+}
+
 /** Storybook 10.6.5 `extend()` merges the base story's parameters into the new input, and this reader does not follow the base. */
 function storyValue(
   init: unknown,
@@ -146,22 +181,6 @@ function storyValue(
   return field(unwrap(init), 'callee', 'property', 'name') === 'extend'
     ? unknownValue
     : evaluate(storyArgument(init), bindings);
-}
-
-/** Storybook 10.6.5 composes a factory story from the keys of the `input` that `defineStory` closed over, so only writes below `input` count. */
-function runtimeAssignments(
-  assignments: readonly Assignment[],
-  isFactory: boolean,
-): readonly Assignment[] {
-  if (!isFactory) {
-    return assignments;
-  }
-
-  return assignments.flatMap((assignment) =>
-    assignment.path[0] === 'input' && assignment.path.length > 1
-      ? [{ ...assignment, path: assignment.path.slice(1) }]
-      : [],
-  );
 }
 
 function written(

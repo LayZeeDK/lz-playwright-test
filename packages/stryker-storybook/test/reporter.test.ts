@@ -547,6 +547,28 @@ describe('storybookReporter', () => {
     ]);
   });
 
+  it("leaves out a stub that only a story outside the tag filter of Stryker's Vitest config erases", (t) => {
+    const { reporter, findings, projectDir } = setup(t, 'no-main', {
+      vitest: {
+        configFile: join(fixtures, 'vitest-tags', 'vitest.config.ts'),
+      },
+    });
+    writeStory(
+      projectDir,
+      'Tags.stories.tsx',
+      [
+        "import { fn } from 'storybook/test';",
+        'export default { parameters: { test: { restoreMocks: false } } };',
+        "export const A = { tags: ['flaky'], parameters: { test: { mockReset: true } } };",
+        "export const B = { args: { g: fn().mockReturnValue('stubbed') } };",
+      ].join('\n'),
+    );
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(findings(), []);
+  });
+
   it('prints a scanned finding in its console block', (t) => {
     const { reporter, consoleBlock, projectDir } = setup(t);
     const erased = describeVerdict('erased');

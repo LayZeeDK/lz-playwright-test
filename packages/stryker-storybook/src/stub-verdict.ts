@@ -41,9 +41,9 @@ export interface SpyStubReason {
 
 export function reasonSites(
   program: unknown,
-  { previewTest, transformer }: StorybookProject,
+  { previewTest, testTags, transformer }: StorybookProject,
 ): readonly ReasonSite[] {
-  return classifyStubs(program, previewTest).stubs.flatMap(
+  return classifyStubs(program, previewTest, testTags).stubs.flatMap(
     ({ once, verdict, ...site }): readonly ReasonSite[] => {
       if (verdict === 'kept') {
         return [];
