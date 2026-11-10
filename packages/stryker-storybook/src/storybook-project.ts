@@ -209,9 +209,8 @@ function readPreview(
     return { test: {}, tags: [] };
   }
 
-  const code = readFileSync(file, 'utf8');
-
   try {
+    const code = readFileSync(file, 'utf8');
     const tags: unknown = loadConfig(code, file)
       .parse()
       .getFieldValue(['tags']);

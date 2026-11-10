@@ -132,7 +132,6 @@ export const A = meta.story({});
 const helper = () => null;
 export { helper };
 `,
-    todo: 'Storybook takes every export by specifier for a story; the package takes only factory calls in a factory file',
   },
 ];
 

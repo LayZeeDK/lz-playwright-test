@@ -41,9 +41,12 @@ export type ResetSetting = boolean | 'unreadable';
 
 export type ResetSettings = Readonly<Partial<Record<ResetKey, ResetSetting>>>;
 
-type ResetKey = 'mockReset' | 'clearMocks' | 'restoreMocks';
+/** In the order Storybook 10.6.5's mock-reset loader checks them. */
+const resetKeys = ['mockReset', 'clearMocks', 'restoreMocks'] as const;
 
-export const unreadableSettings: ResetSettings = {
+type ResetKey = (typeof resetKeys)[number];
+
+export const unreadableSettings: Readonly<Record<ResetKey, ResetSetting>> = {
   mockReset: 'unreadable',
   clearMocks: 'unreadable',
   restoreMocks: 'unreadable',
@@ -81,8 +84,13 @@ function definePreviewArgument(node: unknown): unknown {
 function testSettings(parameters: unknown): ResetSettings {
   const test = member(parameters, 'test');
 
-  return decisiveSettings.reduce<Partial<Record<ResetKey, ResetSetting>>>(
-    (settings, [key]) => {
+  // Storybook 10.6.5 combineParameters lets an array replace an object instead of merging into it.
+  if (Array.isArray(test)) {
+    return unreadableSettings;
+  }
+
+  return resetKeys.reduce<Partial<Record<ResetKey, ResetSetting>>>(
+    (settings, key) => {
       const value = member(test, key);
 
       if (value !== undefined) {
@@ -123,11 +131,11 @@ export function classifyStubs(
 ): StubClassification {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
+  const tagsByStory = storyTags(code, fileName);
   const {
     metaObjects: [meta],
     stories: exported,
-  } = csfFile(body, bindings);
-  const tagsByStory = storyTags(code, fileName);
+  } = csfFile(body, bindings, ({ name }) => tagsByStory.has(name));
   const metaValue = evaluate(meta, bindings);
   const metaTest = testSettings(member(metaValue, 'parameters'));
   const declared = exported
@@ -136,16 +144,19 @@ export function classifyStubs(
 
       return tested && tags !== undefined && isTestedByTags(testTags, tags);
     })
-    .flatMap(({ name, init, runtimeAssignments, extendsBase }) => {
+    .flatMap(({ name, init, runtimeAssignments, extendsBase, testOptions }) => {
       const story = runtimeAssignments.reduce(
         (value, assignment) =>
           written(value, assignment.path, evaluate(assignment.value, bindings)),
         extendsBase ? unknownValue : evaluate(storyArgument(init), bindings),
       );
-      const isSkipped = skipped(
+      const isSkipped = storySkipped(
         testTags,
         member(metaValue, 'tags'),
-        member(story, 'tags'),
+        story,
+        testOptions.map((options) =>
+          options === undefined ? undefined : evaluate(options, bindings),
+        ),
       );
 
       if (isSkipped === true) {
@@ -186,6 +197,36 @@ export function classifyStubs(
   return { stories, stubs };
 }
 
+/** Storybook 10.6.5 runs each `.test()` call on a factory story as a test of its own, so one of them can run when the story's own test is skipped. */
+function storySkipped(
+  testTags: TestTags,
+  metaTags: unknown,
+  story: unknown,
+  testOptions: readonly unknown[],
+): boolean | 'unknown' {
+  const base = skipped(testTags, metaTags, member(story, 'tags'));
+
+  if (base !== true) {
+    return base;
+  }
+
+  const children = testOptions.map((options) => {
+    const child = skipped(
+      testTags,
+      metaTags,
+      childTags(member(story, 'tags'), member(options, 'tags')),
+    );
+
+    return child === false && member(options, 'parameters') !== undefined
+      ? 'unknown'
+      : child;
+  });
+
+  return children.includes('unknown')
+    ? 'unknown'
+    : children.every((child) => child === true);
+}
+
 /** Storybook 10.6.5 test-utils.ts `testStory` checks skip tags on the tags prepareStory.ts composes at run time, which hold no play-fn. */
 function skipped(
   { previewTags, skip }: TestTags,
@@ -206,6 +247,16 @@ function skipped(
   const tags = combineTags('dev', 'test', ...previewTags, ...meta, ...story);
 
   return skip.some((tag) => tags.includes(tag));
+}
+
+/** Storybook 10.6.5 csf-factories.ts `test` extends the story with these tags, which `extend` combines. */
+function childTags(storyTags: unknown, optionTags: unknown): unknown {
+  const story = tagList(storyTags);
+  const own = tagList(optionTags);
+
+  return story === undefined || own === undefined
+    ? unknownValue
+    : combineTags(...story, 'test-fn', '!autodocs', ...own);
 }
 
 function tagList(value: unknown): readonly string[] | undefined {
@@ -281,17 +332,19 @@ function contains(node: unknown, position: number): boolean {
   );
 }
 
-const decisiveSettings: readonly (readonly [ResetKey, boolean, ResetBranch])[] =
-  [
-    ['mockReset', true, 'reset'],
-    ['clearMocks', true, 'clear'],
-    ['restoreMocks', false, 'none'],
-  ];
+const decisiveSettings: Readonly<
+  Record<ResetKey, readonly [boolean, ResetBranch]>
+> = {
+  mockReset: [true, 'reset'],
+  clearMocks: [true, 'clear'],
+  restoreMocks: [false, 'none'],
+};
 
 function branchOf(levels: readonly ResetSettings[]): ResetBranch {
   return (
-    decisiveSettings
-      .map(([key, decisive, branch]) => {
+    resetKeys
+      .map((key) => {
+        const [decisive, branch] = decisiveSettings[key];
         const setting = levels.reduce<ResetSetting | undefined>(
           (value, level) => level[key] ?? value,
           undefined,

@@ -170,22 +170,34 @@ export interface CsfFile {
   readonly stories: readonly StoryExport[];
 }
 
-export function csfFile(body: readonly unknown[], bindings: Bindings): CsfFile {
+/** `isIndexed` picks the stories, as Storybook's story index lists them, in place of the package's own reading of the exports. */
+export function csfFile(
+  body: readonly unknown[],
+  bindings: Bindings,
+  isIndexed?: (named: NamedExport) => boolean,
+): CsfFile {
   const metas = factoryMetas(body, bindings);
   const metaObjects = [
     defaultExport(body),
     ...metas.map((init) => list(field(init, 'arguments'))[0]),
   ].flatMap((meta) => objectOf(meta, bindings));
+  const isFactoryFile = metas.length > 0;
 
   return {
     metaObjects,
-    stories: storyExports(body, bindings, metaObjects, metas.length > 0),
+    stories: storyExports(
+      body,
+      bindings,
+      isFactoryFile,
+      isIndexed ?? storyFilter(metaObjects, isFactoryFile),
+    ),
   };
 }
 
 function storyFilter(
   metaObjects: readonly unknown[],
-): (name: unknown) => boolean {
+  isFactoryFile: boolean,
+): (named: NamedExport) => boolean {
   const [includeStories, excludeStories] = [
     'includeStories',
     'excludeStories',
@@ -195,28 +207,23 @@ function storyFilter(
       .find((value) => value !== undefined),
   );
 
-  return (name) => isExportStory(name, includeStories, excludeStories);
+  return ({ name, init }) =>
+    name !== '__namedExportsOrder' &&
+    isExportStory(name, includeStories, excludeStories) &&
+    (!isFactoryFile || isStoryFactoryCall(unwrap(init)));
 }
 
 function storyExports(
   body: readonly unknown[],
   bindings: Bindings,
-  metaObjects: readonly unknown[],
   isFactoryFile: boolean,
+  isStory: (named: NamedExport) => boolean,
 ): readonly StoryExport[] {
-  const isStory = storyFilter(metaObjects);
-  const exports = namedExports(body, bindings);
-  const isFactoryStory = ({ init }: NamedExport): boolean =>
-    isStoryFactoryCall(unwrap(init));
   const assignments = body.flatMap(assignmentOf);
+  const testCalls = body.flatMap(testCallOf);
 
-  return exports
-    .filter(
-      (named) =>
-        named.name !== '__namedExportsOrder' &&
-        isStory(named.name) &&
-        (!isFactoryFile || isFactoryStory(named)),
-    )
+  return namedExports(body, bindings)
+    .filter(isStory)
     .map(({ name, local, init, form }) => {
       const storyAssignments = assignments.filter(
         ({ target }) => target === local,
@@ -226,6 +233,13 @@ function storyExports(
         name,
         local,
         init,
+        testOptions: isStoryFactoryCall(unwrap(init))
+          ? testCalls
+              .filter(({ target }) => target === local)
+              .map(({ args: [, ...rest] }) =>
+                rest.length > 1 ? rest[0] : undefined,
+              )
+          : [],
         tested:
           form === 'declaration' ||
           (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
@@ -241,6 +255,8 @@ export interface StoryExport {
   readonly name: string;
   readonly local: unknown;
   readonly init: unknown;
+  /** The options argument of each `.test()` call on a factory story, `undefined` for a call without one; Storybook 10.6.5 runs other stories' `.test()` calls as the story itself. */
+  readonly testOptions: readonly unknown[];
   /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
   readonly tested: boolean;
   readonly assignments: readonly Assignment[];
