@@ -394,6 +394,17 @@ test("with webServer.mutate: 'auto', a process that did not run the dry run foll
   assert.equal(fake.setups.length, 1);
 });
 
+test("with webServer.mutate: 'auto', a process that follows the dry run's off decision tells the webServer no active mutant", async (t) => {
+  const fake = serverFake(t);
+  writeServerMutantsFile(fake.sandbox, []);
+  const { shell } = fake.runner({ mutate: 'auto' });
+  await shell.init();
+
+  await shell.mutantRun(runtimeRun('1'));
+
+  assert.deepEqual(fake.controls, [undefined]);
+});
+
 test('isolate keeps the webServer between runs the server did not run in the dry run', async (t) => {
   const fake = serverFake(t, { runTests: passAllWithDryRunServerMutants('2') });
   const { shell } = fake.runner();
