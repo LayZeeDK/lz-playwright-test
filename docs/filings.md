@@ -1071,6 +1071,17 @@ ruled out in favour of reading Storybook's index. `lz-tpp` step 4 recommends the
 offers simpler tests or refactorings; it has no step for a candidate a ruling forbids before any attempt. Evidence:
 `r8fix/notes.md`, "lz-tdd friction".
 
+**O147. A green's part whose only pin is the next commit's `test-after` (adds to O140).** In the round 9 fixes, the
+green counted index rows and calls per test name, which the red did not require: a total count passed it too.
+Replacing either name filter with `true` left all 530 tests green in the fix commit; the next commit's planned pin
+killed both. Neither `lz-tpp` nor `test-first.md` says whether to narrow such a part to what the red asks, or to pull
+the later test into the same commit. Evidence: `r9fix/notes.md`, "lz-tdd friction"; `r9fix/cycles.log`.
+
+**O148. A green that makes an older guard unreachable while the type checker keeps it (adds to O83).** In the same
+fixes, the new count check made a `call === undefined` guard unreachable. `lz-refactor` cannot remove it, because the
+type needs it, and `lz-red` cannot pin it. The cycle log has no place to record that a green turned a pinnable part
+into a type-only one. Evidence: `r9fix/notes.md`, "lz-tdd friction".
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
