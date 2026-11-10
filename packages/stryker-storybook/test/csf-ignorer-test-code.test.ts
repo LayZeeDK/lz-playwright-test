@@ -87,6 +87,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('places a play function assigned to an export that excludeStories matches', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b', excludeStories: ['Hidden'] };\nexport const Hidden = {};\nHidden.play = async () => {\n  await x(1 + 1);\n};",
+        )
+      ).filter((outcome) => /^[34] /.test(outcome)),
+      ['3 BlockStatement placed', '4 ArithmeticOperator placed'],
+    );
+  });
+
   it("ignores the meta's play function", async () => {
     const { outcomes } = setup();
 
@@ -193,6 +206,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('places a .test() call on an object that is not a story', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\n/a/.test(1 + 1 === 2 ? 'a' : 'b');",
+        )
+      ).filter((outcome) => outcome.startsWith('2 ArithmeticOperator')),
+      ['2 ArithmeticOperator placed'],
+    );
+  });
+
   it("ignores a story's beforeEach", async () => {
     const { outcomes } = setup();
 
@@ -265,6 +291,19 @@ describe('lz-storybook-csf', () => {
         `5 ArrayDeclaration ${mswReason}`,
         `5 StringLiteral ${mswReason}`,
       ],
+    );
+  });
+
+  it('places the msw value in parameters assigned to an object that is not a story', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nconst helper = {};\nhelper.parameters = {\n  msw: { handlers: [] },\n};",
+        )
+      ).filter((outcome) => outcome.startsWith('4 ')),
+      ['4 ObjectLiteral placed', '4 ArrayDeclaration placed'],
     );
   });
 

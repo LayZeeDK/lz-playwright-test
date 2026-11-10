@@ -52,7 +52,7 @@ export function csfShapes(program: unknown): CsfShapes {
       .map((meta) => propertyValue(meta, key))
       .find((value) => value !== undefined),
   );
-  const stories = [
+  const storyExports = [
     ...namedExports(program),
     ...body.flatMap((statement) =>
       assigned(statement, 'story').map((init) => ({
@@ -60,8 +60,9 @@ export function csfShapes(program: unknown): CsfShapes {
         init,
       })),
     ),
-  ]
-    .filter(({ name }) => isExportStory(name, includeStories, excludeStories))
+  ].filter(({ name }) => isExportStory(name, includeStories, excludeStories));
+  const storyNames = storyExports.map(({ name }) => name);
+  const stories = storyExports
     .map(({ init }) => storyNode(unwrap(init), bindings))
     .filter(
       (init) =>
@@ -69,60 +70,70 @@ export function csfShapes(program: unknown): CsfShapes {
           field(init, 'type') === 'ArrowFunctionExpression') &&
         !metaObjects.includes(init),
     );
+  const storyAnnotations = (key: string): readonly unknown[] => [
+    ...stories.map((story) => propertyValue(story, key)),
+    ...body.flatMap((statement) =>
+      storyNames.includes(
+        field(statement, 'expression', 'left', 'object', 'name'),
+      )
+        ? assigned(statement, key)
+        : [],
+    ),
+  ];
+  const annotations = (key: string): readonly unknown[] =>
+    [
+      ...metaObjects.map((meta) => propertyValue(meta, key)),
+      ...storyAnnotations(key),
+    ].flatMap((value) => withInit(value, bindings));
   const idParameters = stories
     .map((story) => propertyValue(story, 'parameters'))
     .filter((parameters) => propertyValue(parameters, '__id') !== undefined);
-  const testStatements = body.filter(
-    (statement) => testArguments(statement).length > 0,
-  );
-  const testCalls = testStatements.map(testArguments);
-  const testOptions = testCalls
-    .filter((testArgs) => testArgs.length === 3)
-    .map((testArgs) => followed(testArgs[1], bindings));
+  const testCalls = body.flatMap((statement) => {
+    const [name, ...rest] = testArguments(statement);
+
+    return name !== undefined &&
+      storyNames.includes(
+        field(statement, 'expression', 'callee', 'object', 'name'),
+      )
+      ? [
+          {
+            statement,
+            name,
+            options:
+              rest.length > 1 ? followed(rest[0], bindings) : undefined,
+            testFunction: followed(rest.at(-1), bindings),
+          },
+        ]
+      : [];
+  });
 
   return {
     metaObjects: nodeSet(metaObjects),
-    literalContainers: nodeSet([...stories, ...idParameters, ...testOptions]),
+    literalContainers: nodeSet([
+      ...stories,
+      ...idParameters,
+      ...testCalls.map(({ options }) => options),
+    ]),
     testCode: nodeSet([
-      ...[...metaObjects, ...stories].flatMap((object) =>
-        testKeys.flatMap((key) =>
-          withInit(propertyValue(object, key), bindings),
-        ),
-      ),
-      ...body.flatMap((statement) =>
-        testKeys.flatMap((key) =>
-          assigned(statement, key).flatMap((value) =>
-            withInit(value, bindings),
-          ),
-        ),
-      ),
-      ...testStatements,
-      ...testCalls.map((testArgs) => followed(testArgs.at(-1), bindings)),
+      ...testKeys.flatMap(annotations),
+      ...testCalls.flatMap(({ statement, testFunction }) => [
+        statement,
+        testFunction,
+      ]),
     ]),
     mswValues: nodeSet(
-      [
-        ...stories.map((story) => propertyValue(story, 'parameters')),
-        ...body.flatMap((statement) => assigned(statement, 'parameters')),
-      ].map((parameters) => propertyValue(parameters, 'msw')),
+      storyAnnotations('parameters').map((parameters) =>
+        propertyValue(parameters, 'msw'),
+      ),
     ),
     staticValues: nodeSet([
-      ...[...metaObjects, ...stories].flatMap((object) =>
-        staticKeys.flatMap((key) =>
-          withInit(propertyValue(object, key), bindings),
-        ),
-      ),
+      ...staticKeys.flatMap(annotations),
       ...idParameters.map((parameters) => propertyValue(parameters, '__id')),
-      ...body.flatMap((statement) => [
-        ...assigned(statement, 'storyName'),
-        ...assigned(statement, 'tags').flatMap((tags) =>
-          withInit(tags, bindings),
-        ),
-      ]),
       bindings.get('__namedExportsOrder'),
-      ...testCalls.map((testArgs) => testArgs[0]),
-      ...testOptions.flatMap((options) =>
-        withInit(propertyValue(options, 'tags'), bindings),
-      ),
+      ...testCalls.flatMap(({ name, options }) => [
+        name,
+        ...withInit(propertyValue(options, 'tags'), bindings),
+      ]),
       ...specifiers.map((specifier) => field(specifier, 'exported')),
     ]),
   };

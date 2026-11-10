@@ -286,6 +286,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('places tags assigned to an object that is not a story', async () => {
+    const { outcomes } = setup('mutate');
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nconst helper = {};\nhelper.tags = ['x'];",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      ['3 ArrayDeclaration placed', '3 StringLiteral placed'],
+    );
+  });
+
   it('keeps __namedExportsOrder as written', async () => {
     const { outcomes } = setup();
 
