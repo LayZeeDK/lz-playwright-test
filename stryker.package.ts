@@ -10,7 +10,7 @@ export function packageConfig(name: string): PartialStrykerOptions {
   const dir = `packages/${name}`;
   const reportDir = `reports/mutation/${name}`;
   const runner: PartialStrykerOptions =
-    nodeTestRunner === undefined
+    nodeTestRunner === undefined || nodeTestRunner === ''
       ? {
           testRunner: 'command',
           commandRunner: {

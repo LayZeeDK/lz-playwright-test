@@ -94,10 +94,12 @@ test files on every core, and mutants would time out without being killed. For t
 Set `LZ_NODE_TEST_RUNNER` to the `src/index.ts` of an `@layzee/stryker-node-test-runner` checkout to run any of the
 four configs with that runner instead, which runs only the tests that cover each mutant; the default `command`
 runner reruns the whole suite for every mutant. The runner is not on npm, so the command runner stays the default.
+An empty `LZ_NODE_TEST_RUNNER` counts as unset.
 
 The TypeScript checker resolves the JSX mutators' `@babel/core` from `packages/stryker-jsx-mutators/node_modules`.
-Stryker links only real `node_modules` folders into its sandbox, so in a worktree whose package `node_modules` are
-junctions, the checker stops with TS7016 on `@babel/core`. Run Stryker from the main checkout.
+Stryker links only real `node_modules` folders into its sandbox. A copy of this workspace whose package
+`node_modules` were junctions stopped the checker with TS7016 on `@babel/core`, most likely for that reason. Run
+Stryker from the main checkout.
 
 To run Stryker on the demo app, use `npx nx run @layzee/demo-app-e2e:mutate-e2e`,
 `npx nx run @layzee/demo-app-e2e:mutate-e2e-ui`, or `npx nx run @layzee/demo-app:mutate-ct`. Each
