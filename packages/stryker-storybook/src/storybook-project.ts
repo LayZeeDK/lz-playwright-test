@@ -117,9 +117,15 @@ function fallbackProject(
 function readPreview(configDir: string): ResetSettings {
   const file = getInterpretedFile(join(configDir, 'preview'));
 
-  return file === undefined
-    ? {}
-    : readPreviewTest(parseProgram(readFileSync(file, 'utf8'), file));
+  if (file === undefined) {
+    return {};
+  }
+
+  try {
+    return readPreviewTest(parseProgram(readFileSync(file, 'utf8'), file));
+  } catch {
+    return 'unreadable';
+  }
 }
 
 function loadStorybook(configDir: string): LoadResult {

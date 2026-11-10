@@ -40,12 +40,22 @@ const commentKeys = new Set([
 export function selfScan(
   project: StorybookProject,
   isReported: (fileName: string) => boolean,
+  onUnparsable: (fileName: string, error: unknown) => void,
 ): readonly ScannedStub[] {
   return storyFilePaths(project)
     .filter((fileName) => /\.[cm]?[jt]sx?$/.test(fileName))
     .filter((fileName) => !isReported(fileName))
     .flatMap((fileName) => {
-      const program = parseProgram(readFileSync(fileName, 'utf8'), fileName);
+      const program = parseStoryFile(
+        readFileSync(fileName, 'utf8'),
+        fileName,
+        onUnparsable,
+      );
+
+      if (program === undefined) {
+        return [];
+      }
+
       const verdicts = siteVerdicts(program, project);
       const sites = stubSites(program, new Set(verdicts.keys()));
 
@@ -57,6 +67,20 @@ export function selfScan(
           : [{ fileName, line: site.line, ...describeVerdict(verdict) }];
       });
     });
+}
+
+function parseStoryFile(
+  code: string,
+  fileName: string,
+  onUnparsable: (fileName: string, error: unknown) => void,
+): ReturnType<typeof parseProgram> | undefined {
+  try {
+    return parseProgram(code, fileName);
+  } catch (error) {
+    onUnparsable(fileName, error);
+
+    return undefined;
+  }
 }
 
 function storyFilePaths(project: StorybookProject): readonly string[] {

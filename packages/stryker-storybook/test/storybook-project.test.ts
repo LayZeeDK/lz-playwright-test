@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { describe, it, type TestContext } from 'node:test';
@@ -90,6 +90,20 @@ describe('storybookProject', () => {
 
       assert.deepEqual(project.previewTest, { restoreMocks: false });
     });
+  });
+
+  it('reads a preview it cannot parse as unreadable', (t) => {
+    const root = mkdtempSync(join(tmpdir(), 'lz-storybook-project-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    mkdirSync(join(root, '.storybook'));
+    writeFileSync(join(root, '.storybook', 'preview.ts'), 'export const = ;\n');
+
+    const project = storybookProject(join(root, '.storybook'), {
+      info: () => undefined,
+      warn: () => undefined,
+    });
+
+    assert.equal(project.previewTest, 'unreadable');
   });
 
   describe('with a main file that lists story globs', () => {

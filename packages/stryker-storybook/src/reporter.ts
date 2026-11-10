@@ -132,6 +132,10 @@ export function storybookReporter(options: object, log: ProjectLog) {
           : selfScan(
               storybook(),
               (fileName) => projectPath(fileName) in files,
+              (fileName, error) =>
+                log.warn(
+                  `${packageName}: Babel could not parse ${projectPath(fileName)}, so lz-storybook skipped its spy stubs: ${error instanceof Error ? error.message : String(error)}`,
+                ),
             ).map(({ fileName, ...finding }) => ({
               file: projectPath(fileName),
               ...finding,

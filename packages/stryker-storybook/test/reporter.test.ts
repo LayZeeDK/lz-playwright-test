@@ -556,6 +556,33 @@ describe('storybookReporter', () => {
     assert.deepEqual(findings(), []);
   });
 
+  it('reports the other story files when one cannot be parsed', (t) => {
+    const { reporter, findings, projectDir } = setup(t);
+    writeStory(projectDir, 'Broken.stories.tsx', 'export const = ;\n');
+    writeStory(projectDir, 'Meta.stories.tsx', erasedStub);
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(
+      findings().map((finding) => isRecord(finding) && finding['file']),
+      ['src/Meta.stories.tsx'],
+    );
+  });
+
+  it('warns once, naming a story file it cannot parse', (t) => {
+    const { reporter, lines, projectDir } = setup(t);
+    writeStory(projectDir, 'Broken.stories.tsx', 'export const = ;\n');
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(
+      lines.filter((line) => line.startsWith('warn: ')),
+      [
+        'warn: @layzee/stryker-storybook: Babel could not parse src/Broken.stories.tsx, so lz-storybook skipped its spy stubs: Unexpected token (1:13)',
+      ],
+    );
+  });
+
   it('scans no story file when the spy stub mutator is in excludedMutations', (t) => {
     const { reporter, findings, projectDir } = setup(t, 'no-main', {
       mutator: { excludedMutations: ['LzStorybookSpyStub'] },

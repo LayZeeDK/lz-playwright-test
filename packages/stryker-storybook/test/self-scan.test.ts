@@ -15,7 +15,11 @@ describe('selfScan', () => {
       warn: () => undefined,
     });
 
-    const scanned = selfScan(project, () => false);
+    const scanned = selfScan(
+      project,
+      () => false,
+      () => undefined,
+    );
 
     assert.deepEqual(
       scanned.map(({ fileName }) => fileName.split('/').slice(-2).join('/')),
