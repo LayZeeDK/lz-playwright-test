@@ -6,10 +6,14 @@ import { fileURLToPath } from 'node:url';
 
 import { withEnv } from '../../src/process-env.ts';
 import { loadPlaywright } from '../../src/playwright-internals.ts';
-import { type RunSettings, runSettingsEnv } from '../../src/protocol.ts';
+import {
+  hookTestNamespaceEnv,
+  type RunSettings,
+  runSettingsEnv,
+} from '../../src/protocol.ts';
 import { LzPlaywrightCollectingReporter } from '../../src/reporter.ts';
 import { testIdHeader } from '../../src/server-protocol.ts';
-import { tempTree } from './doubles.ts';
+import { hookNamespace, tempTree } from './doubles.ts';
 
 const packageJson = fileURLToPath(
   new URL('../../package.json', import.meta.url),
@@ -61,8 +65,10 @@ export async function headersOfRun(
 
   const { status } = await withEnv(
     {
-      NODE_OPTIONS: `--import "${workerHookUrl}"`,
+      NODE_OPTIONS:
+        `--import "${workerHookUrl}" ${process.env['NODE_OPTIONS'] ?? ''}`.trim(),
       [runSettingsEnv]: JSON.stringify(settings),
+      [hookTestNamespaceEnv]: hookNamespace,
     },
     () =>
       playwright.runTests(reporter, {

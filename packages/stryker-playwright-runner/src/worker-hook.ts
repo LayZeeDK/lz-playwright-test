@@ -30,6 +30,7 @@ import {
   frameReadTimeoutMs,
   installErrorSuffix,
   type PageSettings,
+  readHookTestNamespace,
   readRunSettings,
   type RunSettings,
   serializeSnapshot,
@@ -136,7 +137,7 @@ if (
   Reflect.set(globalThis, installed, installed);
 
   try {
-    install(createRequire(entry), settings);
+    install(createRequire(entry), settings, readHookTestNamespace(process.env));
   } catch (error) {
     try {
       fs.writeFileSync(

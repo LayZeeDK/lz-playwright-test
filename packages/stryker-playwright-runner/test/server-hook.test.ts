@@ -7,8 +7,6 @@ import https from 'node:https';
 import path from 'node:path';
 import { before, test } from 'node:test';
 
-import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
-
 import { readSnapshotDir } from '../src/protocol.ts';
 import {
   anyHooked,
@@ -19,12 +17,13 @@ import {
 } from '../src/server-protocol.ts';
 import { withoutPrototypes } from './support/doubles.ts';
 import {
-  appMutantIdsOf,
+  appActiveMutantEnv,
   bigRequestIds,
   coverageOf,
   instrumentApp,
   moduleScopeAndBigRequestIds,
   moduleScopeAndSmallRequestIds,
+  mutantIdsOf,
   perTestKeysOf,
   smallRequestIds,
   startHeaderEcho,
@@ -105,7 +104,7 @@ test('an http2 server collects coverage per test id header', async (t) => {
   );
 
   assert.deepEqual(
-    appMutantIdsOf(coverageOf(outDir).perTest['big']),
+    mutantIdsOf(coverageOf(outDir).perTest['big']),
     bigRequestIds,
   );
 });
@@ -183,7 +182,7 @@ test('a mutant run once at module scope is active only in a server started with 
   assert.equal(await switched.ask({ n: 2 }), 'hi many');
 
   const started = await startServer(t, {
-    env: { [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: '0' },
+    env: { [appActiveMutantEnv]: '0' },
   });
   started.run({ perTest: false, activeMutant: '0' });
 
@@ -203,7 +202,7 @@ test('code the server runs in a vm realm reports no coverage and gets only the m
 
   const started = await startServer(t, {
     server: 'vm-realm-answer',
-    env: { [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: '2' },
+    env: { [appActiveMutantEnv]: '2' },
   });
   started.run({ perTest: false });
 
@@ -231,12 +230,12 @@ test('coverage goes to the run folder per test id header, with what ran before t
     readdirSync(first).every((file) => file.startsWith(serverSnapshotPrefix)),
   );
   assert.deepEqual(
-    appMutantIdsOf(coverage.static),
+    mutantIdsOf(coverage.static),
     moduleScopeAndBigRequestIds,
     'module scope, and a request before any run, such as a readiness check',
   );
-  assert.deepEqual(appMutantIdsOf(coverage.perTest['big']), bigRequestIds);
-  assert.deepEqual(appMutantIdsOf(coverage.perTest['small']), smallRequestIds);
+  assert.deepEqual(mutantIdsOf(coverage.perTest['big']), bigRequestIds);
+  assert.deepEqual(mutantIdsOf(coverage.perTest['small']), smallRequestIds);
   assert.equal(coverage.perTest['before-any-run'], undefined);
   assert.deepEqual(
     withoutPrototypes(coverageOf(second)),
@@ -278,7 +277,7 @@ test('hits a request makes after its response ended reach the run folder when th
   await server.ask({ n: 0, testId: 'small' });
   await server.exited;
 
-  assert.deepEqual(appMutantIdsOf(coverageOf(outDir).perTest['small']), [
+  assert.deepEqual(mutantIdsOf(coverageOf(outDir).perTest['small']), [
     '1',
     '2',
     '3',
@@ -296,8 +295,8 @@ test("module scope evaluated lazily inside a request is static, and the rest of 
 
   const coverage = coverageOf(outDir);
 
-  assert.deepEqual(appMutantIdsOf(coverage.static), ['0']);
-  assert.deepEqual(appMutantIdsOf(coverage.perTest['big']), bigRequestIds);
+  assert.deepEqual(mutantIdsOf(coverage.static), ['0']);
+  assert.deepEqual(mutantIdsOf(coverage.perTest['big']), bigRequestIds);
 });
 
 test('hits count as static only until the microtask after the first read of the namespace global', async (t) => {
@@ -340,8 +339,8 @@ test('a second copy of the hook leaves lazily evaluated module scope static', as
 
   const coverage = coverageOf(outDir);
 
-  assert.deepEqual(appMutantIdsOf(coverage.static), ['0']);
-  assert.deepEqual(appMutantIdsOf(coverage.perTest['big']), bigRequestIds);
+  assert.deepEqual(mutantIdsOf(coverage.static), ['0']);
+  assert.deepEqual(mutantIdsOf(coverage.perTest['big']), bigRequestIds);
 });
 
 test('without per-test coverage lazily evaluated module scope and the request are static', async (t) => {
@@ -352,10 +351,7 @@ test('without per-test coverage lazily evaluated module scope and the request ar
   const coverage = coverageOf(outDir);
 
   assert.deepEqual(Object.keys(coverage.perTest), []);
-  assert.deepEqual(
-    appMutantIdsOf(coverage.static),
-    moduleScopeAndBigRequestIds,
-  );
+  assert.deepEqual(mutantIdsOf(coverage.static), moduleScopeAndBigRequestIds);
 });
 
 test('assigning the namespace global is ignored, not a throw', async (t) => {
@@ -405,10 +401,7 @@ test('without per-test coverage every hit is static, header or not', async (t) =
   const coverage = coverageOf(outDir);
 
   assert.deepEqual(Object.keys(coverage.perTest), []);
-  assert.deepEqual(
-    appMutantIdsOf(coverage.static),
-    moduleScopeAndSmallRequestIds,
-  );
+  assert.deepEqual(mutantIdsOf(coverage.static), moduleScopeAndSmallRequestIds);
 });
 
 test("a run's hit count counts only the active mutant's hits in that run", async (t) => {

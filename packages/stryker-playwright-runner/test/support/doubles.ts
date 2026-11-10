@@ -26,6 +26,8 @@ import { dryRunBudget } from '../../src/timeouts.ts';
 
 export type Outcome = ReturnType<TestCase['outcome']>;
 
+export const hookNamespace = '__stryker_hook_test__';
+
 export function tempTree(
   t: TestContext,
   prefix: string,

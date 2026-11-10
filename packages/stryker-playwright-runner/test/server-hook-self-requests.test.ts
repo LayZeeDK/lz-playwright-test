@@ -5,11 +5,11 @@ import { before, test } from 'node:test';
 
 import { untaggedArrival } from '../src/server-protocol.ts';
 import {
-  appMutantIdsOf,
   bigRequestIds,
   coverageOf,
   instrumentApp,
   moduleScopeAndBigRequestIds,
+  mutantIdsOf,
   perTestKeysOf,
   smallRequestIds,
   startHeaderEcho,
@@ -72,7 +72,7 @@ before(instrumentApp);
       'hi many',
     );
     assert.deepEqual(
-      appMutantIdsOf(coverageOf(outDir).perTest['big']),
+      mutantIdsOf(coverageOf(outDir).perTest['big']),
       bigRequestIds,
     );
   });
@@ -97,8 +97,8 @@ before(instrumentApp);
 
     const coverage = coverageOf(outDir);
 
-    assert.deepEqual(appMutantIdsOf(coverage.perTest['small']), bigRequestIds);
-    assert.deepEqual(appMutantIdsOf(coverage.perTest['big']), []);
+    assert.deepEqual(mutantIdsOf(coverage.perTest['small']), bigRequestIds);
+    assert.deepEqual(mutantIdsOf(coverage.perTest['big']), []);
   });
 });
 
@@ -138,8 +138,8 @@ test('requests two tests make at once each send their own test id to the server 
 
   const coverage = coverageOf(outDir);
 
-  assert.deepEqual(appMutantIdsOf(coverage.perTest['big']), bigRequestIds);
-  assert.deepEqual(appMutantIdsOf(coverage.perTest['small']), smallRequestIds);
+  assert.deepEqual(mutantIdsOf(coverage.perTest['big']), bigRequestIds);
+  assert.deepEqual(mutantIdsOf(coverage.perTest['small']), smallRequestIds);
 });
 
 test('without per-test coverage a request the server sends itself is static', async (t) => {
@@ -154,10 +154,7 @@ test('without per-test coverage a request the server sends itself is static', as
   const coverage = coverageOf(outDir);
 
   assert.deepEqual(Object.keys(coverage.perTest), []);
-  assert.deepEqual(
-    appMutantIdsOf(coverage.static),
-    moduleScopeAndBigRequestIds,
-  );
+  assert.deepEqual(mutantIdsOf(coverage.static), moduleScopeAndBigRequestIds);
 });
 
 test('a request the server sends itself after the response ended still counts under the test of the request that started it', async (t) => {
@@ -173,7 +170,7 @@ test('a request the server sends itself after the response ended still counts un
     'hi many',
   );
   assert.deepEqual(
-    appMutantIdsOf(coverageOf(outDir).perTest['big']),
+    mutantIdsOf(coverageOf(outDir).perTest['big']),
     bigRequestIds,
   );
 });
@@ -194,7 +191,7 @@ test('a test id header the server forwards to a second hooked server counts ther
     'hi many',
   );
   assert.deepEqual(
-    appMutantIdsOf(coverageOf(secondOutDir).perTest['big']),
+    mutantIdsOf(coverageOf(secondOutDir).perTest['big']),
     bigRequestIds,
   );
 });
@@ -221,7 +218,7 @@ test('a request the server sends itself with raw array headers still goes out, w
     }),
     'hi many',
   );
-  assert.deepEqual(appMutantIdsOf(coverageOf(outDir).perTest['big']), []);
+  assert.deepEqual(mutantIdsOf(coverageOf(outDir).perTest['big']), []);
 });
 
 test('a request the server sends itself with fetch and the test id header name as another header value still names the test', async (t) => {
@@ -237,7 +234,7 @@ test('a request the server sends itself with fetch and the test id header name a
     'hi many',
   );
   assert.deepEqual(
-    appMutantIdsOf(coverageOf(outDir).perTest['big']),
+    mutantIdsOf(coverageOf(outDir).perTest['big']),
     bigRequestIds,
   );
 });
