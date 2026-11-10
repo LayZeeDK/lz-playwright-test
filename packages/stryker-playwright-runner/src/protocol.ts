@@ -12,7 +12,7 @@ export const runSettingsEnv = 'LZ_STRYKER_PLAYWRIGHT_RUN';
  * The global the hooks manage in place of Stryker's, for the hooks' own tests: under Stryker the test's
  * instrumented copy of a hook keeps Stryker's global.
  */
-export const hookNamespaceEnv = 'LZ_STRYKER_PLAYWRIGHT_NAMESPACE';
+export const hookTestNamespaceEnv = 'LZ_STRYKER_PLAYWRIGHT_HOOK_TEST_NAMESPACE';
 
 export const snapshotSuffix = '.ndjson';
 
@@ -184,6 +184,14 @@ function coveredMutants(coverage: MutantCoverage | undefined): string[] {
     ...Object.keys(coverage.static),
     ...Object.values(coverage.perTest).flatMap((hits) => Object.keys(hits)),
   ];
+}
+
+export function readHookTestNamespace(
+  env: NodeJS.ProcessEnv,
+): string | undefined {
+  const name = env[hookTestNamespaceEnv];
+
+  return name === undefined || name === '' ? undefined : name;
 }
 
 export function readRunSettings(

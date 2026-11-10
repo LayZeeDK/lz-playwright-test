@@ -5,12 +5,13 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import type { TestContext } from 'node:test';
+import { setTimeout } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 import { Instrumenter } from '@stryker-mutator/instrumenter';
 
-import { hookNamespaceEnv, readSnapshotDir } from '../../src/protocol.ts';
+import { hookTestNamespaceEnv, readSnapshotDir } from '../../src/protocol.ts';
 import { mergeCoverage } from '../../src/run-result.ts';
 import {
   type ServerControl,
@@ -41,8 +42,10 @@ export const smallRequestIds = ['1', '2', '3', '4', '5', '7'];
 export const moduleScopeAndBigRequestIds = ['0', ...bigRequestIds];
 export const moduleScopeAndSmallRequestIds = ['0', ...smallRequestIds];
 const testIdsTheseTestsSend = ['big', 'small'];
+const stopTimeoutMs = 5000;
 // Under Stryker the runner's active mutant reaches the server, where it is the hook's, not the app's.
 export const appActiveMutantEnv = '__STRYKER_HOOK_TEST_ACTIVE_MUTANT__';
+
 type ServerProgram =
   | 'answer'
   | 'answer-continue'
@@ -109,7 +112,7 @@ export async function startServer(
     'server.mjs': readFileSync(
       new URL(`servers/${server}.mjs`, import.meta.url),
       'utf8',
-    ),
+    ).replaceAll(INSTRUMENTER_CONSTANTS.NAMESPACE, hookNamespace),
     'tls/localhost-key.pem': readFileSync(tlsKeyPath, 'utf8'),
     'tls/localhost-cert.pem': readFileSync(tlsCertPath, 'utf8'),
   });
@@ -128,7 +131,7 @@ export async function startServer(
       env: {
         ...process.env,
         [serverDirEnv]: serverDir,
-        [hookNamespaceEnv]: hookNamespace,
+        [hookTestNamespaceEnv]: hookNamespace,
         ...env,
       },
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -141,11 +144,19 @@ export async function startServer(
   });
   const exited = once(child, 'exit');
   exited.catch(() => undefined);
-  // Not a kill: on Windows that runs no exit listener, so the test runner's hook in the server would lose the
-  // coverage it writes as the server exits.
+  // A kill first would run no exit listener, so the test runner's hook in the server would lose the coverage
+  // it writes as the server exits.
   t.after(async () => {
     child.stdin.end();
-    await exited;
+    const stopped = await Promise.race([
+      exited.then(() => true),
+      setTimeout(stopTimeoutMs, false, { ref: false }),
+    ]);
+
+    if (!stopped) {
+      child.kill();
+      await exited;
+    }
   });
   const exitedFirst = exited.then(([code]) => {
     throw new Error(
@@ -226,7 +237,7 @@ export function perTestKeysOf(outDir: string): string[] {
   );
 }
 
-export function appMutantIdsOf(
+export function mutantIdsOf(
   hits: Record<string, number> | undefined,
 ): string[] {
   return Object.keys(hits ?? {}).sort();

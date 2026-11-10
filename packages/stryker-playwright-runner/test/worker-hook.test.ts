@@ -11,7 +11,7 @@ import type {
 } from '../src/playwright-internals.ts';
 import {
   frameReadTimeoutMs,
-  hookNamespaceEnv,
+  hookTestNamespaceEnv,
   readSnapshotDir,
   runSettingsEnv,
   type RunSettings,
@@ -119,7 +119,7 @@ function runWorker(
       env: {
         ...process.env,
         [runSettingsEnv]: JSON.stringify({ outDir, perTest: false }),
-        [hookNamespaceEnv]: hookNamespace,
+        [hookTestNamespaceEnv]: hookNamespace,
       },
     },
   );

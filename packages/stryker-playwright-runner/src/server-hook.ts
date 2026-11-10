@@ -11,7 +11,7 @@ import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
 import { isRecord } from './is-record.ts';
 import { globalNamespace, markInstrumentedReads } from './namespace.ts';
-import { hookNamespaceEnv, snapshotSuffix } from './protocol.ts';
+import { readHookTestNamespace, snapshotSuffix } from './protocol.ts';
 import {
   hookedPrefix,
   hostKey,
@@ -35,7 +35,7 @@ const installed: unique symbol = Symbol.for(
 
 if (serverDir !== undefined && !(installed in globalThis)) {
   Reflect.set(globalThis, installed, installed);
-  installServerHook(serverDir, process.env[hookNamespaceEnv]);
+  installServerHook(serverDir, readHookTestNamespace(process.env));
 }
 
 /**

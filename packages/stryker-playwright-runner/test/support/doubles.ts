@@ -26,7 +26,6 @@ import { dryRunBudget } from '../../src/timeouts.ts';
 
 export type Outcome = ReturnType<TestCase['outcome']>;
 
-/** The global the hooks under test manage, so that under Stryker their instrumented copies keep Stryker's. */
 export const hookNamespace = '__stryker_hook_test__';
 
 export function tempTree(

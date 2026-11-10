@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { withEnv } from '../../src/process-env.ts';
 import { loadPlaywright } from '../../src/playwright-internals.ts';
 import {
-  hookNamespaceEnv,
+  hookTestNamespaceEnv,
   type RunSettings,
   runSettingsEnv,
 } from '../../src/protocol.ts';
@@ -65,9 +65,10 @@ export async function headersOfRun(
 
   const { status } = await withEnv(
     {
-      NODE_OPTIONS: `--import "${workerHookUrl}"`,
+      NODE_OPTIONS:
+        `--import "${workerHookUrl}" ${process.env['NODE_OPTIONS'] ?? ''}`.trim(),
       [runSettingsEnv]: JSON.stringify(settings),
-      [hookNamespaceEnv]: hookNamespace,
+      [hookTestNamespaceEnv]: hookNamespace,
     },
     () =>
       playwright.runTests(reporter, {

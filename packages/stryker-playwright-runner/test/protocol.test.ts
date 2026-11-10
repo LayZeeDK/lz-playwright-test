@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
+  hookTestNamespaceEnv,
   parseSnapshotLine,
+  readHookTestNamespace,
   readRunSettings,
   readSnapshotDir,
   runSettingsEnv,
@@ -72,6 +74,18 @@ test('a parsed line keeps no coverage that is not a map', () => {
         ?.coverage,
     ),
     { static: {}, perTest: { a: {} } },
+  );
+});
+
+test("the hooks' test namespace is read from the environment, and an empty one counts as unset", () => {
+  assert.equal(readHookTestNamespace({}), undefined);
+  assert.equal(
+    readHookTestNamespace({ [hookTestNamespaceEnv]: '' }),
+    undefined,
+  );
+  assert.equal(
+    readHookTestNamespace({ [hookTestNamespaceEnv]: '__test__' }),
+    '__test__',
   );
 });
 
