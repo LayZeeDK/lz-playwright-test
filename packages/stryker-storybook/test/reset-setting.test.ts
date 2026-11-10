@@ -579,6 +579,28 @@ A.input.parameters = { test: { mockReset: true } };`,
     assert.deepEqual(verdicts, ['erased']);
   });
 
+  it('reads a story made by .extend() on a local story as unknown', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+const Base = meta.story({ parameters: { test: { mockReset: true } } });
+export const B = Base.extend({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story made by .extend() on an exported story as unknown', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({});
+export const A = meta.story({ parameters: { test: { restoreMocks: false } } });
+export const B = A.extend({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
   it('leaves out an object assigned to the input of a factory story', () => {
     const verdicts = verdictsOf(
       `import preview from '../.storybook/preview';
