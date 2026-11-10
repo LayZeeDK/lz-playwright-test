@@ -260,6 +260,16 @@ export const A = { args: { g: fn().mockReturnValue(1) } };`,
     assert.deepEqual(verdicts, ['unknown']);
   });
 
+  it('reads a test parameter given as an array as unknown', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { parameters: { test: [] } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
   it('reads a preview whose parameters spread an import as unreadable', () => {
     const settings = readPreviewTest(
       parseProgram(

@@ -81,6 +81,11 @@ function definePreviewArgument(node: unknown): unknown {
 function testSettings(parameters: unknown): ResetSettings {
   const test = member(parameters, 'test');
 
+  // Storybook 10.6.5 combineParameters lets an array replace an object instead of merging into it.
+  if (Array.isArray(test)) {
+    return unreadableSettings;
+  }
+
   return decisiveSettings.reduce<Partial<Record<ResetKey, ResetSetting>>>(
     (settings, [key]) => {
       const value = member(test, key);
