@@ -245,11 +245,34 @@ test('a worker writes the coverage its app code recorded at exit, as one line', 
   );
 });
 
+test('a worker whose instrumented code loaded writes that at exit, with no coverage', () => {
+  const { ns, lines, exit } = worker({ perTest: false });
+  ns.instrumented = true;
+
+  exit();
+
+  assert.deepEqual(
+    lines.map((line): unknown => JSON.parse(line)),
+    [{ outlivedItsTest: false, instrumented: true }],
+  );
+});
+
+// Stryker's header reads activeMutant as each instrumented file loads, and sets it from the environment.
+test('a read of the active mutant marks the worker instrumented, and a write does not', () => {
+  const { ns } = worker({ perTest: false });
+
+  ns.activeMutant = '5';
+
+  assert.equal(ns.instrumented, undefined);
+  assert.equal(ns.activeMutant, '5');
+  assert.equal(ns.instrumented, true);
+});
+
 test('the active mutant is left for the instrumented code to read from the environment', () => {
   const { ns } = worker({ perTest: true, hitLimit: 10 });
 
   assert.equal(ns.activeMutant, undefined);
-  assert.equal(Object.hasOwn(ns, 'activeMutant'), false);
+  assert.equal(Object.keys(ns).includes('activeMutant'), false);
 });
 
 test('per-test coverage names the test running at the time, and none between tests', () => {
@@ -537,14 +560,15 @@ test('without per-test coverage the init script names no test, and no mutant out
   ]);
 });
 
-test("every new context also gets Stryker's page helpers, after the init script", async (t) => {
+// The helpers' own header reads the active mutant, which must not mark the page instrumented.
+test("every new context also gets Stryker's page helpers, before the init script", async (t) => {
   const hooked = installed(t, { perTest: false, pageHelpers: 'h();' });
 
   const { scripts } = await hooked.context();
 
   assert.deepEqual(
     scripts.map(([script]) => script),
-    [hook.initPage, { content: 'h();' }],
+    [{ content: 'h();' }, hook.initPage],
   );
 });
 
@@ -575,6 +599,19 @@ test('a closing context writes what each frame of each page holds, as one line p
     [frameLine, frameLine].map((line) => JSON.stringify(line)).join('\n') +
       '\n',
   );
+});
+
+test('a closing context writes that a frame loaded instrumented code, though it reached no mutant', async (t) => {
+  const hooked = installed(t, { perTest: false });
+  hooked.namespace().instrumented = true;
+  const created = await hooked.context();
+  created.open(hooked.page().page);
+
+  await created.close();
+
+  assert.deepEqual(hooked.lines(), [
+    { outlivedItsTest: false, instrumented: true },
+  ]);
 });
 
 test('a context closes into the snapshot file once', async (t) => {

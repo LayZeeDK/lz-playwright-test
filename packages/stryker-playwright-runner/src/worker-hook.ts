@@ -7,7 +7,11 @@ import { isMainThread } from 'node:worker_threads';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
 import { isRecord } from './is-record.ts';
-import { globalNamespace, type StrykerNamespace } from './namespace.ts';
+import {
+  globalNamespace,
+  markInstrumentedReads,
+  type StrykerNamespace,
+} from './namespace.ts';
 import {
   type HookedBrowser,
   type HookedContext,
@@ -238,16 +242,18 @@ export function install(
       contexts.set(context, state);
       collectBeforeBrowserCloses(context.browser());
       context.on('page', (page) => collectBeforePageCloses(state, page));
+
+      // First, so the helpers' header reads the active mutant before initPage marks such reads.
+      if (pageHelpers !== undefined) {
+        await context.addInitScript({ content: pageHelpers });
+      }
+
       await context.addInitScript(initPage, {
         ns,
         activeMutant,
         testId: state.testId,
         hitLimit,
       } satisfies PageSettings);
-
-      if (pageHelpers !== undefined) {
-        await context.addInitScript({ content: pageHelpers });
-      }
 
       if (tagHosts !== undefined) {
         await tagPageRequests(context, owningTest, tagHosts);
@@ -347,12 +353,15 @@ export function recordNodeCoverage(
           mutantCoverage: ns.mutantCoverage,
           hitCount: ns.hitCount,
           outlivedItsTest: false,
+          instrumented: ns.instrumented,
         }),
       );
     } catch {
       // Dropped, as above.
     }
   };
+
+  markInstrumentedReads(ns);
 
   if (hitLimit !== undefined) {
     let hits = 0;
@@ -374,7 +383,7 @@ export function recordNodeCoverage(
   }
 
   onExit(() => {
-    if (ns.mutantCoverage === undefined && !ns.hitCount) {
+    if (ns.mutantCoverage === undefined && !ns.hitCount && !ns.instrumented) {
       return;
     }
 
@@ -450,9 +459,10 @@ async function readNamespace(
         return undefined;
       }
 
-      const { mutantCoverage, hitCount }: StrykerNamespace = found;
+      const { mutantCoverage, hitCount, instrumented }: StrykerNamespace =
+        found;
 
-      return { mutantCoverage, hitCount };
+      return { mutantCoverage, hitCount, instrumented };
     }, ns)
     .then(frameRead)
     .catch(() =>
@@ -468,7 +478,11 @@ async function readNamespace(
 
 function frameRead(value: unknown): FrameRead | undefined {
   return isRecord(value)
-    ? { mutantCoverage: value['mutantCoverage'], hitCount: value['hitCount'] }
+    ? {
+        mutantCoverage: value['mutantCoverage'],
+        hitCount: value['hitCount'],
+        instrumented: value['instrumented'],
+      }
     : undefined;
 }
 
@@ -486,6 +500,19 @@ export function initPage({
 
   if (activeMutant !== undefined) {
     s.activeMutant = activeMutant;
+  } else {
+    let value = s.activeMutant;
+    Object.defineProperty(s, 'activeMutant', {
+      configurable: true,
+      get: () => {
+        s.instrumented = true;
+
+        return value;
+      },
+      set: (next: unknown) => {
+        value = next;
+      },
+    });
   }
 
   if (hitLimit !== undefined) {
