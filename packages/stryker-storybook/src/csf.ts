@@ -345,6 +345,12 @@ function propertyValue(object: unknown, key: string): unknown {
     : field(property, 'value');
 }
 
+export const annotationFactories: readonly unknown[] = [
+  'definePreview',
+  'meta',
+  'story',
+];
+
 function storyNode(init: unknown, bindings: Bindings): unknown {
   if (isTemplateBind(init)) {
     return followed(field(init, 'callee', 'object'), bindings);
@@ -352,7 +358,7 @@ function storyNode(init: unknown, bindings: Bindings): unknown {
 
   const method = field(init, 'callee', 'property', 'name');
 
-  return method === 'story' || method === 'extend'
+  return method === 'extend' || annotationFactories.includes(method)
     ? list(field(init, 'arguments'))[0]
     : init;
 }

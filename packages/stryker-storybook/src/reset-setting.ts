@@ -1,4 +1,10 @@
-import { namedExports, storyExports, topLevelBindings, unwrap } from './csf.ts';
+import {
+  annotationFactories,
+  namedExports,
+  storyExports,
+  topLevelBindings,
+  unwrap,
+} from './csf.ts';
 import { isRecord } from './is-record.ts';
 import { field, list } from './node-field.ts';
 import { definitionTimeStubs } from './stub-shape.ts';
@@ -83,7 +89,7 @@ export function classifyStubs(
   const metaTest = testSettings(
     member(
       defaultExport(body, bindings) ??
-        evaluate(annotations(factoryMeta), bindings),
+        evaluate(factoryArgument(factoryMeta), bindings),
       'parameters',
     ),
   );
@@ -95,7 +101,7 @@ export function classifyStubs(
         member(
           assignsParameters(body, name)
             ? unknownValue
-            : evaluate(annotations(init), bindings),
+            : evaluate(factoryArgument(init), bindings),
           'parameters',
         ),
       );
@@ -202,16 +208,10 @@ function defaultExport(
     return undefined;
   }
 
-  return evaluate(annotations(declaration), bindings);
+  return evaluate(factoryArgument(declaration), bindings);
 }
 
-const annotationFactories: readonly unknown[] = [
-  'definePreview',
-  'meta',
-  'story',
-];
-
-function annotations(node: unknown): unknown {
+function factoryArgument(node: unknown): unknown {
   const current = unwrap(node);
 
   return field(current, 'type') === 'CallExpression' &&
