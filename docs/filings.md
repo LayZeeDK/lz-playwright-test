@@ -833,6 +833,17 @@ Evidence: `sb-s4/notes.md` F2.
 line would have kept the green red, so the filter was narrowed to the two body mutators before Green. `lz-red` has no
 word for asserting only the rows built so far. Evidence: `sb-s4/notes.md` F3, `sb-s4/cycles.log` cycle 18.
 
+**O110 (lz-tpp misfit). A parser paired with its builder pays for constants the round trip rules out.** In S3 part
+(b), `parseSpyStubReason` reads back what `spyStubReason` writes. The first green, `(nil -> constant)`, returned one
+verdict's parts for any input; two more tests (a foreign reason, a second verdict) existed only to break that constant
+before the real reading (find the verdict whose prefix the reason starts with) replaced it. The builder's tests already
+name every case, so the parse side spent two cycles on scaffolding. Evidence: `sb-s3c/cycles.log` cycles 5-7.
+
+**O111. A red test's own wrong expectation has no rule.** In S3 part (b) cycle 12 the red expected one string mutant on
+the play line where the instrumenter places two. The worker fixed the expectation while the test was still red and ran
+it again. `test-first.md` says the source never changes to make a test fail, but says nothing about correcting a red
+test before Green. Evidence: `sb-s3c/cycles.log` cycle 12.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
