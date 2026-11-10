@@ -180,18 +180,7 @@ function storyExports(
       tested:
         form === 'declaration' ||
         (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
-      assignments: assignments
-        .filter(({ target }) => target === local)
-        .flatMap((assignment) => {
-          if (!isFactoryFile) {
-            return [assignment];
-          }
-
-          // Storybook 10.6.5 composeStory reads a factory story's annotations from its input.
-          return assignment.path[0] === 'input'
-            ? [{ ...assignment, path: assignment.path.slice(1) }]
-            : [];
-        }),
+      assignments: assignments.filter(({ target }) => target === local),
     }));
 }
 

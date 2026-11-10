@@ -579,6 +579,17 @@ A.input.parameters = { test: { mockReset: true } };`,
     assert.deepEqual(verdicts, ['erased']);
   });
 
+  it('leaves out an object assigned to the input of a factory story', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({});
+export const A = meta.story({ args: { g: fn().mockReturnValue(1) } });
+A.input = { parameters: { test: { restoreMocks: false } } };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
   it('leaves out the parameters assigned to a factory story itself', () => {
     const verdicts = verdictsOf(
       `import preview from '../.storybook/preview';

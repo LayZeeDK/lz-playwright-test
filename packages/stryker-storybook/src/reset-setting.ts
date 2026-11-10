@@ -1,4 +1,5 @@
 import {
+  type Assignment,
   csfFile,
   defaultExport,
   definePreviewArgument,
@@ -91,13 +92,14 @@ export function classifyStubs(
   const bindings = topLevelBindings(body);
   const {
     metaObjects: [meta],
+    isFactory,
     stories: exported,
   } = csfFile(body, bindings);
   const metaTest = testSettings(member(evaluate(meta, bindings), 'parameters'));
   const declared = exported
     .filter(({ tested }) => tested)
     .map(({ name, init, assignments }) => {
-      const story = assignments.reduce(
+      const story = runtimeAssignments(assignments, isFactory).reduce(
         (value, assignment) =>
           written(value, assignment.path, evaluate(assignment.value, bindings)),
         evaluate(storyArgument(init), bindings),
@@ -126,6 +128,22 @@ export function classifyStubs(
   );
 
   return { stories, stubs };
+}
+
+/** Storybook 10.6.5 composes a factory story from the keys of the `input` that `defineStory` closed over, so only writes below `input` count. */
+function runtimeAssignments(
+  assignments: readonly Assignment[],
+  isFactory: boolean,
+): readonly Assignment[] {
+  if (!isFactory) {
+    return assignments;
+  }
+
+  return assignments.flatMap((assignment) =>
+    assignment.path[0] === 'input' && assignment.path.length > 1
+      ? [{ ...assignment, path: assignment.path.slice(1) }]
+      : [],
+  );
 }
 
 function written(

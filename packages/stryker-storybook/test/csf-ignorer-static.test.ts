@@ -282,6 +282,32 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('keeps a name assigned to X.storyName of a factory story as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "import preview from '#.storybook/preview';\nconst meta = preview.meta({ component: B });\nexport const A = meta.story({});\nA.storyName = 'Go';",
+        )
+      ).filter((outcome) => outcome.startsWith('4 ')),
+      [`4 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it('places a name assigned to X.input.storyName of a factory story', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "import preview from '#.storybook/preview';\nconst meta = preview.meta({ component: B });\nexport const A = meta.story({});\nA.input.storyName = 'Go';",
+        )
+      ).filter((outcome) => outcome.startsWith('4 ')),
+      ['4 StringLiteral placed'],
+    );
+  });
+
   it('keeps a name assigned to the storyName of an exported function story as written', async () => {
     const { outcomes } = setup();
 
