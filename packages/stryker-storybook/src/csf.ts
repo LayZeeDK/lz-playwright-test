@@ -638,7 +638,7 @@ function namesReadElsewhere(body: readonly unknown[]): ReadonlySet<unknown> {
   const copies = body
     .flatMap(spreadCopiesOf)
     .map(({ copy, source }) => ({ copy, source: field(source, 'name') }));
-  const written = withSpreadSources(
+  const written = withSpreadFamilies(
     new Set([
       ...referenced,
       ...body.flatMap(assignmentOf).map(({ target }) => target),
@@ -654,17 +654,17 @@ function namesReadElsewhere(body: readonly unknown[]): ReadonlySet<unknown> {
   ]);
 }
 
-function withSpreadSources(
+function withSpreadFamilies(
   names: ReadonlySet<unknown>,
   copies: readonly SpreadCopy[],
 ): ReadonlySet<unknown> {
-  const sources = copies
+  const reached = copies
     .filter(({ copy, source }) => names.has(copy) !== names.has(source))
     .flatMap(({ copy, source }) => [copy, source]);
 
-  return sources.length === 0
+  return reached.length === 0
     ? names
-    : withSpreadSources(new Set([...names, ...sources]), copies);
+    : withSpreadFamilies(new Set([...names, ...reached]), copies);
 }
 
 interface SpreadCopy {
