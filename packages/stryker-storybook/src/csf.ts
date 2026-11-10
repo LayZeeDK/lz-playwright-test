@@ -49,19 +49,13 @@ export function csfShapes(program: unknown): CsfShapes {
   const storyAssignments = assignments.filter(({ target }) =>
     storyNames.includes(target),
   );
-  const storyAnnotations = (key: string): readonly unknown[] =>
+  const annotations = (key: string): readonly unknown[] =>
     [
-      ...stories.map((story) => propertyValue(story, key)),
+      ...[...metaObjects, ...stories].map((owner) => propertyValue(owner, key)),
       ...storyAssignments
         .filter((assignment) => assignment.key === key)
         .map(({ value }) => value),
     ].flatMap((value) => withInit(value, bindings));
-  const annotations = (key: string): readonly unknown[] => [
-    ...metaObjects.flatMap((meta) =>
-      withInit(propertyValue(meta, key), bindings),
-    ),
-    ...storyAnnotations(key),
-  ];
   const idParameters = stories
     .map((story) => propertyValue(story, 'parameters'))
     .filter((parameters) => propertyValue(parameters, '__id') !== undefined);
@@ -97,8 +91,8 @@ export function csfShapes(program: unknown): CsfShapes {
       ]),
     ]),
     mswValues: nodeSet(
-      storyAnnotations('parameters').map((parameters) =>
-        propertyValue(parameters, 'msw'),
+      annotations('parameters').flatMap((parameters) =>
+        withInit(propertyValue(parameters, 'msw'), bindings),
       ),
     ),
     staticValues: nodeSet([

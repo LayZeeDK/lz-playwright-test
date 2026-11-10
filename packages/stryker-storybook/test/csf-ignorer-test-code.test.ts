@@ -327,6 +327,41 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('ignores the msw value that a story names', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nconst msw = {\n  handlers: [h('/a')],\n};\nexport const A = { parameters: { msw } };",
+        )
+      ).filter((outcome) => /^[23] /.test(outcome)),
+      [
+        `2 ObjectLiteral ${mswReason}`,
+        `3 ArrayDeclaration ${mswReason}`,
+        `3 StringLiteral ${mswReason}`,
+      ],
+    );
+  });
+
+  it('ignores the msw value in the parameters that the meta names', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "const params = {\n  msw: {\n    handlers: [h('/a')],\n  },\n};\nexport default { title: 'a/b', parameters: params };",
+        )
+      ).filter((outcome) => /^[1-3] /.test(outcome)),
+      [
+        '1 ObjectLiteral placed',
+        `2 ObjectLiteral ${mswReason}`,
+        `3 ArrayDeclaration ${mswReason}`,
+        `3 StringLiteral ${mswReason}`,
+      ],
+    );
+  });
+
   it('places the msw value in parameters assigned to an object that is not a story', async () => {
     const { outcomes } = setup();
 
