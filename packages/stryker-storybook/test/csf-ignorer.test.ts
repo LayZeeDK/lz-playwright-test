@@ -40,22 +40,22 @@ describe('lz-storybook-csf', () => {
   it('keeps the meta title as written', async () => {
     const { outcomes } = setup('mutate');
 
-    assert.ok(
-      (await outcomes("export default { title: 'a/b' };")).includes(
-        `1 StringLiteral ${staticReason}`,
-      ),
-    );
+    assert.deepEqual(await outcomes("export default { title: 'a/b' };"), [
+      '1 ObjectLiteral placed',
+      `1 StringLiteral ${staticReason}`,
+    ]);
   });
 
   it("places the mutants of a story's args", async () => {
     const { outcomes } = setup();
 
-    assert.ok(
+    assert.deepEqual(
       (
         await outcomes(
           "export default { title: 'a/b' };\nexport const A = {\n  args: { label: 'Go' },\n};",
         )
-      ).includes('3 StringLiteral placed'),
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      ['3 ObjectLiteral placed', '3 StringLiteral placed'],
     );
   });
 
@@ -201,24 +201,26 @@ describe('lz-storybook-csf', () => {
   it("places a story object's own mutant in 'mutate' mode", async () => {
     const { outcomes } = setup('mutate');
 
-    assert.ok(
+    assert.deepEqual(
       (
         await outcomes(
           "export default { title: 'a/b' };\nexport const A = { args: {} };",
         )
-      ).includes('2 ObjectLiteral placed'),
+      ).filter((outcome) => outcome.startsWith('2 ')),
+      ['2 ObjectLiteral placed'],
     );
   });
 
   it('keeps a story object under satisfies as written', async () => {
     const { outcomes } = setup();
 
-    assert.ok(
+    assert.deepEqual(
       (
         await outcomes(
           "export default { title: 'a/b' };\nexport const A = { args: {} } satisfies Story;",
         )
-      ).includes(`2 ObjectLiteral ${storyReason}`),
+      ).filter((outcome) => outcome.startsWith('2 ')),
+      [`2 ObjectLiteral ${storyReason}`],
     );
   });
 
@@ -251,24 +253,26 @@ describe('lz-storybook-csf', () => {
   it('keeps the object passed to meta.story() as written', async () => {
     const { outcomes } = setup();
 
-    assert.ok(
+    assert.deepEqual(
       (
         await outcomes(
           'const meta = preview.meta({ component: B });\nexport const A = meta.story({\n  args: { a: 1 },\n});',
         )
-      ).includes(`2 ObjectLiteral ${storyReason}`),
+      ).filter((outcome) => outcome.startsWith('2 ')),
+      [`2 ObjectLiteral ${storyReason}`],
     );
   });
 
   it('keeps the object passed to .extend() as written', async () => {
     const { outcomes } = setup();
 
-    assert.ok(
+    assert.deepEqual(
       (
         await outcomes(
           'const meta = preview.meta({ component: B });\nexport const A = meta.story();\nexport const C = A.extend({\n  args: { a: 1 },\n});',
         )
-      ).includes(`3 ObjectLiteral ${storyReason}`),
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      [`3 ObjectLiteral ${storyReason}`],
     );
   });
 
@@ -327,24 +331,26 @@ describe('lz-storybook-csf', () => {
   it('keeps a story object exported under another name as written', async () => {
     const { outcomes } = setup();
 
-    assert.ok(
+    assert.deepEqual(
       (
         await outcomes(
           "export default { title: 'a/b' };\nconst A = {\n  args: { a: 1 },\n};\nexport { A as B };",
         )
-      ).includes(`2 ObjectLiteral ${storyReason}`),
+      ).filter((outcome) => outcome.startsWith('2 ')),
+      [`2 ObjectLiteral ${storyReason}`],
     );
   });
 
   it('keeps an object assigned to X.story as written', async () => {
     const { outcomes } = setup();
 
-    assert.ok(
+    assert.deepEqual(
       (
         await outcomes(
           "export default { title: 'a/b' };\nexport const A = () => null;\nA.story = {\n  parameters: { a: 1 },\n};",
         )
-      ).includes(`3 ObjectLiteral ${storyReason}`),
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      [`3 ObjectLiteral ${storyReason}`],
     );
   });
 
@@ -364,12 +370,13 @@ describe('lz-storybook-csf', () => {
   it('keeps the options object of a .test() call as written', async () => {
     const { outcomes } = setup();
 
-    assert.ok(
+    assert.deepEqual(
       (
         await outcomes(
           "export default { title: 'a/b' };\nexport const A = {};\nA.test(\n  'name',\n  { tags: ['x'] },\n  () => undefined,\n);",
         )
-      ).includes(`5 ObjectLiteral ${storyReason}`),
+      ).filter((outcome) => outcome.startsWith('5 ObjectLiteral')),
+      [`5 ObjectLiteral ${storyReason}`],
     );
   });
 
