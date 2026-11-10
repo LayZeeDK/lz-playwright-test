@@ -3,6 +3,7 @@ import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
 import { csfShapes } from './csf.ts';
 import { isRecord } from './is-record.ts';
+import { field, list } from './node-field.ts';
 import { lzStorybookOptions } from './options.ts';
 import { packageName } from './package-name.ts';
 import {
@@ -83,15 +84,4 @@ function keepStoryContainer(container: unknown): void {
       loc: container['loc'],
     },
   ];
-}
-
-function list(value: unknown): readonly unknown[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function field(value: unknown, ...keys: readonly string[]): unknown {
-  return keys.reduce<unknown>(
-    (found, key) => (isRecord(found) ? found[key] : undefined),
-    value,
-  );
 }
