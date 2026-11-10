@@ -45,8 +45,10 @@
     "storybook": "^10.6.0"
   },
   "devDependencies": {
+    "@storybook/addon-vitest": "10.6.5",
     "ajv": "8.20.0",
-    "storybook": "10.6.5"
+    "storybook": "10.6.5",
+    "vitest": "5.1.0"
   },
   "nx": {
     "tags": [
