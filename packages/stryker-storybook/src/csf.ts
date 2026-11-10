@@ -284,15 +284,27 @@ function assigned(statement: unknown, property: string): readonly unknown[] {
 }
 
 function storyNode(init: unknown, bindings: Bindings): unknown {
-  const method = field(init, 'callee', 'property', 'name');
-
-  if (method === 'bind') {
+  if (isTemplateBind(init)) {
     return followed(field(init, 'callee', 'object'), bindings);
   }
+
+  const method = field(init, 'callee', 'property', 'name');
 
   return method === 'story' || method === 'extend'
     ? list(field(init, 'arguments'))[0]
     : init;
+}
+
+function isTemplateBind(init: unknown): boolean {
+  const [context, ...more] = list(field(init, 'arguments'));
+
+  return (
+    field(init, 'callee', 'property', 'name') === 'bind' &&
+    more.length === 0 &&
+    (context === undefined ||
+      (field(context, 'type') === 'ObjectExpression' &&
+        list(field(context, 'properties')).length === 0))
+  );
 }
 
 function objectOf(expression: unknown, bindings: Bindings): readonly unknown[] {

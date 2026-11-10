@@ -116,6 +116,45 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('places the function that a .bind() call with arguments binds', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nconst fn = (args) =>\n  render(args);\nexport const A = fn.bind(null, 1 + 1);",
+        )
+      ).filter((outcome) => outcome.includes('ArrowFunction')),
+      ['2 ArrowFunction placed'],
+    );
+  });
+
+  it('keeps the template of a CSF2 Template.bind() story as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nconst Template = (args) =>\n  render(args);\nexport const A = Template.bind();",
+        )
+      ).filter((outcome) => outcome.includes('ArrowFunction')),
+      [`2 ArrowFunction ${storyReason}`],
+    );
+  });
+
+  it('places the function that a .bind() call binds to a named context', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nconst fn = (args) =>\n  render(args);\nexport const A = fn.bind(ctx);",
+        )
+      ).filter((outcome) => outcome.includes('ArrowFunction')),
+      ['2 ArrowFunction placed'],
+    );
+  });
+
   it('keeps the object passed to meta.story() as written', async () => {
     const { outcomes } = setup();
 
