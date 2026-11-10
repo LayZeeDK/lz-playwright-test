@@ -10,10 +10,9 @@ import {
   type StorybookProject,
 } from './storybook-project.ts';
 import { definitionTimeStubs } from './stub-shape.ts';
-import { spyStubReason } from './stub-verdict.ts';
+import { spyStubReason, type ReasonVerdict } from './stub-verdict.ts';
 
 export function stubIgnorer(options: object, log: ProjectLog): Ignorer {
-  let project: StorybookProject | undefined;
   let reasons: ReadonlyMap<unknown, string> = new Map();
 
   return {
@@ -22,8 +21,7 @@ export function stubIgnorer(options: object, log: ProjectLog): Ignorer {
 
       if (field(node, 'type') === 'Program') {
         const fileName = field(path, 'hub', 'file', 'opts', 'filename');
-
-        project ??= storybookProject(
+        const project = storybookProject(
           lzStorybookOptions(options).configDir,
           log,
         );
@@ -42,6 +40,18 @@ function siteReasons(
   program: unknown,
   project: StorybookProject,
 ): ReadonlyMap<unknown, string> {
+  return new Map(
+    [...siteVerdicts(program, project)].map(([start, verdict]) => [
+      start,
+      spyStubReason(verdict),
+    ]),
+  );
+}
+
+export function siteVerdicts(
+  program: unknown,
+  project: StorybookProject,
+): ReadonlyMap<number, ReasonVerdict> {
   const onceSites = new Set(
     definitionTimeStubs(program).flatMap(({ start, once }) =>
       once ? [start] : [],
@@ -50,18 +60,16 @@ function siteReasons(
 
   return new Map(
     classifyStubs(program, project.previewTest).stubs.flatMap(
-      ({ start, verdict }) => {
+      ({ start, verdict }): readonly (readonly [number, ReasonVerdict])[] => {
         if (verdict === 'kept') {
           return [];
         }
 
         if (project.transformer === 'seen') {
-          return onceSites.has(start)
-            ? [[start, spyStubReason('once-not-rewritten')]]
-            : [];
+          return onceSites.has(start) ? [[start, 'once-not-rewritten']] : [];
         }
 
-        return [[start, spyStubReason(verdict)]];
+        return [[start, verdict]];
       },
     ),
   );

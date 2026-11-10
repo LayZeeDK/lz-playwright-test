@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { describe, it, type TestContext } from 'node:test';
@@ -15,6 +21,34 @@ import recorded from './fixtures/reporter/mutation.json' with { type: 'json' };
 
 const fixtures = fileURLToPath(new URL('fixtures/', import.meta.url));
 
+const erasedStub = [
+  "import { fn } from 'storybook/test';",
+  '',
+  "export default { args: { onClick: fn().mockReturnValue('stubbed') } };",
+  '',
+  'export const Primary = {};',
+  '',
+].join('\n');
+
+function commentedStub(comment: string): string {
+  return [
+    "import { fn } from 'storybook/test';",
+    '',
+    'export default {',
+    `  ${comment}`,
+    "  args: { onClick: fn().mockReturnValue('stubbed') },",
+    '};',
+    '',
+    'export const Primary = {};',
+    '',
+  ].join('\n');
+}
+
+function writeStory(projectDir: string, name: string, content: string): void {
+  mkdirSync(join(projectDir, 'src'), { recursive: true });
+  writeFileSync(join(projectDir, 'src', name), content);
+}
+
 function runPlan(fileName: string, line: number, isStatic = true) {
   return {
     plan: PlanKind.Run,
@@ -28,7 +62,7 @@ function runPlan(fileName: string, line: number, isStatic = true) {
   } as const;
 }
 
-function setup(t: TestContext, fixture = 'no-main') {
+function setup(t: TestContext, fixture = 'no-main', options: object = {}) {
   const previousDir = process.cwd();
   const projectDir = mkdtempSync(join(tmpdir(), 'lz-storybook-reporter-'));
   const previousRecord = process.env[recordVariable];
@@ -44,7 +78,10 @@ function setup(t: TestContext, fixture = 'no-main') {
   });
   const lines: string[] = [];
   const reporter = storybookReporter(
-    { lzStorybook: { configDir: join(fixtures, fixture, '.storybook') } },
+    {
+      ...options,
+      lzStorybook: { configDir: join(fixtures, fixture, '.storybook') },
+    },
     {
       info: (message) => lines.push(`info: ${message}`),
       warn: (message) => lines.push(`warn: ${message}`),
@@ -59,6 +96,7 @@ function setup(t: TestContext, fixture = 'no-main') {
   return {
     reporter,
     lines,
+    consoleBlock: (): readonly string[] => (lines.at(-1) ?? '').split('\n'),
     projectDir,
     written,
     findings: (): readonly unknown[] => {
@@ -225,30 +263,30 @@ describe('storybookReporter', () => {
   });
 
   it('opens its console block with the finding counts per verdict', (t) => {
-    const { reporter, lines } = setup(t);
+    const { reporter, consoleBlock } = setup(t);
 
     reporter.onMutationTestReportReady(recorded);
 
     assert.equal(
-      lines.join('\n').split('\n')[0],
+      consoleBlock()[0],
       'info: @layzee/stryker-storybook: 4 spy stub findings (1 unknown, 1 order-dependent, 1 erased, 1 unchecked)',
     );
   });
 
   it('prints one line per finding with its verdict, place, cause and fix', (t) => {
-    const { reporter, lines } = setup(t);
+    const { reporter, consoleBlock } = setup(t);
     const erased = parseSpyStubReason(spyStubReason('erased'));
 
     reporter.onMutationTestReportReady(recorded);
 
     assert.equal(
-      lines.join('\n').split('\n')[3],
+      consoleBlock()[3],
       `  erased  src/SpyStubDefault.stories.tsx:15  ${erased?.why}; ${erased?.fix}`,
     );
   });
 
   it('closes its console block with the static story mutant count', (t) => {
-    const { reporter, lines, projectDir } = setup(t);
+    const { reporter, consoleBlock, projectDir } = setup(t);
 
     reporter.onMutationTestingPlanReady({
       mutantPlans: [
@@ -259,31 +297,31 @@ describe('storybookReporter', () => {
     reporter.onMutationTestReportReady(recorded);
 
     assert.equal(
-      lines.join('\n').split('\n').at(-1),
+      consoleBlock().at(-1),
       '  static story mutants: 2, each runs every test; net times in reports/lz-storybook.json',
     );
   });
 
   it('prints one line saying so when the run has no story findings', (t) => {
-    const { reporter, lines } = setup(t);
+    const { reporter, consoleBlock } = setup(t);
 
     reporter.onMutationTestReportReady({ files: {} });
 
-    assert.deepEqual(lines, [
+    assert.deepEqual(consoleBlock(), [
       'info: @layzee/stryker-storybook: no spy stub findings and no static story mutants',
     ]);
   });
 
   it('leaves the static line out when the run has no static story mutant', (t) => {
-    const { reporter, lines } = setup(t);
+    const { reporter, consoleBlock } = setup(t);
 
     reporter.onMutationTestReportReady(recorded);
 
-    assert.equal(lines.join('\n').split('\n').length, 5);
+    assert.equal(consoleBlock().length, 5);
   });
 
   it('says there are no findings above the static line when only static mutants exist', (t) => {
-    const { reporter, lines, projectDir } = setup(t);
+    const { reporter, consoleBlock, projectDir } = setup(t);
 
     reporter.onMutationTestingPlanReady({
       mutantPlans: [
@@ -293,7 +331,7 @@ describe('storybookReporter', () => {
     reporter.onMutationTestReportReady({ files: {} });
 
     assert.equal(
-      lines.at(-1)?.split('\n')[0],
+      consoleBlock()[0],
       'info: @layzee/stryker-storybook: no spy stub findings',
     );
   });
@@ -341,6 +379,223 @@ describe('storybookReporter', () => {
       lines.filter((line) => line.startsWith('warn: ')),
       [],
     );
+  });
+
+  it('reports an erased stub in a story file absent from the mutation report', (t) => {
+    const { reporter, findings, projectDir } = setup(t);
+    writeStory(projectDir, 'Meta.stories.tsx', erasedStub);
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(findings(), [
+      {
+        file: 'src/Meta.stories.tsx',
+        line: 3,
+        ...parseSpyStubReason(spyStubReason('erased')),
+      },
+    ]);
+  });
+
+  it('prints a scanned finding in its console block', (t) => {
+    const { reporter, consoleBlock, projectDir } = setup(t);
+    const erased = parseSpyStubReason(spyStubReason('erased'));
+    writeStory(projectDir, 'Meta.stories.tsx', erasedStub);
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(consoleBlock(), [
+      'info: @layzee/stryker-storybook: 1 spy stub findings (1 erased)',
+      `  erased  src/Meta.stories.tsx:3  ${erased?.why}; ${erased?.fix}`,
+    ]);
+  });
+
+  it('leaves a story file in the mutation report to the report', (t) => {
+    const { reporter, findings, projectDir } = setup(t);
+    writeStory(projectDir, 'Meta.stories.tsx', erasedStub);
+
+    reporter.onMutationTestReportReady({
+      files: { 'src/Meta.stories.tsx': { mutants: [] } },
+    });
+
+    assert.deepEqual(findings(), []);
+  });
+
+  it('leaves out a scanned stub under a disable next-line comment naming the spy stub mutator', (t) => {
+    const { reporter, findings, projectDir } = setup(t);
+    writeStory(
+      projectDir,
+      'Meta.stories.tsx',
+      commentedStub(
+        '// Stryker disable next-line LzStorybookSpyStub: kept on purpose',
+      ),
+    );
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(findings(), []);
+  });
+
+  it('leaves out a scanned stub under a disable next-line all comment', (t) => {
+    const { reporter, findings, projectDir } = setup(t);
+    writeStory(
+      projectDir,
+      'Meta.stories.tsx',
+      commentedStub('// Stryker disable next-line all'),
+    );
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(findings(), []);
+  });
+
+  it('leaves out a scanned stub below a disable comment without next-line', (t) => {
+    const { reporter, findings, projectDir } = setup(t);
+    writeStory(
+      projectDir,
+      'Meta.stories.tsx',
+      `// Stryker disable LzStorybookSpyStub\n${erasedStub}`,
+    );
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(findings(), []);
+  });
+
+  it('reports a scanned stub below a restore comment that ends a disable', (t) => {
+    const { reporter, findings, projectDir } = setup(t);
+    writeStory(
+      projectDir,
+      'Meta.stories.tsx',
+      `// Stryker disable LzStorybookSpyStub\n${commentedStub('// Stryker restore all')}`,
+    );
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(
+      findings().map((finding) => isRecord(finding) && finding['verdict']),
+      ['erased'],
+    );
+  });
+
+  it('leaves out a scanned stub under a disable comment listing the mutator in lower case among others', (t) => {
+    const { reporter, findings, projectDir } = setup(t);
+    writeStory(
+      projectDir,
+      'Meta.stories.tsx',
+      commentedStub(
+        '// Stryker disable next-line StringLiteral, lzstorybookspystub',
+      ),
+    );
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(findings(), []);
+  });
+
+  it('reports a scanned stub on a later line than its disable next-line comment covers', (t) => {
+    const { reporter, findings, projectDir } = setup(t);
+    writeStory(
+      projectDir,
+      'Meta.stories.tsx',
+      [
+        "import { fn } from 'storybook/test';",
+        '',
+        '// Stryker disable next-line LzStorybookSpyStub',
+        'export default {',
+        "  args: { onClick: fn().mockReturnValue('stubbed') },",
+        '};',
+        '',
+        'export const Primary = {};',
+        '',
+      ].join('\n'),
+    );
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(
+      findings().map((finding) => isRecord(finding) && finding['line']),
+      [5],
+    );
+  });
+
+  it('scans a *.story.* file when Storybook has no main file', (t) => {
+    const { reporter, findings, projectDir } = setup(t);
+    writeStory(projectDir, 'Meta.story.tsx', erasedStub);
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(
+      findings().map((finding) => isRecord(finding) && finding['file']),
+      ['src/Meta.story.tsx'],
+    );
+  });
+
+  it('skips story files under node_modules when Storybook has no main file', (t) => {
+    const { reporter, findings, projectDir } = setup(t);
+    writeStory(
+      join(projectDir, 'node_modules', 'ui'),
+      'Meta.stories.tsx',
+      erasedStub,
+    );
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(findings(), []);
+  });
+
+  it('skips a story file that is not JavaScript or TypeScript', (t) => {
+    const { reporter, findings, projectDir } = setup(t);
+    writeStory(
+      projectDir,
+      'Docs.stories.mdx',
+      '# Docs\n\n<Meta title="Docs" />\n',
+    );
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(findings(), []);
+  });
+
+  it('scans no story file when the spy stub mutator is in excludedMutations', (t) => {
+    const { reporter, findings, projectDir } = setup(t, 'no-main', {
+      mutator: { excludedMutations: ['LzStorybookSpyStub'] },
+    });
+    writeStory(projectDir, 'Meta.stories.tsx', erasedStub);
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(findings(), []);
+  });
+
+  it('reports a scanned stub under a disable comment naming another mutator', (t) => {
+    const { reporter, findings, projectDir } = setup(t);
+    writeStory(
+      projectDir,
+      'Meta.stories.tsx',
+      commentedStub('// Stryker disable next-line StringLiteral'),
+    );
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(
+      findings().map((finding) => isRecord(finding) && finding['verdict']),
+      ['erased'],
+    );
+  });
+
+  it('removes the transformer record file when the run ends', (t) => {
+    const { reporter, projectDir } = setup(t);
+    appendRecord(join(projectDir, 'src', 'Stub.stories.tsx'), 1);
+
+    reporter.wrapUp();
+
+    assert.equal(existsSync(process.env[recordVariable] ?? ''), false);
+  });
+
+  it('ends the run without error when the transformer wrote no record file', (t) => {
+    const { reporter } = setup(t);
+
+    assert.doesNotThrow(() => reporter.wrapUp());
   });
 
   it('stays quiet when neither Storybook nor the records show the transformer', (t) => {

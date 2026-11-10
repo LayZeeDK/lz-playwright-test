@@ -36,9 +36,11 @@ export function parseSpyStubReason(reason: string): SpyStubReason | undefined {
     reason.startsWith(`${spyStubName}: ${candidate}: `),
   );
 
-  return verdict === undefined
-    ? undefined
-    : { verdict, why: whys[verdict], fix };
+  return verdict === undefined ? undefined : describeVerdict(verdict);
+}
+
+export function describeVerdict(verdict: ReasonVerdict): SpyStubReason {
+  return { verdict, why: whys[verdict], fix };
 }
 
 export function spyStubReason(verdict: ReasonVerdict): string {

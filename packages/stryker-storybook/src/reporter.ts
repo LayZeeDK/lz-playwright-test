@@ -1,13 +1,15 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 
 import { PlanKind } from '@stryker-mutator/api/core';
 import type { Reporter } from '@stryker-mutator/api/report';
 
+import { isRecord } from './is-record.ts';
 import { lzStorybookOptions } from './options.ts';
 import { packageName } from './package-name.ts';
+import { selfScan } from './self-scan.ts';
 import {
   isStoryFile,
   storybookProject,
@@ -81,14 +83,13 @@ interface PlanEvent {
 
 export function storybookReporter(options: object, log: ProjectLog) {
   let staticStoryMutants: readonly StaticStoryMutant[] = [];
-  let project: StorybookProject | undefined;
   const recordFile = join(
     tmpdir(),
     `lz-storybook-records-${randomUUID()}.jsonl`,
   );
   process.env[recordVariable] = recordFile;
   const storybook = (): StorybookProject =>
-    (project ??= storybookProject(lzStorybookOptions(options).configDir, log));
+    storybookProject(lzStorybookOptions(options).configDir, log);
 
   return {
     onDryRunCompleted(): void {
@@ -124,15 +125,18 @@ export function storybookReporter(options: object, log: ProjectLog) {
       );
     },
     onMutationTestReportReady({ files }: ReportInput): void {
-      const findings = Object.entries(files).flatMap(([file, { mutants }]) =>
-        mutants.flatMap((mutant) => {
-          const verdict = stubVerdict(mutant);
-
-          return verdict === undefined
-            ? []
-            : [{ file, line: mutant.location.start.line, ...verdict }];
-        }),
-      );
+      const findings = [
+        ...reportFindings(files),
+        ...(excludesSpyStub(options)
+          ? []
+          : selfScan(
+              storybook(),
+              (fileName) => projectPath(fileName) in files,
+            ).map(({ fileName, ...finding }) => ({
+              file: projectPath(fileName),
+              ...finding,
+            }))),
+      ];
       const report: LzStorybookReport = { findings, staticStoryMutants };
       mkdirSync('reports', { recursive: true });
       writeFileSync(
@@ -140,6 +144,9 @@ export function storybookReporter(options: object, log: ProjectLog) {
         JSON.stringify(report, null, 2),
       );
       log.info(consoleBlock(report));
+    },
+    wrapUp(): void {
+      rmSync(recordFile, { force: true });
     },
   } satisfies Reporter;
 }
@@ -170,6 +177,25 @@ function consoleBlock({
           `  static story mutants: ${staticStoryMutants.length}, each runs every test; net times in reports/lz-storybook.json`,
         ]),
   ].join('\n');
+}
+
+function reportFindings(files: ReportInput['files']): readonly StubFinding[] {
+  return Object.entries(files).flatMap(([file, { mutants }]) =>
+    mutants.flatMap((mutant) => {
+      const verdict = stubVerdict(mutant);
+
+      return verdict === undefined
+        ? []
+        : [{ file, line: mutant.location.start.line, ...verdict }];
+    }),
+  );
+}
+
+function excludesSpyStub(options: object): boolean {
+  const mutator: unknown = Reflect.get(options, 'mutator');
+  const excluded = isRecord(mutator) ? mutator['excludedMutations'] : undefined;
+
+  return Array.isArray(excluded) && excluded.includes(spyStubName);
 }
 
 function projectPath(fileName: string): string {
