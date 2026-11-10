@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 
 import { PlanKind } from '@stryker-mutator/api/core';
+import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 import type { Reporter } from '@stryker-mutator/api/report';
 
 import { isRecord } from './is-record.ts';
@@ -150,6 +151,8 @@ export function storybookReporter(options: object, log: ProjectLog) {
     },
   } satisfies Reporter;
 }
+
+storybookReporter.inject = tokens(commonTokens.options, commonTokens.logger);
 
 function consoleBlock({
   findings,

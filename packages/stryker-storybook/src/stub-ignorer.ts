@@ -1,4 +1,5 @@
 import type { Ignorer } from '@stryker-mutator/api/ignore';
+import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
 import { isRecord } from './is-record.ts';
 import { lzStorybookOptions } from './options.ts';
@@ -35,6 +36,8 @@ export function stubIgnorer(options: object, log: ProjectLog): Ignorer {
     },
   };
 }
+
+stubIgnorer.inject = tokens(commonTokens.options, commonTokens.logger);
 
 function siteReasons(
   program: unknown,
