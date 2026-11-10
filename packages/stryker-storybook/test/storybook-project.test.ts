@@ -103,7 +103,7 @@ describe('storybookProject', () => {
     });
   });
 
-  it('reads a preview it cannot parse as unreadable', (t) => {
+  it('reads a preview it cannot parse as unreadable, with no tags', (t) => {
     const root = mkdtempSync(join(tmpdir(), 'lz-storybook-project-'));
     t.after(() => rmSync(root, { recursive: true, force: true }));
     mkdirSync(join(root, '.storybook'));
@@ -114,11 +114,39 @@ describe('storybookProject', () => {
       warn: () => undefined,
     });
 
-    assert.deepEqual(project.previewTest, {
-      mockReset: 'unreadable',
-      clearMocks: 'unreadable',
-      restoreMocks: 'unreadable',
+    assert.deepEqual(
+      [project.previewTest, project.testTags.previewTags],
+      [
+        {
+          mockReset: 'unreadable',
+          clearMocks: 'unreadable',
+          restoreMocks: 'unreadable',
+        },
+        [],
+      ],
+    );
+  });
+
+  it('warns once, naming a preview it cannot parse and the error', (t) => {
+    const root = mkdtempSync(join(tmpdir(), 'lz-storybook-project-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    mkdirSync(join(root, '.storybook'));
+    const preview = join(root, '.storybook', 'preview.ts');
+    writeFileSync(preview, 'export const = ;\n');
+    const lines: string[] = [];
+
+    storybookProject(join(root, '.storybook'), {
+      info: () => undefined,
+      warn: (message: string) => lines.push(message),
     });
+
+    assert.equal(lines.length, 1);
+    assert.ok(
+      lines[0]?.startsWith(
+        `@layzee/stryker-storybook: could not parse ${preview}, so its parameters.test is unknown and its tags are left out: SyntaxError: `,
+      ),
+      lines[0],
+    );
   });
 
   describe('with a main file that lists story globs', () => {

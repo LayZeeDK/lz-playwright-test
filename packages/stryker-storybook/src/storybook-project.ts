@@ -88,8 +88,7 @@ function loadProject(
     configDir,
     vitestConfigFile,
   );
-  const previewTest = readPreview(configDir);
-  const previewTags = readPreviewTags(configDir);
+  const { test: previewTest, tags: previewTags } = readPreview(configDir, log);
 
   const testTags = {
     ...tagFilter(vitestTags, vitestConfigFile, log),
@@ -199,36 +198,34 @@ function fallbackProject(
   };
 }
 
-/** Storybook 10.6.5 vitest-plugin index.ts `extractTagsFromPreview`. */
-function readPreviewTags(configDir: string): readonly string[] {
+/** The tags are read as Storybook 10.6.5 vitest-plugin index.ts `extractTagsFromPreview` reads them. */
+function readPreview(
+  configDir: string,
+  log: ProjectLog,
+): { readonly test: ResetSettings; readonly tags: readonly string[] } {
   const file = getInterpretedFile(join(configDir, 'preview'));
 
   if (file === undefined) {
-    return [];
+    return { test: {}, tags: [] };
   }
 
+  const code = readFileSync(file, 'utf8');
+
   try {
-    const tags: unknown = loadConfig(readFileSync(file, 'utf8'), file)
+    const tags: unknown = loadConfig(code, file)
       .parse()
       .getFieldValue(['tags']);
 
-    return isStringArray(tags) ? tags : [];
-  } catch {
-    return [];
-  }
-}
+    return {
+      test: readPreviewTest(parseProgram(code, file)),
+      tags: isStringArray(tags) ? tags : [],
+    };
+  } catch (error) {
+    log.warn(
+      `${packageName}: could not parse ${file}, so its parameters.test is unknown and its tags are left out: ${String(error)}`,
+    );
 
-function readPreview(configDir: string): ResetSettings {
-  const file = getInterpretedFile(join(configDir, 'preview'));
-
-  if (file === undefined) {
-    return {};
-  }
-
-  try {
-    return readPreviewTest(parseProgram(readFileSync(file, 'utf8'), file));
-  } catch {
-    return unreadableSettings;
+    return { test: unreadableSettings, tags: [] };
   }
 }
 
