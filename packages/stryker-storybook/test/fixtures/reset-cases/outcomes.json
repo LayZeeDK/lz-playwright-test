@@ -1,0 +1,948 @@
+{
+  "F01AllDefault": {
+    "default": {
+      "1": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "2": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "none": {
+        "First": "failed",
+        "Second": "failed"
+      }
+    },
+    "clear": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "off": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "reset": {
+      "1": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "2": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "none": {
+        "First": "failed",
+        "Second": "failed"
+      }
+    }
+  },
+  "F02MetaOff": {
+    "default": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "clear": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "off": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "reset": {
+      "1": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "2": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "none": {
+        "First": "failed",
+        "Second": "failed"
+      }
+    }
+  },
+  "F03OffAfterDefault": {
+    "default": {
+      "1": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "2": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "failed",
+        "Second": "failed"
+      }
+    },
+    "clear": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "off": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "reset": {
+      "1": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "2": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "none": {
+        "First": "failed",
+        "Second": "failed"
+      }
+    }
+  },
+  "F04OffBeforeDefault": {
+    "default": {
+      "1": {
+        "First": "passed",
+        "Second": "failed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "failed"
+      }
+    },
+    "clear": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "off": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "reset": {
+      "1": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "2": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "none": {
+        "First": "failed",
+        "Second": "failed"
+      }
+    }
+  },
+  "F05MetaClear": {
+    "default": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "clear": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "off": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "reset": {
+      "1": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "2": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "none": {
+        "First": "failed",
+        "Second": "failed"
+      }
+    }
+  },
+  "F06MetaResetBeatsOff": {
+    "default": {
+      "1": {
+        "First": "failed"
+      },
+      "2": {
+        "First": "failed"
+      },
+      "3": {
+        "First": "failed"
+      },
+      "none": {
+        "First": "failed"
+      }
+    },
+    "clear": {
+      "1": {
+        "First": "failed"
+      },
+      "2": {
+        "First": "failed"
+      },
+      "3": {
+        "First": "failed"
+      },
+      "none": {
+        "First": "failed"
+      }
+    },
+    "off": {
+      "1": {
+        "First": "failed"
+      },
+      "2": {
+        "First": "failed"
+      },
+      "3": {
+        "First": "failed"
+      },
+      "none": {
+        "First": "failed"
+      }
+    },
+    "reset": {
+      "1": {
+        "First": "failed"
+      },
+      "2": {
+        "First": "failed"
+      },
+      "3": {
+        "First": "failed"
+      },
+      "none": {
+        "First": "failed"
+      }
+    }
+  },
+  "F07MetaOffStoryOn": {
+    "default": {
+      "1": {
+        "First": "passed",
+        "Second": "failed",
+        "Third": "failed"
+      },
+      "2": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "failed",
+        "Third": "failed"
+      }
+    },
+    "clear": {
+      "1": {
+        "First": "passed",
+        "Second": "passed",
+        "Third": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed",
+        "Third": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed",
+        "Third": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed",
+        "Third": "passed"
+      }
+    },
+    "off": {
+      "1": {
+        "First": "passed",
+        "Second": "failed",
+        "Third": "failed"
+      },
+      "2": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "failed",
+        "Third": "failed"
+      }
+    },
+    "reset": {
+      "1": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "failed"
+      },
+      "2": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "failed"
+      },
+      "none": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "failed"
+      }
+    }
+  },
+  "F08MetaClearStoryReset": {
+    "default": {
+      "1": {
+        "First": "passed",
+        "Second": "failed",
+        "Third": "failed"
+      },
+      "2": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "failed",
+        "Third": "failed"
+      }
+    },
+    "clear": {
+      "1": {
+        "First": "passed",
+        "Second": "failed",
+        "Third": "failed"
+      },
+      "2": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "failed",
+        "Third": "failed"
+      }
+    },
+    "off": {
+      "1": {
+        "First": "passed",
+        "Second": "failed",
+        "Third": "failed"
+      },
+      "2": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "failed",
+        "Third": "failed"
+      }
+    },
+    "reset": {
+      "1": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "failed"
+      },
+      "2": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "failed"
+      },
+      "none": {
+        "First": "failed",
+        "Second": "failed",
+        "Third": "failed"
+      }
+    }
+  },
+  "F09MetaArgsStub": {
+    "default": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "clear": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "off": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "reset": {
+      "1": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "2": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "none": {
+        "First": "failed",
+        "Second": "failed"
+      }
+    }
+  },
+  "F10LocalConst": {
+    "default": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "clear": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "off": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "reset": {
+      "1": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "2": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "none": {
+        "First": "failed",
+        "Second": "failed"
+      }
+    }
+  },
+  "F11Imported": {
+    "default": {
+      "1": {
+        "First": "passed"
+      },
+      "2": {
+        "First": "passed"
+      },
+      "3": {
+        "First": "passed"
+      },
+      "none": {
+        "First": "passed"
+      }
+    },
+    "clear": {
+      "1": {
+        "First": "passed"
+      },
+      "2": {
+        "First": "passed"
+      },
+      "3": {
+        "First": "passed"
+      },
+      "none": {
+        "First": "passed"
+      }
+    },
+    "off": {
+      "1": {
+        "First": "passed"
+      },
+      "2": {
+        "First": "passed"
+      },
+      "3": {
+        "First": "passed"
+      },
+      "none": {
+        "First": "passed"
+      }
+    },
+    "reset": {
+      "1": {
+        "First": "failed"
+      },
+      "2": {
+        "First": "failed"
+      },
+      "3": {
+        "First": "failed"
+      },
+      "none": {
+        "First": "failed"
+      }
+    }
+  },
+  "F12UndefinedNoOverride": {
+    "default": {
+      "1": {
+        "First": "passed"
+      },
+      "2": {
+        "First": "passed"
+      },
+      "3": {
+        "First": "passed"
+      },
+      "none": {
+        "First": "passed"
+      }
+    },
+    "clear": {
+      "1": {
+        "First": "passed"
+      },
+      "2": {
+        "First": "passed"
+      },
+      "3": {
+        "First": "passed"
+      },
+      "none": {
+        "First": "passed"
+      }
+    },
+    "off": {
+      "1": {
+        "First": "passed"
+      },
+      "2": {
+        "First": "passed"
+      },
+      "3": {
+        "First": "passed"
+      },
+      "none": {
+        "First": "passed"
+      }
+    },
+    "reset": {
+      "1": {
+        "First": "failed"
+      },
+      "2": {
+        "First": "failed"
+      },
+      "3": {
+        "First": "failed"
+      },
+      "none": {
+        "First": "failed"
+      }
+    }
+  },
+  "F13ClearBeatsRestoreTrue": {
+    "default": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "clear": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "off": {
+      "1": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "2": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "3": {
+        "First": "passed",
+        "Second": "passed"
+      },
+      "none": {
+        "First": "passed",
+        "Second": "passed"
+      }
+    },
+    "reset": {
+      "1": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "2": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "3": {
+        "First": "failed",
+        "Second": "failed"
+      },
+      "none": {
+        "First": "failed",
+        "Second": "failed"
+      }
+    }
+  }
+}
