@@ -165,9 +165,13 @@ function setup(t: TestContext, fixture = 'no-main', options: object = {}) {
     findings: (): readonly unknown[] => {
       const report = written();
 
-      return isRecord(report) && Array.isArray(report['findings'])
-        ? report['findings']
-        : [];
+      if (!isRecord(report) || !Array.isArray(report['findings'])) {
+        throw new Error(
+          `The report holds no findings array: ${JSON.stringify(report)}`,
+        );
+      }
+
+      return report['findings'];
     },
   };
 }
