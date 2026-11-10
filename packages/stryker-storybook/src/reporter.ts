@@ -9,7 +9,7 @@ import type { Reporter } from '@stryker-mutator/api/report';
 import { isRecord } from './is-record.ts';
 import { lzStorybookOptions } from './options.ts';
 import { packageName } from './package-name.ts';
-import { selfScan } from './self-scan.ts';
+import { parseStoryFile, selfScan, silencedSites } from './self-scan.ts';
 import {
   isStoryFile,
   storybookProject,
@@ -17,6 +17,7 @@ import {
   type StorybookProject,
 } from './storybook-project.ts';
 import { hasRecords, recordVariable } from './stryker-record.ts';
+import { definitionTimeStubs } from './stub-shape.ts';
 import {
   parseSpyStubReason,
   spyStubName,
@@ -46,12 +47,17 @@ interface ReportMutant {
   readonly mutatorName: string;
   readonly status: string;
   readonly statusReason?: string | undefined;
-  readonly location: { readonly start: { readonly line: number } };
+  readonly location: {
+    readonly start: { readonly line: number; readonly column: number };
+  };
 }
 
 interface ReportInput {
   readonly files: Readonly<
-    Record<string, { readonly mutants: readonly ReportMutant[] }>
+    Record<
+      string,
+      { readonly source: string; readonly mutants: readonly ReportMutant[] }
+    >
   >;
 }
 
@@ -125,22 +131,23 @@ export function storybookReporter(options: object, log: ProjectLog) {
       );
     },
     onMutationTestReportReady({ files }: ReportInput): void {
-      const findings = [
-        ...reportFindings(files),
-        ...(excludesSpyStub(options)
-          ? []
-          : selfScan(
+      const warnUnparsable = (fileName: string, error: unknown): void =>
+        log.warn(
+          `${packageName}: Babel could not parse ${projectPath(fileName)}, so lz-storybook skipped its spy stubs: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      const findings = excludesSpyStub(options)
+        ? []
+        : [
+            ...reportFindings(files, warnUnparsable),
+            ...selfScan(
               storybook(),
               (fileName) => projectPath(fileName) in files,
-              (fileName, error) =>
-                log.warn(
-                  `${packageName}: Babel could not parse ${projectPath(fileName)}, so lz-storybook skipped its spy stubs: ${error instanceof Error ? error.message : String(error)}`,
-                ),
+              warnUnparsable,
             ).map(({ fileName, ...finding }) => ({
               file: projectPath(fileName),
               ...finding,
-            }))),
-      ];
+            })),
+          ];
       const report: LzStorybookReport = { findings, staticStoryMutants };
       mkdirSync('reports', { recursive: true });
       writeFileSync(
@@ -183,16 +190,61 @@ function consoleBlock({
   ].join('\n');
 }
 
-function reportFindings(files: ReportInput['files']): readonly StubFinding[] {
-  return Object.entries(files).flatMap(([file, { mutants }]) =>
-    mutants.flatMap((mutant) => {
-      const verdict = stubVerdict(mutant);
+function reportFindings(
+  files: ReportInput['files'],
+  onUnparsable: (fileName: string, error: unknown) => void,
+): readonly StubFinding[] {
+  return Object.entries(files).flatMap(([file, { source, mutants }]) => {
+    const stubbed = mutants.flatMap(({ statusReason, location }) => {
+      const reason =
+        statusReason === undefined
+          ? undefined
+          : parseSpyStubReason(statusReason);
 
-      return verdict === undefined
+      return reason === undefined
         ? []
-        : [{ file, line: mutant.location.start.line, ...verdict }];
-    }),
-  );
+        : [{ offset: offsetOf(source, location.start), reason }];
+    });
+    const program =
+      stubbed.length === 0
+        ? undefined
+        : parseStoryFile(source, file, onUnparsable);
+    const sites = program === undefined ? [] : definitionTimeStubs(program);
+    const silenced = silencedSites(program, sites);
+
+    return [
+      ...sites.flatMap((site) => {
+        const found = stubbed.find(
+          ({ offset }) => site.start <= offset && offset < site.end,
+        );
+
+        return found === undefined || silenced.has(site)
+          ? []
+          : [{ file, line: site.line, ...found.reason }];
+      }),
+      ...mutants.flatMap(({ mutatorName, status, location }) =>
+        mutatorName === spyStubName && status === 'Survived'
+          ? [{ file, line: location.start.line, ...unchecked }]
+          : [],
+      ),
+    ];
+  });
+}
+
+// Babel's line terminators; report columns are 1-based
+function offsetOf(
+  source: string,
+  { line, column }: { readonly line: number; readonly column: number },
+): number {
+  const previousBreak = [...source.matchAll(/\r\n?|[\n\p{Zl}\p{Zp}]/gu)]
+    .slice(0, line - 1)
+    .at(-1);
+  const lineStart =
+    previousBreak === undefined
+      ? 0
+      : previousBreak.index + previousBreak[0].length;
+
+  return lineStart + column - 1;
 }
 
 function excludesSpyStub(options: object): boolean {
@@ -204,14 +256,4 @@ function excludesSpyStub(options: object): boolean {
 
 function projectPath(fileName: string): string {
   return relative(process.cwd(), fileName).split(sep).join('/');
-}
-
-function stubVerdict({ mutatorName, status, statusReason }: ReportMutant) {
-  if (mutatorName === spyStubName && status === 'Survived') {
-    return unchecked;
-  }
-
-  return statusReason === undefined
-    ? undefined
-    : parseSpyStubReason(statusReason);
 }

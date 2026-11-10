@@ -13,6 +13,9 @@ export interface StoryReset {
 
 export interface ClassifiedStub {
   readonly start: number;
+  readonly end: number;
+  readonly line: number;
+  readonly once: boolean;
   readonly verdict: StubVerdict;
 }
 
@@ -94,12 +97,14 @@ export function classifyStubs(
     };
   });
   const stories = declared.map(({ story }) => story);
-  const stubs = definitionTimeStubs(program).map(({ start }) => {
-    const owner = declared.findIndex(({ init }) => contains(init, start));
-    const users = owner === -1 ? stories.map((_, index) => index) : [owner];
+  const stubs = definitionTimeStubs(program).map(
+    ({ start, end, line, once }) => {
+      const owner = declared.findIndex(({ init }) => contains(init, start));
+      const users = owner === -1 ? stories.map((_, index) => index) : [owner];
 
-    return { start, verdict: siteVerdict(stories, users) };
-  });
+      return { start, end, line, once, verdict: siteVerdict(stories, users) };
+    },
+  );
 
   return { stories, stubs };
 }

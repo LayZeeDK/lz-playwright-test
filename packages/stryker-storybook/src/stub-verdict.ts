@@ -1,15 +1,17 @@
-import type { StubVerdict } from './reset-setting.ts';
+import {
+  classifyStubs,
+  type ClassifiedStub,
+  type StubVerdict,
+} from './reset-setting.ts';
+import type { StorybookProject } from './storybook-project.ts';
 
 export const spyStubName = 'LzStorybookSpyStub';
 
 export type ReasonVerdict = Exclude<StubVerdict, 'kept'> | 'once-not-rewritten';
 
-const verdicts: readonly ReasonVerdict[] = [
-  'erased',
-  'order-dependent',
-  'unknown',
-  'once-not-rewritten',
-];
+export interface ReasonSite extends Omit<ClassifiedStub, 'verdict' | 'once'> {
+  readonly verdict: ReasonVerdict;
+}
 
 const whys: Readonly<Record<ReasonVerdict, string>> = {
   erased:
@@ -31,12 +33,35 @@ export interface SpyStubReason {
   readonly fix: string;
 }
 
-export function parseSpyStubReason(reason: string): SpyStubReason | undefined {
-  const verdict = verdicts.find((candidate) =>
-    reason.startsWith(`${spyStubName}: ${candidate}: `),
+export function reasonSites(
+  program: unknown,
+  { previewTest, transformer }: StorybookProject,
+): readonly ReasonSite[] {
+  return classifyStubs(program, previewTest).stubs.flatMap(
+    ({ once, verdict, ...site }): readonly ReasonSite[] => {
+      if (verdict === 'kept') {
+        return [];
+      }
+
+      if (transformer === 'seen') {
+        return once ? [{ ...site, verdict: 'once-not-rewritten' }] : [];
+      }
+
+      return [{ ...site, verdict }];
+    },
   );
+}
+
+export function parseSpyStubReason(reason: string): SpyStubReason | undefined {
+  const verdict = Object.keys(whys)
+    .filter(isReasonVerdict)
+    .find((candidate) => reason.startsWith(`${spyStubName}: ${candidate}: `));
 
   return verdict === undefined ? undefined : describeVerdict(verdict);
+}
+
+function isReasonVerdict(value: string): value is ReasonVerdict {
+  return Object.hasOwn(whys, value);
 }
 
 export function describeVerdict(verdict: ReasonVerdict): SpyStubReason {

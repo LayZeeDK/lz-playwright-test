@@ -3,10 +3,11 @@ import { readFileSync } from 'node:fs';
 import { isRecord } from './is-record.ts';
 import { parseProgram } from './parse.ts';
 import { storyFilePaths, type StorybookProject } from './storybook-project.ts';
-import { siteVerdicts } from './stub-ignorer.ts';
 import {
   describeVerdict,
+  reasonSites,
   spyStubName,
+  type ReasonSite,
   type SpyStubReason,
 } from './stub-verdict.ts';
 
@@ -19,11 +20,6 @@ interface DirectiveRule {
   readonly disable: boolean;
   readonly line: number | undefined;
   readonly names: readonly string[];
-}
-
-interface Site {
-  readonly line: number;
-  readonly silenced: boolean;
 }
 
 // Stryker 10.1.1 instrumenter, src/transformers/directive-bookkeeper.ts
@@ -55,20 +51,20 @@ export function selfScan(
         return [];
       }
 
-      const verdicts = siteVerdicts(program, project);
-      const sites = stubSites(program, new Set(verdicts.keys()));
+      const sites = reasonSites(program, project);
+      const silenced = silencedSites(program, sites);
 
-      return [...verdicts].flatMap(([start, verdict]) => {
-        const site = sites.get(start);
-
-        return site === undefined || site.silenced
-          ? []
-          : [{ fileName, line: site.line, ...describeVerdict(verdict) }];
-      });
+      return sites
+        .filter((site) => !silenced.has(site))
+        .map(({ line, verdict }) => ({
+          fileName,
+          line,
+          ...describeVerdict(verdict),
+        }));
     });
 }
 
-function parseStoryFile(
+export function parseStoryFile(
   code: string,
   fileName: string,
   onUnparsable: (fileName: string, error: unknown) => void,
@@ -82,28 +78,23 @@ function parseStoryFile(
   }
 }
 
-function stubSites(
-  program: unknown,
-  starts: ReadonlySet<number>,
-): ReadonlyMap<number, Site> {
-  const sites = new Map<number, Site>();
+export function silencedSites<
+  TSite extends Pick<ReasonSite, 'start' | 'end' | 'line'>,
+>(program: unknown, sites: readonly TSite[]): ReadonlySet<TSite> {
+  const silenced = new Set<TSite>();
   const rules: DirectiveRule[] = [];
   const visit = (node: unknown): void => {
     if (!isRecord(node) || typeof node['type'] !== 'string') {
       return;
     }
 
-    const line = startLine(node);
-    rules.push(...directiveRules(node['leadingComments'], line));
-    const start = node['start'];
+    rules.push(...directiveRules(node['leadingComments'], startLine(node)));
+    const site = sites.find(
+      ({ start, end }) => node['start'] === start && node['end'] === end,
+    );
 
-    if (
-      node['type'] === 'CallExpression' &&
-      typeof start === 'number' &&
-      starts.has(start) &&
-      !sites.has(start)
-    ) {
-      sites.set(start, { line, silenced: isSilenced(rules, line) });
+    if (site !== undefined && isSilenced(rules, site.line)) {
+      silenced.add(site);
     }
 
     Object.entries(node).forEach(([key, value]) => {
@@ -115,7 +106,7 @@ function stubSites(
 
   visit(program);
 
-  return sites;
+  return silenced;
 }
 
 function directiveRules(

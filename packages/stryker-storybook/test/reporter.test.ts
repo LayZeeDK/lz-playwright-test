@@ -44,6 +44,33 @@ function commentedStub(comment: string): string {
   ].join('\n');
 }
 
+const literalStub = [
+  "import { fn } from 'storybook/test';",
+  '',
+  'export default {',
+  "  args: { getValue: fn().mockReturnValue({ label: 'stubbed', count: 1 + 1 }) },",
+  '};',
+  '',
+  'export const Primary = {};',
+  '',
+].join('\n');
+
+function ignoredAt(source: string, text: string, mutatorName: string) {
+  const lines = source.split('\n');
+  const line = lines.findIndex((candidate) => candidate.includes(text)) + 1;
+  const column = (lines[line - 1] ?? '').indexOf(text) + 1;
+
+  return {
+    mutatorName,
+    status: 'Ignored',
+    statusReason: spyStubReason('erased'),
+    location: {
+      start: { line, column },
+      end: { line, column: column + text.length },
+    },
+  } as const;
+}
+
 function writeStory(projectDir: string, name: string, content: string): void {
   mkdirSync(join(projectDir, 'src'), { recursive: true });
   writeFileSync(join(projectDir, 'src', name), content);
@@ -162,6 +189,67 @@ describe('storybookReporter', () => {
         },
       ],
     );
+  });
+
+  it('reports a stub once, whatever the number of its Ignored mutants', (t) => {
+    const { reporter, findings } = setup(t);
+
+    reporter.onMutationTestReportReady({
+      files: {
+        'src/Literal.stories.tsx': {
+          source: literalStub,
+          mutants: [
+            ignoredAt(literalStub, "{ label: 'stubbed'", 'ObjectLiteral'),
+            ignoredAt(literalStub, "'stubbed'", 'StringLiteral'),
+            ignoredAt(literalStub, '1 + 1', 'ArithmeticOperator'),
+          ],
+        },
+      },
+    });
+
+    assert.deepEqual(findings(), [
+      {
+        file: 'src/Literal.stories.tsx',
+        line: 4,
+        ...parseSpyStubReason(spyStubReason('erased')),
+      },
+    ]);
+  });
+
+  it('leaves out a reported stub under a disable next-line comment naming the spy stub mutator', (t) => {
+    const { reporter, findings } = setup(t);
+    const source = literalStub.replace(
+      '  args:',
+      '  // Stryker disable next-line LzStorybookSpyStub\n  args:',
+    );
+
+    reporter.onMutationTestReportReady({
+      files: {
+        'src/Literal.stories.tsx': {
+          source,
+          mutants: [ignoredAt(source, "'stubbed'", 'StringLiteral')],
+        },
+      },
+    });
+
+    assert.deepEqual(findings(), []);
+  });
+
+  it('leaves out a reported stub when the spy stub mutator is in excludedMutations', (t) => {
+    const { reporter, findings } = setup(t, 'no-main', {
+      mutator: { excludedMutations: ['LzStorybookSpyStub'] },
+    });
+
+    reporter.onMutationTestReportReady({
+      files: {
+        'src/Literal.stories.tsx': {
+          source: literalStub,
+          mutants: [ignoredAt(literalStub, "'stubbed'", 'StringLiteral')],
+        },
+      },
+    });
+
+    assert.deepEqual(findings(), []);
   });
 
   it('reports a Survived spy stub mutant as an unchecked stub', (t) => {
@@ -414,7 +502,7 @@ describe('storybookReporter', () => {
     writeStory(projectDir, 'Meta.stories.tsx', erasedStub);
 
     reporter.onMutationTestReportReady({
-      files: { 'src/Meta.stories.tsx': { mutants: [] } },
+      files: { 'src/Meta.stories.tsx': { source: erasedStub, mutants: [] } },
     });
 
     assert.deepEqual(findings(), []);

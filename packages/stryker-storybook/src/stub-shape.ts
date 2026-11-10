@@ -12,6 +12,8 @@ export interface StubSite {
   readonly method: StubMethod;
   readonly once: boolean;
   readonly start: number;
+  readonly end: number;
+  readonly line: number;
   readonly argumentStart: number | undefined;
 }
 
@@ -66,6 +68,8 @@ function stubSite(
   spies: ReadonlySet<string>,
 ): StubSite | undefined {
   const start = field(node, 'start');
+  const end = field(node, 'end');
+  const line = field(node, 'loc', 'start', 'line');
   const spy = field(node, 'callee', 'object', 'callee', 'name');
   const name = field(node, 'callee', 'property', 'name');
   const method = stubMethods.find(
@@ -75,6 +79,8 @@ function stubSite(
   if (
     field(node, 'type') !== 'CallExpression' ||
     typeof start !== 'number' ||
+    typeof end !== 'number' ||
+    typeof line !== 'number' ||
     field(node, 'callee', 'type') !== 'MemberExpression' ||
     field(node, 'callee', 'computed') === true ||
     field(node, 'callee', 'object', 'type') !== 'CallExpression' ||
@@ -93,6 +99,8 @@ function stubSite(
     method,
     once: name !== method,
     start,
+    end,
+    line,
     argumentStart:
       typeof argumentStart === 'number' ? argumentStart : undefined,
   };
