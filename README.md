@@ -27,10 +27,12 @@ mutators from there, so build first (the Nx targets below do).
   `@layzee/stryker-playwright-mutators`.
 - `packages/stryker-mutator-install`: the private code that both mutator packages use to put their mutators into
   Stryker, package `@layzee/stryker-mutator-install`.
-- `packages/<package>/stryker.config.mjs`: in the JSX mutators, the Playwright mutators and the install code, a
-  Stryker config that mutates the package's own source. The runner has none: its hooks run inside the worker,
-  page and server processes whose Stryker namespace they manage, so instrumented hook code would mark those
-  processes instrumented and record coverage of its own mutants, and its unit tests would fail.
+- `packages/<package>/stryker.config.mjs`: in each of the four packages, a Stryker config that mutates the
+  package's own source. In the runner, its config leaves out the hooks and the files they import (`worker-hook`,
+  `server-hook`, `is-record`, `namespace`, `playwright-internals`, `protocol`, `server-protocol`,
+  `server-run-switch`), and `page-helpers`, which reaches the page through `addInitScript`. They run inside the
+  worker, page and server processes whose Stryker namespace the hooks manage: instrumented hook code would mark
+  those processes instrumented and record coverage of its own mutants, and its unit tests would fail.
 - `apps/demo-app` (Nx project `@layzee/demo-app`): the demo app and its Playwright component tests
   (`playwright.components.config.mts`).
 - `apps/demo-app-e2e`: the demo app's Playwright e2e tests.
@@ -38,7 +40,7 @@ mutators from there, so build first (the Nx targets below do).
   `stryker.e2e.ui.config.ts` adds the JSX mutators to the e2e run.
 - `stryker.base.ts`: the settings that all four Stryker configs share. The package configs share its reporters
   and ignore list.
-- `stryker.package.ts`: `packageConfig(name)`, the shared body of the three package `stryker.config.mjs` files.
+- `stryker.package.ts`: `packageConfig(name)`, the shared body of the four package `stryker.config.mjs` files.
 - `stryker.e2e.command.config.ts`: the demo baselines on Stryker's `command` runner, selected with
   `STRYKER_BASELINE=define` or `STRYKER_BASELINE=off`.
 - `oss/`: the configs, patches, and scripts that copies of four open-source repos needed for a Stryker
@@ -74,7 +76,7 @@ npx nx run @layzee/stryker-jsx-mutators:test
 
 Neither do the Playwright mutators' tests nor the install code's. To check that a package's tests catch a change to
 its source, run Stryker on it with the package's own config, where `<package>` is `stryker-jsx-mutators`,
-`stryker-playwright-mutators` or `stryker-mutator-install`:
+`stryker-playwright-mutators`, `stryker-mutator-install` or `stryker-playwright-runner`:
 
 ```sh
 npx nx run @layzee/stryker-playwright-mutators:test
@@ -88,6 +90,14 @@ without a build Stryker's first test run fails. The configs' thresholds are 100,
 Stryker's `command` runner and `node --test --test-concurrency=1`. Run in parallel, each Stryker worker would start
 test files on every core, and mutants would time out without being killed. For the same reason each config sets
 `timeoutMS` to 30000: on a loaded machine, Stryker's default of 5000 let mutants that no test kills pass as Timeouts.
+
+Set `LZ_NODE_TEST_RUNNER` to the `src/index.ts` of an `@layzee/stryker-node-test-runner` checkout to run any of the
+four configs with that runner instead, which runs only the tests that cover each mutant; the default `command`
+runner reruns the whole suite for every mutant. The runner is not on npm, so the command runner stays the default.
+
+The TypeScript checker resolves the JSX mutators' `@babel/core` from `packages/stryker-jsx-mutators/node_modules`.
+Stryker links only real `node_modules` folders into its sandbox, so in a worktree whose package `node_modules` are
+junctions, the checker stops with TS7016 on `@babel/core`. Run Stryker from the main checkout.
 
 To run Stryker on the demo app, use `npx nx run @layzee/demo-app-e2e:mutate-e2e`,
 `npx nx run @layzee/demo-app-e2e:mutate-e2e-ui`, or `npx nx run @layzee/demo-app:mutate-ct`. Each
