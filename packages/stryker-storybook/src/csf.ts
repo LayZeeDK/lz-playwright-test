@@ -3,9 +3,19 @@ export interface CsfShapes {
   readonly storyContainers: ReadonlySet<unknown>;
   readonly testCode: ReadonlySet<unknown>;
   readonly mswValues: ReadonlySet<unknown>;
+  readonly staticValues: ReadonlySet<unknown>;
 }
 
 const testKeys = ['play', 'beforeEach', 'afterEach'];
+const staticKeys = [
+  'title',
+  'id',
+  'tags',
+  'includeStories',
+  'excludeStories',
+  'name',
+  'storyName',
+];
 
 export function csfShapes(program: unknown): CsfShapes {
   const body = list(field(program, 'body'));
@@ -35,13 +45,14 @@ export function csfShapes(program: unknown): CsfShapes {
   const idParameters = stories
     .map((story) => propertyValue(story, 'parameters'))
     .filter((parameters) => propertyValue(parameters, '__id') !== undefined);
-  const testOptions = body
-    .map(testArguments)
+  const testCalls = body.map(testArguments);
+  const testOptions = testCalls
     .filter((testArgs) => testArgs.length === 3)
     .map((testArgs) => testArgs[1]);
+  const metaObjects = objectOf(declaration, body);
 
   return {
-    metaObjects: new Set(objectOf(declaration, body)),
+    metaObjects: new Set(metaObjects),
     storyContainers: new Set([...stories, ...idParameters, ...testOptions]),
     testCode: new Set([
       ...stories.flatMap((story) =>
@@ -50,7 +61,7 @@ export function csfShapes(program: unknown): CsfShapes {
       ...body.flatMap((statement) =>
         testKeys.flatMap((key) => assigned(statement, key)),
       ),
-      ...body.map(testArguments).map((testArgs) => testArgs.at(-1)),
+      ...testCalls.map((testArgs) => testArgs.at(-1)),
     ]),
     mswValues: new Set(
       [
@@ -58,7 +69,33 @@ export function csfShapes(program: unknown): CsfShapes {
         ...body.flatMap((statement) => assigned(statement, 'parameters')),
       ].map((parameters) => propertyValue(parameters, 'msw')),
     ),
+    staticValues: new Set([
+      ...[...metaObjects, ...stories].flatMap((object) =>
+        staticKeys.flatMap((key) => withInit(propertyValue(object, key), body)),
+      ),
+      ...idParameters.map((parameters) => propertyValue(parameters, '__id')),
+      ...body.flatMap((statement) =>
+        ['storyName', 'tags'].flatMap((key) => assigned(statement, key)),
+      ),
+      initOf('__namedExportsOrder', body),
+      ...testCalls.map((testArgs) => testArgs[0]),
+      ...testOptions.map((options) => propertyValue(options, 'tags')),
+      ...body.flatMap((statement) =>
+        list(field(statement, 'specifiers')).map((specifier) =>
+          field(specifier, 'exported'),
+        ),
+      ),
+    ]),
   };
+}
+
+function withInit(
+  value: unknown,
+  body: readonly unknown[],
+): readonly unknown[] {
+  return field(value, 'type') === 'Identifier'
+    ? [value, initOf(field(value, 'name'), body)]
+    : [value];
 }
 
 function testArguments(statement: unknown): readonly unknown[] {

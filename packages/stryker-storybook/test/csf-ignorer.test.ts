@@ -405,4 +405,239 @@ describe('lz-storybook-csf', () => {
       ],
     );
   });
+
+  it("places a title in a story's args", async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {\n  args: { title: 'Go' },\n};",
+        )
+      ).filter((outcome) => /^3 StringLiteral/.test(outcome)),
+      ['3 StringLiteral placed'],
+    );
+  });
+
+  it('keeps the meta id as written', async () => {
+    const { outcomes } = setup('mutate');
+
+    assert.deepEqual(
+      (await outcomes("export default {\n  id: 'a-b',\n};")).filter((outcome) =>
+        outcome.startsWith('2 '),
+      ),
+      [`2 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it('keeps the meta tags as written', async () => {
+    const { outcomes } = setup('mutate');
+
+    assert.deepEqual(
+      (await outcomes("export default {\n  tags: ['a'],\n};")).filter(
+        (outcome) => outcome.startsWith('2 '),
+      ),
+      [`2 ArrayDeclaration ${staticReason}`, `2 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it("keeps a story's tags as written", async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {\n  tags: ['!test'],\n};",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      [`3 ArrayDeclaration ${staticReason}`, `3 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it('keeps the tags that the meta names as written', async () => {
+    const { outcomes } = setup('mutate');
+
+    assert.deepEqual(
+      (await outcomes("const tags = ['a'];\nexport default { tags };")).filter(
+        (outcome) => outcome.startsWith('1 '),
+      ),
+      [`1 ArrayDeclaration ${staticReason}`, `1 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it('keeps a title that the meta names as written', async () => {
+    const { outcomes } = setup('mutate');
+
+    assert.deepEqual(
+      (
+        await outcomes("const title = 'a/b';\nexport default { title };")
+      ).filter((outcome) => outcome.startsWith('1 ')),
+      [`1 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it('keeps a meta title under satisfies as written', async () => {
+    const { outcomes } = setup('mutate');
+
+    assert.deepEqual(
+      (
+        await outcomes("export default {\n  title: 'a/b' satisfies string,\n};")
+      ).filter((outcome) => outcome.startsWith('2 ')),
+      [`2 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it('keeps the meta includeStories as written', async () => {
+    const { outcomes } = setup('mutate');
+
+    assert.deepEqual(
+      (await outcomes("export default {\n  includeStories: ['A'],\n};")).filter(
+        (outcome) => outcome.startsWith('2 '),
+      ),
+      [`2 ArrayDeclaration ${staticReason}`, `2 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it('keeps the meta excludeStories as written', async () => {
+    const { outcomes } = setup('mutate');
+
+    assert.deepEqual(
+      (
+        await outcomes("export default {\n  excludeStories: ['data'],\n};")
+      ).filter((outcome) => outcome.startsWith('2 ')),
+      [`2 ArrayDeclaration ${staticReason}`, `2 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it("keeps a story's name as written", async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {\n  name: 'Go',\n};",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      [`3 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it("keeps a story's storyName as written", async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {\n  storyName: 'Go',\n};",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      [`3 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it("keeps a story's __id as written", async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {\n  parameters: {\n    __id: 'x',\n  },\n};",
+        )
+      ).filter((outcome) => outcome.startsWith('4 ')),
+      [`4 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it('keeps a name assigned to X.storyName as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = () => null;\nA.storyName = 'Go';",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      [`3 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it('keeps tags assigned to X.tags as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = () => null;\nA.tags = ['!test'];",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      [`3 ArrayDeclaration ${staticReason}`, `3 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it('keeps __namedExportsOrder as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nexport const __namedExportsOrder = ['A'];",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      [`3 ArrayDeclaration ${staticReason}`, `3 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it('keeps the name of a .test() call as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nA.test('name', async () => {\n  await x();\n});",
+        )
+      ).filter((outcome) => /^3 StringLiteral/.test(outcome)),
+      [`3 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it('keeps the tags in the options of a .test() call as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nA.test(\n  'name',\n  { tags: ['x'] },\n  () => undefined,\n);",
+        )
+      ).filter((outcome) =>
+        /^5 (ArrayDeclaration|StringLiteral)/.test(outcome),
+      ),
+      [`5 ArrayDeclaration ${staticReason}`, `5 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it('keeps a story exported under a string name as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nconst A = {};\nexport { A as 'B c' };",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      [`3 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it("keeps a story's name as written in 'mutate' mode", async () => {
+    const { outcomes } = setup('mutate');
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {\n  name: 'Go',\n};",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      [`3 StringLiteral ${staticReason}`],
+    );
+  });
 });

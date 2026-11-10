@@ -54,10 +54,7 @@ export function csfIgnorer(options: object, log: ProjectLog): Ignorer {
         return mswReason;
       }
 
-      return field(path, 'key') === 'value' &&
-        field(path, 'parentPath', 'node', 'key', 'name') === 'title'
-        ? staticReason
-        : undefined;
+      return shapes?.staticValues.has(node) ? staticReason : undefined;
     },
   };
 }
