@@ -40,11 +40,20 @@ const childFile = fileURLToPath(
   ),
 );
 
+const projects = new Map<string, StorybookProject>();
+
 export function storybookProject(
   givenConfigDir: string,
   log: ProjectLog,
 ): StorybookProject {
   const configDir = resolve(givenConfigDir);
+  const project = projects.get(configDir) ?? loadProject(configDir, log);
+  projects.set(configDir, project);
+
+  return project;
+}
+
+function loadProject(configDir: string, log: ProjectLog): StorybookProject {
   const result = loadStorybook(configDir);
 
   switch (result.kind) {
