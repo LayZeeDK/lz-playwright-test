@@ -90,6 +90,67 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('keeps a meta object under satisfies as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      await outcomes("export default { args: { a: 'x' } } satisfies Meta;"),
+      [
+        `1 ObjectLiteral ${metaReason}`,
+        `1 ObjectLiteral ${metaReason}`,
+        `1 StringLiteral ${metaReason}`,
+      ],
+    );
+  });
+
+  it('keeps a meta object under satisfies that the default export names', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      await outcomes(
+        'const meta = { component: B } satisfies Meta;\nexport default meta;',
+      ),
+      [`1 ObjectLiteral ${metaReason}`],
+    );
+  });
+
+  it('keeps a meta object exported as default by name as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      await outcomes(
+        "const meta = {\n  title: 'a/b',\n};\nexport { meta as default };",
+      ),
+      [`1 ObjectLiteral ${metaReason}`, `2 StringLiteral ${metaReason}`],
+    );
+  });
+
+  it('keeps the object passed to preview.meta() as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "const meta = preview.meta({\n  title: 'a/b',\n});\nexport const A = meta.story();",
+        )
+      ).filter((outcome) => /^[12] /.test(outcome)),
+      [`1 ObjectLiteral ${metaReason}`, `2 StringLiteral ${metaReason}`],
+    );
+  });
+
+  it('keeps the object passed to preview.type().meta() as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "const meta = preview.type<{ args: A }>().meta({\n  title: 'a/b',\n});\nexport const A = meta.story();",
+        )
+      ).filter((outcome) => /^[12] /.test(outcome)),
+      [`1 ObjectLiteral ${metaReason}`, `2 StringLiteral ${metaReason}`],
+    );
+  });
+
   it('keeps a multi-line story object as written and places what it holds', async () => {
     const { outcomes } = setup();
 
@@ -296,6 +357,56 @@ describe('lz-storybook-csf', () => {
         )
       ).filter((outcome) => /^[23] /.test(outcome)),
       [`2 BlockStatement ${metaReason}`, `3 ArithmeticOperator ${metaReason}`],
+    );
+  });
+
+  it("places a story's play function in 'mutate' mode", async () => {
+    const { outcomes } = setup('mutate');
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {\n  play: async () => {\n    await x(1 + 1);\n  },\n};",
+        )
+      ).filter((outcome) => /^[34] /.test(outcome)),
+      ['3 BlockStatement placed', '4 ArithmeticOperator placed'],
+    );
+  });
+
+  it("places the meta's play function in 'mutate' mode", async () => {
+    const { outcomes } = setup('mutate');
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          'export default {\n  play: async () => {\n    await x(1 + 1);\n  },\n};',
+        )
+      ).filter((outcome) => /^[23] /.test(outcome)),
+      ['2 BlockStatement placed', '3 ArithmeticOperator placed'],
+    );
+  });
+
+  it("places a story's globals in 'mutate' mode", async () => {
+    const { outcomes } = setup('mutate');
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {\n  globals: { theme: 'dark' },\n};",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      ['3 ObjectLiteral placed', '3 StringLiteral placed'],
+    );
+  });
+
+  it("places the meta's globals in 'mutate' mode", async () => {
+    const { outcomes } = setup('mutate');
+
+    assert.deepEqual(
+      (
+        await outcomes("export default {\n  globals: { theme: 'dark' },\n};")
+      ).filter((outcome) => outcome.startsWith('2 ')),
+      ['2 ObjectLiteral placed', '2 StringLiteral placed'],
     );
   });
 

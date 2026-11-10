@@ -25,22 +25,41 @@ export function csfShapes(program: unknown): CsfShapes {
     ),
     'declaration',
   );
+  const specifiers = body.flatMap((statement) =>
+    list(field(statement, 'specifiers')),
+  );
+  const defaultSpecifier = specifiers.find(
+    (specifier) => field(specifier, 'exported', 'name') === 'default',
+  );
+  const metaObjects = [
+    ...objectOf(declaration ?? field(defaultSpecifier, 'local'), body),
+    ...body
+      .flatMap((statement) => [
+        ...list(field(statement, 'declarations')),
+        ...list(field(statement, 'declaration', 'declarations')),
+      ])
+      .map((declarator) => field(declarator, 'init'))
+      .filter((init) => field(init, 'callee', 'property', 'name') === 'meta')
+      .map((init) => list(field(init, 'arguments'))[0]),
+  ];
 
-  const stories = body
-    .flatMap((statement) => [
+  const stories = [
+    ...body.flatMap((statement) => [
       ...list(field(statement, 'declaration', 'declarations')).map(
         (declarator) => field(declarator, 'init'),
       ),
-      ...list(field(statement, 'specifiers')).map((specifier) =>
-        initOf(field(specifier, 'local', 'name'), body),
-      ),
       ...assigned(statement, 'story'),
-    ])
+    ]),
+    ...specifiers.map((specifier) =>
+      initOf(field(specifier, 'local', 'name'), body),
+    ),
+  ]
     .map((init) => storyNode(unwrap(init)))
     .filter(
       (init) =>
-        field(init, 'type') === 'ObjectExpression' ||
-        field(init, 'type') === 'ArrowFunctionExpression',
+        (field(init, 'type') === 'ObjectExpression' ||
+          field(init, 'type') === 'ArrowFunctionExpression') &&
+        !metaObjects.includes(init),
     );
   const idParameters = stories
     .map((story) => propertyValue(story, 'parameters'))
@@ -49,7 +68,6 @@ export function csfShapes(program: unknown): CsfShapes {
   const testOptions = testCalls
     .filter((testArgs) => testArgs.length === 3)
     .map((testArgs) => testArgs[1]);
-  const metaObjects = objectOf(declaration, body);
 
   return {
     metaObjects: new Set(metaObjects),
@@ -80,11 +98,7 @@ export function csfShapes(program: unknown): CsfShapes {
       initOf('__namedExportsOrder', body),
       ...testCalls.map((testArgs) => testArgs[0]),
       ...testOptions.map((options) => propertyValue(options, 'tags')),
-      ...body.flatMap((statement) =>
-        list(field(statement, 'specifiers')).map((specifier) =>
-          field(specifier, 'exported'),
-        ),
-      ),
+      ...specifiers.map((specifier) => field(specifier, 'exported')),
     ]),
   };
 }
@@ -134,7 +148,12 @@ function unwrap(node: unknown): unknown {
     : node;
 }
 
-function objectOf(node: unknown, body: readonly unknown[]): readonly unknown[] {
+function objectOf(
+  expression: unknown,
+  body: readonly unknown[],
+): readonly unknown[] {
+  const node = unwrap(expression);
+
   switch (field(node, 'type')) {
     case 'ObjectExpression': {
       return [node];
