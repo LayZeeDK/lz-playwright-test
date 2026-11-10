@@ -8,7 +8,8 @@
   "include": [
     "test/**/*.ts",
     "test/**/*.tsx",
-    "test/fixtures/*/.storybook/*.ts"
+    "test/fixtures/*/.storybook/*.ts",
+    "test/fixtures/reporter/*.json"
   ],
   "references": [
     {

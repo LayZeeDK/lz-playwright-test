@@ -1,0 +1,831 @@
+{
+  "files": {
+    "src/lzsb/Imported.stories.tsx": {
+      "language": "typescript",
+      "mutants": [
+        {
+          "id": "0",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 2, "line": 10 },
+            "start": { "column": 14, "line": 6 }
+          }
+        },
+        {
+          "id": "1",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 25, "line": 7 },
+            "start": { "column": 10, "line": 7 }
+          }
+        },
+        {
+          "id": "2",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 2, "line": 18 },
+            "start": { "column": 31, "line": 13 }
+          }
+        },
+        {
+          "id": "3",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 54, "line": 14 },
+            "start": { "column": 9, "line": 14 }
+          }
+        },
+        {
+          "id": "4",
+          "mutatorName": "LzStorybookSpyStub",
+          "replacement": "fn()",
+          "statusReason": "LzStorybookSpyStub: unknown: the file's parameters.test cannot be read statically, so whether the reset erases this stub is unknown; pass the implementation to fn() (fn(() => value)) or set the stub in beforeEach",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 52, "line": 14 },
+            "start": { "column": 21, "line": 14 }
+          }
+        },
+        {
+          "id": "5",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 51, "line": 14 },
+            "start": { "column": 42, "line": 14 }
+          }
+        },
+        {
+          "id": "6",
+          "mutatorName": "BlockStatement",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"BlockStatement\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 4, "line": 17 },
+            "start": { "column": 31, "line": 15 }
+          }
+        },
+        {
+          "id": "7",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 44, "line": 16 },
+            "start": { "column": 37, "line": 16 }
+          }
+        },
+        {
+          "id": "8",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 74, "line": 16 },
+            "start": { "column": 65, "line": 16 }
+          }
+        }
+      ],
+      "source": "import { sharedParameters } from '../reset-cases/shared-parameters';\nimport type { Meta, StoryObj } from '@storybook/react-vite';\nimport { expect, fn } from 'storybook/test';\n\nimport { Probe } from '../reset-cases/Probe';\nconst meta = {\n  title: 'Lzsb/Imported',\n  component: Probe,\n  parameters: sharedParameters,\n} satisfies Meta<typeof Probe>;\nexport default meta;\ntype Story = StoryObj<typeof meta>;\nexport const Checked: Story = {\n  args: { getValue: fn().mockReturnValue('stubbed') },\n  play: async ({ canvas }) => {\n    await expect(canvas.getByTestId('value')).toHaveTextContent('stubbed');\n  },\n};\n"
+    },
+    "src/lzsb/OrderDep.stories.tsx": {
+      "language": "typescript",
+      "mutants": [
+        {
+          "id": "9",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 2, "line": 9 },
+            "start": { "column": 14, "line": 5 }
+          }
+        },
+        {
+          "id": "10",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 25, "line": 6 },
+            "start": { "column": 10, "line": 6 }
+          }
+        },
+        {
+          "id": "11",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 2, "line": 18 },
+            "start": { "column": 29, "line": 12 }
+          }
+        },
+        {
+          "id": "12",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 54, "line": 13 },
+            "start": { "column": 9, "line": 13 }
+          }
+        },
+        {
+          "id": "13",
+          "mutatorName": "LzStorybookSpyStub",
+          "replacement": "fn()",
+          "statusReason": "LzStorybookSpyStub: order-dependent: a story with the default mock reset in this file erases this stub when it renders first (Storybook UI, Docs page, shuffled runs); pass the implementation to fn() (fn(() => value)) or set the stub in beforeEach, or turn the reset off in meta",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 52, "line": 13 },
+            "start": { "column": 21, "line": 13 }
+          }
+        },
+        {
+          "id": "14",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 51, "line": 13 },
+            "start": { "column": 42, "line": 13 }
+          }
+        },
+        {
+          "id": "15",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 48, "line": 14 },
+            "start": { "column": 15, "line": 14 }
+          }
+        },
+        {
+          "id": "16",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 46, "line": 14 },
+            "start": { "column": 23, "line": 14 }
+          }
+        },
+        {
+          "id": "17",
+          "mutatorName": "BooleanLiteral",
+          "replacement": "true",
+          "statusReason": "Ignored because of excluded mutation \"BooleanLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 44, "line": 14 },
+            "start": { "column": 39, "line": 14 }
+          }
+        },
+        {
+          "id": "18",
+          "mutatorName": "BlockStatement",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"BlockStatement\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 4, "line": 17 },
+            "start": { "column": 31, "line": 15 }
+          }
+        },
+        {
+          "id": "19",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 44, "line": 16 },
+            "start": { "column": 37, "line": 16 }
+          }
+        },
+        {
+          "id": "20",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 74, "line": 16 },
+            "start": { "column": 65, "line": 16 }
+          }
+        },
+        {
+          "id": "21",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 2, "line": 24 },
+            "start": { "column": 30, "line": 19 }
+          }
+        },
+        {
+          "id": "22",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 40, "line": 20 },
+            "start": { "column": 9, "line": 20 }
+          }
+        },
+        {
+          "id": "23",
+          "mutatorName": "ArrowFunction",
+          "replacement": "() => undefined",
+          "statusReason": "Ignored because of excluded mutation \"ArrowFunction\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 37, "line": 20 },
+            "start": { "column": 24, "line": 20 }
+          }
+        },
+        {
+          "id": "24",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 37, "line": 20 },
+            "start": { "column": 30, "line": 20 }
+          }
+        },
+        {
+          "id": "25",
+          "mutatorName": "BlockStatement",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"BlockStatement\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 4, "line": 23 },
+            "start": { "column": 31, "line": 21 }
+          }
+        },
+        {
+          "id": "26",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 44, "line": 22 },
+            "start": { "column": 37, "line": 22 }
+          }
+        },
+        {
+          "id": "27",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 72, "line": 22 },
+            "start": { "column": 65, "line": 22 }
+          }
+        }
+      ],
+      "source": "import type { Meta, StoryObj } from '@storybook/react-vite';\nimport { expect, fn } from 'storybook/test';\n\nimport { Probe } from '../reset-cases/Probe';\nconst meta = {\n  title: 'Lzsb/OrderDep',\n  component: Probe,\n  \n} satisfies Meta<typeof Probe>;\nexport default meta;\ntype Story = StoryObj<typeof meta>;\nexport const First: Story = {\n  args: { getValue: fn().mockReturnValue('stubbed') },\n  parameters: { test: { restoreMocks: false } },\n  play: async ({ canvas }) => {\n    await expect(canvas.getByTestId('value')).toHaveTextContent('stubbed');\n  },\n};\nexport const Second: Story = {\n  args: { getValue: fn(() => 'plain') },\n  play: async ({ canvas }) => {\n    await expect(canvas.getByTestId('value')).toHaveTextContent('plain');\n  },\n};\n"
+    },
+    "src/SpyStubDefault.stories.tsx": {
+      "language": "typescript",
+      "mutants": [
+        {
+          "id": "28",
+          "mutatorName": "BlockStatement",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"BlockStatement\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 2, "line": 8 },
+            "start": { "column": 59, "line": 6 }
+          }
+        },
+        {
+          "id": "29",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 34, "line": 10 },
+            "start": { "column": 14, "line": 10 }
+          }
+        },
+        {
+          "id": "30",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 2, "line": 19 },
+            "start": { "column": 34, "line": 14 }
+          }
+        },
+        {
+          "id": "31",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 54, "line": 15 },
+            "start": { "column": 9, "line": 15 }
+          }
+        },
+        {
+          "id": "32",
+          "mutatorName": "LzStorybookSpyStub",
+          "replacement": "fn()",
+          "statusReason": "LzStorybookSpyStub: erased: this story's mock reset runs before it renders, so the stub never takes effect; pass the implementation to fn() (fn(() => value)) or set the stub in beforeEach",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 52, "line": 15 },
+            "start": { "column": 21, "line": 15 }
+          }
+        },
+        {
+          "id": "33",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 51, "line": 15 },
+            "start": { "column": 42, "line": 15 }
+          }
+        },
+        {
+          "id": "34",
+          "mutatorName": "BlockStatement",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"BlockStatement\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 4, "line": 18 },
+            "start": { "column": 31, "line": 16 }
+          }
+        },
+        {
+          "id": "35",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 44, "line": 17 },
+            "start": { "column": 37, "line": 17 }
+          }
+        }
+      ],
+      "source": "// SpyStub spike: default reset, so the definition-time stub is erased before render; the play only checks the\n// output exists, like a story that passes on the unstubbed branch.\nimport type { Meta, StoryObj } from '@storybook/react-vite';\nimport { expect, fn } from 'storybook/test';\n\nfunction Probe({ getValue }: { getValue: () => unknown }) {\n  return <output data-testid=\"value\">{String(getValue())}</output>;\n}\n\nconst meta = { component: Probe } satisfies Meta<typeof Probe>;\nexport default meta;\ntype Story = StoryObj<typeof meta>;\n\nexport const ErasedStub: Story = {\n  args: { getValue: fn().mockReturnValue('stubbed') },\n  play: async ({ canvas }) => {\n    await expect(canvas.getByTestId('value')).toBeInTheDocument();\n  },\n};\n"
+    },
+    "src/SpyStubMetaOff.stories.tsx": {
+      "language": "typescript",
+      "mutants": [
+        {
+          "id": "36",
+          "mutatorName": "BlockStatement",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"BlockStatement\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 2, "line": 7 },
+            "start": { "column": 59, "line": 5 }
+          }
+        },
+        {
+          "id": "37",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 2, "line": 12 },
+            "start": { "column": 14, "line": 9 }
+          }
+        },
+        {
+          "id": "38",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 48, "line": 11 },
+            "start": { "column": 15, "line": 11 }
+          }
+        },
+        {
+          "id": "39",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 46, "line": 11 },
+            "start": { "column": 23, "line": 11 }
+          }
+        },
+        {
+          "id": "40",
+          "mutatorName": "BooleanLiteral",
+          "replacement": "true",
+          "statusReason": "Ignored because of excluded mutation \"BooleanLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 44, "line": 11 },
+            "start": { "column": 39, "line": 11 }
+          }
+        },
+        {
+          "id": "41",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 2, "line": 21 },
+            "start": { "column": 35, "line": 16 }
+          }
+        },
+        {
+          "id": "42",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 54, "line": 17 },
+            "start": { "column": 9, "line": 17 }
+          }
+        },
+        {
+          "id": "44",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 51, "line": 17 },
+            "start": { "column": 42, "line": 17 }
+          }
+        },
+        {
+          "id": "45",
+          "mutatorName": "BlockStatement",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"BlockStatement\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 4, "line": 20 },
+            "start": { "column": 31, "line": 18 }
+          }
+        },
+        {
+          "id": "46",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 44, "line": 19 },
+            "start": { "column": 37, "line": 19 }
+          }
+        },
+        {
+          "id": "47",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 74, "line": 19 },
+            "start": { "column": 65, "line": 19 }
+          }
+        },
+        {
+          "id": "48",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 2, "line": 28 },
+            "start": { "column": 37, "line": 23 }
+          }
+        },
+        {
+          "id": "49",
+          "mutatorName": "ObjectLiteral",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"ObjectLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 54, "line": 24 },
+            "start": { "column": 9, "line": 24 }
+          }
+        },
+        {
+          "id": "51",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 51, "line": 24 },
+            "start": { "column": 42, "line": 24 }
+          }
+        },
+        {
+          "id": "52",
+          "mutatorName": "BlockStatement",
+          "replacement": "{}",
+          "statusReason": "Ignored because of excluded mutation \"BlockStatement\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 4, "line": 27 },
+            "start": { "column": 31, "line": 25 }
+          }
+        },
+        {
+          "id": "53",
+          "mutatorName": "StringLiteral",
+          "replacement": "\"\"",
+          "statusReason": "Ignored because of excluded mutation \"StringLiteral\"",
+          "status": "Ignored",
+          "static": false,
+          "location": {
+            "end": { "column": 44, "line": 26 },
+            "start": { "column": 37, "line": 26 }
+          }
+        },
+        {
+          "id": "50",
+          "mutatorName": "LzStorybookSpyStub",
+          "replacement": "fn()",
+          "status": "Survived",
+          "static": true,
+          "testsCompleted": 6,
+          "duration": 168.99999999254942,
+          "coveredBy": [],
+          "location": {
+            "end": { "column": 52, "line": 24 },
+            "start": { "column": 21, "line": 24 }
+          }
+        },
+        {
+          "id": "43",
+          "mutatorName": "LzStorybookSpyStub",
+          "replacement": "fn()",
+          "statusReason": "\n\u001b[34mClick to debug the error directly in Storybook: http://localhost:6006/?path=/story/spystubmetaoff--checked-stub&addonPanel=storybook/interactions/panel\u001b[39m\n\nexpect(element).toHaveTextContent()\n\nExpected element to have text content:\n  stubbed\nReceived:\n  undefined",
+          "status": "Killed",
+          "static": true,
+          "testsCompleted": 1,
+          "duration": 1123.3000000044703,
+          "killedBy": ["0"],
+          "coveredBy": [],
+          "location": {
+            "end": { "column": 52, "line": 17 },
+            "start": { "column": 21, "line": 17 }
+          }
+        }
+      ],
+      "source": "// SpyStub spike: reset off for the file, so the definition-time stub reaches the component and the play checks it.\nimport type { Meta, StoryObj } from '@storybook/react-vite';\nimport { expect, fn } from 'storybook/test';\n\nfunction Probe({ getValue }: { getValue: () => unknown }) {\n  return <output data-testid=\"value\">{String(getValue())}</output>;\n}\n\nconst meta = {\n  component: Probe,\n  parameters: { test: { restoreMocks: false } },\n} satisfies Meta<typeof Probe>;\nexport default meta;\ntype Story = StoryObj<typeof meta>;\n\nexport const CheckedStub: Story = {\n  args: { getValue: fn().mockReturnValue('stubbed') },\n  play: async ({ canvas }) => {\n    await expect(canvas.getByTestId('value')).toHaveTextContent('stubbed');\n  },\n};\n\nexport const UncheckedStub: Story = {\n  args: { getValue: fn().mockReturnValue('stubbed') },\n  play: async ({ canvas }) => {\n    await expect(canvas.getByTestId('value')).toBeInTheDocument();\n  },\n};\n"
+    }
+  },
+  "schemaVersion": "1.0",
+  "thresholds": { "high": 80, "low": 60, "break": null },
+  "testFiles": {
+    "src/SpyStubMetaOff.stories.tsx": {
+      "tests": [
+        {
+          "id": "0",
+          "name": "Checked Stub",
+          "location": { "start": { "column": 1, "line": 67 } }
+        },
+        {
+          "id": "1",
+          "name": "Unchecked Stub",
+          "location": { "start": { "column": 1, "line": 77 } }
+        }
+      ],
+      "source": "// SpyStub spike: reset off for the file, so the definition-time stub reaches the component and the play checks it.\nimport type { Meta, StoryObj } from '@storybook/react-vite';\nimport { expect, fn } from 'storybook/test';\n\nfunction Probe({ getValue }: { getValue: () => unknown }) {\n  return <output data-testid=\"value\">{String(getValue())}</output>;\n}\n\nconst meta = {\n  component: Probe,\n  parameters: { test: { restoreMocks: false } },\n} satisfies Meta<typeof Probe>;\nexport default meta;\ntype Story = StoryObj<typeof meta>;\n\nexport const CheckedStub: Story = {\n  args: { getValue: fn().mockReturnValue('stubbed') },\n  play: async ({ canvas }) => {\n    await expect(canvas.getByTestId('value')).toHaveTextContent('stubbed');\n  },\n};\n\nexport const UncheckedStub: Story = {\n  args: { getValue: fn().mockReturnValue('stubbed') },\n  play: async ({ canvas }) => {\n    await expect(canvas.getByTestId('value')).toBeInTheDocument();\n  },\n};\n"
+    },
+    "src/lzsb/OrderDep.stories.tsx": {
+      "tests": [
+        {
+          "id": "2",
+          "name": "First",
+          "location": { "start": { "column": 1, "line": 10 } }
+        },
+        {
+          "id": "3",
+          "name": "Second",
+          "location": { "start": { "column": 1, "line": 25 } }
+        }
+      ],
+      "source": "import type { Meta, StoryObj } from '@storybook/react-vite';\nimport { expect, fn } from 'storybook/test';\n\nimport { Probe } from '../reset-cases/Probe';\nconst meta = {\n  title: 'Lzsb/OrderDep',\n  component: Probe,\n  \n} satisfies Meta<typeof Probe>;\nexport default meta;\ntype Story = StoryObj<typeof meta>;\nexport const First: Story = {\n  args: { getValue: fn().mockReturnValue('stubbed') },\n  parameters: { test: { restoreMocks: false } },\n  play: async ({ canvas }) => {\n    await expect(canvas.getByTestId('value')).toHaveTextContent('stubbed');\n  },\n};\nexport const Second: Story = {\n  args: { getValue: fn(() => 'plain') },\n  play: async ({ canvas }) => {\n    await expect(canvas.getByTestId('value')).toHaveTextContent('plain');\n  },\n};\n"
+    },
+    "src/SpyStubDefault.stories.tsx": {
+      "tests": [
+        {
+          "id": "4",
+          "name": "Erased Stub",
+          "location": { "start": { "column": 1, "line": 17 } }
+        }
+      ],
+      "source": "// SpyStub spike: default reset, so the definition-time stub is erased before render; the play only checks the\n// output exists, like a story that passes on the unstubbed branch.\nimport type { Meta, StoryObj } from '@storybook/react-vite';\nimport { expect, fn } from 'storybook/test';\n\nfunction Probe({ getValue }: { getValue: () => unknown }) {\n  return <output data-testid=\"value\">{String(getValue())}</output>;\n}\n\nconst meta = { component: Probe } satisfies Meta<typeof Probe>;\nexport default meta;\ntype Story = StoryObj<typeof meta>;\n\nexport const ErasedStub: Story = {\n  args: { getValue: fn().mockReturnValue('stubbed') },\n  play: async ({ canvas }) => {\n    await expect(canvas.getByTestId('value')).toBeInTheDocument();\n  },\n};\n"
+    },
+    "src/lzsb/Imported.stories.tsx": {
+      "tests": [
+        {
+          "id": "5",
+          "name": "Checked",
+          "location": { "start": { "column": 1, "line": 12 } }
+        }
+      ],
+      "source": "import { sharedParameters } from '../reset-cases/shared-parameters';\nimport type { Meta, StoryObj } from '@storybook/react-vite';\nimport { expect, fn } from 'storybook/test';\n\nimport { Probe } from '../reset-cases/Probe';\nconst meta = {\n  title: 'Lzsb/Imported',\n  component: Probe,\n  parameters: sharedParameters,\n} satisfies Meta<typeof Probe>;\nexport default meta;\ntype Story = StoryObj<typeof meta>;\nexport const Checked: Story = {\n  args: { getValue: fn().mockReturnValue('stubbed') },\n  play: async ({ canvas }) => {\n    await expect(canvas.getByTestId('value')).toHaveTextContent('stubbed');\n  },\n};\n"
+    }
+  },
+  "projectRoot": "D:\\tmp\\oss-storybook\\sb-latest-probe",
+  "config": {
+    "testRunner": "vitest",
+    "vitest": {
+      "configFile": "vitest.lzsb.config.ts",
+      "related": false,
+      "pool": "threads"
+    },
+    "coverageAnalysis": "perTest",
+    "mutate": ["src/SpyStub*.stories.tsx", "src/lzsb/*.stories.tsx"],
+    "appendPlugins": ["../protos/lz-storybook-plugins.mjs"],
+    "ignorers": ["lz-storybook"],
+    "mutator": {
+      "excludedMutations": [
+        "ArithmeticOperator",
+        "ArrayDeclaration",
+        "ArrowFunction",
+        "AssignmentOperator",
+        "BlockStatement",
+        "BooleanLiteral",
+        "CallExpression",
+        "ConditionalExpression",
+        "EqualityOperator",
+        "LogicalOperator",
+        "MethodExpression",
+        "ObjectLiteral",
+        "OptionalChaining",
+        "Regex",
+        "StringLiteral",
+        "UnaryOperator",
+        "UpdateOperator"
+      ],
+      "plugins": null
+    },
+    "lzStorybook": { "previewPath": ".storybook-lzsb/preview.ts" },
+    "concurrency": 2,
+    "inPlace": true,
+    "reporters": ["clear-text", "json", "lz-storybook"],
+    "jsonReporter": { "fileName": "reports/lzsb/mutation.json" },
+    "tempDirName": ".stryker-tmp",
+    "configFile": "stryker.lzsb.config.json",
+    "allowConsoleColors": true,
+    "checkers": [],
+    "checkerNodeArgs": [],
+    "commandRunner": { "command": "npm test" },
+    "clearTextReporter": {
+      "allowColor": true,
+      "allowEmojis": false,
+      "logTests": true,
+      "maxTestsToLog": 3,
+      "reportTests": true,
+      "reportMutants": true,
+      "reportScoreTable": true,
+      "skipFull": false
+    },
+    "dashboard": {
+      "baseUrl": "https://dashboard.stryker-mutator.io/api/reports",
+      "reportType": "full"
+    },
+    "dryRunOnly": false,
+    "eventReporter": { "baseDir": "reports/mutation/events" },
+    "ignorePatterns": [],
+    "ignoreStatic": false,
+    "incremental": false,
+    "incrementalFile": "reports/stryker-incremental.json",
+    "force": false,
+    "fileLogLevel": "off",
+    "logLevel": "info",
+    "maxConcurrentTestRunners": 9007199254740991,
+    "maxTestRunnerReuse": 0,
+    "plugins": ["@stryker-mutator/*"],
+    "htmlReporter": { "fileName": "reports/mutation/mutation.html" },
+    "disableTypeChecks": true,
+    "symlinkNodeModules": true,
+    "cleanTempDir": true,
+    "testRunnerNodeArgs": [],
+    "thresholds": { "high": 80, "low": 60, "break": null },
+    "timeoutFactor": 1.5,
+    "timeoutMS": 5000,
+    "dryRunTimeoutMinutes": 5,
+    "tsconfigFile": "tsconfig.json",
+    "warnings": true,
+    "disableBail": false,
+    "allowEmpty": false,
+    "testFiles": []
+  },
+  "framework": {
+    "name": "StrykerJS",
+    "version": "10.1.1",
+    "branding": {
+      "homepageUrl": "https://stryker-mutator.io",
+      "imageUrl": "data:image/svg+xml;utf8,%3Csvg viewBox='0 0 1458 1458' xmlns='http://www.w3.org/2000/svg' fill-rule='evenodd' clip-rule='evenodd' stroke-linejoin='round' stroke-miterlimit='2'%3E%3Cpath fill='none' d='M0 0h1458v1458H0z'/%3E%3CclipPath id='a'%3E%3Cpath d='M0 0h1458v1458H0z'/%3E%3C/clipPath%3E%3Cg clip-path='url(%23a)'%3E%3Cpath d='M1458 729c0 402.655-326.345 729-729 729S0 1131.655 0 729C0 326.445 326.345 0 729 0s729 326.345 729 729' fill='%23e74c3c' fill-rule='nonzero'/%3E%3Cpath d='M778.349 1456.15L576.6 1254.401l233-105 85-78.668v-64.332l-257-257-44-187-50-208 251.806-82.793L1076.6 389.401l380.14 379.15c-19.681 367.728-311.914 663.049-678.391 687.599z' fill-opacity='.3'/%3E%3Cpath d='M753.4 329.503c41.79 0 74.579 7.83 97.925 25.444 23.571 18.015 41.69 43.956 55.167 77.097l11.662 28.679 165.733-58.183-14.137-32.13c-26.688-60.655-64.896-108.61-114.191-144.011-49.329-35.423-117.458-54.302-204.859-54.302-50.78 0-95.646 7.376-134.767 21.542-40.093 14.671-74.09 34.79-102.239 60.259-28.84 26.207-50.646 57.06-65.496 92.701-14.718 35.052-22.101 72.538-22.101 112.401 0 72.536 20.667 133.294 61.165 182.704 38.624 47.255 98.346 88.037 179.861 121.291 42.257 17.475 78.715 33.125 109.227 46.994 27.193 12.361 49.294 26.124 66.157 41.751 15.309 14.186 26.497 30.584 33.63 49.258 7.721 20.214 11.16 45.69 11.16 76.402 0 28.021-4.251 51.787-13.591 71.219-8.832 18.374-20.171 33.178-34.523 44.219-14.787 11.374-31.193 19.591-49.393 24.466-19.68 5.359-39.14 7.993-58.69 7.993-29.359 0-54.387-3.407-75.182-10.747-20.112-7.013-37.144-16.144-51.259-27.486-13.618-11.009-24.971-23.766-33.744-38.279-9.64-15.8-17.272-31.924-23.032-48.408l-10.965-31.376-161.669 60.585 10.734 30.124c10.191 28.601 24.197 56.228 42.059 82.748 18.208 27.144 41.322 51.369 69.525 72.745 27.695 21.075 60.904 38.218 99.481 51.041 37.777 12.664 82.004 19.159 132.552 19.159 49.998 0 95.818-8.321 137.611-24.622 42.228-16.471 78.436-38.992 108.835-67.291 30.719-28.597 54.631-62.103 71.834-100.642 17.263-38.56 25.923-79.392 25.923-122.248 0-54.339-8.368-100.37-24.208-138.32-16.29-38.759-38.252-71.661-65.948-98.797-26.965-26.418-58.269-48.835-93.858-67.175-33.655-17.241-69.196-33.11-106.593-47.533-35.934-13.429-65.822-26.601-89.948-39.525-22.153-11.868-40.009-24.21-53.547-37.309-11.429-11.13-19.83-23.678-24.718-37.664-5.413-15.49-7.98-33.423-7.98-53.577 0-40.883 11.293-71.522 37.086-90.539 28.443-20.825 64.985-30.658 109.311-30.658z' fill='%23f1c40f' fill-rule='nonzero'/%3E%3Cpath d='M720 0h18v113h-18zM1458 738v-18h-113v18h113zM720 1345h18v113h-18zM113 738v-18H0v18h113z'/%3E%3C/g%3E%3C/svg%3E"
+    },
+    "dependencies": { "typescript": "7.0.2" }
+  }
+}

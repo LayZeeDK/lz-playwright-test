@@ -1,4 +1,4 @@
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, existsSync } from 'node:fs';
 import { relative, sep } from 'node:path';
 
 export const mockTransformerPluginName = 'lz-storybook-mock-transformer';
@@ -17,4 +17,8 @@ export function appendRecord(file: string, rewritten: number): void {
     recordFile,
     `${JSON.stringify({ file: projectFile, rewritten })}\n`,
   );
+}
+
+export function hasRecords(recordFile: string): boolean {
+  return existsSync(recordFile);
 }
