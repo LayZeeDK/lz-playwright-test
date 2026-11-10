@@ -4,8 +4,12 @@ import { tmpdir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { getInterpretedFile } from 'storybook/internal/common';
+
 import { isRecord } from './is-record.ts';
 import { packageName } from './package-name.ts';
+import { parseProgram } from './parse.ts';
+import { readPreviewTest } from './reset-setting.ts';
 import { mockTransformerPluginName } from './stryker-record.ts';
 
 export interface ProjectLog {
@@ -17,6 +21,7 @@ export interface StorybookProject {
   readonly configDir: string;
   readonly storyFiles: ReadonlySet<string> | 'fallback';
   readonly transformer: 'seen' | 'not-seen';
+  readonly previewTest: unknown;
 }
 
 type LoadResult =
@@ -50,6 +55,7 @@ export function storybookProject(
         transformer: result.pluginNames.includes(mockTransformerPluginName)
           ? 'seen'
           : 'not-seen',
+        previewTest: readPreview(configDir),
       };
     }
     case 'no-main': {
@@ -87,7 +93,20 @@ function normalizePath(path: string): string {
 }
 
 function fallbackProject(configDir: string): StorybookProject {
-  return { configDir, storyFiles: 'fallback', transformer: 'not-seen' };
+  return {
+    configDir,
+    storyFiles: 'fallback',
+    transformer: 'not-seen',
+    previewTest: readPreview(configDir),
+  };
+}
+
+function readPreview(configDir: string): unknown {
+  const file = getInterpretedFile(join(configDir, 'preview'));
+
+  return file === undefined
+    ? undefined
+    : readPreviewTest(parseProgram(readFileSync(file, 'utf8'), file));
 }
 
 function loadStorybook(configDir: string): LoadResult {
