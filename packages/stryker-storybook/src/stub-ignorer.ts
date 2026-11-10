@@ -7,15 +7,14 @@ import {
   storybookProject,
   type ProjectLog,
 } from './storybook-project.ts';
-import { reasonSites, spyStubReason } from './stub-verdict.ts';
+import { reasonSites, spyStubReason, type ReasonSite } from './stub-verdict.ts';
 
 export function stubIgnorer(options: object, log: ProjectLog): Ignorer {
-  let reasons: ReadonlyMap<number, string> = new Map();
+  let sites: readonly ReasonSite[] = [];
 
   return {
     shouldIgnore(path) {
       const node = field(path, 'node');
-      const start = field(node, 'start');
 
       if (field(node, 'type') === 'Program') {
         const fileName = field(path, 'hub', 'file', 'opts', 'filename');
@@ -23,17 +22,18 @@ export function stubIgnorer(options: object, log: ProjectLog): Ignorer {
           lzStorybookOptions(options).configDir,
           log,
         );
-        reasons = new Map(
+        sites =
           typeof fileName === 'string' && isStoryFile(project, fileName)
-            ? reasonSites(node, project).map(({ start, verdict }) => [
-                start,
-                spyStubReason(verdict),
-              ])
-            : [],
-        );
+            ? reasonSites(node, project)
+            : [];
       }
 
-      return typeof start === 'number' ? reasons.get(start) : undefined;
+      const site = sites.find(
+        ({ start, end }) =>
+          field(node, 'start') === start && field(node, 'end') === end,
+      );
+
+      return site === undefined ? undefined : spyStubReason(site.verdict);
     },
   };
 }
