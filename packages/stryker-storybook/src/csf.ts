@@ -220,6 +220,7 @@ function storyExports(
   isStory: (named: NamedExport) => boolean,
 ): readonly StoryExport[] {
   const assignments = body.flatMap(assignmentOf);
+  const testCalls = body.flatMap(testCallOf);
 
   return namedExports(body, bindings)
     .filter(isStory)
@@ -232,6 +233,13 @@ function storyExports(
         name,
         local,
         init,
+        testOptions: isStoryFactoryCall(unwrap(init))
+          ? testCalls
+              .filter(({ target }) => target === local)
+              .map(({ args: [, ...rest] }) =>
+                rest.length > 1 ? rest[0] : undefined,
+              )
+          : [],
         tested:
           form === 'declaration' ||
           (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
@@ -247,6 +255,8 @@ export interface StoryExport {
   readonly name: string;
   readonly local: unknown;
   readonly init: unknown;
+  /** The options argument of each `.test()` call on a factory story, `undefined` for a call without one; Storybook 10.6.5 runs other stories' `.test()` calls as the story itself. */
+  readonly testOptions: readonly unknown[];
   /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
   readonly tested: boolean;
   readonly assignments: readonly Assignment[];

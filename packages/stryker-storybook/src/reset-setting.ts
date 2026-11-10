@@ -141,16 +141,19 @@ export function classifyStubs(
 
       return tested && tags !== undefined && isTestedByTags(testTags, tags);
     })
-    .flatMap(({ name, init, runtimeAssignments, extendsBase }) => {
+    .flatMap(({ name, init, runtimeAssignments, extendsBase, testOptions }) => {
       const story = runtimeAssignments.reduce(
         (value, assignment) =>
           written(value, assignment.path, evaluate(assignment.value, bindings)),
         extendsBase ? unknownValue : evaluate(storyArgument(init), bindings),
       );
-      const isSkipped = skipped(
+      const isSkipped = storySkipped(
         testTags,
         member(metaValue, 'tags'),
-        member(story, 'tags'),
+        story,
+        testOptions.map((options) =>
+          options === undefined ? undefined : evaluate(options, bindings),
+        ),
       );
 
       if (isSkipped === true) {
@@ -191,6 +194,36 @@ export function classifyStubs(
   return { stories, stubs };
 }
 
+/** Storybook 10.6.5 runs each `.test()` call on a factory story as a test of its own, so one of them can run when the story's own test is skipped. */
+function storySkipped(
+  testTags: TestTags,
+  metaTags: unknown,
+  story: unknown,
+  testOptions: readonly unknown[],
+): boolean | 'unknown' {
+  const base = skipped(testTags, metaTags, member(story, 'tags'));
+
+  if (base !== true) {
+    return base;
+  }
+
+  const children = testOptions.map((options) => {
+    const child = skipped(
+      testTags,
+      metaTags,
+      childTags(member(story, 'tags'), member(options, 'tags')),
+    );
+
+    return child === false && member(options, 'parameters') !== undefined
+      ? 'unknown'
+      : child;
+  });
+
+  return children.includes('unknown')
+    ? 'unknown'
+    : children.every((child) => child === true);
+}
+
 /** Storybook 10.6.5 test-utils.ts `testStory` checks skip tags on the tags prepareStory.ts composes at run time, which hold no play-fn. */
 function skipped(
   { previewTags, skip }: TestTags,
@@ -211,6 +244,16 @@ function skipped(
   const tags = combineTags('dev', 'test', ...previewTags, ...meta, ...story);
 
   return skip.some((tag) => tags.includes(tag));
+}
+
+/** Storybook 10.6.5 csf-factories.ts `test` extends the story with these tags, which `extend` combines. */
+function childTags(storyTags: unknown, optionTags: unknown): unknown {
+  const story = tagList(storyTags);
+  const own = tagList(optionTags);
+
+  return story === undefined || own === undefined
+    ? unknownValue
+    : combineTags(...story, 'test-fn', '!autodocs', ...own);
 }
 
 function tagList(value: unknown): readonly string[] | undefined {
