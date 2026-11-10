@@ -30,10 +30,10 @@ export function csfShapes(program: unknown): CsfShapes {
   );
   const { metaObjects, stories: exported } = csfFile(body, bindings);
   const assignments = exported.flatMap((story) => story.assignments);
+  const assignedTo = (key: string): readonly Assignment[] =>
+    assignments.filter(({ path }) => path.length === 1 && path[0] === key);
   const assigned = (key: string): readonly unknown[] =>
-    assignments
-      .filter(({ path }) => path.length === 1 && path[0] === key)
-      .map(({ value }) => value);
+    assignedTo(key).map(({ value }) => value);
   const stories = [...exported.map(({ init }) => init), ...assigned('story')]
     .map((init) => storyNode(unwrap(init), bindings))
     .filter(
@@ -77,6 +77,7 @@ export function csfShapes(program: unknown): CsfShapes {
     ]),
     testCode: nodeSet([
       ...testKeys.flatMap(annotations),
+      ...testKeys.flatMap(assignedTo).map(({ statement }) => statement),
       ...testCalls.flatMap(({ statement, testFunction }) => [
         statement,
         testFunction,
@@ -386,6 +387,7 @@ function matchesStories(name: unknown, descriptor: unknown): boolean {
 }
 
 export interface Assignment {
+  readonly statement: unknown;
   readonly target: unknown;
   readonly path: readonly unknown[];
   readonly value: unknown;
@@ -403,6 +405,7 @@ function assignmentOf(statement: unknown): readonly Assignment[] {
 
   return [
     {
+      statement,
       target,
       path,
       value: field(statement, 'expression', 'right'),

@@ -74,7 +74,7 @@ describe('lz-storybook-csf', () => {
     );
   });
 
-  it("ignores a play function assigned to X['play']", async () => {
+  it("ignores a play function assigned to X['play'] and its key", async () => {
     const { outcomes } = setup();
 
     assert.deepEqual(
@@ -84,7 +84,7 @@ describe('lz-storybook-csf', () => {
         )
       ).filter((outcome) => /^[34] /.test(outcome)),
       [
-        '3 StringLiteral placed',
+        `3 StringLiteral ${testReason}`,
         `3 BlockStatement ${testReason}`,
         `4 ArithmeticOperator ${testReason}`,
       ],
@@ -218,6 +218,23 @@ describe('lz-storybook-csf', () => {
         )
       ).filter((outcome) => /^[34] /.test(outcome)),
       ['3 BlockStatement placed', '4 ArithmeticOperator placed'],
+    );
+  });
+
+  it("places a play function assigned to X['play'] and its key in 'mutate' mode", async () => {
+    const { outcomes } = setup('mutate');
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nA['play'] = async () => {\n  await x(1 + 1);\n};",
+        )
+      ).filter((outcome) => /^[34] /.test(outcome)),
+      [
+        '3 StringLiteral placed',
+        '3 BlockStatement placed',
+        '4 ArithmeticOperator placed',
+      ],
     );
   });
 
