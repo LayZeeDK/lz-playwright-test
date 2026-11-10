@@ -53,6 +53,7 @@ export async function globalSetupWatchingConfiguredPorts(
       mutate === 'auto'
         ? await boundMoves({
             ...moved,
+            // Stryker disable next-line MethodExpression: the late check just above found every watched move down, so only a port that comes up between the two checks, while watch() polls too, tells the lists apart
             moves: moved.moves.filter((move) => answering.has(move)),
           })
         : [];

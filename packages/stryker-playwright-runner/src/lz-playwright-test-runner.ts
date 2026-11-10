@@ -139,6 +139,7 @@ class StaticMutantStopsServer extends Error {
   constructor(mutant: string, cause: unknown) {
     super(
       `The webServer did not start with static mutant ${mutant}: ${String(cause)}`,
+      // Stryker disable next-line ObjectLiteral: the only catch of this error reads its message alone
       { cause },
     );
   }
@@ -765,6 +766,7 @@ async function serverSide(
   }
 
   const dir = path.join(root.dir, 'server');
+  // Stryker disable next-line ObjectLiteral,BooleanLiteral: root.dir is a new mkdtemp folder and this runs once per root, so a plain mkdir does the same
   fs.mkdirSync(dir, { recursive: true });
 
   return {
@@ -790,6 +792,7 @@ async function hookedWithin(dir: string, waitMs: number): Promise<boolean> {
   const until = performance.now() + waitMs;
 
   while (!anyHooked(dir)) {
+    // Stryker disable next-line EqualityOperator: > differs only when the clock reads until exactly, one poll more or less
     if (performance.now() >= until) {
       return false;
     }
@@ -810,6 +813,7 @@ async function waitUntilStopped(
 ): Promise<void> {
   const until = performance.now() + waitMs;
 
+  // Stryker disable next-line EqualityOperator: <= differs only when the clock reads until exactly, one poll more or less
   while (performance.now() < until) {
     const up = await Promise.all(servers.map((server) => server.isUp()));
 
