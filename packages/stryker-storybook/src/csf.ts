@@ -73,11 +73,13 @@ export function csfShapes(program: unknown): CsfShapes {
     metaObjects: new Set(metaObjects),
     storyContainers: new Set([...stories, ...idParameters, ...testOptions]),
     testCode: new Set([
-      ...stories.flatMap((story) =>
-        testKeys.map((key) => propertyValue(story, key)),
+      ...[...metaObjects, ...stories].flatMap((object) =>
+        testKeys.flatMap((key) => withInit(propertyValue(object, key), body)),
       ),
       ...body.flatMap((statement) =>
-        testKeys.flatMap((key) => assigned(statement, key)),
+        testKeys.flatMap((key) =>
+          assigned(statement, key).flatMap((value) => withInit(value, body)),
+        ),
       ),
       ...body.filter((statement) => testArguments(statement).length > 0),
     ]),

@@ -334,6 +334,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('ignores the play function that a story names', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nconst sharedPlay = async () => {\n  await x(1 + 1);\n};\nexport const A = {\n  play: sharedPlay,\n};",
+        )
+      ).filter((outcome) => /^[23] /.test(outcome)),
+      [`2 BlockStatement ${testReason}`, `3 ArithmeticOperator ${testReason}`],
+    );
+  });
+
   it("ignores a story's play method", async () => {
     const { outcomes } = setup();
 
@@ -360,6 +373,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('ignores the play function that X.play names', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nconst sharedPlay = async () => {\n  await x(1 + 1);\n};\nexport const A = {};\nA.play = sharedPlay;",
+        )
+      ).filter((outcome) => /^[23] /.test(outcome)),
+      [`2 BlockStatement ${testReason}`, `3 ArithmeticOperator ${testReason}`],
+    );
+  });
+
   it("ignores the meta's play function", async () => {
     const { outcomes } = setup();
 
@@ -370,6 +396,19 @@ describe('lz-storybook-csf', () => {
         )
       ).filter((outcome) => /^[23] /.test(outcome)),
       [`2 BlockStatement ${metaReason}`, `3 ArithmeticOperator ${metaReason}`],
+    );
+  });
+
+  it('ignores the play function that the meta names', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          'const sharedPlay = async () => {\n  await x(1 + 1);\n};\nexport default {\n  play: sharedPlay,\n};',
+        )
+      ).filter((outcome) => /^[12] /.test(outcome)),
+      [`1 BlockStatement ${testReason}`, `2 ArithmeticOperator ${testReason}`],
     );
   });
 
