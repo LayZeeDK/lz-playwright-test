@@ -1,4 +1,5 @@
 import { isRecord } from './is-record.ts';
+import { definitionTimeStubs } from './stub-shape.ts';
 
 export type ResetBranch = 'reset' | 'clear' | 'restore' | 'none' | 'unknown';
 
@@ -20,10 +21,28 @@ export interface StubClassification {
 }
 
 export function readPreviewTest(program: unknown): unknown {
-  return field(
-    defaultExport(list(field(program, 'body'))),
-    'parameters',
-    'test',
+  const body = list(field(program, 'body'));
+  const bindings = topLevelBindings(body);
+  const exported = defaultExport(body, bindings);
+
+  if (exported !== undefined) {
+    return field(exported, 'parameters', 'test');
+  }
+
+  const parameters = namedExports(body).find(
+    (declarator) => field(declarator, 'id', 'name') === 'parameters',
+  );
+
+  return parameters === undefined
+    ? undefined
+    : field(evaluate(field(parameters, 'init'), bindings), 'test');
+}
+
+function namedExports(body: readonly unknown[]): readonly unknown[] {
+  return body.flatMap((statement) =>
+    field(statement, 'type') === 'ExportNamedDeclaration'
+      ? list(field(statement, 'declaration', 'declarations'))
+      : [],
   );
 }
 
@@ -32,23 +51,103 @@ export function classifyStubs(
   previewTest: unknown,
 ): StubClassification {
   const body = list(field(program, 'body'));
-  const metaTest = field(defaultExport(body), 'parameters', 'test');
-  const restoreMocks =
-    field(metaTest, 'restoreMocks') ?? field(previewTest, 'restoreMocks');
-  const branch: ResetBranch = restoreMocks === false ? 'none' : 'restore';
-  const stories = body.flatMap((statement) =>
-    field(statement, 'type') === 'ExportNamedDeclaration'
-      ? list(field(statement, 'declaration', 'declarations')).flatMap(
-          (declarator) => {
-            const name = field(declarator, 'id', 'name');
-
-            return typeof name === 'string' ? [{ name, branch }] : [];
-          },
-        )
-      : [],
+  const bindings = topLevelBindings(body);
+  const factoryMeta = [...bindings.values()].find(
+    (init) => field(unwrap(init), 'callee', 'property', 'name') === 'meta',
   );
+  const metaTest = field(
+    defaultExport(body, bindings) ??
+      evaluate(annotations(factoryMeta), bindings),
+    'parameters',
+    'test',
+  );
+  const declared = namedExports(body).flatMap((declarator) => {
+    const name = field(declarator, 'id', 'name');
+    const init = field(declarator, 'init');
+    const storyTest = field(
+      evaluate(annotations(init), bindings),
+      'parameters',
+      'test',
+    );
 
-  return { stories, stubs: [] };
+    return typeof name === 'string'
+      ? [
+          {
+            story: {
+              name,
+              branch: branchOf([previewTest, metaTest, storyTest]),
+            },
+            init,
+          },
+        ]
+      : [];
+  });
+  const stories = declared.map(({ story }) => story);
+  const stubs = definitionTimeStubs(program).map(({ start }) => {
+    const owner = declared.findIndex(({ init }) => contains(init, start));
+    const users = owner === -1 ? stories.map((_, index) => index) : [owner];
+
+    return { start, verdict: siteVerdict(stories, users) };
+  });
+
+  return { stories, stubs };
+}
+
+function siteVerdict(
+  stories: readonly StoryReset[],
+  users: readonly number[],
+): StubVerdict {
+  const erasesBy = (index: number): boolean =>
+    stories.slice(0, index + 1).some(({ branch }) => erases(branch));
+
+  if (!erasesBy(stories.length - 1)) {
+    return stories.some(({ branch }) => branch === 'unknown')
+      ? 'unknown'
+      : 'kept';
+  }
+
+  return users.every(erasesBy) ? 'erased' : 'order-dependent';
+}
+
+function erases(branch: ResetBranch): boolean {
+  return branch === 'reset' || branch === 'restore';
+}
+
+function contains(node: unknown, position: number): boolean {
+  const start = field(node, 'start');
+  const end = field(node, 'end');
+
+  return (
+    typeof start === 'number' &&
+    typeof end === 'number' &&
+    start <= position &&
+    position < end
+  );
+}
+
+const decisiveSettings = [
+  ['mockReset', true, 'reset'],
+  ['clearMocks', true, 'clear'],
+  ['restoreMocks', false, 'none'],
+] as const;
+
+function branchOf(levels: readonly unknown[]): ResetBranch {
+  return (
+    decisiveSettings
+      .map(([key, decisive, branch]) => {
+        const setting = levels.reduce<unknown>(
+          (value, level) => field(level, key) ?? value,
+          undefined,
+        );
+
+        if (setting === unknownValue) {
+          return 'unknown';
+        }
+
+        return setting === decisive ? branch : undefined;
+      })
+      .find((branch) => branch !== undefined) ?? 'restore'
+  );
 }
 
 const wrappers: readonly unknown[] = [
@@ -65,18 +164,42 @@ function unwrap(node: unknown): unknown {
     : node;
 }
 
-function defaultExport(body: readonly unknown[]): unknown {
-  const name = field(
-    body.find(
-      (statement) => field(statement, 'type') === 'ExportDefaultDeclaration',
+function defaultExport(
+  body: readonly unknown[],
+  bindings: ReadonlyMap<string, unknown>,
+): unknown {
+  const declaration = unwrap(
+    field(
+      body.find(
+        (statement) => field(statement, 'type') === 'ExportDefaultDeclaration',
+      ),
+      'declaration',
     ),
-    'declaration',
-    'name',
   );
 
-  return typeof name === 'string'
-    ? evaluate(topLevelBindings(body).get(name))
-    : undefined;
+  if (declaration === undefined) {
+    return undefined;
+  }
+
+  return evaluate(annotations(declaration), bindings);
+}
+
+const annotationFactories: readonly unknown[] = [
+  'definePreview',
+  'meta',
+  'story',
+];
+
+function annotations(node: unknown): unknown {
+  const current = unwrap(node);
+
+  return field(current, 'type') === 'CallExpression' &&
+    annotationFactories.includes(
+      field(current, 'callee', 'name') ??
+        field(current, 'callee', 'property', 'name'),
+    )
+    ? field(current, 'arguments', '0')
+    : current;
 }
 
 function topLevelBindings(
@@ -101,30 +224,51 @@ function topLevelBindings(
   );
 }
 
-function evaluate(node: unknown): unknown {
+function evaluate(
+  node: unknown,
+  bindings: ReadonlyMap<string, unknown>,
+): unknown {
   const current = unwrap(node);
 
   switch (field(current, 'type')) {
     case 'BooleanLiteral': {
       return field(current, 'value');
     }
+    case 'Identifier': {
+      const name = field(current, 'name');
+
+      if (name === 'undefined') {
+        return undefined;
+      }
+
+      return typeof name === 'string' && bindings.has(name)
+        ? evaluate(bindings.get(name), bindings)
+        : unknownValue;
+    }
     case 'ObjectExpression': {
       return Object.fromEntries(
         list(field(current, 'properties')).map((property) => [
           String(field(property, 'key', 'name')),
-          evaluate(field(property, 'value')),
+          evaluate(field(property, 'value'), bindings),
         ]),
       );
     }
     default: {
-      return undefined;
+      return unknownValue;
     }
   }
 }
 
+const unknownValue = Symbol('unknown');
+
 function field(node: unknown, ...keys: readonly string[]): unknown {
   return keys.reduce<unknown>(
-    (value, key) => (isRecord(value) ? value[key] : undefined),
+    (value, key) =>
+      value === unknownValue
+        ? unknownValue
+        : isRecord(value)
+          ? value[key]
+          : undefined,
     node,
   );
 }

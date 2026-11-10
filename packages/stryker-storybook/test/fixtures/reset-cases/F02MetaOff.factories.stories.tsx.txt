@@ -1,0 +1,24 @@
+import { expect, fn } from 'storybook/test';
+
+import preview from '../../.storybook/preview';
+import { Probe } from './Probe';
+
+const meta = preview.meta({
+  title: 'ResetCases/F02',
+  component: Probe,
+  parameters: { test: { restoreMocks: false } },
+});
+export const First = meta.story({
+  args: { getValue: fn().mockReturnValue('stubbed') },
+
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId('value')).toHaveTextContent('stubbed');
+  },
+});
+export const Second = meta.story({
+  args: { getValue: fn().mockReturnValue('stubbed') },
+
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId('value')).toHaveTextContent('stubbed');
+  },
+});
