@@ -197,6 +197,7 @@ describe('selectMutators', () => {
   });
 
   for (const [title, options, shown] of [
+    ['null', null, 'null'],
     ['a Map', new Map([['extended', true]]), "Map(1) { 'extended' => true }"],
     ['a Date', new Date(0), '1970-01-01T00:00:00.000Z'],
     [
@@ -255,6 +256,14 @@ describe('selectMutators', () => {
     assert.throws(() => select({ LzOptInA: { LzExperimentalA: true } }), {
       message:
         "@layzee/test-mutators: LzOptInA takes only true, not { LzExperimentalA: true }; Stryker's " +
+        'mutator.excludedMutations turns mutators off.',
+    });
+  });
+
+  it('rejects false as the value of extended', () => {
+    assert.throws(() => select({ extended: false }), {
+      message:
+        "@layzee/test-mutators: extended takes only true, not false; Stryker's " +
         'mutator.excludedMutations turns mutators off.',
     });
   });
