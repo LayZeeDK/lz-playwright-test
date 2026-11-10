@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { setup, storyReason } from './support/csf-ignorer.ts';
+import { setup, containerReason } from './support/csf-ignorer.ts';
 
 describe('lz-storybook-csf', () => {
   it("places the mutants of a story's args", async () => {
@@ -29,7 +29,7 @@ describe('lz-storybook-csf', () => {
         /^[2-9] (ObjectLiteral|ArrowFunction)/.test(outcome),
       ),
       [
-        `2 ObjectLiteral ${storyReason}`,
+        `2 ObjectLiteral ${containerReason}`,
         '3 ObjectLiteral placed',
         '4 ArrowFunction placed',
       ],
@@ -46,9 +46,9 @@ describe('lz-storybook-csf', () => {
         )
       ).filter((outcome) => /^2 (ObjectLiteral|ArrowFunction)/.test(outcome)),
       [
-        `2 ObjectLiteral ${storyReason}`,
-        `2 ObjectLiteral ${storyReason}`,
-        `2 ArrowFunction ${storyReason}`,
+        `2 ObjectLiteral ${containerReason}`,
+        `2 ObjectLiteral ${containerReason}`,
+        `2 ArrowFunction ${containerReason}`,
       ],
     );
   });
@@ -86,7 +86,7 @@ describe('lz-storybook-csf', () => {
           "export default { title: 'a/b' };\nexport const A = { args: {} } satisfies Story;",
         )
       ).filter((outcome) => outcome.startsWith('2 ')),
-      [`2 ObjectLiteral ${storyReason}`],
+      [`2 ObjectLiteral ${containerReason}`],
     );
   });
 
@@ -99,7 +99,7 @@ describe('lz-storybook-csf', () => {
           "export default { title: 'a/b' };\nexport const A = (args) =>\n  render(args);",
         )
       ).filter((outcome) => outcome.includes('ArrowFunction')),
-      [`2 ArrowFunction ${storyReason}`],
+      [`2 ArrowFunction ${containerReason}`],
     );
   });
 
@@ -112,7 +112,7 @@ describe('lz-storybook-csf', () => {
           "export default { title: 'a/b' };\nconst Template = (args) =>\n  render(args);\nexport const A = Template.bind({});",
         )
       ).filter((outcome) => outcome.includes('ArrowFunction')),
-      [`2 ArrowFunction ${storyReason}`],
+      [`2 ArrowFunction ${containerReason}`],
     );
   });
 
@@ -138,7 +138,7 @@ describe('lz-storybook-csf', () => {
           "export default { title: 'a/b' };\nconst Template = (args) =>\n  render(args);\nexport const A = Template.bind();",
         )
       ).filter((outcome) => outcome.includes('ArrowFunction')),
-      [`2 ArrowFunction ${storyReason}`],
+      [`2 ArrowFunction ${containerReason}`],
     );
   });
 
@@ -164,7 +164,7 @@ describe('lz-storybook-csf', () => {
           'const meta = preview.meta({ component: B });\nexport const A = meta.story({\n  args: { a: 1 },\n});',
         )
       ).filter((outcome) => outcome.startsWith('2 ')),
-      [`2 ObjectLiteral ${storyReason}`],
+      [`2 ObjectLiteral ${containerReason}`],
     );
   });
 
@@ -177,7 +177,7 @@ describe('lz-storybook-csf', () => {
           'const meta = preview.meta({ component: B });\nexport const A = meta.story();\nexport const C = A.extend({\n  args: { a: 1 },\n});',
         )
       ).filter((outcome) => outcome.startsWith('3 ')),
-      [`3 ObjectLiteral ${storyReason}`],
+      [`3 ObjectLiteral ${containerReason}`],
     );
   });
 
@@ -229,7 +229,7 @@ describe('lz-storybook-csf', () => {
           "export default {\n  title: 'a/b',\n  includeStories: ['B c'],\n};\nconst A = {\n  args: { a: 1 },\n};\nexport { A as 'B c' };",
         )
       ).filter((outcome) => outcome.startsWith('5 ')),
-      [`5 ObjectLiteral ${storyReason}`],
+      [`5 ObjectLiteral ${containerReason}`],
     );
   });
 
@@ -242,7 +242,7 @@ describe('lz-storybook-csf', () => {
           "export default { title: 'a/b' };\nconst A = {\n  args: { a: 1 },\n};\nexport { A as B };",
         )
       ).filter((outcome) => outcome.startsWith('2 ')),
-      [`2 ObjectLiteral ${storyReason}`],
+      [`2 ObjectLiteral ${containerReason}`],
     );
   });
 
@@ -255,7 +255,7 @@ describe('lz-storybook-csf', () => {
           "export default { title: 'a/b' };\nexport const A = () => null;\nA.story = {\n  parameters: { a: 1 },\n};",
         )
       ).filter((outcome) => outcome.startsWith('3 ')),
-      [`3 ObjectLiteral ${storyReason}`],
+      [`3 ObjectLiteral ${containerReason}`],
     );
   });
 
@@ -268,7 +268,7 @@ describe('lz-storybook-csf', () => {
           "export default { title: 'a/b' };\nexport const A = {\n  parameters: {\n    __id: 'x',\n    b: { c: 1 },\n  },\n};",
         )
       ).filter((outcome) => /^[3-9] ObjectLiteral/.test(outcome)),
-      [`3 ObjectLiteral ${storyReason}`, '5 ObjectLiteral placed'],
+      [`3 ObjectLiteral ${containerReason}`, '5 ObjectLiteral placed'],
     );
   });
 
@@ -281,7 +281,7 @@ describe('lz-storybook-csf', () => {
           "export default { title: 'a/b' };\nexport const A = {};\nA.test(\n  'name',\n  { tags: ['x'] },\n  () => undefined,\n);",
         )
       ).filter((outcome) => outcome.startsWith('5 ObjectLiteral')),
-      [`5 ObjectLiteral ${storyReason}`],
+      [`5 ObjectLiteral ${containerReason}`],
     );
   });
 
@@ -294,7 +294,7 @@ describe('lz-storybook-csf', () => {
           "export default { title: 'a/b' };\nexport const A = {};\nconst opts = {\n  tags: ['x'],\n};\nA.test('name', opts, () => undefined);",
         )
       ).filter((outcome) => outcome.startsWith('3 ')),
-      [`3 ObjectLiteral ${storyReason}`],
+      [`3 ObjectLiteral ${containerReason}`],
     );
   });
 
