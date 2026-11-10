@@ -1038,6 +1038,19 @@ unparseable preview were left unpinned after a fix, and the natural pin was one 
 assertion, not a new test. The log's `test-after` line assumes a new test. Evidence: `r6fix/cycles.log`, the last
 `test-after` line.
 
+**O142. A red written before its green may enter a commit has no log shape.** In the round 6 follow-up, the
+differential rows had to fail on the gap cases and be committed before the fix, with every commit bisect-safe. The
+rows went red, were marked node:test `todo` to keep the gate green, and the fix's cycles began by removing the `todo`.
+The cycle log has no field for "red, deferred to a later commit", so the first commit's lines read `green: deferred`,
+the fix repeats the same red, and two rows that passed with no edit of their own once the first went green read as
+`test-after` although they were reds when written. Evidence: `r6bfix/cycles.log` cycles 1-5.
+
+**O143. A first red caused by state another test left behind looks like the sharpest red.** In the same follow-up,
+a new test failed on its first run because a module-level cache, keyed by config folder and file, still held the
+result of an earlier test. The output was an AssertionError on the value, which `lz-red` step 5 calls the sharpest
+red; only reading the actual value showed the code under test never ran. `lz-red` has no check for a red that comes
+from shared state. Evidence: `r6bfix/notes.md`, "lz-tdd friction"; `r6bfix/cycles.log`, the D3 cycle.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
