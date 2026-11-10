@@ -6,7 +6,7 @@ import {
   isTemplateBind,
   namedExports,
   storyArgument,
-  storyTags,
+  storyIndex,
   topLevelBindings,
   unwrap,
   withoutBinding,
@@ -131,20 +131,20 @@ export function classifyStubs(
 ): StubClassification {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
-  const tagsByStory = storyTags(code, fileName);
+  const index = storyIndex(code, fileName);
   const {
     metaObjects: [meta],
     stories: exported,
-  } = csfFile(body, bindings, ({ name }) => tagsByStory.has(name));
+  } = csfFile(body, bindings, index);
   const metaValue = evaluate(meta, bindings);
   const metaTest = testSettings(member(metaValue, 'parameters'));
   const declared = exported
     .filter(({ name, tested }) => {
-      const tags = tagsByStory.get(name);
+      const tags = index.get(name)?.tags;
 
       return tested && tags !== undefined && isTestedByTags(testTags, tags);
     })
-    .flatMap(({ name, init, runtimeAssignments, extendsBase, testOptions }) => {
+    .flatMap(({ name, init, runtimeAssignments, extendsBase, children }) => {
       const story = runtimeAssignments.reduce(
         (value, assignment) =>
           written(value, assignment.path, evaluate(assignment.value, bindings)),
@@ -154,9 +154,15 @@ export function classifyStubs(
         testTags,
         member(metaValue, 'tags'),
         story,
-        testOptions.map((options) =>
-          options === undefined ? undefined : evaluate(options, bindings),
-        ),
+        children.map((child) => {
+          if (child === 'unmatched') {
+            return unknownValue;
+          }
+
+          return child.options === undefined
+            ? undefined
+            : evaluate(child.options, bindings);
+        }),
       );
 
       if (isSkipped === true) {

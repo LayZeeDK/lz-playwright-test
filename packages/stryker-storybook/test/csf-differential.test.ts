@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { vitestTransform } from 'storybook/internal/csf-tools';
 
+import { csfFile, storyIndex, topLevelBindings } from '../src/csf.ts';
+import { field, list } from '../src/node-field.ts';
 import { parseProgram } from '../src/parse.ts';
 import {
   classifyStubs,
@@ -146,9 +148,24 @@ function packageStories(code: string, testTags: TestTags): readonly string[] {
 /** Storybook checks skip tags on the run-time tags; here they join exclude and are checked on the static tags. A file Storybook cannot read has no tested stories. */
 async function storybookStories(
   code: string,
-  { previewTags, include, exclude, skip }: TestTags,
+  testTags: TestTags,
 ): Promise<readonly string[]> {
-  const text = await vitestTransform({
+  const text = await transformed(code, testTags);
+
+  return [
+    ...new Set(
+      [...text.matchAll(/exportName: "([^"]*)"/g)].flatMap(([, name]) =>
+        name === undefined ? [] : [name],
+      ),
+    ),
+  ];
+}
+
+async function transformed(
+  code: string,
+  { previewTags, include, exclude, skip }: TestTags,
+): Promise<string> {
+  return vitestTransform({
     code,
     fileName,
     configDir: `${noMain}.storybook`,
@@ -163,15 +180,51 @@ async function storybookStories(
     (result) => (typeof result === 'string' ? result : result.code),
     () => '',
   );
-
-  return [
-    ...new Set(
-      [...text.matchAll(/exportName: "([^"]*)"/g)].flatMap(([, name]) =>
-        name === undefined ? [] : [name],
-      ),
-    ),
-  ];
 }
+
+const childRows: readonly Row[] = [
+  {
+    name: 'a .test() call named by a template literal',
+    code: `import preview from '../.storybook/preview';
+const meta = preview.meta({});
+export const A = meta.story({});
+A.test(\`runs\`, { tags: ['!slow'] }, async () => undefined);
+A.test('real', async () => undefined);
+export const B = meta.story({});
+`,
+  },
+];
+
+function packageChildren(code: string): readonly (readonly [string, number])[] {
+  const body = list(field(parseProgram(code, fileName), 'body'));
+  return csfFile(
+    body,
+    topLevelBindings(body),
+    storyIndex(code, fileName),
+  ).stories.map(({ name, children }) => [name, children.length] as const);
+}
+
+async function storybookChildren(
+  code: string,
+): Promise<readonly (readonly [string, number])[]> {
+  const text = await transformed(code, defaultTestTags);
+  const children = [
+    ...text.matchAll(/exportName: "([^"]*)",[^}]*testName: "/g),
+  ].flatMap(([, name]) => (name === undefined ? [] : [name]));
+
+  return (await storybookStories(code, defaultTestTags)).map(
+    (name) =>
+      [name, children.filter((child) => child === name).length] as const,
+  );
+}
+
+describe("csfFile counts the .test() children that Storybook's Vitest transform tests", () => {
+  childRows.forEach(({ name, code }) => {
+    it(name, async () => {
+      assert.deepEqual(packageChildren(code), await storybookChildren(code));
+    });
+  });
+});
 
 describe("classifyStubs tests the stories that Storybook's Vitest transform tests", () => {
   rows.forEach(({ name, code, testTags, todo }) => {

@@ -3,20 +3,43 @@ import { loadCsf } from 'storybook/internal/csf-tools';
 import { isStringArray } from './is-record.ts';
 import { field, list } from './node-field.ts';
 
-/** Each story's static tags, the meta's first, as Storybook's CsfFile reads them; none when Storybook cannot read the file. */
-export function storyTags(
+export interface IndexedStory {
+  /** The story's static tags, the meta's first. */
+  readonly tags: readonly string[];
+  /** The name of each `.test()` call on the story that the index lists. */
+  readonly tests: readonly unknown[];
+}
+
+/** The stories Storybook's CsfFile indexes; none when Storybook cannot read the file. */
+export function storyIndex(
   code: string,
   fileName: string,
-): ReadonlyMap<string, readonly string[]> {
+): ReadonlyMap<string, IndexedStory> {
+  const inputs = list(indexInputs(code, fileName));
+
   return new Map(
-    list(indexInputs(code, fileName)).flatMap((input) => {
+    inputs.flatMap((input) => {
       const exportName = field(input, 'exportName');
       const tags = field(input, 'tags');
 
       return field(input, 'subtype') === 'story' &&
         typeof exportName === 'string' &&
         isStringArray(tags)
-        ? [[exportName, tags] as const]
+        ? [
+            [
+              exportName,
+              {
+                tags,
+                tests: inputs
+                  .filter(
+                    (test) =>
+                      field(test, 'subtype') === 'test' &&
+                      field(test, 'exportName') === exportName,
+                  )
+                  .map((test) => field(test, 'name')),
+              },
+            ] as const,
+          ]
         : [];
     }),
   );
@@ -170,11 +193,11 @@ export interface CsfFile {
   readonly stories: readonly StoryExport[];
 }
 
-/** `isIndexed` picks the stories, as Storybook's story index lists them, in place of the package's own reading of the exports. */
+/** `index` gives the stories and their `.test()` children, as Storybook's story index lists them, in place of the package's own reading of the exports. */
 export function csfFile(
   body: readonly unknown[],
   bindings: Bindings,
-  isIndexed?: (named: NamedExport) => boolean,
+  index?: ReadonlyMap<string, IndexedStory>,
 ): CsfFile {
   const metas = factoryMetas(body, bindings);
   const metaObjects = [
@@ -189,7 +212,10 @@ export function csfFile(
       body,
       bindings,
       isFactoryFile,
-      isIndexed ?? storyFilter(metaObjects, isFactoryFile),
+      index === undefined
+        ? storyFilter(metaObjects, isFactoryFile)
+        : ({ name }) => index.has(name),
+      (name) => index?.get(name)?.tests ?? [],
     ),
   };
 }
@@ -218,6 +244,7 @@ function storyExports(
   bindings: Bindings,
   isFactoryFile: boolean,
   isStory: (named: NamedExport) => boolean,
+  testNames: (name: string) => readonly unknown[],
 ): readonly StoryExport[] {
   const assignments = body.flatMap(assignmentOf);
   const testCalls = body.flatMap(testCallOf);
@@ -228,17 +255,14 @@ function storyExports(
       const storyAssignments = assignments.filter(
         ({ target }) => target === local,
       );
+      const storyCalls = testCalls.filter(({ target }) => target === local);
 
       return {
         name,
         local,
         init,
-        testOptions: isStoryFactoryCall(unwrap(init))
-          ? testCalls
-              .filter(({ target }) => target === local)
-              .map(({ args: [, ...rest] }) =>
-                rest.length > 1 ? rest[0] : undefined,
-              )
+        children: isStoryFactoryCall(unwrap(init))
+          ? testNames(name).map((testName) => childOf(testName, storyCalls))
           : [],
         tested:
           form === 'declaration' ||
@@ -255,8 +279,8 @@ export interface StoryExport {
   readonly name: string;
   readonly local: unknown;
   readonly init: unknown;
-  /** The options argument of each `.test()` call on a factory story, `undefined` for a call without one; Storybook 10.6.5 runs other stories' `.test()` calls as the story itself. */
-  readonly testOptions: readonly unknown[];
+  /** Each `.test()` child of a factory story that the index lists; Storybook 10.6.5 runs other stories' `.test()` calls as the story itself. */
+  readonly children: readonly TestChild[];
   /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
   readonly tested: boolean;
   readonly assignments: readonly Assignment[];
@@ -264,6 +288,30 @@ export interface StoryExport {
   readonly runtimeAssignments: readonly Assignment[];
   /** Storybook 10.6.5 `extend()` merges the base story into the new input at run time, so the argument is only part of the story. */
   readonly extendsBase: boolean;
+}
+
+/** The options argument of the `.test()` call an index row names, `undefined` for a call without one, or `'unmatched'` when that call cannot be told. */
+export type TestChild = { readonly options: unknown } | 'unmatched';
+
+/** Storybook 10.6.5 test-utils.ts `testStory` runs the first child that has the row's name, which a call named other than by a string literal may have. */
+function childOf(testName: unknown, calls: readonly TestCall[]): TestChild {
+  const call = calls.find(({ args: [name] }) => {
+    const value = field(name, 'value');
+
+    return typeof value !== 'string' || value === testName;
+  });
+
+  if (
+    typeof testName !== 'string' ||
+    call === undefined ||
+    field(call.args[0], 'value') !== testName
+  ) {
+    return 'unmatched';
+  }
+
+  const [, ...rest] = call.args;
+
+  return { options: rest.length > 1 ? rest[0] : undefined };
 }
 
 const storyFactories: readonly unknown[] = ['story', 'extend'];
