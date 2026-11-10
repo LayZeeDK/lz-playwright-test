@@ -18,10 +18,13 @@ export function stubIgnorer(options: object, log: ProjectLog): Ignorer {
 
       if (field(node, 'type') === 'Program') {
         const fileName = field(path, 'hub', 'file', 'opts', 'filename');
+        const code = field(path, 'hub', 'file', 'code');
         const project = strykerStorybookProject(options, log);
         sites =
-          typeof fileName === 'string' && isStoryFile(project, fileName)
-            ? reasonSites(node, project)
+          typeof fileName === 'string' &&
+          typeof code === 'string' &&
+          isStoryFile(project, fileName)
+            ? reasonSites({ program: node, code, fileName }, project)
             : [];
       }
 

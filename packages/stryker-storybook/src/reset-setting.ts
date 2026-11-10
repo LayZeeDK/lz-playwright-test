@@ -6,6 +6,7 @@ import {
   isTemplateBind,
   namedExports,
   storyArgument,
+  storyTags,
   topLevelBindings,
   unwrap,
   withoutBinding,
@@ -109,8 +110,14 @@ export const defaultTestTags: TestTags = {
   skip: [],
 };
 
+export interface StoryFile {
+  readonly program: unknown;
+  readonly code: string;
+  readonly fileName: string;
+}
+
 export function classifyStubs(
-  program: unknown,
+  { program, code, fileName }: StoryFile,
   previewTest: ResetSettings,
   testTags: TestTags,
 ): StubClassification {
@@ -118,15 +125,16 @@ export function classifyStubs(
   const bindings = topLevelBindings(body);
   const {
     metaObjects: [meta],
-    metaTags,
     stories: exported,
   } = csfFile(body, bindings);
+  const tagsByStory = storyTags(code, fileName);
   const metaTest = testSettings(member(evaluate(meta, bindings), 'parameters'));
   const declared = exported
-    .filter(
-      ({ tested, tags }) =>
-        tested && isTestedByTags(testTags, [...metaTags, ...tags]),
-    )
+    .filter(({ name, tested }) => {
+      const tags = tagsByStory.get(name);
+
+      return tested && tags !== undefined && isTestedByTags(testTags, tags);
+    })
     .map(({ name, init, runtimeAssignments, extendsBase }) => {
       const story = runtimeAssignments.reduce(
         (value, assignment) =>

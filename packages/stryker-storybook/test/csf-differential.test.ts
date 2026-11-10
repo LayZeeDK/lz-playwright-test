@@ -54,7 +54,6 @@ export const A = {};
 A.story = { tags: ['!test'] };
 export const B = {};
 `,
-    todo: 'the package does not read a story annotation',
   },
   {
     name: 'a play in a story annotation assigned to a story',
@@ -64,7 +63,6 @@ A.story = { play: async () => undefined };
 export const B = {};
 `,
     testTags: { include: ['play-fn'] },
-    todo: 'the package does not read a story annotation',
   },
   {
     name: 'a factory story exported by specifier',
@@ -74,7 +72,6 @@ const A = meta.story({ tags: ['!test'] });
 export { A };
 export const B = meta.story({});
 `,
-    todo: 'the package reads the tags of a factory call exported by specifier',
   },
   {
     name: 'the play-fn tag of a story',
@@ -111,7 +108,6 @@ B.input.tags = ['!test'];
 const smoke = 'smoke';
 export const A = { tags: [smoke] };
 `,
-    todo: 'Storybook cannot read the file, and the package leaves the tag out',
   },
   {
     name: 'preview tags',
@@ -121,12 +117,31 @@ export const B = { tags: ['!test'] };
 `,
     testTags: { previewTags: ['!test'] },
   },
+  {
+    name: 'a story with a .test() whose tags leave the test out',
+    code: `export default {};
+export const A = {};
+A.test('renders', { tags: ['!test'] }, async () => undefined);
+`,
+  },
+  {
+    name: 'a function exported by specifier from a factory file',
+    code: `import preview from '../.storybook/preview';
+const meta = preview.meta({});
+export const A = meta.story({});
+const helper = () => null;
+export { helper };
+`,
+    todo: 'Storybook takes every export by specifier for a story; the package takes only factory calls in a factory file',
+  },
 ];
 
 function packageStories(code: string, testTags: TestTags): readonly string[] {
-  return classifyStubs(parseProgram(code, fileName), {}, testTags).stories.map(
-    ({ name }) => name,
-  );
+  return classifyStubs(
+    { program: parseProgram(code, fileName), code, fileName },
+    {},
+    testTags,
+  ).stories.map(({ name }) => name);
 }
 
 /** Storybook checks skip tags on the run-time tags; here they join exclude and are checked on the static tags. A file Storybook cannot read has no tested stories. */

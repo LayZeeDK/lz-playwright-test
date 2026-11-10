@@ -42,7 +42,7 @@ export function siteFindings(
     return [];
   }
 
-  const sites = reasonSites(program, project);
+  const sites = reasonSites({ program, code, fileName }, project);
   const silenced = silencedSites(program, sites);
 
   return sites

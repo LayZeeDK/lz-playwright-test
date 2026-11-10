@@ -10,6 +10,7 @@ import {
   defaultTestTags,
   readPreviewTest,
   type ResetSettings,
+  type StoryFile,
   type StoryReset,
   type StubVerdict,
   type TestTags,
@@ -95,15 +96,16 @@ function storiesOf(
   file: string,
   preview: keyof typeof previews,
 ): readonly StoryReset[] {
-  return classifyStubs(
-    storyProgram(file),
-    previewTest(preview),
-    defaultTestTags,
-  ).stories;
+  return classifyStubs(fixtureFile(file), previewTest(preview), defaultTestTags)
+    .stories;
 }
 
-function storyProgram(file: string): unknown {
-  return parseProgram(
+function storyFile(code: string, fileName: string): StoryFile {
+  return { program: parseProgram(code, fileName), code, fileName };
+}
+
+function fixtureFile(file: string): StoryFile {
+  return storyFile(
     readFileSync(fixture(`${file}.stories.tsx.txt`), 'utf8'),
     `${file}.stories.tsx`,
   );
@@ -136,17 +138,17 @@ describe('classifyStubs stub verdicts', () => {
 
   rows.forEach(([file, preview, verdicts]) => {
     it(`gives the stubs of ${file} under the ${preview} preview the verdicts ${verdicts.join(', ')}`, () => {
-      const program = storyProgram(file);
+      const story = fixtureFile(file);
 
       const { stubs } = classifyStubs(
-        program,
+        story,
         previewTest(preview),
         defaultTestTags,
       );
 
       assert.deepEqual(
         stubs,
-        definitionTimeStubs(program).map(
+        definitionTimeStubs(story.program).map(
           ({ start, end, line, once }, index) => ({
             start,
             end,
@@ -163,7 +165,7 @@ describe('classifyStubs stub verdicts', () => {
 describe('classifyStubs parameter reading', () => {
   function verdictsOf(source: string): readonly StubVerdict[] {
     return classifyStubs(
-      parseProgram(
+      storyFile(
         `import { fn } from 'storybook/test';\n${source}`,
         'X.stories.ts',
       ),
@@ -708,7 +710,7 @@ describe('classifyStubs tag filter', () => {
     testTags = defaultTestTags,
   ): readonly StubVerdict[] {
     return classifyStubs(
-      parseProgram(
+      storyFile(
         `import { fn } from 'storybook/test';\n${source}`,
         'X.stories.ts',
       ),

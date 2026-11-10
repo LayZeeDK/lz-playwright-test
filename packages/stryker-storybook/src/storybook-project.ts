@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { getInterpretedFile } from 'storybook/internal/common';
 import { loadConfig } from 'storybook/internal/csf-tools';
 
-import { isRecord } from './is-record.ts';
+import { isRecord, isStringArray } from './is-record.ts';
 import type { LoadResult } from './loader-result.ts';
 import { field } from './node-field.ts';
 import { lzStorybookOptions, vitestConfigFile } from './options.ts';
@@ -323,11 +323,5 @@ function parseResult(value: unknown): LoadResult {
 
   throw new Error(
     `${packageName}: the Storybook loader wrote a result of an unknown shape`,
-  );
-}
-
-function isStringArray(value: unknown): value is readonly string[] {
-  return (
-    Array.isArray(value) && value.every((item) => typeof item === 'string')
   );
 }
