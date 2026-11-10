@@ -308,6 +308,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('keeps the options object that a .test() call names as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nconst opts = {\n  tags: ['x'],\n};\nA.test('name', opts, () => undefined);",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      [`3 ObjectLiteral ${storyReason}`],
+    );
+  });
+
   it("ignores a story's play function", async () => {
     const { outcomes } = setup();
 
@@ -685,6 +698,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('keeps the tags that X.tags names as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = () => null;\nconst tg = ['x'];\nA.tags = tg;",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      [`3 ArrayDeclaration ${staticReason}`, `3 StringLiteral ${staticReason}`],
+    );
+  });
+
   it('keeps __namedExportsOrder as written', async () => {
     const { outcomes } = setup();
 
@@ -723,6 +749,32 @@ describe('lz-storybook-csf', () => {
         /^5 (ArrayDeclaration|StringLiteral)/.test(outcome),
       ),
       [`5 ArrayDeclaration ${staticReason}`, `5 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it('keeps the tags that the options of a .test() call name as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nconst tg = ['t'];\nA.test('name', { tags: tg }, () => undefined);",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      [`3 ArrayDeclaration ${staticReason}`, `3 StringLiteral ${staticReason}`],
+    );
+  });
+
+  it('keeps the tags in the options object that a .test() call names as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nconst opts = {\n  tags: ['x'],\n};\nA.test('name', opts, () => undefined);",
+        )
+      ).filter((outcome) => outcome.startsWith('4 ')),
+      [`4 ArrayDeclaration ${staticReason}`, `4 StringLiteral ${staticReason}`],
     );
   });
 

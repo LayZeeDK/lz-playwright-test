@@ -67,7 +67,7 @@ export function csfShapes(program: unknown): CsfShapes {
   const testCalls = body.map(testArguments);
   const testOptions = testCalls
     .filter((testArgs) => testArgs.length === 3)
-    .map((testArgs) => testArgs[1]);
+    .map((testArgs) => followed(testArgs[1], body));
 
   return {
     metaObjects: new Set(metaObjects),
@@ -92,12 +92,15 @@ export function csfShapes(program: unknown): CsfShapes {
         staticKeys.flatMap((key) => withInit(propertyValue(object, key), body)),
       ),
       ...idParameters.map((parameters) => propertyValue(parameters, '__id')),
-      ...body.flatMap((statement) =>
-        ['storyName', 'tags'].flatMap((key) => assigned(statement, key)),
-      ),
+      ...body.flatMap((statement) => [
+        ...assigned(statement, 'storyName'),
+        ...assigned(statement, 'tags').flatMap((tags) => withInit(tags, body)),
+      ]),
       initOf('__namedExportsOrder', body),
       ...testCalls.map((testArgs) => testArgs[0]),
-      ...testOptions.map((options) => propertyValue(options, 'tags')),
+      ...testOptions.flatMap((options) =>
+        withInit(propertyValue(options, 'tags'), body),
+      ),
       ...specifiers.map((specifier) => field(specifier, 'exported')),
     ]),
   };
@@ -107,9 +110,13 @@ function withInit(
   value: unknown,
   body: readonly unknown[],
 ): readonly unknown[] {
+  return [value, followed(value, body)];
+}
+
+function followed(value: unknown, body: readonly unknown[]): unknown {
   return field(value, 'type') === 'Identifier'
-    ? [value, initOf(field(value, 'name'), body)]
-    : [value];
+    ? initOf(field(value, 'name'), body)
+    : value;
 }
 
 function testArguments(statement: unknown): readonly unknown[] {
