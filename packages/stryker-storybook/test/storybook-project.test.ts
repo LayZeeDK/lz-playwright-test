@@ -1,19 +1,21 @@
 import assert from 'node:assert/strict';
+import { cpSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
-import { describe, it } from 'node:test';
+import { describe, it, type TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import { isStoryFile, storybookProject } from '../src/storybook-project.ts';
 
 const fixtures = fileURLToPath(new URL('fixtures/', import.meta.url));
 
-function setup(fixture: string) {
+function setup(fixture: string, root = fixtures) {
   const lines: string[] = [];
   const log = {
     info: (message: string) => lines.push(`info: ${message}`),
     warn: (message: string) => lines.push(`warn: ${message}`),
   };
-  const project = storybookProject(join(fixtures, fixture, '.storybook'), log);
+  const project = storybookProject(join(root, fixture, '.storybook'), log);
 
   return {
     lines,
@@ -21,6 +23,17 @@ function setup(fixture: string) {
     file: (...segments: readonly string[]) =>
       join(fixtures, fixture, ...segments),
   };
+}
+
+function freshSetup(t: TestContext, fixture: string) {
+  const root = mkdtempSync(join(tmpdir(), 'lz-storybook-project-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  cpSync(join(fixtures, fixture), join(root, fixture), { recursive: true });
+  cpSync(join(fixtures, 'framework'), join(root, 'framework'), {
+    recursive: true,
+  });
+
+  return setup(fixture, root);
 }
 
 describe('storybookProject', () => {
@@ -56,13 +69,19 @@ describe('storybookProject', () => {
       assert.equal(relativeProject.configDir, project.configDir);
     });
 
-    it('says once that it uses the file names', () => {
-      const { lines, project } = setup('no-main');
+    it('says once that it uses the file names', (t) => {
+      const { lines, project } = freshSetup(t, 'no-main');
 
       assert.deepEqual(lines, [
         `info: @layzee/stryker-storybook: no Storybook main file in ${project.configDir}; story files are the files named *.stories.* or *.story.*`,
       ]);
     });
+  });
+
+  it('gives the same project for the same config folder', () => {
+    const { project } = setup('globs');
+
+    assert.equal(setup('globs').project, project);
   });
 
   describe('with a preview file in the config folder', () => {
@@ -74,8 +93,8 @@ describe('storybookProject', () => {
   });
 
   describe('with a main file that lists story globs', () => {
-    it('logs nothing', () => {
-      const { lines } = setup('globs');
+    it('logs nothing', (t) => {
+      const { lines } = freshSetup(t, 'globs');
 
       assert.deepEqual(lines, []);
     });
@@ -142,8 +161,8 @@ describe('storybookProject', () => {
   });
 
   describe('with a main.js file', () => {
-    it('loads it like a main.ts file and logs nothing', () => {
-      const { lines } = setup('main-js');
+    it('loads it like a main.ts file and logs nothing', (t) => {
+      const { lines } = freshSetup(t, 'main-js');
 
       assert.deepEqual(lines, []);
     });
@@ -165,8 +184,8 @@ describe('storybookProject', () => {
       );
     });
 
-    it('warns once, naming the folder and the error', () => {
-      const { lines, project } = setup('failing');
+    it('warns once, naming the folder and the error', (t) => {
+      const { lines, project } = freshSetup(t, 'failing');
 
       assert.equal(lines.length, 1);
       assert.ok(
@@ -181,8 +200,8 @@ describe('storybookProject', () => {
       );
     });
 
-    it('leaves the stack trace out of the warning', () => {
-      const { lines } = setup('failing');
+    it('leaves the stack trace out of the warning', (t) => {
+      const { lines } = freshSetup(t, 'failing');
 
       assert.doesNotMatch(lines.join('\n'), /^\s+at /m);
     });
