@@ -93,9 +93,8 @@ export function classifyStubs(
       'parameters',
     ),
   );
-  // Storybook 10.6.5's Vitest transform makes no test of an export without a local variable or function
   const declared = storyExports(body, bindings)
-    .filter(({ init }) => init !== undefined)
+    .filter(({ tested }) => tested)
     .map(({ name, init }) => {
       const storyTest = testSettings(
         member(

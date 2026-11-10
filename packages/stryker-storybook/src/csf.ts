@@ -31,14 +31,14 @@ export function csfShapes(program: unknown): CsfShapes {
   const metaObjects = metaObjectsOf(body, bindings);
   const isStory = storyFilter(metaObjects);
   const assignments = body.map(assignmentOf);
-  const storyExports = [
-    ...namedExports(body, bindings),
+  const storyInits = [
+    ...storyExports(body, bindings),
     ...assignments
-      .filter(({ key }) => key === 'story')
+      .filter(({ target, key }) => key === 'story' && isStory(target))
       .map(({ target, value }) => ({ name: target, init: value })),
-  ].filter(({ name }) => isStory(name));
-  const storyNames = storyExports.map(({ name }) => name);
-  const stories = storyExports
+  ];
+  const storyNames = storyInits.map(({ name }) => name);
+  const stories = storyInits
     .map(({ init }) => storyNode(unwrap(init), bindings))
     .filter(
       (init) =>
@@ -135,7 +135,7 @@ function metaObjectsOf(
   return [
     ...objectOf(declaration ?? field(defaultSpecifier, 'local'), bindings),
     ...[...bindings.values()]
-      .filter((init) => field(init, 'callee', 'property', 'name') === 'meta')
+      .filter(isFactoryMeta)
       .map((init) => list(field(init, 'arguments'))[0]),
   ];
 }
@@ -158,15 +158,46 @@ function storyFilter(
 export function storyExports(
   body: readonly unknown[],
   bindings: Bindings,
-): readonly NamedExport[] {
+): readonly StoryExport[] {
   const isStory = storyFilter(metaObjectsOf(body, bindings));
+  const isFactoryFile = [...bindings.values()].some(isFactoryMeta);
 
-  return namedExports(body, bindings).filter(({ name }) => isStory(name));
+  return namedExports(body, bindings)
+    .filter(
+      ({ name, init }) =>
+        name !== '__namedExportsOrder' &&
+        isStory(name) &&
+        (!isFactoryFile ||
+          storyFactories.includes(
+            field(unwrap(init), 'callee', 'property', 'name'),
+          )),
+    )
+    .map(({ name, init, form }) => ({
+      name,
+      init,
+      tested:
+        form === 'declaration' ||
+        (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
+    }));
+}
+
+export interface StoryExport {
+  readonly name: string;
+  readonly init: unknown;
+  /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
+  readonly tested: boolean;
+}
+
+const storyFactories: readonly unknown[] = ['story', 'extend'];
+
+function isFactoryMeta(init: unknown): boolean {
+  return field(init, 'callee', 'property', 'name') === 'meta';
 }
 
 export interface NamedExport {
   readonly name: string;
   readonly init: unknown;
+  readonly form: 'declaration' | 'specifier';
 }
 
 export function namedExports(
@@ -184,6 +215,7 @@ export function namedExports(
         (declarator) => ({
           name: field(declarator, 'id', 'name'),
           init: field(declarator, 'init'),
+          form: 'declaration' as const,
         }),
       ),
       ...(field(statement, 'declaration', 'type') === 'FunctionDeclaration'
@@ -191,25 +223,24 @@ export function namedExports(
             {
               name: field(statement, 'declaration', 'id', 'name'),
               init: field(statement, 'declaration'),
+              form: 'declaration' as const,
             },
           ]
         : []),
       ...list(field(statement, 'specifiers'))
         .filter((specifier) => field(specifier, 'exportKind') !== 'type')
-        .map((specifier) => {
-          const init = followed(field(specifier, 'local'), bindings);
-
-          return {
-            name:
-              field(specifier, 'exported', 'name') ??
-              field(specifier, 'exported', 'value'),
-            init:
-              field(init, 'type') === 'FunctionDeclaration' ? undefined : init,
-          };
-        }),
+        .map((specifier) => ({
+          name:
+            field(specifier, 'exported', 'name') ??
+            field(specifier, 'exported', 'value'),
+          init: followed(field(specifier, 'local'), bindings),
+          form: 'specifier' as const,
+        })),
     ])
-    .flatMap(({ name, init }) =>
-      typeof name === 'string' && name !== 'default' ? [{ name, init }] : [],
+    .flatMap(({ name, init, form }) =>
+      typeof name === 'string' && name !== 'default'
+        ? [{ name, init, form }]
+        : [],
     );
 }
 

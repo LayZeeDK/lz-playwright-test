@@ -359,6 +359,27 @@ export { Other };`,
     assert.deepEqual(verdicts, ['kept']);
   });
 
+  it('leaves __namedExportsOrder out of the stories', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+export const __namedExportsOrder = ['A'];`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('leaves a non-factory export of a CSF factory file out of the stories', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ args: { g: fn().mockReturnValue(1) } });
+export const helper = () => null;`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
   it('leaves a function declaration exported by specifier out of the stories', () => {
     const verdicts = verdictsOf(
       `export default {};
