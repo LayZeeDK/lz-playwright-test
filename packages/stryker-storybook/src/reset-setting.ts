@@ -6,7 +6,7 @@ import {
   isTemplateBind,
   namedExports,
   storyArgument,
-  storyTags,
+  storyIndex,
   topLevelBindings,
   unwrap,
   withoutBinding,
@@ -84,8 +84,8 @@ function definePreviewArgument(node: unknown): unknown {
 function testSettings(parameters: unknown): ResetSettings {
   const test = member(parameters, 'test');
 
-  // Storybook 10.6.5 combineParameters lets an array replace an object instead of merging into it.
-  if (Array.isArray(test)) {
+  // Storybook 10.6.5 combineParameters lets any value that is not a plain object replace an object instead of merging into it.
+  if (test !== undefined && (!isRecord(test) || Array.isArray(test))) {
     return unreadableSettings;
   }
 
@@ -131,20 +131,20 @@ export function classifyStubs(
 ): StubClassification {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
-  const tagsByStory = storyTags(code, fileName);
+  const index = storyIndex(code, fileName);
   const {
     metaObjects: [meta],
     stories: exported,
-  } = csfFile(body, bindings, ({ name }) => tagsByStory.has(name));
+  } = csfFile(body, bindings, index);
   const metaValue = evaluate(meta, bindings);
   const metaTest = testSettings(member(metaValue, 'parameters'));
   const declared = exported
     .filter(({ name, tested }) => {
-      const tags = tagsByStory.get(name);
+      const tags = index.get(name)?.tags;
 
       return tested && tags !== undefined && isTestedByTags(testTags, tags);
     })
-    .flatMap(({ name, init, runtimeAssignments, extendsBase, testOptions }) => {
+    .flatMap(({ name, init, runtimeAssignments, extendsBase, children }) => {
       const story = runtimeAssignments.reduce(
         (value, assignment) =>
           written(value, assignment.path, evaluate(assignment.value, bindings)),
@@ -154,9 +154,15 @@ export function classifyStubs(
         testTags,
         member(metaValue, 'tags'),
         story,
-        testOptions.map((options) =>
-          options === undefined ? undefined : evaluate(options, bindings),
-        ),
+        children.map((child) => {
+          if (child === 'unmatched') {
+            return unknownValue;
+          }
+
+          return child.options === undefined
+            ? undefined
+            : evaluate(child.options, bindings);
+        }),
       );
 
       if (isSkipped === true) {
@@ -197,24 +203,20 @@ export function classifyStubs(
   return { stories, stubs };
 }
 
-/** Storybook 10.6.5 runs each `.test()` call on a factory story as a test of its own, so one of them can run when the story's own test is skipped. */
+/** Storybook 10.6.5 runs each `.test()` call on a factory story as a test of its own, so one of them can run when the story's own test is skipped, and with parameters of its own. */
 function storySkipped(
   testTags: TestTags,
   metaTags: unknown,
   story: unknown,
   testOptions: readonly unknown[],
 ): boolean | 'unknown' {
-  const base = skipped(testTags, metaTags, member(story, 'tags'));
-
-  if (base !== true) {
-    return base;
-  }
-
+  const storyTags = tagList(member(story, 'tags'));
+  const base = skipped(testTags, metaTags, storyTags);
   const children = testOptions.map((options) => {
     const child = skipped(
       testTags,
       metaTags,
-      childTags(member(story, 'tags'), member(options, 'tags')),
+      storyTags && childTags(storyTags, member(options, 'tags')),
     );
 
     return child === false && member(options, 'parameters') !== undefined
@@ -222,23 +224,24 @@ function storySkipped(
       : child;
   });
 
-  return children.includes('unknown')
-    ? 'unknown'
-    : children.every((child) => child === true);
+  if (children.includes('unknown')) {
+    return 'unknown';
+  }
+
+  return base === true ? children.every((child) => child === true) : base;
 }
 
 /** Storybook 10.6.5 test-utils.ts `testStory` checks skip tags on the tags prepareStory.ts composes at run time, which hold no play-fn. */
 function skipped(
   { previewTags, skip }: TestTags,
   metaTags: unknown,
-  storyTags: unknown,
+  story: readonly string[] | undefined,
 ): boolean | 'unknown' {
   if (skip.length === 0) {
     return false;
   }
 
   const meta = tagList(metaTags);
-  const story = tagList(storyTags);
 
   if (meta === undefined || story === undefined) {
     return 'unknown';
@@ -250,13 +253,15 @@ function skipped(
 }
 
 /** Storybook 10.6.5 csf-factories.ts `test` extends the story with these tags, which `extend` combines. */
-function childTags(storyTags: unknown, optionTags: unknown): unknown {
-  const story = tagList(storyTags);
+function childTags(
+  storyTags: readonly string[],
+  optionTags: unknown,
+): readonly string[] | undefined {
   const own = tagList(optionTags);
 
-  return story === undefined || own === undefined
-    ? unknownValue
-    : combineTags(...story, 'test-fn', '!autodocs', ...own);
+  return own === undefined
+    ? undefined
+    : combineTags(...storyTags, 'test-fn', '!autodocs', ...own);
 }
 
 function tagList(value: unknown): readonly string[] | undefined {
