@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import { isRecord } from '../src/is-record.ts';
+import { field } from '../src/node-field.ts';
 import { parseProgram } from '../src/parse.ts';
 import {
   classifyStubs,
@@ -61,10 +62,7 @@ function previewTest(preview: keyof typeof previews): ResetSettings {
 }
 
 function recorded(...keys: readonly string[]): unknown {
-  return keys.reduce<unknown>(
-    (value, key) => (isRecord(value) ? value[key] : undefined),
-    outcomes,
-  );
+  return field(outcomes, ...keys);
 }
 
 function erases(story: StoryReset): boolean {
@@ -182,6 +180,53 @@ export const A = { args: { g: fn().mockReturnValue(1) } };`,
     assert.deepEqual(verdicts, ['unknown']);
   });
 
+  it('reads a key set after a spread of an import', () => {
+    const verdicts = verdictsOf(
+      `import { shared } from './shared';
+export default {};
+export const A = {
+  parameters: { ...shared, test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads a key set before a spread of an import as unknown', () => {
+    const verdicts = verdictsOf(
+      `import { shared } from './shared';
+export default {};
+export const A = {
+  parameters: { test: { restoreMocks: false }, ...shared },
+  args: { g: fn().mockReturnValue(1) },
+};`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a spread of an object that spreads itself as unknown', () => {
+    const verdicts = verdictsOf(
+      `export default {};
+var a = { ...a };
+export const A = { ...a, args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a spread of two objects that spread each other as unknown', () => {
+    const verdicts = verdictsOf(
+      `export default {};
+var a = { ...b };
+var b = { ...a };
+export const A = { ...a, args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
   it('reads the settings a story spreads in from a local object', () => {
     const verdicts = verdictsOf(
       `export default {};
@@ -210,7 +255,11 @@ export const A = { args: { g: fn().mockReturnValue(1) } };`,
       ),
     );
 
-    assert.equal(settings, 'unreadable');
+    assert.deepEqual(settings, {
+      mockReset: 'unreadable',
+      clearMocks: 'unreadable',
+      restoreMocks: 'unreadable',
+    });
   });
 
   it('finds a story exported through an export specifier', () => {
@@ -224,6 +273,106 @@ export { A };`,
     );
 
     assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('leaves an export that excludeStories matches out of the stories', () => {
+    const verdicts = verdictsOf(
+      `export default {
+  excludeStories: /.*Data$/,
+  parameters: { test: { restoreMocks: false } },
+};
+export const TasksData = [{ id: '1' }];
+export const A = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('leaves a type-only export out of the stories', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+export type { Props } from './props';`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('leaves a type-only export specifier out of the stories', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+type Props = { label: string };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+export { type Props };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads the meta and preview settings for a function story', () => {
+    const verdicts = verdictsOf(
+      `export default {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+export function Primary() {
+  return null;
+}`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads a function story with parameters assigned after it as unknown', () => {
+    const verdicts = verdictsOf(
+      `export default {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+export function Primary() {
+  return null;
+}
+Primary.parameters = { test: { mockReset: true } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads an object story with parameters assigned after it as unknown', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+A.parameters = { test: { mockReset: true } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('leaves a re-exported import out of the stories', () => {
+    const verdicts = verdictsOf(
+      `import { Other } from './other.stories';
+export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+export { Other };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('leaves a function declaration exported by specifier out of the stories', () => {
+    const verdicts = verdictsOf(
+      `export default {};
+function helper() {
+  return null;
+}
+export { helper };
+export const A = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
   });
 });
 

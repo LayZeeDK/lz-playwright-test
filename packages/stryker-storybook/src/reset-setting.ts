@@ -1,5 +1,6 @@
-import { namedExports, topLevelBindings, unwrap } from './csf.ts';
+import { namedExports, storyExports, topLevelBindings, unwrap } from './csf.ts';
 import { isRecord } from './is-record.ts';
+import { field, list } from './node-field.ts';
 import { definitionTimeStubs } from './stub-shape.ts';
 
 export type ResetBranch = 'reset' | 'clear' | 'restore' | 'none' | 'unknown';
@@ -26,11 +27,15 @@ export interface StubClassification {
 
 export type ResetSetting = boolean | 'unreadable';
 
-export type ResetSettings =
-  | 'unreadable'
-  | Readonly<Partial<Record<ResetKey, ResetSetting>>>;
+export type ResetSettings = Readonly<Partial<Record<ResetKey, ResetSetting>>>;
 
 type ResetKey = (typeof decisiveSettings)[number][0];
+
+export const unreadableSettings: ResetSettings = {
+  mockReset: 'unreadable',
+  clearMocks: 'unreadable',
+  restoreMocks: 'unreadable',
+};
 
 export function readPreviewTest(program: unknown): ResetSettings {
   const body = list(field(program, 'body'));
@@ -41,7 +46,7 @@ export function readPreviewTest(program: unknown): ResetSettings {
     return testSettings(member(exported, 'parameters'));
   }
 
-  const parameters = namedExports(program).find(
+  const parameters = namedExports(body, bindings).find(
     ({ name }) => name === 'parameters',
   );
 
@@ -52,10 +57,6 @@ export function readPreviewTest(program: unknown): ResetSettings {
 
 function testSettings(parameters: unknown): ResetSettings {
   const test = member(parameters, 'test');
-
-  if (test === unknownValue) {
-    return 'unreadable';
-  }
 
   return Object.fromEntries(
     decisiveSettings.flatMap(([key]) => {
@@ -86,16 +87,24 @@ export function classifyStubs(
       'parameters',
     ),
   );
-  const declared = namedExports(program).map(({ name, init }) => {
-    const storyTest = testSettings(
-      member(evaluate(annotations(init), bindings), 'parameters'),
-    );
+  // Storybook 10.6.5's Vitest transform makes no test of an export without a local variable or function
+  const declared = storyExports(body, bindings)
+    .filter(({ init }) => init !== undefined)
+    .map(({ name, init }) => {
+      const storyTest = testSettings(
+        member(
+          assignsParameters(body, name)
+            ? unknownValue
+            : evaluate(annotations(init), bindings),
+          'parameters',
+        ),
+      );
 
-    return {
-      story: { name, branch: branchOf([previewTest, metaTest, storyTest]) },
-      init,
-    };
-  });
+      return {
+        story: { name, branch: branchOf([previewTest, metaTest, storyTest]) },
+        init,
+      };
+    });
   const stories = declared.map(({ story }) => story);
   const stubs = definitionTimeStubs(program).map(
     ({ start, end, line, once }) => {
@@ -107,6 +116,16 @@ export function classifyStubs(
   );
 
   return { stories, stubs };
+}
+
+function assignsParameters(body: readonly unknown[], name: string): boolean {
+  return body.some(
+    (statement) =>
+      field(statement, 'expression', 'type') === 'AssignmentExpression' &&
+      field(statement, 'expression', 'left', 'object', 'name') === name &&
+      field(statement, 'expression', 'left', 'property', 'name') ===
+        'parameters',
+  );
 }
 
 function siteVerdict(
@@ -152,8 +171,7 @@ function branchOf(levels: readonly ResetSettings[]): ResetBranch {
     decisiveSettings
       .map(([key, decisive, branch]) => {
         const setting = levels.reduce<ResetSetting | undefined>(
-          (value, level) =>
-            level === 'unreadable' ? level : (level[key] ?? value),
+          (value, level) => level[key] ?? value,
           undefined,
         );
 
@@ -215,6 +233,9 @@ function evaluate(
     case 'BooleanLiteral': {
       return field(current, 'value');
     }
+    case 'FunctionDeclaration': {
+      return undefined;
+    }
     case 'Identifier': {
       const name = field(current, 'name');
 
@@ -223,21 +244,28 @@ function evaluate(
       }
 
       return typeof name === 'string' && bindings.has(name)
-        ? evaluate(bindings.get(name), bindings)
+        ? evaluate(
+            bindings.get(name),
+            new Map([...bindings].filter(([bound]) => bound !== name)),
+          )
         : unknownValue;
     }
     case 'ObjectExpression': {
-      const parts = list(field(current, 'properties')).map((property) =>
-        objectPart(property, bindings),
-      );
+      return list(field(current, 'properties')).reduce<
+        Readonly<Record<PropertyKey, unknown>>
+      >((object, property) => {
+        const part = objectPart(property, bindings);
 
-      return parts.includes(unknownValue)
-        ? unknownValue
-        : Object.fromEntries(
-            parts.flatMap((part) =>
-              isRecord(part) ? Object.entries(part) : [],
-            ),
-          );
+        if (part === unknownValue) {
+          return { [unknownRest]: true };
+        }
+
+        if (!isRecord(part)) {
+          return object;
+        }
+
+        return Object.hasOwn(part, unknownRest) ? part : { ...object, ...part };
+      }, {});
     }
     default: {
       return unknownValue;
@@ -265,21 +293,17 @@ function objectPart(
 
 const unknownValue = Symbol('unknown');
 
+const unknownRest = Symbol('unknown rest');
+
 function member(value: unknown, key: string): unknown {
-  if (value === unknownValue) {
+  if (
+    value === unknownValue ||
+    (isRecord(value) &&
+      !Object.hasOwn(value, key) &&
+      Object.hasOwn(value, unknownRest))
+  ) {
     return unknownValue;
   }
 
-  return isRecord(value) ? value[key] : undefined;
-}
-
-function field(node: unknown, ...keys: readonly string[]): unknown {
-  return keys.reduce<unknown>(
-    (value, key) => (isRecord(value) ? value[key] : undefined),
-    node,
-  );
-}
-
-function list(value: unknown): readonly unknown[] {
-  return Array.isArray(value) ? value : [];
+  return field(value, key);
 }

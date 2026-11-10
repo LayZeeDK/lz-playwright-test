@@ -27,6 +27,12 @@ const whys: Readonly<Record<ReasonVerdict, string>> = {
 const fix =
   'pass the implementation to fn(), as in fn(() => value), or set the stub in beforeEach';
 
+export const uncheckedFinding = {
+  verdict: 'unchecked',
+  why: 'no test fails without this stub, so no play checks what it changes',
+  fix: 'assert in the play what the stubbed value changes',
+} as const;
+
 export interface SpyStubReason {
   readonly verdict: ReasonVerdict;
   readonly why: string;
@@ -50,18 +56,6 @@ export function reasonSites(
       return [{ ...site, verdict }];
     },
   );
-}
-
-export function parseSpyStubReason(reason: string): SpyStubReason | undefined {
-  const verdict = Object.keys(whys)
-    .filter(isReasonVerdict)
-    .find((candidate) => reason.startsWith(`${spyStubName}: ${candidate}: `));
-
-  return verdict === undefined ? undefined : describeVerdict(verdict);
-}
-
-function isReasonVerdict(value: string): value is ReasonVerdict {
-  return Object.hasOwn(whys, value);
 }
 
 export function describeVerdict(verdict: ReasonVerdict): SpyStubReason {

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, relative, sep } from 'node:path';
+import { join, relative, resolve, sep } from 'node:path';
 
 import {
   PlanKind,
@@ -13,10 +13,10 @@ import {
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 import type { Reporter } from '@stryker-mutator/api/report';
 
-import { isRecord } from './is-record.ts';
+import { field, list } from './node-field.ts';
 import { lzStorybookOptions } from './options.ts';
 import { packageName } from './package-name.ts';
-import { parseStoryFile, selfScan, silencedSites } from './self-scan.ts';
+import { selfScan } from './self-scan.ts';
 import {
   isStoryFile,
   storybookProject,
@@ -24,18 +24,12 @@ import {
   type StorybookProject,
 } from './storybook-project.ts';
 import { hasRecords, recordVariable } from './stryker-record.ts';
-import { definitionTimeStubs } from './stub-shape.ts';
+import { siteFindings } from './stub-findings.ts';
 import {
-  parseSpyStubReason,
   spyStubName,
+  uncheckedFinding,
   type ReasonVerdict,
 } from './stub-verdict.ts';
-
-const unchecked = {
-  verdict: 'unchecked',
-  why: 'no test fails without this stub, so no play checks what it changes',
-  fix: 'assert in the play what the stubbed value changes',
-} as const;
 
 export interface LzStorybookReport {
   readonly findings: readonly StubFinding[];
@@ -45,14 +39,14 @@ export interface LzStorybookReport {
 interface StubFinding {
   readonly file: string;
   readonly line: number;
-  readonly verdict: ReasonVerdict | 'unchecked';
+  readonly verdict: ReasonVerdict | (typeof uncheckedFinding)['verdict'];
   readonly why: string;
   readonly fix: string;
 }
 
 type ReportMutant = Pick<
   schema.MutantResult,
-  'mutatorName' | 'status' | 'statusReason' | 'location'
+  'mutatorName' | 'status' | 'location'
 >;
 
 interface ReportInput {
@@ -138,7 +132,7 @@ export function storybookReporter(options: object, log: ProjectLog) {
       const findings = excludesSpyStub(options)
         ? []
         : [
-            ...reportFindings(files, warnUnparsable),
+            ...reportFindings(files, storybook(), warnUnparsable),
             ...selfScan(
               storybook(),
               (fileName) => projectPath(fileName) in files,
@@ -194,63 +188,28 @@ function consoleBlock({
 
 function reportFindings(
   files: ReportInput['files'],
+  project: StorybookProject,
   onUnparsable: (fileName: string, error: unknown) => void,
 ): readonly StubFinding[] {
-  return Object.entries(files).flatMap(([file, { source, mutants }]) => {
-    const stubbed = mutants.flatMap(({ statusReason, location }) => {
-      const reason =
-        statusReason === undefined
-          ? undefined
-          : parseSpyStubReason(statusReason);
-
-      return reason === undefined
-        ? []
-        : [{ offset: offsetOf(source, location.start), reason }];
-    });
-    const program =
-      stubbed.length === 0
-        ? undefined
-        : parseStoryFile(source, file, onUnparsable);
-    const sites = program === undefined ? [] : definitionTimeStubs(program);
-    const silenced = silencedSites(program, sites);
-
-    return [
-      ...sites.flatMap((site) => {
-        const found = stubbed.find(
-          ({ offset }) => site.start <= offset && offset < site.end,
-        );
-
-        return found === undefined || silenced.has(site)
-          ? []
-          : [{ file, line: site.line, ...found.reason }];
-      }),
-      ...mutants.flatMap(({ mutatorName, status, location }) =>
-        mutatorName === spyStubName && status === 'Survived'
-          ? [{ file, line: location.start.line, ...unchecked }]
-          : [],
-      ),
-    ];
-  });
-}
-
-// Babel's line terminators; report columns are 1-based
-function offsetOf(source: string, { line, column }: schema.Position): number {
-  const previousBreak = [...source.matchAll(/\r\n?|[\n\p{Zl}\p{Zp}]/gu)]
-    .slice(0, line - 1)
-    .at(-1);
-  const lineStart =
-    previousBreak === undefined
-      ? 0
-      : previousBreak.index + previousBreak[0].length;
-
-  return lineStart + column - 1;
+  return Object.entries(files).flatMap(([file, { source, mutants }]) => [
+    ...(isStoryFile(project, resolve(file))
+      ? siteFindings(source, file, project, onUnparsable).map((finding) => ({
+          file,
+          ...finding,
+        }))
+      : []),
+    ...mutants.flatMap(({ mutatorName, status, location }) =>
+      mutatorName === spyStubName && status === 'Survived'
+        ? [{ file, line: location.start.line, ...uncheckedFinding }]
+        : [],
+    ),
+  ]);
 }
 
 function excludesSpyStub(options: object): boolean {
-  const mutator: unknown = Reflect.get(options, 'mutator');
-  const excluded = isRecord(mutator) ? mutator['excludedMutations'] : undefined;
-
-  return Array.isArray(excluded) && excluded.includes(spyStubName);
+  return list(field(options, 'mutator', 'excludedMutations')).includes(
+    spyStubName,
+  );
 }
 
 function projectPath(fileName: string): string {

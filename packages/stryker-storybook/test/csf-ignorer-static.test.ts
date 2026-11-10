@@ -260,6 +260,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('keeps a name assigned to the storyName of an exported function story as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport function A() {\n  return null;\n}\nA.storyName = 'Go';",
+        )
+      ).filter((outcome) => outcome.startsWith('5 ')),
+      [`5 StringLiteral ${staticReason}`],
+    );
+  });
+
   it('keeps tags assigned to X.tags as written', async () => {
     const { outcomes } = setup();
 

@@ -9,7 +9,11 @@ import { getInterpretedFile } from 'storybook/internal/common';
 import { isRecord } from './is-record.ts';
 import { packageName } from './package-name.ts';
 import { parseProgram } from './parse.ts';
-import { readPreviewTest, type ResetSettings } from './reset-setting.ts';
+import {
+  readPreviewTest,
+  unreadableSettings,
+  type ResetSettings,
+} from './reset-setting.ts';
 import { mockTransformerPluginName } from './stryker-record.ts';
 
 export interface ProjectLog {
@@ -134,7 +138,7 @@ function readPreview(configDir: string): ResetSettings {
   try {
     return readPreviewTest(parseProgram(readFileSync(file, 'utf8'), file));
   } catch {
-    return 'unreadable';
+    return unreadableSettings;
   }
 }
 

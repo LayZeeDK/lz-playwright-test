@@ -103,7 +103,11 @@ describe('storybookProject', () => {
       warn: () => undefined,
     });
 
-    assert.equal(project.previewTest, 'unreadable');
+    assert.deepEqual(project.previewTest, {
+      mockReset: 'unreadable',
+      clearMocks: 'unreadable',
+      restoreMocks: 'unreadable',
+    });
   });
 
   describe('with a main file that lists story globs', () => {
