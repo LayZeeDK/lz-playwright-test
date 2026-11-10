@@ -1,11 +1,10 @@
 import {
+  csfFile,
   defaultExport,
   definePreviewArgument,
   isTemplateBind,
-  metaObjectsOf,
   namedExports,
   storyArgument,
-  storyExports,
   topLevelBindings,
   unwrap,
   withoutBinding,
@@ -90,10 +89,12 @@ export function classifyStubs(
 ): StubClassification {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
-  const metaObjects = metaObjectsOf(body, bindings);
-  const [meta] = metaObjects;
+  const {
+    metaObjects: [meta],
+    stories: exported,
+  } = csfFile(body, bindings);
   const metaTest = testSettings(member(evaluate(meta, bindings), 'parameters'));
-  const declared = storyExports(body, bindings, metaObjects)
+  const declared = exported
     .filter(({ tested }) => tested)
     .map(({ name, init, assignments }) => {
       const story = assignments.reduce(

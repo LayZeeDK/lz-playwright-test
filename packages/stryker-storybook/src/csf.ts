@@ -28,8 +28,7 @@ export function csfShapes(program: unknown): CsfShapes {
   const specifiers = body.flatMap((statement) =>
     list(field(statement, 'specifiers')),
   );
-  const metaObjects = metaObjectsOf(body, bindings);
-  const exported = storyExports(body, bindings, metaObjects);
+  const { metaObjects, stories: exported } = csfFile(body, bindings);
   const assignments = exported.flatMap((story) => story.assignments);
   const assigned = (key: string): readonly unknown[] =>
     assignments
@@ -119,16 +118,25 @@ export function defaultExport(body: readonly unknown[]): unknown {
   return declaration ?? field(defaultSpecifier, 'local');
 }
 
-export function metaObjectsOf(
-  body: readonly unknown[],
-  bindings: Bindings,
-): readonly unknown[] {
-  return [
+export interface CsfFile {
+  readonly metaObjects: readonly unknown[];
+  readonly isFactory: boolean;
+  readonly stories: readonly StoryExport[];
+}
+
+export function csfFile(body: readonly unknown[], bindings: Bindings): CsfFile {
+  const metas = factoryMetas(body, bindings);
+  const metaObjects = [
     defaultExport(body),
-    ...factoryMetas(body, bindings).map(
-      (init) => list(field(init, 'arguments'))[0],
-    ),
+    ...metas.map((init) => list(field(init, 'arguments'))[0]),
   ].flatMap((meta) => objectOf(meta, bindings));
+  const isFactory = metas.length > 0;
+
+  return {
+    metaObjects,
+    isFactory,
+    stories: storyExports(body, bindings, metaObjects, isFactory),
+  };
 }
 
 function storyFilter(
@@ -146,16 +154,16 @@ function storyFilter(
   return (name) => isExportStory(name, includeStories, excludeStories);
 }
 
-export function storyExports(
+function storyExports(
   body: readonly unknown[],
   bindings: Bindings,
   metaObjects: readonly unknown[],
+  isFactoryFile: boolean,
 ): readonly StoryExport[] {
   const isStory = storyFilter(metaObjects);
   const exports = namedExports(body, bindings);
   const isFactoryStory = ({ init }: NamedExport): boolean =>
     isStoryFactoryCall(unwrap(init));
-  const isFactoryFile = factoryMetas(body, bindings).length > 0;
   const assignments = body.flatMap(assignmentOf);
 
   return exports
