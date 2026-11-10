@@ -40,7 +40,7 @@ export type ResetSetting = boolean | 'unreadable';
 
 export type ResetSettings = Readonly<Partial<Record<ResetKey, ResetSetting>>>;
 
-type ResetKey = (typeof decisiveSettings)[number][0];
+type ResetKey = 'mockReset' | 'clearMocks' | 'restoreMocks';
 
 export const unreadableSettings: ResetSettings = {
   mockReset: 'unreadable',
@@ -80,16 +80,17 @@ function definePreviewArgument(node: unknown): unknown {
 function testSettings(parameters: unknown): ResetSettings {
   const test = member(parameters, 'test');
 
-  return Object.fromEntries(
-    decisiveSettings.flatMap(([key]) => {
+  return decisiveSettings.reduce<Partial<Record<ResetKey, ResetSetting>>>(
+    (settings, [key]) => {
       const value = member(test, key);
 
-      if (value === undefined) {
-        return [];
+      if (value !== undefined) {
+        settings[key] = typeof value === 'boolean' ? value : 'unreadable';
       }
 
-      return [[key, typeof value === 'boolean' ? value : 'unreadable']];
-    }),
+      return settings;
+    },
+    {},
   );
 }
 
@@ -223,11 +224,12 @@ function contains(node: unknown, position: number): boolean {
   );
 }
 
-const decisiveSettings = [
-  ['mockReset', true, 'reset'],
-  ['clearMocks', true, 'clear'],
-  ['restoreMocks', false, 'none'],
-] as const;
+const decisiveSettings: readonly (readonly [ResetKey, boolean, ResetBranch])[] =
+  [
+    ['mockReset', true, 'reset'],
+    ['clearMocks', true, 'clear'],
+    ['restoreMocks', false, 'none'],
+  ];
 
 function branchOf(levels: readonly ResetSettings[]): ResetBranch {
   return (

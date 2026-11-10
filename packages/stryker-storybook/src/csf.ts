@@ -11,8 +11,8 @@ export interface CsfShapes {
 
 type Bindings = ReadonlyMap<string, unknown>;
 
-const testKeys = ['play', 'beforeEach', 'afterEach'];
-const staticKeys = [
+const testKeys: readonly string[] = ['play', 'beforeEach', 'afterEach'];
+const staticKeys: readonly string[] = [
   'title',
   'id',
   'tags',
