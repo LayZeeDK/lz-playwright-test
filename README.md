@@ -27,6 +27,10 @@ mutators from there, so build first (the Nx targets below do).
   `@layzee/stryker-playwright-mutators`.
 - `packages/stryker-mutator-install`: the private code that both mutator packages use to put their mutators into
   Stryker, package `@layzee/stryker-mutator-install`.
+- `packages/stryker-storybook`: the Stryker plugins for Storybook stories and their play functions, package
+  `@layzee/stryker-storybook`.
+- `packages/storybook-mock-transformer`: the Vite plugin that keeps Storybook's definition-time spy stubs through the
+  default mock reset, package `@layzee/storybook-mock-transformer`.
 - `packages/<package>/stryker.config.mjs`: in each of the six packages, a Stryker config that mutates the
   package's own source. The runner's hooks' tests install the hooks under test on their own global,
   `__stryker_hook_test__`, named by `LZ_STRYKER_PLAYWRIGHT_HOOK_TEST_NAMESPACE`, so an instrumented copy of a hook

@@ -69,7 +69,7 @@ change often enough that unit tests alone stop catching regressions.
 
 ## Spike result, 2026-11-10
 
-They did. From 2026-10-24 to 2026-11-10 the nine files held 41% of the runner's source lines, and took 51% of its
+The hooks did change that often. From 2026-10-24 to 2026-11-10 the nine files held 41% of the runner's source lines, and took 51% of its
 commits and 52% of its fix commits.
 
 What changed:
