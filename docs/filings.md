@@ -788,6 +788,18 @@ After the first went red and green, the other three passed on their first run an
 in three edits, to keep `test-first.md`'s one-test-per-edit check honest; one parameterised table would read better
 but counts as several tests in one edit. Evidence: `sb-s2/cycles.log`, the lines after cycle 6.
 
+**O103 (lz-tpp misfit). The reading a branch stands on has no rung.** In S3, cycle 2's first meta-level row needed a
+binding lookup, an unwrap of `satisfies` and `as`, and a small evaluator for boolean and object literals before the one
+named `(unconditional -> if)` on `restoreMocks` could see its value. The named transformation is the branch; the
+plumbing under it is several transformations' worth with no list entry. The prediction-table seam (story outcomes from
+recorded runs) sits far from the AST walk, so one row drives much code. Evidence: `sb-s3/cycles.log` cycle 2,
+`sb-s3/notes.md`.
+
+**O104. The three skills and the spec filled a worker's context before its first cycle.** In S3 the three lz-tdd
+SKILL.md files, the design sections, the prototypes and one `pstack:how` report used most of a 150k-token budget, and
+the worker handed back after 3 cycles of a 52-row table. One cycle per driving row does not fit one worker when the
+setup reading is that large. Evidence: `sb-s3/notes.md`, the worker's hand-back on 2026-11-10.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
@@ -1121,6 +1133,10 @@ impasse check, name the change of representation as a case of its own.
 
 **S94 (from O102).** In `test-first.md` (Lars's user-scope rule, not the plugin), allow one table edit for test-after
 rows that pin inputs of a rule a single cycle drove, logged as one `test-after` line naming each row.
+
+**S95 (from O103).** In `lz-tpp`, say how to name a green whose branch needs reading code first: name the branch's
+transformation and list the reading as preparatory refactorings, or pose a simpler test that reaches the value with
+less reading.
 
 ## stefanoslig/angular-ngrx-nx-realworld-example-app: "View article's author" e2e test always fails
 
