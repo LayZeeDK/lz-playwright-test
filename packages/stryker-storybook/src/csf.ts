@@ -285,7 +285,7 @@ export interface StoryExport {
   readonly children: readonly TestChild[];
   /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
   readonly tested: boolean;
-  /** The file names the story outside its declaration, its export, the `.test()` calls Storybook 10.6.5 CsfFile indexes, member assignments and spreads, so what runs can differ from what the package reads. */
+  /** The file names the story outside its declaration, its export, the `.test()` calls Storybook 10.6.5 CsfFile indexes, member assignments and top-level spread copies that nothing writes through, so what runs can differ from what the package reads. */
   readonly referencedElsewhere: boolean;
   readonly assignments: readonly Assignment[];
   /** The writes that the story Storybook runs is composed from, with a factory story's `input` stripped from the path. */
@@ -416,10 +416,7 @@ export function namedExports(
 export function topLevelBindings(body: readonly unknown[]): Bindings {
   return new Map(
     body.flatMap((statement) => {
-      const declaration =
-        field(statement, 'type') === 'ExportNamedDeclaration'
-          ? field(statement, 'declaration')
-          : statement;
+      const declaration = declarationOf(statement);
       const functionName = field(declaration, 'id', 'name');
 
       if (
@@ -439,6 +436,12 @@ export function topLevelBindings(body: readonly unknown[]): Bindings {
       });
     }),
   );
+}
+
+function declarationOf(statement: unknown): unknown {
+  return field(statement, 'type') === 'ExportNamedDeclaration'
+    ? field(statement, 'declaration')
+    : statement;
 }
 
 const wrappers: readonly unknown[] = [
@@ -584,7 +587,7 @@ function testCallOf(statement: unknown): readonly TestCall[] {
     : [];
 }
 
-/** Storybook 10.6.5 CsfFile indexes a `B.test('name', ...)` statement that is a plain call with a string-literal name and two or more arguments. */
+/** Storybook 10.6.5 CsfFile indexes a `B.test('name', ...)` statement that is a plain call with a string-literal name and two or more arguments; this check also needs no spread argument, as only running the file tells which argument a spread fills. */
 function isIndexedTestCall(statement: unknown): boolean {
   const call = field(statement, 'expression');
   const args = list(field(call, 'arguments'));
@@ -593,15 +596,13 @@ function isIndexedTestCall(statement: unknown): boolean {
     field(call, 'type') === 'CallExpression' &&
     field(call, 'callee', 'property', 'name') === 'test' &&
     args.length >= 2 &&
-    field(args[0], 'type') === 'StringLiteral'
+    field(args[0], 'type') === 'StringLiteral' &&
+    !args.some((arg) => field(arg, 'type') === 'SpreadElement')
   );
 }
 
 function identifiersInReadForms(statement: unknown): readonly unknown[] {
-  const declaration =
-    field(statement, 'type') === 'ExportNamedDeclaration'
-      ? field(statement, 'declaration')
-      : statement;
+  const declaration = declarationOf(statement);
 
   return [
     field(declaration, 'id'),
@@ -618,6 +619,7 @@ function identifiersInReadForms(statement: unknown): readonly unknown[] {
     ...(field(statement, 'expression', 'operator') === '='
       ? [rootObject(field(statement, 'expression', 'left', 'object'))]
       : []),
+    ...spreadCopiesOf(statement).map(({ source }) => source),
   ];
 }
 
@@ -627,23 +629,64 @@ function rootObject(node: unknown): unknown {
     : node;
 }
 
-/** The names the file uses outside the forms the package reads, a spread excepted; a shadowing local or an object key counts too, as no scopes are resolved. */
+/** The names the file uses outside the forms the package reads, plus the sources of the spread copies the file writes through; a shadowing local or an object key counts too, as no scopes are resolved. */
 function namesReadElsewhere(body: readonly unknown[]): ReadonlySet<unknown> {
   const read = new Set(body.flatMap(identifiersInReadForms));
+  const referenced = identifiersIn(body)
+    .filter((identifier) => !read.has(identifier))
+    .map((identifier) => field(identifier, 'name'));
+  const copies = body
+    .flatMap(spreadCopiesOf)
+    .map(({ copy, source }) => ({ copy, source: field(source, 'name') }));
+  const written = withSpreadSources(
+    new Set([
+      ...referenced,
+      ...body.flatMap(assignmentOf).map(({ target }) => target),
+    ]),
+    copies,
+  );
 
-  return new Set(
-    identifiersIn(body)
-      .filter((identifier) => !read.has(identifier))
-      .map((identifier) => field(identifier, 'name')),
+  return new Set([
+    ...referenced,
+    ...copies
+      .filter(({ copy }) => written.has(copy))
+      .map(({ source }) => source),
+  ]);
+}
+
+function withSpreadSources(
+  names: ReadonlySet<unknown>,
+  copies: readonly SpreadCopy[],
+): ReadonlySet<unknown> {
+  const sources = copies
+    .filter(({ copy, source }) => names.has(copy) && !names.has(source))
+    .map(({ source }) => source);
+
+  return sources.length === 0
+    ? names
+    : withSpreadSources(new Set([...names, ...sources]), copies);
+}
+
+interface SpreadCopy {
+  readonly copy: unknown;
+  readonly source: unknown;
+}
+
+/** A top-level `const C = { ...A }` shares A's nested objects, so a write through C changes what A runs with. */
+function spreadCopiesOf(statement: unknown): readonly SpreadCopy[] {
+  return list(field(declarationOf(statement), 'declarations')).flatMap(
+    (declarator) =>
+      list(field(unwrap(field(declarator, 'init')), 'properties'))
+        .filter((property) => field(property, 'type') === 'SpreadElement')
+        .map((property) => ({
+          copy: field(declarator, 'id', 'name'),
+          source: field(property, 'argument'),
+        })),
   );
 }
 
 function identifiersIn(node: unknown): readonly unknown[] {
-  if (
-    !isRecord(node) ||
-    (node['type'] === 'SpreadElement' &&
-      field(node, 'argument', 'type') === 'Identifier')
-  ) {
+  if (!isRecord(node)) {
     return [];
   }
 
