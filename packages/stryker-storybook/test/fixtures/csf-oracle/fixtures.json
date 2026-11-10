@@ -1,0 +1,545 @@
+{
+  "source": {
+    "repository": "storybookjs/storybook",
+    "tag": "v10.6.5",
+    "files": [
+      "code/core/src/csf-tools/CsfFile.test.ts",
+      "code/core/src/csf-tools/vitest-plugin/transformer.test.ts"
+    ],
+    "license": "The MIT License (MIT)\n\nCopyright (c) 2024 Storybook\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in\nall copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN\nTHE SOFTWARE.\n"
+  },
+  "fixtures": [
+    {
+      "name": "CsfFile: CsfFile > basic > filters out non-story exports",
+      "code": "export default { title: 'foo/bar', excludeStories: ['invalidStory'] };\nexport const invalidStory = {};\nexport const validStory = {};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > filters out non-story exports #2",
+      "code": "export default { title: 'foo/bar', excludeStories: ['invalidStory'] };\nexport const invalidStory = {};\nexport const A = {}\nconst B = {};\nexport { B };\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > transforms inline default exports to constant declarations",
+      "code": "export default { title: 'foo/bar' };\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > exported const stories",
+      "code": "export default { title: 'foo/bar' };\nconst A = () => {};\nconst B = (args) => {};\nexport { A, B };\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > underscores",
+      "code": "export default { title: 'foo/bar' };\nexport const __Basic__ = () => {};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > exclude stories",
+      "code": "export default { title: 'foo/bar', excludeStories: ['B', 'C'] };\nexport const A = () => {};\nexport const B = (args) => {};\nexport const C = () => {};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > include stories",
+      "code": "export default { title: 'foo/bar', includeStories: ['IncludeA'] };\nexport const SomeHelper = () => {};\nexport const IncludeA = () => {};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > storyName annotation",
+      "code": "export default { title: 'foo/bar' };\nexport const A = () => {};\nA.storyName = 'Some story';\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > no title",
+      "code": "export default { component: 'foo' }\nexport const A = () => {};\nexport const B = () => {};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > custom component id",
+      "code": "export default { title: 'foo/bar', id: 'custom-id' };\nexport const A = () => {};\nexport const B = () => {};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > custom parameters.__id",
+      "code": "export default { title: 'foo/bar', id: 'custom-meta-id' };\nexport const JustCustomMetaId = {};\nexport const CustomParemetersId = { parameters: { __id: 'custom-id' } };\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > typescript",
+      "code": "import type { Meta, StoryFn } from '@storybook/react';\ntype PropTypes = {};\nexport default { title: 'foo/bar/baz' } as Meta<PropTypes>;\nexport const A: StoryFn<PropTypes> = () => <>A</>;\nexport const B: StoryFn<PropTypes> = () => <>B</>;\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > typescript satisfies",
+      "code": "import type { Meta, StoryFn, StoryObj } from '@storybook/react';\ntype PropTypes = {};\nexport default { title: 'foo/bar' } satisfies Meta<PropTypes>;\nexport const A = { name: 'AA' } satisfies StoryObj<PropTypes>;\nexport const B = ((args) => {}) satisfies StoryFn<PropTypes>;\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > typescript as",
+      "code": "import type { Meta, StoryFn, StoryObj } from '@storybook/react';\ntype PropTypes = {};\nexport default { title: 'foo/bar' } as Meta<PropTypes>;\nexport const A = { name: 'AA' } as StoryObj<PropTypes>;\nexport const B = ((args) => {}) as StoryFn<PropTypes>;\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > typescript satisfies as",
+      "code": "import type { Meta, StoryFn, StoryObj } from '@storybook/react';\ntype PropTypes = {};\nexport default { title: 'foo/bar' } satisfies Meta<PropTypes> as Meta<PropTypes>;\nexport const A = { name: 'AA' } satisfies StoryObj<PropTypes>;\nexport const B = ((args) => {}) satisfies StoryFn<PropTypes>;\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > typescript meta var",
+      "code": "import type { Meta, StoryFn } from '@storybook/react';\ntype PropTypes = {};\nconst meta = { title: 'foo/bar/baz' } as Meta<PropTypes>;\nexport default meta;\nexport const A: StoryFn<PropTypes> = () => <>A</>;\nexport const B: StoryFn<PropTypes> = () => <>B</>;\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > typescript satisfies meta var",
+      "code": "import type { Meta, StoryFn } from '@storybook/react';\ntype PropTypes = {};\nconst meta = { title: 'foo/bar/baz' } satisfies Meta<PropTypes>;\nexport default meta;\nexport const A: StoryFn<PropTypes> = () => <>A</>;\nexport const B: StoryFn<PropTypes> = () => <>B</>;\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > typescript satisfies as meta",
+      "code": "import type { Meta, StoryFn } from '@storybook/react';\ntype PropTypes = {};\nconst meta = { title: 'foo/bar/baz' } satisfies Meta<PropTypes> as Meta<PropTypes>;\nexport default meta;\nexport const A: StoryFn<PropTypes> = () => <>A</>;\nexport const B: StoryFn<PropTypes> = () => <>B</>;\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > typescript satisfies as stories",
+      "code": "import type { Meta, StoryFn, StoryObj } from '@storybook/react';\ntype PropTypes = {};\nexport default { title: 'foo/bar' } as Meta<PropTypes>;\nexport const A = { name: 'AA' } satisfies StoryObj<PropTypes> as StoryObj<PropTypes>;\nexport const B = ((args) => {}) satisfies StoryFn<PropTypes> as StoryFn<PropTypes>;\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > typescript satisfies as export specifier",
+      "code": "import type { Meta, StoryFn } from '@storybook/react';\ntype PropTypes = {};\nconst meta = { title: 'foo/bar/baz' } satisfies Meta<PropTypes> as Meta<PropTypes>;\nconst story1 = { name: 'Story A' };\nconst story2 = { name: 'Story B' };\nexport { meta as default, story1 as A, story2 as 'あ' };\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > component object",
+      "code": "export default { component: {} }\nexport const A = () => {};\nexport const B = () => {};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > template bind",
+      "code": "export default { title: 'foo/bar' };\nconst Template = (args) => { };\nexport const A = Template.bind({});\nA.args = { x: 1 };\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > meta variable",
+      "code": "const meta = { title: 'foo/bar' };\nexport default meta;\nexport const A = () => {}\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > docs-only story",
+      "code": "export default { title: 'foo/bar' };\nexport const __page = () => {};\n__page.parameters = { docsOnly: true };\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > docs-only story with local vars",
+      "code": "export const TestControl = () => _jsx(\"p\", {\n  children: \"Hello\"\n});\nexport default { title: 'foo/bar', includeStories: [\"__page\"] };\nexport const __page = () => {};\n__page.parameters = { docsOnly: true };\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > title variable",
+      "code": "const title = 'foo/bar';\nexport default { title };\nexport const A = () => {};\nexport const B = (args) => {};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > re-exported stories",
+      "code": "export default { title: 'foo/bar' };\nexport { default as A } from './A';\nexport { B } from './B';\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > named exports order",
+      "code": "export default { title: 'foo/bar' };\nexport const A = () => {};\nexport const B = (args) => {};\nexport const __namedExportsOrder = ['B', 'A'];\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > as default export",
+      "code": "const meta = { title: 'foo/bar' };\nexport const A = () => {};\nexport {\n  meta as default,\n  A\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > basic > support for parameter decorators",
+      "code": "import { Component, Input, Output, EventEmitter, Inject, HostBinding } from '@angular/core';\nimport { CHIP_COLOR } from './chip-color.token';\n\n@Component({\n  selector: 'storybook-chip',\n})\nexport class ChipComponent {\n  // The error occurs on the Inject decorator used on a parameter\n  constructor(@Inject(CHIP_COLOR) chipColor: string) {\n    this.backgroundColor = chipColor;\n  }\n}\n\nexport default {\n  title: 'Chip',\n}\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > error handling > no meta",
+      "code": "export const A = () => {};\nexport const B = () => {};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > error handling > bad meta",
+      "code": "const foo = bar();\nexport default foo;\nexport const A = () => {};\nexport const B = () => {};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > error handling > no metadata",
+      "code": "export default { foo: '5' };\nexport const A = () => {};\nexport const B = () => {};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > error handling > dynamic titles",
+      "code": "export default { title: 'foo' + 'bar' };\nexport const A = () => {};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > error handling > storiesOf calls",
+      "code": "import { storiesOf } from '@storybook/react';\nexport default { title: 'foo/bar' };\nexport const A = () => {};\nstoriesOf('foo').add('bar', () => <baz />);\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > error handling > function exports",
+      "code": "export default { title: 'foo/bar' };\nexport function A() {}\nexport function B() {}\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > indexed annotations > meta annotations",
+      "code": "export default { title: 'foo/bar', x: 1, y: 2 };\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > indexed annotations > story annotations",
+      "code": "export default { title: 'foo/bar' };\nexport const A = () => {};\nA.x = 1;\nA.y = 2;\nexport const B = () => {};\nB.z = 3;\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > indexed annotations > v1-style story annotations",
+      "code": "export default { title: 'foo/bar' };\nexport const A = () => {};\nA.story = {\n  x: 1,\n  y: 2,\n}\nexport const B = () => {};\nB.story = {\n  z: 3,\n}\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > CSF3 > Object export with no-args render",
+      "code": "export default { title: 'foo/bar' };\nexport const A = {\n  render: () => {}\n}\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > CSF3 > Object export with args render",
+      "code": "export default { title: 'foo/bar' };\nexport const A = {\n  render: (args) => {}\n}\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > CSF3 > Object export with args render method",
+      "code": "export default { title: 'foo/bar' };\nexport const A = {\n  render(args) {}\n}\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > CSF3 > Object export with default render",
+      "code": "export default { title: 'foo/bar' };\nexport const A = {}\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > CSF3 > Object export with name",
+      "code": "export default { title: 'foo/bar' };\nexport const A = {\n  name: 'Apple'\n}\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > CSF3 > Object export with storyName",
+      "code": "export default { title: 'foo/bar' };\nexport const A = {\n  storyName: 'Apple'\n}\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > import handling > imports",
+      "code": "import Button from './Button';\nimport { Check } from './Check';\nexport default { title: 'foo/bar', x: 1, y: 2 };\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > import handling #2",
+      "code": "const Button = await import('./Button');\nexport default { title: 'foo/bar', x: 1, y: 2 };\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > import handling #3",
+      "code": "const Button = require('./Button');\nexport default { title: 'foo/bar', x: 1, y: 2 };\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > tags > csf2",
+      "code": "export default { title: 'foo/bar', tags: ['X'] };\nexport const A = () => {};\nA.tags = ['Y'];\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > tags > csf3",
+      "code": "export default { title: 'foo/bar', tags: ['X'] };\nexport const A = {\n  render: () => {},\n  tags: ['Y'],\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > tags > csf3 as renamed export",
+      "code": "export default { title: 'foo/bar', tags: ['X'] };\n\nconst localName = {\n  render: () => {},\n  tags: ['Y']\n};\nexport {\n  localName as exportedName,\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > tags > variables",
+      "code": "const x = ['X'];\nconst y = ['Y'];\nexport default { title: 'foo/bar', tags: x };\nexport const A = {\n  render: () => {},\n  tags: y,\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > tags > array error",
+      "code": "export default { title: 'foo/bar', tags: 'X' };\nexport const A = {\n  render: () => {},\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > tags > array element handling",
+      "code": "export default { title: 'foo/bar', tags: [10] };\nexport const A = {\n  render: () => {},\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > play functions > story csf2",
+      "code": "export default { title: 'foo/bar', tags: ['X'] };\nexport const A = () => {};\nA.play = () => {};\nA.tags = ['Y'];\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > play functions > story csf3",
+      "code": "export default { title: 'foo/bar', tags: ['X'] };\nexport const A = {\n  render: () => {},\n  play: () => {},\n  tags: ['Y'],\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > play functions > play method",
+      "code": "export default { title: 'foo/bar' };\nexport const A = {\n  play({ context }) {},\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > play functions > meta play method",
+      "code": "export default { title: 'foo/bar', play({ context }) {} };\nexport const A = {};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > play functions > mount",
+      "code": "export default { title: 'foo/bar' };\nexport const A = {\n  play: ({ mount }) => {},\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > play functions > mount renamed",
+      "code": "export default { title: 'foo/bar' };\nexport const A = {\n  play: ({ mount: mountRenamed, context }) => {},\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > play functions > mount in method",
+      "code": "export default { title: 'foo/bar' };\nexport const A = {\n  play({ mount, context }) {},\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > play functions > mount meta",
+      "code": "export default {\n  title: 'foo/bar',\n  play: ({ context, mount: mountRenamed }) => {},\n};\nexport const A = {};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > play functions > meta csf2",
+      "code": "export default { title: 'foo/bar', play: () => {}, tags: ['X'] };\nexport const A = {\n  render: () => {},\n  loaders: [],\n  tags: ['Y'],\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > play functions > meta csf3",
+      "code": "export default { title: 'foo/bar', play: () => {}, tags: ['X'] };\nexport const A = () => {};\nA.tags = ['Y'];\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > index inputs > generates index inputs",
+      "code": "export default {\n  id: 'component-id',\n  title: 'custom foo title',\n  tags: ['component-tag']\n};\n\nexport const A = {\n  play: () => {},\n  tags: ['story-tag'],\n};\n\nexport const B = {\n  play: () => {},\n  tags: ['story-tag'],\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > index inputs > supports custom parameters.__id",
+      "code": "export default {\n  id: 'component-id',\n  title: 'custom foo title',\n  tags: ['component-tag']\n};\n\nexport const A = {\n  parameters: { __id: 'custom-story-id' }\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > index inputs > removes duplicate tags",
+      "code": "export default {\n  title: 'custom foo title',\n  tags: ['component-tag', 'component-tag-dup', 'component-tag-dup', 'inherit-tag-dup']\n};\n\nexport const A = {\n  tags: ['story-tag', 'story-tag-dup', 'story-tag-dup', 'inherit-tag-dup']\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > index inputs > throws if getting indexInputs without filename option",
+      "code": "export default {\n  title: 'custom foo title',\n  tags: ['component-tag', 'component-tag-dup', 'component-tag-dup', 'inherit-tag-dup']\n};\n\nexport const A = {\n  tags: ['story-tag', 'story-tag-dup', 'story-tag-dup', 'inherit-tag-dup']\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > component paths > no component",
+      "code": "import { Component } from '../src/Component.js';\nexport default {\n  title: 'custom foo title',\n};\n\nexport const A = {\n  render: () => {},\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > component paths > local component",
+      "code": "const Component = (props) => <div>hello</div>;\n\nexport default {\n  title: 'custom foo title',\n  component: Component,\n};\n\nexport const A = {\n  render: () => {},\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > component paths > imported component from file",
+      "code": "import { Component } from '../src/Component.js';\nexport default {\n  title: 'custom foo title',\n  component: Component,\n};\n\nexport const A = {\n  render: () => {},\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > component paths > imported component from library",
+      "code": "import { Component } from 'some-library';\nexport default {\n  title: 'custom foo title',\n  component: Component,\n};\n\nexport const A = {\n  render: () => {},\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > beforeEach > basic",
+      "code": "export default { title: 'foo/bar' };\nexport const A = {\n  beforeEach: async () => {},\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > globals > basic",
+      "code": "export default { title: 'foo/bar' };\nexport const A = {\n  globals: { foo: 'bar' }\n};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > module mocks > alias",
+      "code": "import foo from '#bar.mock';\nexport default { title: 'foo/bar' };\nexport const A = {};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > module mocks > relative",
+      "code": "import foo from './bar.mock';\nexport default { title: 'foo/bar' };\nexport const A = {};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > normal > meta variable",
+      "code": "import { config } from '#.storybook/preview'\nconst meta = config.meta({ component: 'foo' });\nexport const A = meta.story({})\nexport const B = meta.story({})\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > normal > meta variable with renamed factory",
+      "code": "import { boo as moo } from '#.storybook/preview'\nconst meta = moo.meta({ component: 'foo' });\nexport const A = meta.story({})\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > normal > meta default export",
+      "code": "import { config } from '#.storybook/preview'\nconst meta = config.meta({ component: 'foo' });\nexport default meta;\nexport const A = meta.story({})\nexport const B = meta.story({})\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > normal > extend story",
+      "code": "import { config } from '#.storybook/preview'\nconst meta = config.meta({ component: 'foo' });\nexport default meta;\nexport const A = meta.story({})\nexport const B = A.extend({})\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > normal > story test - index snapshot",
+      "code": "import { config } from '#.storybook/preview'\nconst meta = config.meta({ component: 'foo' });\nexport default meta;\nexport const A = meta.story({ args: { label: 'foo' } })\nA.test('simple test', async () => {})\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > normal > story test - parsing",
+      "code": "import { config } from '#.storybook/preview'\nconst meta = config.meta({ component: 'foo' });\nexport default meta;\nexport const A = meta.story({ args: { label: 'foo' } })\nA.test('simple test', async () => {})\nA.test('with overrides', { args: { label: 'bar' } }, async () => {})\nconst runTest = () => {}\nA.test('with function reference', runTest)\nA.test('with function call', runTest())\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > normal > story name",
+      "code": "import { config } from '#.storybook/preview'\nconst meta = config.meta({ component: 'foo' });\nexport const A = meta.story({ name: 'bar'})\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > normal > Object export with no-args render",
+      "code": "import { config } from '#.storybook/preview'\nconst meta = config.meta({ title: 'foo/bar' });\nexport const A = meta.story({\n  render: () => {}\n})\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > normal > Object export with args render",
+      "code": "import { config } from '#.storybook/preview'\nconst meta = config.meta({ title: 'foo/bar' });\nexport const A = meta.story({\n  render: (args) => {}\n});\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > normal > meta variable with .type() chaining",
+      "code": "import { config } from '#.storybook/preview'\nconst meta = config.type<{ args: { label: string } }>().meta({ component: 'foo' });\nexport const A = meta.story({})\nexport const B = meta.story({})\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > errors > multiple meta variables",
+      "code": "import { config } from '#.storybook/preview'\nconst foo = config.meta({ component: 'foo' });\nexport const A = foo.story({})\nconst bar = config.meta({ component: 'bar' });\nexport const B = bar.story({})\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > errors > default export and meta",
+      "code": "import { config } from '#.storybook/preview'\nexport default { title: 'atoms/foo' };\nconst meta = config.meta({ component: 'foo' });\nexport const A = meta.story({})\nexport const B = meta.story({})\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > errors > meta and default export",
+      "code": "import { config } from '#.storybook/preview'\nconst meta = config.meta({ component: 'foo' });\nexport default { title: 'atoms/foo' };\nexport const A = meta.story({})\nexport const B = meta.story({})\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > errors > bad preview import",
+      "code": "import { preview } from '#.storybook/bad-preview'\nconst meta = preview.meta({ component: 'foo' });\nexport const A = meta.story({})\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > errors > local defineConfig",
+      "code": "import { defineConfig } from '@storybook/react/preview';\nconst config = defineConfig({ });\nconst meta = config.meta({ component: 'foo' });\nexport const A = meta.story({})\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > errors > skips non-factory exports in factory files",
+      "code": "import { config } from '#.storybook/preview'\nconst meta = config.meta({ component: 'foo' });\nexport const A = meta.story({})\nexport const B = {}\nexport const someHelper = () => {}\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > errors > excludeStories still works with factories",
+      "code": "import { config } from '#.storybook/preview'\nconst meta = config.meta({ component: 'foo', excludeStories: ['B'] });\nexport const A = meta.story({})\nexport const B = meta.story({})\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > errors > factory stories in non-factory file",
+      "code": "import { meta } from 'somewhere';\nexport default { title: 'atoms/foo' };\nexport const A = {}\nexport const B = meta.story({})\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > errors > ignores unrelated .meta() calls on imported variables (e.g., Zod v4)",
+      "code": "import { mySchema } from './schemas';\n\nconst validatedSchema = mySchema.meta({ description: 'Value' });\n\nexport default {\n  title: 'Example',\n  component: () => null,\n};\n\nexport const Default = {};\n"
+    },
+    {
+      "name": "CsfFile: CsfFile > csf factories > errors > ignores chained .meta() calls from libraries like Zod",
+      "code": "import { z } from 'zod';\nimport { mySchema } from './schemas';\n\nconst workingSchema = z.object({\n  name: z.string().meta({ description: 'Name' }),\n});\n\nconst failingSchema = z.object({\n  value: mySchema.meta({ description: 'Value' }),\n});\n\nexport default {\n  title: 'Example',\n  component: () => null,\n};\n\nexport const Default = {};\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > default exports (meta) > should add title to inline default export if not present",
+      "code": "export default {\n  component: Button,\n};\nexport const Story = {};\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > default exports (meta) > should overwrite title to inline default export if already present",
+      "code": "export default {\n  title: 'Button',\n  component: Button,\n};\nexport const Story = {};\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > default exports (meta) > should add title to const declared default export if not present",
+      "code": "const meta = {\n  component: Button,\n};\nexport default meta;\n\nexport const Story = {};\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > default exports (meta) > should overwrite title to const declared default export if already present",
+      "code": "const meta = {\n  title: 'Button',\n  component: Button,\n};\nexport default meta;\n\nexport const Story = {};\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > named exports (stories) > should add test statement to inline exported stories",
+      "code": "export default {\n  component: Button,\n}\nexport const Primary = {\n  args: {\n    label: 'Primary Button',\n  },\n};\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > named exports (stories) > use the story's name as test title > should support CSF v3 via name property",
+      "code": "export default { component: Button }\nexport const Primary = { name: \"custom name\" };\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > named exports (stories) > use the story's name as test title > should support CSF v1/v2 via storyName property",
+      "code": "export default { component: Button }\nexport const Story = () => {}\nStory.storyName = 'custom name';\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > named exports (stories) > should add test statement to const declared exported stories",
+      "code": "export default {};\nconst Primary = {\n  args: {\n    label: 'Primary Button',\n  },\n};\n\nexport { Primary };\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > named exports (stories) > should add test statement to const declared renamed exported stories",
+      "code": "export default {};\nconst Primary = {\n  args: {\n    label: 'Primary Button',\n  },\n};\n\nexport { Primary as PrimaryStory };\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > named exports (stories) > should add tests for multiple stories",
+      "code": "export default {};\nconst Primary = {\n  args: {\n    label: 'Primary Button',\n  },\n};\n\nexport const Secondary = {}\n\nexport { Primary };\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > named exports (stories) > should exclude exports via excludeStories",
+      "code": "export default {\n  title: 'Button',\n  component: Button,\n  excludeStories: ['nonStory'],\n}\nexport const Story = {};\nexport const nonStory = 123\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > named exports (stories) > should return a describe with skip if there are no valid stories",
+      "code": "export default {\n  title: 'Button',\n  component: Button,\n  tags: ['!test']\n}\nexport const Story = {}\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > tags filtering mechanism > should only include stories from tags.include",
+      "code": "export default {};\nexport const Included = { tags: ['include-me'] };\n\nexport const NotIncluded = {}\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > tags filtering mechanism > should exclude stories from tags.exclude",
+      "code": "export default {};\nexport const Included = {};\n\nexport const NotIncluded = { tags: ['exclude-me'] }\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > tags filtering mechanism > should pass skip tags to testStory call using tags.skip",
+      "code": "export default {};\nexport const Skipped = { tags: ['skip-me'] };\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > tags filtering mechanism > should pass skip tags to child .test() calls using tags.skip",
+      "code": "export default {};\nexport const Primary = {};\nPrimary.test(\"runs\", () => {});\nPrimary.test(\"skipped\", { tags: ['skip-me'] }, () => {});\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > component info extraction > should extract component name from named import specifier",
+      "code": "import { Button } from './Button';\nexport default {\n  component: Button,\n}\nexport const Primary = {};\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > component info extraction > should extract component name from default import specifier",
+      "code": "import Button from './Button';\nexport default {\n  component: Button,\n}\nexport const Primary = {};\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > component info extraction > should extract component name from aliased import specifier",
+      "code": "import { Component as Button } from './Button';\nexport default {\n  component: Button,\n}\nexport const Primary = {};\n"
+    },
+    {
+      "name": "transformer: transformer > CSF v1/v2/v3 > source map calculation > should remap the location of an inline named export to its relative testStory function",
+      "code": "const meta = {\n  title: 'Button',\n  component: Button,\n}\nexport default meta;\nexport const Primary = {};\n"
+    },
+    {
+      "name": "transformer: transformer > CSF Factories > default exports (meta) > should add title to inline default export if not present",
+      "code": "import { config } from '#.storybook/preview';\nconst meta = config.meta({ component: Button });\nexport const Story = meta.story({});\n"
+    },
+    {
+      "name": "transformer: transformer > CSF Factories > named exports (stories) > should use the story's name as test title",
+      "code": "import { config } from '#.storybook/preview';\nconst meta = config.meta({ component: Button });\nexport const Primary = meta.story({ name: \"custom name\" });\n"
+    },
+    {
+      "name": "transformer: transformer > CSF Factories > named exports (stories) > should add test statement to const declared exported stories",
+      "code": "import { config } from '#.storybook/preview';\nconst meta = config.meta({ component: Button });\nconst Primary = meta.story({\n  args: {\n    label: 'Primary Button',\n  }\n});\n\nexport { Primary };\n"
+    },
+    {
+      "name": "transformer: transformer > CSF Factories > named exports (stories) > should add test statement to const declared renamed exported stories",
+      "code": "import { config } from '#.storybook/preview';\nconst meta = config.meta({ component: Button });\nconst Primary = meta.story({\n  args: {\n    label: 'Primary Button',\n  }\n});\n\nexport { Primary as PrimaryStory };\n"
+    },
+    {
+      "name": "transformer: transformer > CSF Factories > named exports (stories) > should add tests for multiple stories",
+      "code": "export default {};\nconst Primary = {\n  args: {\n    label: 'Primary Button',\n  },\n};\n\nexport const Secondary = {}\n\nexport { Primary };\n"
+    },
+    {
+      "name": "transformer: transformer > CSF Factories > named exports (stories) > should exclude exports via excludeStories",
+      "code": "export default {\n  title: 'Button',\n  component: Button,\n  excludeStories: ['nonStory'],\n}\nexport const Story = {};\nexport const nonStory = 123\n"
+    },
+    {
+      "name": "transformer: transformer > CSF Factories > named exports (stories) > should return a describe with skip if there are no valid stories",
+      "code": "export default {\n  title: 'Button',\n  component: Button,\n  tags: ['!test']\n}\nexport const Story = {}\n"
+    },
+    {
+      "name": "transformer: transformer > CSF Factories > named exports (stories) > should support test annotation",
+      "code": "import { config } from '#.storybook/preview';\nconst meta = config.meta({ component: Button });\nexport const A = meta.story({});\nA.test(\"foo\", { args: { primary: true }}, () => {});\nA.test(\"bar\", () => {});\n"
+    },
+    {
+      "name": "transformer: transformer > CSF Factories > test syntax > should add test statement to story tests",
+      "code": "import { config } from '#.storybook/preview';\nconst meta = config.meta({});\nexport const Primary = meta.story({});\nPrimary.test(\"foo\", () => {});\n"
+    },
+    {
+      "name": "transformer: transformer > CSF Factories > tags filtering mechanism > should only include stories from tags.include",
+      "code": "import { config } from '#.storybook/preview';\nconst meta = config.meta({});\nexport const Included = meta.story({ tags: ['include-me'] });\n\nexport const NotIncluded = meta.story({});\n"
+    },
+    {
+      "name": "transformer: transformer > CSF Factories > tags filtering mechanism > should exclude stories from tags.exclude",
+      "code": "import { config } from '#.storybook/preview';\nconst meta = config.meta({});\nexport const Included = meta.story({});\n\nexport const NotIncluded = meta.story({ tags: ['exclude-me'] });\n"
+    },
+    {
+      "name": "transformer: transformer > CSF Factories > tags filtering mechanism > should pass skip tags to testStory call using tags.skip",
+      "code": "import { config } from '#.storybook/preview';\nconst meta = config.meta({});\nexport const Skipped = meta.story({ tags: ['skip-me'] });\n"
+    },
+    {
+      "name": "transformer: transformer > CSF Factories > tags filtering mechanism > should pass skip tags to child .test() calls using tags.skip",
+      "code": "import { config } from '#.storybook/preview';\nconst meta = config.meta({});\nexport const Primary = meta.story({});\nPrimary.test(\"runs\", () => {});\nPrimary.test(\"skipped\", { tags: ['skip-me'] }, () => {});\n"
+    },
+    {
+      "name": "transformer: transformer > CSF Factories > source map calculation > should remap the location of an inline named export to its relative testStory function",
+      "code": "import { config } from '#.storybook/preview';\nconst meta = config.meta({});\nexport const Primary = meta.story({});\nPrimary.test(\"foo\", () => {});\n"
+    },
+    {
+      "name": "transformer: transformer > CSF Factories > source map calculation #2",
+      "code": "import { config } from '#.storybook/preview';\nconst meta = config.meta({});\nexport const Primary = meta.story({});\nPrimary.test(\"foo\", () => {});\n"
+    },
+    {
+      "name": "transformer: transformer > error handling > should warn when autotitle is not successful",
+      "code": "export default {}\nexport const Primary = {};\n"
+    },
+    {
+      "name": "transformer: transformer > error handling > should warn when on unsupported story formats",
+      "code": "export default {}\nexport { Primary } from './Button.stories';\n"
+    }
+  ]
+}
