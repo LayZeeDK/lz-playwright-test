@@ -375,6 +375,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('places a value given to X.play by a compound assignment', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nA.play ??= 1 + 1;",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      ['3 AssignmentOperator placed', '3 ArithmeticOperator placed'],
+    );
+  });
+
   it('places a play function assigned to this.play after this.story', async () => {
     const { outcomes } = setup();
 

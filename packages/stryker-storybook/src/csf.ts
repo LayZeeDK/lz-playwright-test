@@ -361,7 +361,7 @@ export function assignmentOf(statement: unknown): readonly Assignment[] {
   );
 
   if (
-    field(statement, 'expression', 'type') !== 'AssignmentExpression' ||
+    field(statement, 'expression', 'operator') !== '=' ||
     typeof target !== 'string'
   ) {
     return [];
