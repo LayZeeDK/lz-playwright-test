@@ -969,6 +969,13 @@ moves add cases for the behaviour being driven, not the cases where the upstream
 test in hand. Neither prompts the worker, when porting an upstream rule, to put the upstream's negative tests into the
 test list. Evidence: `g1r3fix/cycles.log` cycles 2 and 5, and `g1r3fix/gate-b.log`.
 
+**O131. A pin that finds an unpinned branch leaves the refactor step two choices that both change behaviour.** In the
+fourth review fixes for the spy-stub path, item 5 renamed a helper. Forcing off one of its branches (a member-callee
+`x.definePreview()`) left all 436 tests green. Adding a test-after pin has no place in `lz-refactor` (O129). Deleting
+the branch changes behaviour for inputs no test names, so it is not a refactoring, and `lz-tpp` has no red to attach it
+to. The worker deleted the branch and reported the behaviour change. Neither skill names that choice or says who makes
+it. Evidence: `g1r4fix/cycles.log`, the item 5 line.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
