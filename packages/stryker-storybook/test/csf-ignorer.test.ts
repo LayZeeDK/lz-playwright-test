@@ -438,6 +438,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('ignores the statement of a .test() call', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nA.test('name', async () => {\n  await x(1 + 1);\n});",
+        )
+      ).filter((outcome) => outcome.startsWith('3 CallExpression')),
+      [`3 CallExpression ${testReason}`],
+    );
+  });
+
   it("ignores a story's beforeEach", async () => {
     const { outcomes } = setup();
 
@@ -724,8 +737,8 @@ describe('lz-storybook-csf', () => {
     );
   });
 
-  it('keeps the name of a .test() call as written', async () => {
-    const { outcomes } = setup();
+  it("keeps the name of a .test() call as written in 'mutate' mode", async () => {
+    const { outcomes } = setup('mutate');
 
     assert.deepEqual(
       (
@@ -737,8 +750,8 @@ describe('lz-storybook-csf', () => {
     );
   });
 
-  it('keeps the tags in the options of a .test() call as written', async () => {
-    const { outcomes } = setup();
+  it("keeps the tags in the options of a .test() call as written in 'mutate' mode", async () => {
+    const { outcomes } = setup('mutate');
 
     assert.deepEqual(
       (

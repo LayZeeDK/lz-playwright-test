@@ -79,7 +79,7 @@ export function csfShapes(program: unknown): CsfShapes {
       ...body.flatMap((statement) =>
         testKeys.flatMap((key) => assigned(statement, key)),
       ),
-      ...testCalls.map((testArgs) => testArgs.at(-1)),
+      ...body.filter((statement) => testArguments(statement).length > 0),
     ]),
     mswValues: new Set(
       [
