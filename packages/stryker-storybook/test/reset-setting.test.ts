@@ -1296,6 +1296,20 @@ export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
     assert.deepEqual(verdicts, ['erased']);
   });
 
+  it('keeps a factory story with a tag that skip names when its second of two differently named .test() calls negates that tag', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ tags: ['slow'], parameters: { test: { mockReset: true } } });
+A.test('first', async () => undefined);
+A.test('second', { tags: ['!slow'] }, async () => undefined);
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
   it('reads a factory story as unknown when a .test() call sets parameters and the story itself runs', () => {
     const verdicts = verdictsOf(
       `import preview from '../.storybook/preview';

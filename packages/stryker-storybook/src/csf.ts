@@ -263,9 +263,7 @@ function storyExports(
         local,
         init,
         children: isStoryFactoryCall(unwrap(init))
-          ? testNames(name).map((testName, _, rows) =>
-              childOf(testName, rows, storyCalls),
-            )
+          ? testNames(name).map((testName) => childOf(testName, storyCalls))
           : [],
         tested:
           form === 'declaration' ||
@@ -299,27 +297,13 @@ export interface StoryExport {
 /** The options argument of the `.test()` call an index row names, `undefined` for a call without one, or `'unmatched'` when that call cannot be told. */
 export type TestChild = { readonly options: unknown } | 'unmatched';
 
-/** Storybook 10.6.5 test-utils.ts `testStory` runs the first child that has the row's name, which a call named other than by a string literal, or a call CsfFile indexes below the top level, may have. */
-function childOf(
-  testName: unknown,
-  rows: readonly unknown[],
-  calls: readonly TestCall[],
-): TestChild {
-  const call = calls.find(({ args: [name] }) => {
-    const value = field(name, 'value');
-
-    return typeof value !== 'string' || value === testName;
-  });
-  const namedCalls = calls.filter(
+/** Storybook 10.6.5 test-utils.ts `testStory` runs the first child that has the row's name. */
+function childOf(testName: unknown, calls: readonly TestCall[]): TestChild {
+  const call = calls.find(
     ({ args: [name] }) => field(name, 'value') === testName,
   );
 
-  if (
-    typeof testName !== 'string' ||
-    rows.filter((row) => row === testName).length !== namedCalls.length ||
-    call === undefined ||
-    field(call.args[0], 'value') !== testName
-  ) {
+  if (call === undefined) {
     return 'unmatched';
   }
 
