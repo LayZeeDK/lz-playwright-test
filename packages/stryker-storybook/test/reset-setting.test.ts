@@ -1109,6 +1109,32 @@ export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
     assert.deepEqual(verdicts, ['unknown']);
   });
 
+  it('reads a factory story as unknown when a .test() call sets parameters and the story itself runs', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({});
+A.test('resets', { parameters: { test: { mockReset: true } } }, async () => undefined);
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a factory story without a tag that skip names as unknown when the options of its .test() call cannot be read', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+import { fast } from './options';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({});
+A.test('runs', fast, async () => undefined);
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
   it('reads a story as unknown when skip is set and its run-time tags cannot be read', () => {
     const verdicts = verdictsOf(
       `import preview from '../.storybook/preview';

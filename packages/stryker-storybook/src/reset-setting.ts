@@ -203,7 +203,7 @@ export function classifyStubs(
   return { stories, stubs };
 }
 
-/** Storybook 10.6.5 runs each `.test()` call on a factory story as a test of its own, so one of them can run when the story's own test is skipped. */
+/** Storybook 10.6.5 runs each `.test()` call on a factory story as a test of its own, so one of them can run when the story's own test is skipped, and with parameters of its own. */
 function storySkipped(
   testTags: TestTags,
   metaTags: unknown,
@@ -211,11 +211,6 @@ function storySkipped(
   testOptions: readonly unknown[],
 ): boolean | 'unknown' {
   const base = skipped(testTags, metaTags, member(story, 'tags'));
-
-  if (base !== true) {
-    return base;
-  }
-
   const children = testOptions.map((options) => {
     const child = skipped(
       testTags,
@@ -228,9 +223,11 @@ function storySkipped(
       : child;
   });
 
-  return children.includes('unknown')
-    ? 'unknown'
-    : children.every((child) => child === true);
+  if (children.includes('unknown')) {
+    return 'unknown';
+  }
+
+  return base === true ? children.every((child) => child === true) : base;
 }
 
 /** Storybook 10.6.5 test-utils.ts `testStory` checks skip tags on the tags prepareStory.ts composes at run time, which hold no play-fn. */
