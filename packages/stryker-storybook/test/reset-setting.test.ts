@@ -223,6 +223,19 @@ export { A };`,
 
     assert.deepEqual(verdicts, ['erased']);
   });
+
+  it('leaves an export that excludeStories matches out of the stories', () => {
+    const verdicts = verdictsOf(
+      `export default {
+  excludeStories: /.*Data$/,
+  parameters: { test: { restoreMocks: false } },
+};
+export const TasksData = [{ id: '1' }];
+export const A = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
 });
 
 describe('classifyStubs', () => {

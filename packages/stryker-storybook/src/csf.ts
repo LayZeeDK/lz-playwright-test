@@ -25,42 +25,20 @@ const staticKeys = [
 export function csfShapes(program: unknown): CsfShapes {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
-  const declaration = field(
-    body.find(
-      (statement) => field(statement, 'type') === 'ExportDefaultDeclaration',
-    ),
-    'declaration',
-  );
   const specifiers = body.flatMap((statement) =>
     list(field(statement, 'specifiers')),
   );
-  const defaultSpecifier = specifiers.find(
-    (specifier) => field(specifier, 'exported', 'name') === 'default',
-  );
-  const metaObjects = [
-    ...objectOf(declaration ?? field(defaultSpecifier, 'local'), bindings),
-    ...[...bindings.values()]
-      .filter((init) => field(init, 'callee', 'property', 'name') === 'meta')
-      .map((init) => list(field(init, 'arguments'))[0]),
-  ];
-
-  const [includeStories, excludeStories] = [
-    'includeStories',
-    'excludeStories',
-  ].map((key) =>
-    metaObjects
-      .map((meta) => propertyValue(meta, key))
-      .find((value) => value !== undefined),
-  );
+  const metaObjects = metaObjectsOf(body, bindings);
+  const isStory = storyFilter(metaObjects);
   const storyExports = [
-    ...namedExports(program),
+    ...namedExports(body, bindings),
     ...body.flatMap((statement) =>
       assigned(statement, 'story').map((init) => ({
         name: field(statement, 'expression', 'left', 'object', 'name'),
         init,
       })),
     ),
-  ].filter(({ name }) => isExportStory(name, includeStories, excludeStories));
+  ].filter(({ name }) => isStory(name));
   const storyNames = storyExports.map(({ name }) => name);
   const stories = storyExports
     .map(({ init }) => storyNode(unwrap(init), bindings))
@@ -143,15 +121,61 @@ function nodeSet(values: readonly unknown[]): ReadonlySet<unknown> {
   return new Set(values.filter((value) => value !== undefined));
 }
 
+function metaObjectsOf(
+  body: readonly unknown[],
+  bindings: Bindings,
+): readonly unknown[] {
+  const declaration = field(
+    body.find(
+      (statement) => field(statement, 'type') === 'ExportDefaultDeclaration',
+    ),
+    'declaration',
+  );
+  const defaultSpecifier = body
+    .flatMap((statement) => list(field(statement, 'specifiers')))
+    .find((specifier) => field(specifier, 'exported', 'name') === 'default');
+
+  return [
+    ...objectOf(declaration ?? field(defaultSpecifier, 'local'), bindings),
+    ...[...bindings.values()]
+      .filter((init) => field(init, 'callee', 'property', 'name') === 'meta')
+      .map((init) => list(field(init, 'arguments'))[0]),
+  ];
+}
+
+function storyFilter(
+  metaObjects: readonly unknown[],
+): (name: unknown) => boolean {
+  const [includeStories, excludeStories] = [
+    'includeStories',
+    'excludeStories',
+  ].map((key) =>
+    metaObjects
+      .map((meta) => propertyValue(meta, key))
+      .find((value) => value !== undefined),
+  );
+
+  return (name) => isExportStory(name, includeStories, excludeStories);
+}
+
+export function storyExports(
+  body: readonly unknown[],
+  bindings: Bindings,
+): readonly NamedExport[] {
+  const isStory = storyFilter(metaObjectsOf(body, bindings));
+
+  return namedExports(body, bindings).filter(({ name }) => isStory(name));
+}
+
 export interface NamedExport {
   readonly name: string;
   readonly init: unknown;
 }
 
-export function namedExports(program: unknown): readonly NamedExport[] {
-  const body = list(field(program, 'body'));
-  const bindings = topLevelBindings(body);
-
+export function namedExports(
+  body: readonly unknown[],
+  bindings: Bindings,
+): readonly NamedExport[] {
   return body
     .filter(
       (statement) => field(statement, 'type') === 'ExportNamedDeclaration',

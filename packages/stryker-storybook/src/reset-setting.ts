@@ -1,4 +1,4 @@
-import { namedExports, topLevelBindings, unwrap } from './csf.ts';
+import { namedExports, storyExports, topLevelBindings, unwrap } from './csf.ts';
 import { isRecord } from './is-record.ts';
 import { field, list } from './node-field.ts';
 import { definitionTimeStubs } from './stub-shape.ts';
@@ -42,7 +42,7 @@ export function readPreviewTest(program: unknown): ResetSettings {
     return testSettings(member(exported, 'parameters'));
   }
 
-  const parameters = namedExports(program).find(
+  const parameters = namedExports(body, bindings).find(
     ({ name }) => name === 'parameters',
   );
 
@@ -87,7 +87,7 @@ export function classifyStubs(
       'parameters',
     ),
   );
-  const declared = namedExports(program).map(({ name, init }) => {
+  const declared = storyExports(body, bindings).map(({ name, init }) => {
     const storyTest = testSettings(
       member(evaluate(annotations(init), bindings), 'parameters'),
     );
