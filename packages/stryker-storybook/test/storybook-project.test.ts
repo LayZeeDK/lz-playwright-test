@@ -5,7 +5,11 @@ import { join, relative } from 'node:path';
 import { describe, it, type TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
-import { isStoryFile, storybookProject } from '../src/storybook-project.ts';
+import {
+  isStoryFile,
+  storyFilePaths,
+  storybookProject,
+} from '../src/storybook-project.ts';
 
 const fixtures = fileURLToPath(new URL('fixtures/', import.meta.url));
 
@@ -146,6 +150,17 @@ describe('storybookProject', () => {
       const { project } = setup('globs');
 
       assert.deepEqual(project.previewTest, { clearMocks: true });
+    });
+
+    it('lists only the story files that the globs match', () => {
+      const { project } = setup('scan');
+
+      assert.deepEqual(
+        storyFilePaths(project).map((fileName) =>
+          fileName.split('/').slice(-2).join('/'),
+        ),
+        ['src/Listed.stories.tsx'],
+      );
     });
 
     it('does not count a *.stories.* file outside the globs', () => {

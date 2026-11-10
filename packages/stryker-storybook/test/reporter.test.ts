@@ -252,6 +252,16 @@ describe('storybookReporter', () => {
     ]);
   });
 
+  it('leaves out a stub in a mutation report file that is no story file', (t) => {
+    const { reporter, findings } = setup(t);
+
+    reporter.onMutationTestReportReady({
+      files: { 'src/meta.ts': { source: erasedStub, mutants: [] } },
+    });
+
+    assert.deepEqual(findings(), []);
+  });
+
   it('reports a stub that holds no mutant in a story file in the mutation report', (t) => {
     const { reporter, findings } = setup(t);
     const source = erasedStub.replace("'stubbed'", '42');

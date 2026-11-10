@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve, sep } from 'node:path';
 
@@ -16,9 +16,9 @@ import type { Reporter } from '@stryker-mutator/api/report';
 import { field, list } from './node-field.ts';
 import { lzStorybookOptions } from './options.ts';
 import { packageName } from './package-name.ts';
-import { selfScan } from './self-scan.ts';
 import {
   isStoryFile,
+  storyFilePaths,
   storybookProject,
   type ProjectLog,
   type StorybookProject,
@@ -131,17 +131,7 @@ export function storybookReporter(options: object, log: ProjectLog) {
         );
       const findings = excludesSpyStub(options)
         ? []
-        : [
-            ...reportFindings(files, storybook(), warnUnparsable),
-            ...selfScan(
-              storybook(),
-              (fileName) => projectPath(fileName) in files,
-              warnUnparsable,
-            ).map(({ fileName, ...finding }) => ({
-              file: projectPath(fileName),
-              ...finding,
-            })),
-          ];
+        : stubFindings(files, storybook(), warnUnparsable);
       const report: LzStorybookReport = { findings, staticStoryMutants };
       mkdirSync('reports', { recursive: true });
       writeFileSync(
@@ -186,24 +176,35 @@ function consoleBlock({
   ].join('\n');
 }
 
-function reportFindings(
+function stubFindings(
   files: ReportInput['files'],
   project: StorybookProject,
   onUnparsable: (fileName: string, error: unknown) => void,
 ): readonly StubFinding[] {
-  return Object.entries(files).flatMap(([file, { source, mutants }]) => [
-    ...(isStoryFile(project, resolve(file))
-      ? siteFindings(source, file, project, onUnparsable).map((finding) => ({
-          file,
-          ...finding,
-        }))
-      : []),
-    ...mutants.flatMap(({ mutatorName, status, location }) =>
-      mutatorName === spyStubName && status === 'Survived'
-        ? [{ file, line: location.start.line, ...uncheckedFinding }]
-        : [],
-    ),
+  const storyFiles = new Set([
+    ...Object.keys(files).filter((file) => isStoryFile(project, resolve(file))),
+    ...storyFilePaths(project)
+      .filter((fileName) => /\.[cm]?[jt]sx?$/.test(fileName))
+      .map(projectPath),
   ]);
+
+  return [
+    ...[...storyFiles].flatMap((file) =>
+      siteFindings(
+        files[file]?.source ?? readFileSync(file, 'utf8'),
+        file,
+        project,
+        onUnparsable,
+      ).map((finding) => ({ file, ...finding })),
+    ),
+    ...Object.entries(files).flatMap(([file, { mutants }]) =>
+      mutants.flatMap(({ mutatorName, status, location }) =>
+        mutatorName === spyStubName && status === 'Survived'
+          ? [{ file, line: location.start.line, ...uncheckedFinding }]
+          : [],
+      ),
+    ),
+  ];
 }
 
 function excludesSpyStub(options: object): boolean {
