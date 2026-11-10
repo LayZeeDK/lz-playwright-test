@@ -1,4 +1,4 @@
-import { namedExports } from './csf.ts';
+import { namedExports, topLevelBindings, unwrap } from './csf.ts';
 import { isRecord } from './is-record.ts';
 import { definitionTimeStubs } from './stub-shape.ts';
 
@@ -167,20 +167,6 @@ function branchOf(levels: readonly ResetSettings[]): ResetBranch {
   );
 }
 
-const wrappers: readonly unknown[] = [
-  'TSSatisfiesExpression',
-  'TSAsExpression',
-  'TSNonNullExpression',
-  'TSTypeAssertion',
-  'ParenthesizedExpression',
-];
-
-function unwrap(node: unknown): unknown {
-  return wrappers.includes(field(node, 'type'))
-    ? unwrap(field(node, 'expression'))
-    : node;
-}
-
 function defaultExport(
   body: readonly unknown[],
   bindings: ReadonlyMap<string, unknown>,
@@ -217,28 +203,6 @@ function annotations(node: unknown): unknown {
     )
     ? field(current, 'arguments', '0')
     : current;
-}
-
-function topLevelBindings(
-  body: readonly unknown[],
-): ReadonlyMap<string, unknown> {
-  return new Map(
-    body.flatMap((statement) => {
-      const declaration =
-        field(statement, 'type') === 'ExportNamedDeclaration'
-          ? field(statement, 'declaration')
-          : statement;
-
-      return list(field(declaration, 'declarations')).flatMap((declarator) => {
-        const name = field(declarator, 'id', 'name');
-        const init = field(declarator, 'init');
-
-        return typeof name === 'string' && init !== null
-          ? [[name, init] as const]
-          : [];
-      });
-    }),
-  );
 }
 
 function evaluate(

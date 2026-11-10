@@ -1,3 +1,5 @@
+import { field, list } from './node-field.ts';
+
 export interface CsfShapes {
   readonly metaObjects: ReadonlySet<unknown>;
   /** Story objects and functions, `parameters` objects that hold `__id`, and `.test()` options objects. */
@@ -6,6 +8,8 @@ export interface CsfShapes {
   readonly mswValues: ReadonlySet<unknown>;
   readonly staticValues: ReadonlySet<unknown>;
 }
+
+type Bindings = ReadonlyMap<string, unknown>;
 
 const testKeys = ['play', 'beforeEach', 'afterEach'];
 const staticKeys = [
@@ -20,6 +24,7 @@ const staticKeys = [
 
 export function csfShapes(program: unknown): CsfShapes {
   const body = list(field(program, 'body'));
+  const bindings = topLevelBindings(body);
   const declaration = field(
     body.find(
       (statement) => field(statement, 'type') === 'ExportDefaultDeclaration',
@@ -33,13 +38,8 @@ export function csfShapes(program: unknown): CsfShapes {
     (specifier) => field(specifier, 'exported', 'name') === 'default',
   );
   const metaObjects = [
-    ...objectOf(declaration ?? field(defaultSpecifier, 'local'), body),
-    ...body
-      .flatMap((statement) => [
-        ...list(field(statement, 'declarations')),
-        ...list(field(statement, 'declaration', 'declarations')),
-      ])
-      .map((declarator) => field(declarator, 'init'))
+    ...objectOf(declaration ?? field(defaultSpecifier, 'local'), bindings),
+    ...[...bindings.values()]
       .filter((init) => field(init, 'callee', 'property', 'name') === 'meta')
       .map((init) => list(field(init, 'arguments'))[0]),
   ];
@@ -62,7 +62,7 @@ export function csfShapes(program: unknown): CsfShapes {
     ),
   ]
     .filter(({ name }) => isExportStory(name, includeStories, excludeStories))
-    .map(({ init }) => storyNode(unwrap(init), body))
+    .map(({ init }) => storyNode(unwrap(init), bindings))
     .filter(
       (init) =>
         (field(init, 'type') === 'ObjectExpression' ||
@@ -78,21 +78,26 @@ export function csfShapes(program: unknown): CsfShapes {
   const testCalls = testStatements.map(testArguments);
   const testOptions = testCalls
     .filter((testArgs) => testArgs.length === 3)
-    .map((testArgs) => followed(testArgs[1], body));
+    .map((testArgs) => followed(testArgs[1], bindings));
 
   return {
     metaObjects: nodeSet(metaObjects),
     literalContainers: nodeSet([...stories, ...idParameters, ...testOptions]),
     testCode: nodeSet([
       ...[...metaObjects, ...stories].flatMap((object) =>
-        testKeys.flatMap((key) => withInit(propertyValue(object, key), body)),
+        testKeys.flatMap((key) =>
+          withInit(propertyValue(object, key), bindings),
+        ),
       ),
       ...body.flatMap((statement) =>
         testKeys.flatMap((key) =>
-          assigned(statement, key).flatMap((value) => withInit(value, body)),
+          assigned(statement, key).flatMap((value) =>
+            withInit(value, bindings),
+          ),
         ),
       ),
       ...testStatements,
+      ...testCalls.map((testArgs) => followed(testArgs.at(-1), bindings)),
     ]),
     mswValues: nodeSet(
       [
@@ -102,17 +107,21 @@ export function csfShapes(program: unknown): CsfShapes {
     ),
     staticValues: nodeSet([
       ...[...metaObjects, ...stories].flatMap((object) =>
-        staticKeys.flatMap((key) => withInit(propertyValue(object, key), body)),
+        staticKeys.flatMap((key) =>
+          withInit(propertyValue(object, key), bindings),
+        ),
       ),
       ...idParameters.map((parameters) => propertyValue(parameters, '__id')),
       ...body.flatMap((statement) => [
         ...assigned(statement, 'storyName'),
-        ...assigned(statement, 'tags').flatMap((tags) => withInit(tags, body)),
+        ...assigned(statement, 'tags').flatMap((tags) =>
+          withInit(tags, bindings),
+        ),
       ]),
-      initOf('__namedExportsOrder', body),
+      bindings.get('__namedExportsOrder'),
       ...testCalls.map((testArgs) => testArgs[0]),
       ...testOptions.flatMap((options) =>
-        withInit(propertyValue(options, 'tags'), body),
+        withInit(propertyValue(options, 'tags'), bindings),
       ),
       ...specifiers.map((specifier) => field(specifier, 'exported')),
     ]),
@@ -130,6 +139,7 @@ export interface NamedExport {
 
 export function namedExports(program: unknown): readonly NamedExport[] {
   const body = list(field(program, 'body'));
+  const bindings = topLevelBindings(body);
 
   return body
     .filter(
@@ -146,7 +156,7 @@ export function namedExports(program: unknown): readonly NamedExport[] {
         name:
           field(specifier, 'exported', 'name') ??
           field(specifier, 'exported', 'value'),
-        init: initOf(field(specifier, 'local', 'name'), body),
+        init: followed(field(specifier, 'local'), bindings),
       })),
     ])
     .flatMap(({ name, init }) =>
@@ -154,11 +164,58 @@ export function namedExports(program: unknown): readonly NamedExport[] {
     );
 }
 
-function withInit(
-  value: unknown,
-  body: readonly unknown[],
-): readonly unknown[] {
-  return [value, followed(value, body)];
+export function topLevelBindings(body: readonly unknown[]): Bindings {
+  return new Map(
+    body.flatMap((statement) => {
+      const declaration =
+        field(statement, 'type') === 'ExportNamedDeclaration'
+          ? field(statement, 'declaration')
+          : statement;
+      const functionName = field(declaration, 'id', 'name');
+
+      if (
+        field(declaration, 'type') === 'FunctionDeclaration' &&
+        typeof functionName === 'string'
+      ) {
+        return [[functionName, declaration] as const];
+      }
+
+      return list(field(declaration, 'declarations')).flatMap((declarator) => {
+        const name = field(declarator, 'id', 'name');
+        const init = field(declarator, 'init');
+
+        return typeof name === 'string' && init !== null
+          ? [[name, init] as const]
+          : [];
+      });
+    }),
+  );
+}
+
+const wrappers: readonly unknown[] = [
+  'TSSatisfiesExpression',
+  'TSAsExpression',
+  'TSNonNullExpression',
+  'TSTypeAssertion',
+  'ParenthesizedExpression',
+];
+
+export function unwrap(node: unknown): unknown {
+  return wrappers.includes(field(node, 'type'))
+    ? unwrap(field(node, 'expression'))
+    : node;
+}
+
+function followed(value: unknown, bindings: Bindings): unknown {
+  const name = field(value, 'name');
+
+  return field(value, 'type') === 'Identifier' && typeof name === 'string'
+    ? bindings.get(name)
+    : value;
+}
+
+function withInit(value: unknown, bindings: Bindings): readonly unknown[] {
+  return [value, followed(value, bindings)];
 }
 
 function isExportStory(
@@ -193,12 +250,6 @@ function matchesStories(name: unknown, descriptor: unknown): boolean {
   );
 }
 
-function followed(value: unknown, body: readonly unknown[]): unknown {
-  return field(value, 'type') === 'Identifier'
-    ? initOf(field(value, 'name'), body)
-    : value;
-}
-
 function testArguments(statement: unknown): readonly unknown[] {
   return field(statement, 'expression', 'callee', 'property', 'name') === 'test'
     ? list(field(statement, 'expression', 'arguments'))
@@ -221,11 +272,11 @@ function assigned(statement: unknown, property: string): readonly unknown[] {
     : [];
 }
 
-function storyNode(init: unknown, body: readonly unknown[]): unknown {
+function storyNode(init: unknown, bindings: Bindings): unknown {
   const method = field(init, 'callee', 'property', 'name');
 
   if (method === 'bind') {
-    return followed(field(init, 'callee', 'object'), body);
+    return followed(field(init, 'callee', 'object'), bindings);
   }
 
   return method === 'story' || method === 'extend'
@@ -233,16 +284,7 @@ function storyNode(init: unknown, body: readonly unknown[]): unknown {
     : init;
 }
 
-function unwrap(node: unknown): unknown {
-  return field(node, 'type') === 'TSSatisfiesExpression'
-    ? field(node, 'expression')
-    : node;
-}
-
-function objectOf(
-  expression: unknown,
-  body: readonly unknown[],
-): readonly unknown[] {
+function objectOf(expression: unknown, bindings: Bindings): readonly unknown[] {
   const node = unwrap(expression);
 
   switch (field(node, 'type')) {
@@ -250,37 +292,10 @@ function objectOf(
       return [node];
     }
     case 'Identifier': {
-      return objectOf(initOf(field(node, 'name'), body), body);
+      return objectOf(followed(node, bindings), bindings);
     }
     default: {
       return [];
     }
   }
-}
-
-function initOf(name: unknown, body: readonly unknown[]): unknown {
-  return field(
-    body
-      .flatMap((statement) => [
-        ...list(field(statement, 'declarations')),
-        ...list(field(statement, 'declaration', 'declarations')),
-      ])
-      .find((declarator) => field(declarator, 'id', 'name') === name),
-    'init',
-  );
-}
-
-function field(node: unknown, ...keys: readonly string[]): unknown {
-  return keys.reduce<unknown>(
-    (value, key) => (isRecord(value) ? value[key] : undefined),
-    node,
-  );
-}
-
-function list(value: unknown): readonly unknown[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }
