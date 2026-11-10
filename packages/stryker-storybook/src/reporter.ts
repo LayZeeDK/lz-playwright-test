@@ -29,14 +29,9 @@ import { definitionTimeStubs } from './stub-shape.ts';
 import {
   parseSpyStubReason,
   spyStubName,
+  uncheckedFinding,
   type ReasonVerdict,
 } from './stub-verdict.ts';
-
-const unchecked = {
-  verdict: 'unchecked',
-  why: 'no test fails without this stub, so no play checks what it changes',
-  fix: 'assert in the play what the stubbed value changes',
-} as const;
 
 export interface LzStorybookReport {
   readonly findings: readonly StubFinding[];
@@ -46,7 +41,7 @@ export interface LzStorybookReport {
 interface StubFinding {
   readonly file: string;
   readonly line: number;
-  readonly verdict: ReasonVerdict | 'unchecked';
+  readonly verdict: ReasonVerdict | (typeof uncheckedFinding)['verdict'];
   readonly why: string;
   readonly fix: string;
 }
@@ -227,7 +222,7 @@ function reportFindings(
       }),
       ...mutants.flatMap(({ mutatorName, status, location }) =>
         mutatorName === spyStubName && status === 'Survived'
-          ? [{ file, line: location.start.line, ...unchecked }]
+          ? [{ file, line: location.start.line, ...uncheckedFinding }]
           : [],
       ),
     ];

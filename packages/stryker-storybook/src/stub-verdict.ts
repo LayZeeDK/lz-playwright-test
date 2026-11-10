@@ -27,6 +27,12 @@ const whys: Readonly<Record<ReasonVerdict, string>> = {
 const fix =
   'pass the implementation to fn(), as in fn(() => value), or set the stub in beforeEach';
 
+export const uncheckedFinding = {
+  verdict: 'unchecked',
+  why: 'no test fails without this stub, so no play checks what it changes',
+  fix: 'assert in the play what the stubbed value changes',
+} as const;
+
 export interface SpyStubReason {
   readonly verdict: ReasonVerdict;
   readonly why: string;

@@ -255,7 +255,11 @@ export const A = { args: { g: fn().mockReturnValue(1) } };`,
       ),
     );
 
-    assert.equal(settings, 'unreadable');
+    assert.deepEqual(settings, {
+      mockReset: 'unreadable',
+      clearMocks: 'unreadable',
+      restoreMocks: 'unreadable',
+    });
   });
 
   it('finds a story exported through an export specifier', () => {

@@ -27,11 +27,15 @@ export interface StubClassification {
 
 export type ResetSetting = boolean | 'unreadable';
 
-export type ResetSettings =
-  | 'unreadable'
-  | Readonly<Partial<Record<ResetKey, ResetSetting>>>;
+export type ResetSettings = Readonly<Partial<Record<ResetKey, ResetSetting>>>;
 
 type ResetKey = (typeof decisiveSettings)[number][0];
+
+export const unreadableSettings: ResetSettings = {
+  mockReset: 'unreadable',
+  clearMocks: 'unreadable',
+  restoreMocks: 'unreadable',
+};
 
 export function readPreviewTest(program: unknown): ResetSettings {
   const body = list(field(program, 'body'));
@@ -53,10 +57,6 @@ export function readPreviewTest(program: unknown): ResetSettings {
 
 function testSettings(parameters: unknown): ResetSettings {
   const test = member(parameters, 'test');
-
-  if (test === unknownValue) {
-    return 'unreadable';
-  }
 
   return Object.fromEntries(
     decisiveSettings.flatMap(([key]) => {
@@ -171,8 +171,7 @@ function branchOf(levels: readonly ResetSettings[]): ResetBranch {
     decisiveSettings
       .map(([key, decisive, branch]) => {
         const setting = levels.reduce<ResetSetting | undefined>(
-          (value, level) =>
-            level === 'unreadable' ? level : (level[key] ?? value),
+          (value, level) => level[key] ?? value,
           undefined,
         );
 
