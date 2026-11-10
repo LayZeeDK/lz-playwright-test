@@ -634,7 +634,9 @@ otherwise:
   code, the dry run fails, because the `webServer` most likely serves the original sources instead of the
   Stryker sandbox. When instrumented code loaded but no test reached a mutant, the dry run completes and
   Stryker reports those mutants as NoCoverage, or Survived with `coverageAnalysis: 'off'`. A page that loaded
-  instrumented code keeps counting after it navigates within the same origin in the same tab.
+  instrumented code keeps counting after it navigates within the same origin in the same tab. After a
+  cross-origin navigation, and in a frame that navigates, a page counts by the document it shows when its
+  context closes.
 - Server-side code gets the active mutant only with `webServer.mutate` on, and only in a Node.js
   `webServer` that serves with `node:http`, `node:https`, or the `node:http2` compatibility API.
   Otherwise its mutants are NoCoverage, or Survived with `coverageAnalysis: 'off'`. Without
