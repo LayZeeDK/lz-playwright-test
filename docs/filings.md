@@ -888,6 +888,17 @@ temporary folder on C:) made Storybook list no story file under D:, so the red w
 green; it showed when the green did not turn it green. `lz-red` step 5 checks where a failure originates, not whether
 the environment can ever pass. Evidence: `sb-s3e/cycles.log` cycle 7.
 
+**O119 (lz-tpp). No case for data the spec gives in full.** S3 part (d), cycles 3-10: a JSON schema is declarative
+data, so every green was `(nil -> constant)` or `(constant -> constant+)` on one keyword, and the priority list ranked
+nothing; the test list alone chose the order. Taking the smallest constant literally gave `enum: ['ignore']` in cycle
+5, a value the spec already said was wrong, kept only so that cycle 6 ("accepts mutate") had a red. `lz-tpp` has no
+case for "the value is specified in full: write it at the first test that touches it". Close to O67, which is about a
+predicate. Evidence: `sb-s3f/cycles.log` cycles 5 and 6.
+
+**O120. A type error that the cycle's runs cannot show.** S3 part (d), cycle 2 (adds to O66): `factory.inject` on the
+union type `declareFactoryPlugin` returns is a type error that node:test under type stripping never reports; red and
+green both ran clean, and the gate's typecheck found it. Evidence: `sb-s3f/notes.md`, `sb-s3f/gate1.log`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
