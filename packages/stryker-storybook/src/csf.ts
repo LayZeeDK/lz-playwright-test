@@ -181,8 +181,9 @@ export function storyExports(
         isStory(named.name) &&
         (!isFactoryFile || isFactoryStory(named)),
     )
-    .map(({ name, init, form }) => ({
+    .map(({ name, local, init, form }) => ({
       name,
+      local,
       init,
       tested:
         form === 'declaration' ||
@@ -192,6 +193,7 @@ export function storyExports(
 
 export interface StoryExport {
   readonly name: string;
+  readonly local: unknown;
   readonly init: unknown;
   /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
   readonly tested: boolean;
@@ -205,6 +207,7 @@ function isFactoryMeta(init: unknown): boolean {
 
 export interface NamedExport {
   readonly name: string;
+  readonly local: unknown;
   readonly init: unknown;
   readonly form: 'declaration' | 'specifier';
 }
@@ -223,6 +226,7 @@ export function namedExports(
       ...list(field(statement, 'declaration', 'declarations')).map(
         (declarator) => ({
           name: field(declarator, 'id', 'name'),
+          local: field(declarator, 'id', 'name'),
           init: field(declarator, 'init'),
           form: 'declaration' as const,
         }),
@@ -231,6 +235,7 @@ export function namedExports(
         ? [
             {
               name: field(statement, 'declaration', 'id', 'name'),
+              local: field(statement, 'declaration', 'id', 'name'),
               init: field(statement, 'declaration'),
               form: 'declaration' as const,
             },
@@ -242,14 +247,13 @@ export function namedExports(
           name:
             field(specifier, 'exported', 'name') ??
             field(specifier, 'exported', 'value'),
+          local: field(specifier, 'local', 'name'),
           init: followed(field(specifier, 'local'), bindings),
           form: 'specifier' as const,
         })),
     ])
-    .flatMap(({ name, init, form }) =>
-      typeof name === 'string' && name !== 'default'
-        ? [{ name, init, form }]
-        : [],
+    .flatMap(({ name, ...named }) =>
+      typeof name === 'string' && name !== 'default' ? [{ name, ...named }] : [],
     );
 }
 
@@ -341,18 +345,29 @@ function matchesStories(name: unknown, descriptor: unknown): boolean {
 
 interface Assignment {
   readonly target: unknown;
+  /** The one key of a `Target.key = value` assignment. */
   readonly key: unknown;
+  readonly path: readonly unknown[];
   readonly value: unknown;
 }
 
-function assignmentOf(statement: unknown): Assignment {
-  const left = field(statement, 'expression', 'left');
+export function assignmentOf(statement: unknown): Assignment {
+  const [target, ...path] = memberChain(
+    field(statement, 'expression', 'left'),
+  );
 
   return {
-    target: field(left, 'object', 'name'),
-    key: field(left, 'property', 'name'),
+    target,
+    key: path.length === 1 ? path[0] : undefined,
+    path,
     value: field(statement, 'expression', 'right'),
   };
+}
+
+function memberChain(node: unknown): readonly unknown[] {
+  return field(node, 'type') === 'MemberExpression'
+    ? [...memberChain(field(node, 'object')), field(node, 'property', 'name')]
+    : [field(node, 'name')];
 }
 
 interface TestCall {

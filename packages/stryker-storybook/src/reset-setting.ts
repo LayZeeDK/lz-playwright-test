@@ -1,5 +1,6 @@
 import {
   annotationFactories,
+  assignmentOf,
   isTemplateBind,
   metaExpressions,
   namedExports,
@@ -91,16 +92,27 @@ export function classifyStubs(
   const metaTest = testSettings(
     member(evaluate(factoryArgument(meta), bindings), 'parameters'),
   );
+  const assignments = body.map(assignmentOf);
   const declared = storyExports(body, bindings)
     .filter(({ tested }) => tested)
-    .map(({ name, init }) => {
+    .map(({ name, local, init }) => {
+      const story = assignments
+        .filter(({ target }) => target === local)
+        .reduce(
+          (value, assignment) =>
+            written(
+              value,
+              assignment.path,
+              evaluate(assignment.value, bindings),
+            ),
+          evaluate(factoryArgument(init), bindings),
+        );
+      // Storybook 10.6.5 normalizeStory: { ...story.story?.parameters, ...story.parameters }
       const storyTest = testSettings(
-        member(
-          assignsParameters(body, name)
-            ? unknownValue
-            : evaluate(factoryArgument(init), bindings),
-          'parameters',
-        ),
+        spread([
+          member(member(story, 'story'), 'parameters'),
+          member(story, 'parameters'),
+        ]),
       );
 
       return {
@@ -121,14 +133,26 @@ export function classifyStubs(
   return { stories, stubs };
 }
 
-function assignsParameters(body: readonly unknown[], name: string): boolean {
-  return body.some(
-    (statement) =>
-      field(statement, 'expression', 'type') === 'AssignmentExpression' &&
-      field(statement, 'expression', 'left', 'object', 'name') === name &&
-      field(statement, 'expression', 'left', 'property', 'name') ===
-        'parameters',
-  );
+function written(
+  object: unknown,
+  [key, ...rest]: readonly unknown[],
+  value: unknown,
+): unknown {
+  if (key === undefined) {
+    return value;
+  }
+
+  const base =
+    object === unknownValue
+      ? { [unknownRest]: true }
+      : isRecord(object)
+        ? object
+        : {};
+
+  return {
+    ...base,
+    [String(key)]: written(member(base, String(key)), rest, value),
+  };
 }
 
 function siteVerdict(
@@ -233,26 +257,33 @@ function evaluate(
         : unknownValue;
     }
     case 'ObjectExpression': {
-      return list(field(current, 'properties')).reduce<
-        Readonly<Record<PropertyKey, unknown>>
-      >((object, property) => {
-        const part = objectPart(property, bindings);
-
-        if (part === unknownValue) {
-          return { [unknownRest]: true };
-        }
-
-        if (!isRecord(part)) {
-          return object;
-        }
-
-        return Object.hasOwn(part, unknownRest) ? part : { ...object, ...part };
-      }, {});
+      return spread(
+        list(field(current, 'properties')).map((property) =>
+          objectPart(property, bindings),
+        ),
+      );
     }
     default: {
       return unknownValue;
     }
   }
+}
+
+function spread(parts: readonly unknown[]): unknown {
+  return parts.reduce<Readonly<Record<PropertyKey, unknown>>>(
+    (object, part) => {
+      if (part === unknownValue) {
+        return { [unknownRest]: true };
+      }
+
+      if (!isRecord(part)) {
+        return object;
+      }
+
+      return Object.hasOwn(part, unknownRest) ? part : { ...object, ...part };
+    },
+    {},
+  );
 }
 
 function objectPart(
