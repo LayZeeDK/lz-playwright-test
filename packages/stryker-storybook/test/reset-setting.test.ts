@@ -390,6 +390,20 @@ export const helper = () => null;`,
     assert.deepEqual(verdicts, ['kept']);
   });
 
+  it('keeps the stories of a file with a meta() call that is no CSF factory', () => {
+    const verdicts = verdictsOf(
+      `import { z } from 'zod';
+const schema = z.string().meta({ id: 'label' });
+export default { parameters: { test: { restoreMocks: false } } };
+export const A = {
+  parameters: { test: { mockReset: true } },
+  args: { g: fn().mockReturnValue(1) },
+};`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
   it('leaves a function declaration exported by specifier out of the stories', () => {
     const verdicts = verdictsOf(
       `export default {};

@@ -169,17 +169,17 @@ export function storyExports(
   bindings: Bindings,
 ): readonly StoryExport[] {
   const isStory = storyFilter(metaObjectsOf(body, bindings));
-  const isFactoryFile = [...bindings.values()].some(isFactoryMeta);
+  const exports = namedExports(body, bindings);
+  const isFactoryStory = ({ init }: NamedExport): boolean =>
+    storyFactories.includes(field(unwrap(init), 'callee', 'property', 'name'));
+  const isFactoryFile = exports.some(isFactoryStory);
 
-  return namedExports(body, bindings)
+  return exports
     .filter(
-      ({ name, init }) =>
-        name !== '__namedExportsOrder' &&
-        isStory(name) &&
-        (!isFactoryFile ||
-          storyFactories.includes(
-            field(unwrap(init), 'callee', 'property', 'name'),
-          )),
+      (named) =>
+        named.name !== '__namedExportsOrder' &&
+        isStory(named.name) &&
+        (!isFactoryFile || isFactoryStory(named)),
     )
     .map(({ name, init, form }) => ({
       name,
