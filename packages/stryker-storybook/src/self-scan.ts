@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 
 import { isRecord } from './is-record.ts';
+import { field, list } from './node-field.ts';
 import { parseProgram } from './parse.ts';
 import { storyFilePaths, type StorybookProject } from './storybook-project.ts';
 import {
@@ -113,25 +114,22 @@ function directiveRules(
   comments: unknown,
   line: number,
 ): readonly DirectiveRule[] {
-  return (Array.isArray(comments) ? comments : []).flatMap(
-    (comment: unknown) => {
-      const value = isRecord(comment) ? comment['value'] : undefined;
-      const match =
-        typeof value === 'string' ? directive.exec(value) : undefined;
+  return list(comments).flatMap((comment: unknown) => {
+    const value = field(comment, 'value');
+    const match = typeof value === 'string' ? directive.exec(value) : undefined;
 
-      return match
-        ? [
-            {
-              disable: match[1] === 'disable',
-              line: match[2] === undefined ? undefined : line,
-              names: (match[3] ?? '')
-                .split(',')
-                .map((name) => name.trim().toLowerCase()),
-            },
-          ]
-        : [];
-    },
-  );
+    return match
+      ? [
+          {
+            disable: match[1] === 'disable',
+            line: match[2] === undefined ? undefined : line,
+            names: (match[3] ?? '')
+              .split(',')
+              .map((name) => name.trim().toLowerCase()),
+          },
+        ]
+      : [];
+  });
 }
 
 function isSilenced(rules: readonly DirectiveRule[], line: number): boolean {
@@ -145,10 +143,8 @@ function isSilenced(rules: readonly DirectiveRule[], line: number): boolean {
   );
 }
 
-function startLine(node: Readonly<Record<string, unknown>>): number {
-  const loc = node['loc'];
-  const start = isRecord(loc) ? loc['start'] : undefined;
-  const line = isRecord(start) ? start['line'] : undefined;
+function startLine(node: unknown): number {
+  const line = field(node, 'loc', 'start', 'line');
 
   return typeof line === 'number' ? line : 0;
 }

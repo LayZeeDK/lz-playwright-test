@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 
 import { isRecord } from '../src/is-record.ts';
+import { field } from '../src/node-field.ts';
 import { parseProgram } from '../src/parse.ts';
 import {
   classifyStubs,
@@ -61,10 +62,7 @@ function previewTest(preview: keyof typeof previews): ResetSettings {
 }
 
 function recorded(...keys: readonly string[]): unknown {
-  return keys.reduce<unknown>(
-    (value, key) => (isRecord(value) ? value[key] : undefined),
-    outcomes,
-  );
+  return field(outcomes, ...keys);
 }
 
 function erases(story: StoryReset): boolean {

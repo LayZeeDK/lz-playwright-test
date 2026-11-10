@@ -13,7 +13,7 @@ import {
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 import type { Reporter } from '@stryker-mutator/api/report';
 
-import { isRecord } from './is-record.ts';
+import { field, list } from './node-field.ts';
 import { lzStorybookOptions } from './options.ts';
 import { packageName } from './package-name.ts';
 import { parseStoryFile, selfScan, silencedSites } from './self-scan.ts';
@@ -247,10 +247,9 @@ function offsetOf(source: string, { line, column }: schema.Position): number {
 }
 
 function excludesSpyStub(options: object): boolean {
-  const mutator: unknown = Reflect.get(options, 'mutator');
-  const excluded = isRecord(mutator) ? mutator['excludedMutations'] : undefined;
-
-  return Array.isArray(excluded) && excluded.includes(spyStubName);
+  return list(field(options, 'mutator', 'excludedMutations')).includes(
+    spyStubName,
+  );
 }
 
 function projectPath(fileName: string): string {

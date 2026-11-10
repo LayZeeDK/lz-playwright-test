@@ -1,5 +1,6 @@
 import { namedExports, topLevelBindings, unwrap } from './csf.ts';
 import { isRecord } from './is-record.ts';
+import { field, list } from './node-field.ts';
 import { definitionTimeStubs } from './stub-shape.ts';
 
 export type ResetBranch = 'reset' | 'clear' | 'restore' | 'none' | 'unknown';
@@ -270,16 +271,5 @@ function member(value: unknown, key: string): unknown {
     return unknownValue;
   }
 
-  return isRecord(value) ? value[key] : undefined;
-}
-
-function field(node: unknown, ...keys: readonly string[]): unknown {
-  return keys.reduce<unknown>(
-    (value, key) => (isRecord(value) ? value[key] : undefined),
-    node,
-  );
-}
-
-function list(value: unknown): readonly unknown[] {
-  return Array.isArray(value) ? value : [];
+  return field(value, key);
 }
