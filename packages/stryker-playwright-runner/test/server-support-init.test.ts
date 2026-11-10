@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
+import { writeFileSync } from 'node:fs';
+import path from 'node:path';
 import { test } from 'node:test';
+import { setTimeout } from 'node:timers/promises';
 
+import { hookedPrefix, serverDirEnv } from '../src/server-protocol.ts';
 import {
   dryRunOptions,
   mutantRunOptions,
@@ -16,6 +20,22 @@ test('init refuses a webServer whose env sets NODE_OPTIONS', async (t) => {
 
   await assert.rejects(shell.init(), {
     message: `lzPlaywright.webServer.mutate is true, but a webServer's env sets NODE_OPTIONS, which replaces the one that loads the server hook. Set NODE_OPTIONS in the environment that runs Stryker instead.`,
+  });
+  assert.deepEqual(fake.setups, []);
+});
+
+test('init refuses a config where only one of two webServers sets NODE_OPTIONS in its env', async (t) => {
+  const fake = serverFake(t, {
+    webServers: [
+      { url: 'http://127.0.0.1:4820/' },
+      { url: 'http://127.0.0.1:4821/', env: { NODE_OPTIONS: '--inspect' } },
+    ],
+    urlUp: async () => false,
+  });
+
+  await assert.rejects(fake.runner().shell.init(), {
+    message:
+      /^lzPlaywright\.webServer\.mutate is true, but a webServer's env sets NODE_OPTIONS/,
   });
   assert.deepEqual(fake.setups, []);
 });
@@ -150,6 +170,27 @@ test("with webServer.mutate: 'auto', init that turns server support off gives th
   assert.ok(autoWarning?.endsWith(autoOff));
   assert.match(timeoutWarning ?? '', /timeout/i);
   assert.deepEqual(more, []);
+});
+
+test('init accepts a webServer that loads the server hook shortly after global setup returns', async (t) => {
+  const fake = serverFake(t, {
+    hooked: false,
+    globalSetup: () => {
+      const serverDir = process.env[serverDirEnv];
+
+      if (serverDir !== undefined) {
+        void setTimeout(100).then(() =>
+          writeFileSync(path.join(serverDir, `${hookedPrefix}1`), ''),
+        );
+      }
+
+      return 'passed';
+    },
+  });
+
+  await fake.runner().shell.init();
+
+  assert.equal(fake.setups.length, 1);
 });
 
 test('init fails when no process global setup started loaded the server hook', async (t) => {

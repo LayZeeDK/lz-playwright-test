@@ -244,6 +244,31 @@ test('a static mutant the webServer did not reach restarts it without the static
   );
 });
 
+test('each webServer restart logs one debug line that names the static mutant it starts with, or none', async (t) => {
+  const fake = serverFake(t, { runTests: passAllWithDryRunServerMutants('2') });
+  const { shell, lines } = fake.runner({ isolate: false });
+  await shell.init();
+  await shell.dryRun(dryRunOptions());
+  const staticRun = (id: string) =>
+    shell.mutantRun(
+      mutantRunOptions({
+        activeMutant: { ...mutantRunOptions().activeMutant, id },
+        mutantActivation: 'static',
+      }),
+    );
+
+  await staticRun('2');
+  await staticRun('3');
+
+  assert.deepEqual(
+    lines.filter(([, message]) => message.startsWith('Restarting')),
+    [
+      ['debug', 'Restarting the webServer with static mutant 2.'],
+      ['debug', 'Restarting the webServer without a mutant.'],
+    ],
+  );
+});
+
 test('a webServer restarted after it died keeps the static mutant it runs', async (t) => {
   let up = true;
   const fake = serverFake(t, {
