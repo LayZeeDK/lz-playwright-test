@@ -1,3 +1,4 @@
 .stryker-tmp*
 reports
 tools/packed-demo
+packages/stryker-storybook/test/fixtures/own-storybook
