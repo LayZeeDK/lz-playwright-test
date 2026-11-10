@@ -127,6 +127,7 @@ export default withWarningsAsErrors([
       '**/test-output',
       // Instrumented bundles that the browser tests write before each run.
       'packages/stryker-playwright-runner/test/**/public/*.js',
+      'packages/stryker-playwright-runner/test/browser/load-fixture/pages/unused.js',
     ],
   },
   {
