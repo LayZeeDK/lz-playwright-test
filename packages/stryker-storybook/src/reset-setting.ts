@@ -210,12 +210,13 @@ function storySkipped(
   story: unknown,
   testOptions: readonly unknown[],
 ): boolean | 'unknown' {
-  const base = skipped(testTags, metaTags, member(story, 'tags'));
+  const storyTags = tagList(member(story, 'tags'));
+  const base = skipped(testTags, metaTags, storyTags);
   const children = testOptions.map((options) => {
     const child = skipped(
       testTags,
       metaTags,
-      childTags(member(story, 'tags'), member(options, 'tags')),
+      storyTags && childTags(storyTags, member(options, 'tags')),
     );
 
     return child === false && member(options, 'parameters') !== undefined
@@ -234,14 +235,13 @@ function storySkipped(
 function skipped(
   { previewTags, skip }: TestTags,
   metaTags: unknown,
-  storyTags: unknown,
+  story: readonly string[] | undefined,
 ): boolean | 'unknown' {
   if (skip.length === 0) {
     return false;
   }
 
   const meta = tagList(metaTags);
-  const story = tagList(storyTags);
 
   if (meta === undefined || story === undefined) {
     return 'unknown';
@@ -253,13 +253,15 @@ function skipped(
 }
 
 /** Storybook 10.6.5 csf-factories.ts `test` extends the story with these tags, which `extend` combines. */
-function childTags(storyTags: unknown, optionTags: unknown): unknown {
-  const story = tagList(storyTags);
+function childTags(
+  storyTags: readonly string[],
+  optionTags: unknown,
+): readonly string[] | undefined {
   const own = tagList(optionTags);
 
-  return story === undefined || own === undefined
-    ? unknownValue
-    : combineTags(...story, 'test-fn', '!autodocs', ...own);
+  return own === undefined
+    ? undefined
+    : combineTags(...storyTags, 'test-fn', '!autodocs', ...own);
 }
 
 function tagList(value: unknown): readonly string[] | undefined {

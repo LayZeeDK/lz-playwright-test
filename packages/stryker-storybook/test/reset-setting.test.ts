@@ -1145,6 +1145,35 @@ export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
     assert.deepEqual(verdicts, ['unknown']);
   });
 
+  it("leaves out a factory story with a tag that skip names when another story's .test() call of the same name negates that tag", () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ tags: ['slow'], parameters: { test: { mockReset: true } } });
+export const C = meta.story({});
+C.test('runs', { tags: ['!slow'] }, async () => undefined);
+A.test('runs', async () => undefined);
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('leaves out a factory story with a tag that skip names when its .test() call passes a named test function and no options', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+import { check } from './check';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ tags: ['slow'], parameters: { test: { mockReset: true } } });
+A.test('runs', check);
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
   it('reads a story as unknown when skip is set and its run-time tags cannot be read', () => {
     const verdicts = verdictsOf(
       `import preview from '../.storybook/preview';
