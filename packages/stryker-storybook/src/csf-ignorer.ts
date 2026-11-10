@@ -1,7 +1,7 @@
 import type { Ignorer } from '@stryker-mutator/api/ignore';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
-import { csfShapes } from './csf.ts';
+import { csfShapes, type CsfShapes } from './csf.ts';
 import { isRecord } from './is-record.ts';
 import { field, list } from './node-field.ts';
 import { lzStorybookOptions } from './options.ts';
@@ -14,7 +14,7 @@ import {
 
 const staticReason = `${packageName}: Storybook reads this CSF value without running the file, so it stays as written`;
 const metaReason = `${packageName}: Storybook reads the meta object without running the file, so it stays an object literal`;
-const storyReason = `${packageName}: Storybook reads this story without running the file, so it stays an object or a function`;
+const containerReason = `${packageName}: Storybook reads this story, its parameters or its test options without running the file, so it stays an object or a function`;
 const testReason = `${packageName}: test code in a story file is mutated by the Stryker config with lzStorybookCsf.play set to mutate`;
 const mswReason = `${packageName}: msw handlers in a story file are mutated by the Stryker config with lzStorybookCsf.play set to mutate`;
 
@@ -32,10 +32,18 @@ export function csfIgnorer(options: object, log: ProjectLog): Ignorer {
           lzStorybookOptions(options).configDir,
           log,
         );
-        reasons =
+        const shapes =
           typeof fileName === 'string' && isStoryFile(project, fileName)
-            ? csfReasons(node, ignoreMode)
-            : new Map();
+            ? csfShapes(node)
+            : undefined;
+
+        if (shapes !== undefined && ignoreMode) {
+          // StrykerJS reads a node's leading comments when it enters that node, after the ignorer has seen the Program node.
+          shapes.literalContainers.forEach(keepLiteralContainer);
+        }
+
+        reasons =
+          shapes === undefined ? new Map() : csfReasons(shapes, ignoreMode);
       }
 
       return reasons.get(node);
@@ -46,10 +54,9 @@ export function csfIgnorer(options: object, log: ProjectLog): Ignorer {
 csfIgnorer.inject = tokens(commonTokens.options, commonTokens.logger);
 
 function csfReasons(
-  program: unknown,
+  shapes: CsfShapes,
   ignoreMode: boolean,
 ): ReadonlyMap<unknown, string> {
-  const shapes = csfShapes(program);
   const staticReasons = [...shapes.staticValues].map(
     (node) => [node, staticReason] as const,
   );
@@ -57,8 +64,6 @@ function csfReasons(
   if (!ignoreMode) {
     return new Map(staticReasons);
   }
-
-  shapes.literalContainers.forEach(keepLiteralContainer);
 
   // A later entry wins: meta over test code over msw over static values.
   return new Map([
@@ -70,7 +75,6 @@ function csfReasons(
 }
 
 // A Stryker ignorer skips a whole subtree; a next-line directive skips only the mutants on the container's first line.
-// StrykerJS reads a node's leading comments when it enters that node, after the ignorer has seen the Program node.
 function keepLiteralContainer(container: unknown): void {
   if (!isRecord(container)) {
     return;
@@ -80,7 +84,7 @@ function keepLiteralContainer(container: unknown): void {
     ...list(container['leadingComments']),
     {
       type: 'CommentLine',
-      value: ` Stryker disable next-line ObjectLiteral,ArrowFunction: ${storyReason}`,
+      value: ` Stryker disable next-line ObjectLiteral,ArrowFunction: ${containerReason}`,
       loc: container['loc'],
     },
   ];

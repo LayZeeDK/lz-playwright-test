@@ -11,7 +11,7 @@ export const staticReason =
 export const metaReason =
   '@layzee/stryker-storybook: Storybook reads the meta object without running the file, so it stays an object literal';
 export const storyReason =
-  '@layzee/stryker-storybook: Storybook reads this story without running the file, so it stays an object or a function';
+  '@layzee/stryker-storybook: Storybook reads this story, its parameters or its test options without running the file, so it stays an object or a function';
 export const testReason =
   '@layzee/stryker-storybook: test code in a story file is mutated by the Stryker config with lzStorybookCsf.play set to mutate';
 export const mswReason =
