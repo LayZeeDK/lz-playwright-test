@@ -1,0 +1,9 @@
+{
+  "name": "storybook",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./internal/core-server": "./fake-core-server.js",
+    "./internal/server-errors": "./fake-server-errors.js"
+  }
+}

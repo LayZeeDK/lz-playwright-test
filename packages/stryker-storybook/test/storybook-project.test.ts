@@ -174,6 +174,14 @@ describe('storybookProject', () => {
     });
   });
 
+  describe('with a Storybook installed in the project', () => {
+    it("loads the project's Storybook instead of the plugin's", () => {
+      const { project, file } = setup('own-storybook');
+
+      assert.equal(isStoryFile(project, file('src', 'Picked.ts')), true);
+    });
+  });
+
   describe('with a main file that fails to load', () => {
     it('counts a *.stories.* file as a story file', () => {
       const { project, file } = setup('failing');
