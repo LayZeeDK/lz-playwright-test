@@ -205,7 +205,7 @@ function isStoryFactoryCall(node: unknown): boolean {
 
 const previewPath = /\/preview(.(js|jsx|mjs|ts|tsx))?$/;
 
-/** Storybook 10.6.5 CsfFile: a top-level `X.meta()` or `X.type().meta()` call, where no module but a preview file exports `X`. */
+/** Storybook 10.6.5 CsfFile: a top-level `X.meta()` or `X.type().meta()` call, where `X` is imported from a preview file. */
 function factoryMetas(
   body: readonly unknown[],
   bindings: Bindings,
@@ -234,9 +234,8 @@ function factoryMetas(
 
     return (
       field(init, 'callee', 'property', 'name') === 'meta' &&
-      field(root, 'type') === 'Identifier' &&
-      (source === undefined ||
-        (typeof source === 'string' && previewPath.test(source)))
+      typeof source === 'string' &&
+      previewPath.test(source)
     );
   });
 }

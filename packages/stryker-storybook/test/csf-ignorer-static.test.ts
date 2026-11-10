@@ -107,10 +107,10 @@ describe('lz-storybook-csf', () => {
     assert.deepEqual(
       (
         await outcomes(
-          "const meta = preview.meta({\n  title: 'a/b',\n});\nexport const A = meta.story();",
+          "import preview from '#.storybook/preview';\nconst meta = preview.meta({\n  title: 'a/b',\n});\nexport const A = meta.story();",
         )
-      ).filter((outcome) => /^[12] /.test(outcome)),
-      [`1 ObjectLiteral ${metaReason}`, `2 StringLiteral ${metaReason}`],
+      ).filter((outcome) => /^[23] /.test(outcome)),
+      [`2 ObjectLiteral ${metaReason}`, `3 StringLiteral ${metaReason}`],
     );
   });
 
@@ -120,10 +120,10 @@ describe('lz-storybook-csf', () => {
     assert.deepEqual(
       (
         await outcomes(
-          "const meta = preview.type<{ args: A }>().meta({\n  title: 'a/b',\n});\nexport const A = meta.story();",
+          "import preview from '#.storybook/preview';\nconst meta = preview.type<{ args: A }>().meta({\n  title: 'a/b',\n});\nexport const A = meta.story();",
         )
-      ).filter((outcome) => /^[12] /.test(outcome)),
-      [`1 ObjectLiteral ${metaReason}`, `2 StringLiteral ${metaReason}`],
+      ).filter((outcome) => /^[23] /.test(outcome)),
+      [`2 ObjectLiteral ${metaReason}`, `3 StringLiteral ${metaReason}`],
     );
   });
 

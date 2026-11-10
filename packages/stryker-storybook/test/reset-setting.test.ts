@@ -615,6 +615,18 @@ export const A = {
     assert.deepEqual(verdicts, ['erased']);
   });
 
+  it('keeps the stories of a file with a meta() call on a local schema', () => {
+    const verdicts = verdictsOf(
+      `import { z } from 'zod';
+export default { parameters: { test: { mockReset: true } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+const schema = z.object({});
+const described = schema.meta({ title: 'S' });`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
   it('keeps the stories of a file that exports a schema made by .extend()', () => {
     const verdicts = verdictsOf(
       `import { z } from 'zod';

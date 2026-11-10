@@ -161,10 +161,10 @@ describe('lz-storybook-csf', () => {
     assert.deepEqual(
       (
         await outcomes(
-          'const meta = preview.meta({ component: B });\nexport const A = meta.story({\n  args: { a: 1 },\n});',
+          "import preview from '#.storybook/preview';\nconst meta = preview.meta({ component: B });\nexport const A = meta.story({\n  args: { a: 1 },\n});",
         )
-      ).filter((outcome) => outcome.startsWith('2 ')),
-      [`2 ObjectLiteral ${containerReason}`],
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      [`3 ObjectLiteral ${containerReason}`],
     );
   });
 
@@ -174,10 +174,10 @@ describe('lz-storybook-csf', () => {
     assert.deepEqual(
       (
         await outcomes(
-          'const meta = preview.meta({ component: B });\nexport const A = meta.story();\nexport const C = A.extend({\n  args: { a: 1 },\n});',
+          "import preview from '#.storybook/preview';\nconst meta = preview.meta({ component: B });\nexport const A = meta.story();\nexport const C = A.extend({\n  args: { a: 1 },\n});",
         )
-      ).filter((outcome) => outcome.startsWith('3 ')),
-      [`3 ObjectLiteral ${containerReason}`],
+      ).filter((outcome) => outcome.startsWith('4 ')),
+      [`4 ObjectLiteral ${containerReason}`],
     );
   });
 
@@ -200,10 +200,10 @@ describe('lz-storybook-csf', () => {
     assert.deepEqual(
       (
         await outcomes(
-          'const meta = preview.meta({ component: B });\nexport const A = meta.story();\nexport const helper = {\n  a: () => null,\n};',
+          "import preview from '#.storybook/preview';\nconst meta = preview.meta({ component: B });\nexport const A = meta.story();\nexport const helper = {\n  a: () => null,\n};",
         )
-      ).filter((outcome) => /^[34] /.test(outcome)),
-      ['3 ObjectLiteral placed', '4 ArrowFunction placed'],
+      ).filter((outcome) => /^[45] /.test(outcome)),
+      ['4 ObjectLiteral placed', '5 ArrowFunction placed'],
     );
   });
 
