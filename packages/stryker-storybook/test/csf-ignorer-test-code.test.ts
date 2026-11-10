@@ -362,6 +362,32 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('places the value that a statement reads from X.play without assigning it', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nconst x = 1 + 1;\nA.play || x;",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      ['3 ArithmeticOperator placed'],
+    );
+  });
+
+  it('places a play function assigned to this.play after this.story', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nthis.story = {};\nthis.play = 1 + 1;",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      ['3 ArithmeticOperator placed'],
+    );
+  });
+
   it('places the msw value in parameters assigned to an object that is not a story', async () => {
     const { outcomes } = setup();
 

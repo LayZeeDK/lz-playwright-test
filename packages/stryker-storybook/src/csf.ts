@@ -30,7 +30,7 @@ export function csfShapes(program: unknown): CsfShapes {
   );
   const metaObjects = metaObjectsOf(body, bindings);
   const isStory = storyFilter(metaObjects);
-  const assignments = body.map(assignmentOf);
+  const assignments = body.flatMap(assignmentOf);
   const storyInits = [
     ...storyExports(body, bindings),
     ...assignments
@@ -350,17 +350,26 @@ interface Assignment {
   readonly value: unknown;
 }
 
-export function assignmentOf(statement: unknown): Assignment {
+export function assignmentOf(statement: unknown): readonly Assignment[] {
   const [target, ...path] = memberChain(
     field(statement, 'expression', 'left'),
   );
 
-  return {
-    target,
-    key: path.length === 1 ? path[0] : undefined,
-    path,
-    value: field(statement, 'expression', 'right'),
-  };
+  if (
+    field(statement, 'expression', 'type') !== 'AssignmentExpression' ||
+    typeof target !== 'string'
+  ) {
+    return [];
+  }
+
+  return [
+    {
+      target,
+      key: path.length === 1 ? path[0] : undefined,
+      path,
+      value: field(statement, 'expression', 'right'),
+    },
+  ];
 }
 
 function memberChain(node: unknown): readonly unknown[] {

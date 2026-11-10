@@ -93,7 +93,7 @@ export function classifyStubs(
   const metaTest = testSettings(
     member(evaluate(factoryArgument(meta), bindings), 'parameters'),
   );
-  const assignments = body.map(assignmentOf);
+  const assignments = body.flatMap(assignmentOf);
   const declared = storyExports(body, bindings)
     .filter(({ tested }) => tested)
     .map(({ name, local, init }) => {
