@@ -5,7 +5,6 @@ import {
   defaultExport,
   isTemplateBind,
   namedExports,
-  runtimeAssignments,
   storyArgument,
   topLevelBindings,
   unwrap,
@@ -41,7 +40,7 @@ export type ResetSetting = boolean | 'unreadable';
 
 export type ResetSettings = Readonly<Partial<Record<ResetKey, ResetSetting>>>;
 
-type ResetKey = (typeof decisiveSettings)[number][0];
+type ResetKey = 'mockReset' | 'clearMocks' | 'restoreMocks';
 
 export const unreadableSettings: ResetSettings = {
   mockReset: 'unreadable',
@@ -81,16 +80,17 @@ function definePreviewArgument(node: unknown): unknown {
 function testSettings(parameters: unknown): ResetSettings {
   const test = member(parameters, 'test');
 
-  return Object.fromEntries(
-    decisiveSettings.flatMap(([key]) => {
+  return decisiveSettings.reduce<Partial<Record<ResetKey, ResetSetting>>>(
+    (settings, [key]) => {
       const value = member(test, key);
 
-      if (value === undefined) {
-        return [];
+      if (value !== undefined) {
+        settings[key] = typeof value === 'boolean' ? value : 'unreadable';
       }
 
-      return [[key, typeof value === 'boolean' ? value : 'unreadable']];
-    }),
+      return settings;
+    },
+    {},
   );
 }
 
@@ -112,14 +112,13 @@ export const defaultTestTags: TestTags = {
 export function classifyStubs(
   program: unknown,
   previewTest: ResetSettings,
-  testTags = defaultTestTags,
+  testTags: TestTags,
 ): StubClassification {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
   const {
     metaObjects: [meta],
     metaTags,
-    isFactory,
     stories: exported,
   } = csfFile(body, bindings);
   const metaTest = testSettings(member(evaluate(meta, bindings), 'parameters'));
@@ -128,11 +127,11 @@ export function classifyStubs(
       ({ tested, tags }) =>
         tested && isTestedByTags(testTags, [...metaTags, ...tags]),
     )
-    .map(({ name, init, assignments }) => {
-      const story = runtimeAssignments(assignments, isFactory).reduce(
+    .map(({ name, init, runtimeAssignments, extendsBase }) => {
+      const story = runtimeAssignments.reduce(
         (value, assignment) =>
           written(value, assignment.path, evaluate(assignment.value, bindings)),
-        storyValue(init, bindings),
+        extendsBase ? unknownValue : evaluate(storyArgument(init), bindings),
       );
       // Storybook 10.6.5 normalizeStory: { ...story.story?.parameters, ...story.parameters }
       const storyTest = testSettings(
@@ -168,19 +167,9 @@ function isTestedByTags(
   const tags = combineTags('test', 'dev', ...previewTags, ...fileTags);
 
   return (
-    include.some((tag) => tags.includes(tag)) &&
+    (include.length === 0 || include.some((tag) => tags.includes(tag))) &&
     ![...exclude, ...skip].some((tag) => tags.includes(tag))
   );
-}
-
-/** Storybook 10.6.5 `extend()` merges the base story's parameters into the new input, and this reader does not follow the base. */
-function storyValue(
-  init: unknown,
-  bindings: ReadonlyMap<string, unknown>,
-): unknown {
-  return field(unwrap(init), 'callee', 'property', 'name') === 'extend'
-    ? unknownValue
-    : evaluate(storyArgument(init), bindings);
 }
 
 function written(
@@ -235,11 +224,12 @@ function contains(node: unknown, position: number): boolean {
   );
 }
 
-const decisiveSettings = [
-  ['mockReset', true, 'reset'],
-  ['clearMocks', true, 'clear'],
-  ['restoreMocks', false, 'none'],
-] as const;
+const decisiveSettings: readonly (readonly [ResetKey, boolean, ResetBranch])[] =
+  [
+    ['mockReset', true, 'reset'],
+    ['clearMocks', true, 'clear'],
+    ['restoreMocks', false, 'none'],
+  ];
 
 function branchOf(levels: readonly ResetSettings[]): ResetBranch {
   return (

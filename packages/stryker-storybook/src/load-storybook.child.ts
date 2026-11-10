@@ -4,7 +4,12 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { isRecord } from './is-record.ts';
-import { field, list } from './node-field.ts';
+import type {
+  LoaderResult,
+  LoaderTestTags,
+  LoadResult,
+} from './loader-result.ts';
+import { field } from './node-field.ts';
 
 const [configDir, resultFile, vitestConfigFile] = process.argv.slice(2);
 
@@ -46,30 +51,39 @@ register(`data:text/javascript,${encodeURIComponent(projectFirstResolve)}`, {
 });
 
 const storybook = await load(configDir, projectDir);
+const result: LoaderResult = {
+  ...storybook,
+  testTags: await testTags(
+    vitestConfigFile,
+    storybook.kind === 'loaded' ? storybook.storyFiles : [],
+  ),
+};
 
-writeFileSync(
-  resultFile,
-  JSON.stringify({
-    ...storybook,
-    testTags: await testTags(
-      vitestConfigFile,
-      list(field(storybook, 'storyFiles')),
-    ),
-  }),
-);
+writeFileSync(resultFile, JSON.stringify(result));
 
 /** Storybook 10.6.5 addon-vitest: storybookTest() puts the tag filter in its project's test.env (vitest-plugin/index.ts 424-426). */
 async function testTags(
   configFile: string | undefined,
-  storyFiles: readonly unknown[],
-): Promise<object> {
+  storyFiles: readonly string[],
+): Promise<LoaderTestTags> {
   // Only the Vitest CLI sets VITEST, and storybookTest() returns no plugins without it.
   process.env['VITEST'] = 'true';
   process.env['STORYBOOK_DISABLE_TELEMETRY'] = '1';
 
   try {
-    const { createVitest } = await import('vitest/node');
-    const vitest = await createVitest('test', {
+    const vitestNode = await import('vitest/node').catch((error: unknown) => {
+      if (isMissingModule(error)) {
+        return undefined;
+      }
+
+      throw error;
+    });
+
+    if (vitestNode === undefined) {
+      return { kind: 'no-vitest' };
+    }
+
+    const vitest = await vitestNode.createVitest('test', {
       config: configFile,
       watch: false,
     });
@@ -82,9 +96,7 @@ async function testTags(
       );
       const env: unknown = (
         storybookProjects.find((project) =>
-          storyFiles.some(
-            (file) => typeof file === 'string' && project.matchesTestGlob(file),
-          ),
+          storyFiles.some((file) => project.matchesTestGlob(file)),
         ) ?? storybookProjects[0]
       )?.config.env;
 
@@ -102,6 +114,14 @@ async function testTags(
   }
 }
 
+function isMissingModule(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    error.code === 'ERR_MODULE_NOT_FOUND'
+  );
+}
+
 function withoutStack(error: unknown): string {
   return String(error)
     .split('\n')
@@ -109,7 +129,10 @@ function withoutStack(error: unknown): string {
     .join('\n');
 }
 
-async function load(configDir: string, projectDir: string): Promise<object> {
+async function load(
+  configDir: string,
+  projectDir: string,
+): Promise<LoadResult> {
   try {
     const { experimental_loadStorybook, getStoriesPathsFromConfig } =
       await import('storybook/internal/core-server');

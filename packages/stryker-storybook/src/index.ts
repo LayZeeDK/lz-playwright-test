@@ -1,10 +1,11 @@
 import { declareFactoryPlugin, PluginKind } from '@stryker-mutator/api/plugin';
 
 import { csfIgnorer } from './csf-ignorer.ts';
+import { playModes } from './options.ts';
 import { storybookReporter } from './reporter.ts';
 import { stubIgnorer } from './stub-ignorer.ts';
 
-export type { LzStorybookOptions } from './options.ts';
+export type { LzStorybookCsfOptions, LzStorybookOptions } from './options.ts';
 export type { LzStorybookReport } from './reporter.ts';
 
 /**
@@ -36,7 +37,7 @@ export const strykerValidationSchema = {
       description: 'Options of the lz-storybook-csf ignorer.',
       properties: {
         play: {
-          enum: ['ignore', 'mutate'],
+          enum: playModes,
           default: 'ignore',
           description:
             'ignore (the default) keeps the mutants of plays, test hooks and msw handlers in story files out of ' +

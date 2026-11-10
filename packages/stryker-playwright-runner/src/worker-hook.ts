@@ -41,6 +41,11 @@ import { hostKey, testIdHeader } from './server-protocol.ts';
 
 type FrameRead = Omit<SnapshotLine, 'outlivedItsTest'>;
 
+/** The namespace fields of a value that only passed an object check, such as another frame's or a stored namespace. */
+type UncheckedNamespace = Readonly<
+  Partial<Record<keyof StrykerNamespace, unknown>>
+>;
+
 class ContextState {
   readonly testId: string | undefined;
   readonly #closedPageSnapshots: FrameRead[] = [];
@@ -459,7 +464,7 @@ async function readNamespace(
         return undefined;
       }
 
-      const { mutantCoverage, hitCount, instrumented }: StrykerNamespace =
+      const { mutantCoverage, hitCount, instrumented }: UncheckedNamespace =
         found;
 
       return { mutantCoverage, hitCount, instrumented };
@@ -533,7 +538,7 @@ export function initPage({
     const carried: unknown = JSON.parse(sessionStorage.getItem(key) ?? 'null');
 
     if (typeof carried === 'object' && carried !== null) {
-      const { mutantCoverage, hitCount, instrumented }: StrykerNamespace =
+      const { mutantCoverage, hitCount, instrumented }: UncheckedNamespace =
         carried;
       s.mutantCoverage = mutantCoverage;
 

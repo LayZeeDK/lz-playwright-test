@@ -3,10 +3,11 @@ import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { describe, it, type TestContext } from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
   isStoryFile,
+  parseLoaderResult,
   storyFilePaths,
   storybookProject,
 } from '../src/storybook-project.ts';
@@ -102,7 +103,7 @@ describe('storybookProject', () => {
     });
   });
 
-  it('reads a preview it cannot parse as unreadable', (t) => {
+  it('reads a preview it cannot parse as unreadable, with no tags', (t) => {
     const root = mkdtempSync(join(tmpdir(), 'lz-storybook-project-'));
     t.after(() => rmSync(root, { recursive: true, force: true }));
     mkdirSync(join(root, '.storybook'));
@@ -113,11 +114,39 @@ describe('storybookProject', () => {
       warn: () => undefined,
     });
 
-    assert.deepEqual(project.previewTest, {
-      mockReset: 'unreadable',
-      clearMocks: 'unreadable',
-      restoreMocks: 'unreadable',
+    assert.deepEqual(
+      [project.previewTest, project.testTags.previewTags],
+      [
+        {
+          mockReset: 'unreadable',
+          clearMocks: 'unreadable',
+          restoreMocks: 'unreadable',
+        },
+        [],
+      ],
+    );
+  });
+
+  it('warns once, naming a preview it cannot parse and the error', (t) => {
+    const root = mkdtempSync(join(tmpdir(), 'lz-storybook-project-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    mkdirSync(join(root, '.storybook'));
+    const preview = join(root, '.storybook', 'preview.ts');
+    writeFileSync(preview, 'export const = ;\n');
+    const lines: string[] = [];
+
+    storybookProject(join(root, '.storybook'), {
+      info: () => undefined,
+      warn: (message: string) => lines.push(message),
     });
+
+    assert.equal(lines.length, 1);
+    assert.ok(
+      lines[0]?.startsWith(
+        `@layzee/stryker-storybook: could not parse ${preview}, so its parameters.test is unknown and its tags are left out: SyntaxError: `,
+      ),
+      lines[0],
+    );
   });
 
   describe('with a main file that lists story globs', () => {
@@ -249,6 +278,49 @@ describe('storybookProject', () => {
       );
     });
 
+    it('reads an empty include as no include filter', () => {
+      const { project } = vitestSetup(
+        'vitest-tags',
+        'vitest.empty-include.config.ts',
+      );
+
+      assert.deepEqual(project.testTags.include, []);
+    });
+
+    it('counts the stories tagged test and logs nothing when no project runs storybookTest', () => {
+      const { lines, project } = vitestSetup(
+        'vitest-tags',
+        'vitest.plain.config.ts',
+      );
+
+      assert.deepEqual(
+        [
+          project.testTags.include,
+          project.testTags.exclude,
+          project.testTags.skip,
+          lines,
+        ],
+        [['test'], [], [], []],
+      );
+    });
+
+    it('counts the stories tagged test and warns once when a tag value is not a string', () => {
+      const { lines, project } = vitestSetup(
+        'vitest-tags',
+        'vitest.odd-tags.config.mjs',
+      );
+
+      assert.deepEqual(
+        [project.testTags.include, lines],
+        [
+          ['test'],
+          [
+            'warn: @layzee/stryker-storybook: the Storybook loader wrote a tag filter of an unknown shape, so the tested stories are the stories tagged test',
+          ],
+        ],
+      );
+    });
+
     it('reads the tag filter of the Storybook project in test.projects', () => {
       const { project } = vitestSetup(
         'vitest-tags',
@@ -350,6 +422,57 @@ describe('storybookProject', () => {
           `warn: @layzee/stryker-storybook: Vitest could not load ${configFile}`,
         ],
       );
+    });
+  });
+
+  describe('without Vitest installed', () => {
+    it('counts the stories tagged test and warns once that Vitest is not installed', (t) => {
+      const nodeOptions = process.env['NODE_OPTIONS'];
+      t.after(() => {
+        process.env['NODE_OPTIONS'] = nodeOptions;
+      });
+      process.env['NODE_OPTIONS'] =
+        `--import=${pathToFileURL(join(fixtures, 'no-vitest', 'register.mjs')).href}`;
+      const lines: string[] = [];
+
+      const project = storybookProject(
+        join(fixtures, 'no-main', '.storybook'),
+        {
+          info: () => undefined,
+          warn: (message: string) => lines.push(`warn: ${message}`),
+        },
+        join(fixtures, 'vitest-tags', 'vitest.plain.config.ts'),
+      );
+
+      assert.deepEqual(
+        [project.testTags.include, lines],
+        [
+          ['test'],
+          [
+            'warn: @layzee/stryker-storybook: Vitest is not installed, so the tested stories are the stories tagged test',
+          ],
+        ],
+      );
+    });
+  });
+
+  describe('parseLoaderResult', () => {
+    it('reads a tag filter of an unknown kind as unreadable', () => {
+      const { vitestTags } = parseLoaderResult({
+        kind: 'no-main',
+        testTags: { kind: 'other' },
+      });
+
+      assert.deepEqual(vitestTags, { kind: 'unreadable' });
+    });
+
+    it('reads a failed tag filter without an error message as unreadable', () => {
+      const { vitestTags } = parseLoaderResult({
+        kind: 'no-main',
+        testTags: { kind: 'failed' },
+      });
+
+      assert.deepEqual(vitestTags, { kind: 'unreadable' });
     });
   });
 

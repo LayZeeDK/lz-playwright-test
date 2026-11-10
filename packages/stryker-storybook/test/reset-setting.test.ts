@@ -7,6 +7,7 @@ import { field } from '../src/node-field.ts';
 import { parseProgram } from '../src/parse.ts';
 import {
   classifyStubs,
+  defaultTestTags,
   readPreviewTest,
   type ResetSettings,
   type StoryReset,
@@ -94,7 +95,11 @@ function storiesOf(
   file: string,
   preview: keyof typeof previews,
 ): readonly StoryReset[] {
-  return classifyStubs(storyProgram(file), previewTest(preview)).stories;
+  return classifyStubs(
+    storyProgram(file),
+    previewTest(preview),
+    defaultTestTags,
+  ).stories;
 }
 
 function storyProgram(file: string): unknown {
@@ -133,7 +138,11 @@ describe('classifyStubs stub verdicts', () => {
     it(`gives the stubs of ${file} under the ${preview} preview the verdicts ${verdicts.join(', ')}`, () => {
       const program = storyProgram(file);
 
-      const { stubs } = classifyStubs(program, previewTest(preview));
+      const { stubs } = classifyStubs(
+        program,
+        previewTest(preview),
+        defaultTestTags,
+      );
 
       assert.deepEqual(
         stubs,
@@ -159,6 +168,7 @@ describe('classifyStubs parameter reading', () => {
         'X.stories.ts',
       ),
       {},
+      defaultTestTags,
     ).stubs.map(({ verdict }) => verdict);
   }
 
@@ -695,7 +705,7 @@ export const A = {
 describe('classifyStubs tag filter', () => {
   function verdictsOf(
     source: string,
-    testTags?: TestTags,
+    testTags = defaultTestTags,
   ): readonly StubVerdict[] {
     return classifyStubs(
       parseProgram(
@@ -708,13 +718,7 @@ describe('classifyStubs tag filter', () => {
   }
 
   function testTags(rule: Partial<TestTags>): TestTags {
-    return {
-      previewTags: [],
-      include: ['test'],
-      exclude: [],
-      skip: [],
-      ...rule,
-    };
+    return { ...defaultTestTags, ...rule };
   }
 
   it('leaves out a story without a tag that include names', () => {
@@ -726,6 +730,51 @@ export const B = { tags: ['smoke'], args: { g: fn().mockReturnValue(1) } };`,
     );
 
     assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('keeps a story without the test tag when include is empty', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { tags: ['!test'], parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ include: [] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('gives a story with a play the play-fn tag', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { play: () => undefined, parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ include: ['play-fn'] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('gives a story assigned a play the play-fn tag', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { parameters: { test: { mockReset: true } } };
+A.play = () => undefined;
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ include: ['play-fn'] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('gives the stories of a meta with a play the play-fn tag', () => {
+    const verdicts = verdictsOf(
+      `export default { play: () => undefined, parameters: { test: { restoreMocks: false } } };
+export const A = { parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ include: ['play-fn'] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
   });
 
   it('leaves out a story with a tag that exclude names', () => {
@@ -812,6 +861,52 @@ export const B = { args: { g: fn().mockReturnValue(1) } };`,
     );
 
     assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads tags assigned to a story over the tags it declares', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { tags: ['!test'], parameters: { test: { mockReset: true } } };
+A.tags = ['test'];
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('keeps a factory story whose input is assigned the tag !test', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ parameters: { test: { mockReset: true } } });
+A.input.tags = ['!test'];
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('leaves out a factory story assigned the tag !test', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ parameters: { test: { mockReset: true } } });
+A.tags = ['!test'];
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it("keeps a story made by .extend() on a story tagged !test, as Storybook's Vitest transform reads only the extend argument's tags", () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({});
+export const A = meta.story({ tags: ['!test'] });
+export const B = A.extend({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
   });
 });
 

@@ -8,6 +8,7 @@ import { getInterpretedFile } from 'storybook/internal/common';
 import { loadConfig } from 'storybook/internal/csf-tools';
 
 import { isRecord } from './is-record.ts';
+import type { LoadResult } from './loader-result.ts';
 import { field } from './node-field.ts';
 import { lzStorybookOptions, vitestConfigFile } from './options.ts';
 import { packageName } from './package-name.ts';
@@ -34,21 +35,14 @@ export interface StorybookProject {
   readonly testTags: TestTags;
 }
 
-type LoadResult =
-  | {
-      readonly kind: 'loaded';
-      readonly storyFiles: readonly string[];
-      readonly pluginNames: readonly string[];
-    }
-  | { readonly kind: 'no-main' }
-  | { readonly kind: 'failed'; readonly error: string };
-
 type VitestTags =
   | {
       readonly kind: 'resolved';
       readonly tags: Omit<TestTags, 'previewTags'>;
     }
-  | { readonly kind: 'failed'; readonly error: string };
+  | { readonly kind: 'failed'; readonly error: string }
+  | { readonly kind: 'no-vitest' }
+  | { readonly kind: 'unreadable' };
 
 const childFile = fileURLToPath(
   new URL(
@@ -94,17 +88,10 @@ function loadProject(
     configDir,
     vitestConfigFile,
   );
-  const previewTest = readPreview(configDir);
-  const previewTags = readPreviewTags(configDir);
-
-  if (vitestTags.kind === 'failed') {
-    log.warn(
-      `${packageName}: Vitest could not load ${vitestConfigFile ?? `its config from ${process.cwd()}`}, so the tested stories are the stories tagged test: ${vitestTags.error}`,
-    );
-  }
+  const { test: previewTest, tags: previewTags } = readPreview(configDir, log);
 
   const testTags = {
-    ...(vitestTags.kind === 'resolved' ? vitestTags.tags : defaultTestTags),
+    ...tagFilter(vitestTags, vitestConfigFile, log),
     previewTags,
   };
 
@@ -133,6 +120,39 @@ function loadProject(
       );
 
       return fallbackProject(configDir, previewTest, testTags);
+    }
+  }
+}
+
+function tagFilter(
+  vitestTags: VitestTags,
+  vitestConfigFile: string | undefined,
+  log: ProjectLog,
+): Omit<TestTags, 'previewTags'> {
+  switch (vitestTags.kind) {
+    case 'resolved': {
+      return vitestTags.tags;
+    }
+    case 'failed': {
+      log.warn(
+        `${packageName}: Vitest could not load ${vitestConfigFile ?? `its config from ${process.cwd()}`}, so the tested stories are the stories tagged test: ${vitestTags.error}`,
+      );
+
+      return defaultTestTags;
+    }
+    case 'no-vitest': {
+      log.warn(
+        `${packageName}: Vitest is not installed, so the tested stories are the stories tagged test`,
+      );
+
+      return defaultTestTags;
+    }
+    case 'unreadable': {
+      log.warn(
+        `${packageName}: the Storybook loader wrote a tag filter of an unknown shape, so the tested stories are the stories tagged test`,
+      );
+
+      return defaultTestTags;
     }
   }
 }
@@ -178,36 +198,34 @@ function fallbackProject(
   };
 }
 
-/** Storybook 10.6.5 vitest-plugin index.ts `extractTagsFromPreview`. */
-function readPreviewTags(configDir: string): readonly string[] {
+/** The tags are read as Storybook 10.6.5 vitest-plugin index.ts `extractTagsFromPreview` reads them. */
+function readPreview(
+  configDir: string,
+  log: ProjectLog,
+): { readonly test: ResetSettings; readonly tags: readonly string[] } {
   const file = getInterpretedFile(join(configDir, 'preview'));
 
   if (file === undefined) {
-    return [];
+    return { test: {}, tags: [] };
   }
 
+  const code = readFileSync(file, 'utf8');
+
   try {
-    const tags: unknown = loadConfig(readFileSync(file, 'utf8'), file)
+    const tags: unknown = loadConfig(code, file)
       .parse()
       .getFieldValue(['tags']);
 
-    return isStringArray(tags) ? tags : [];
-  } catch {
-    return [];
-  }
-}
+    return {
+      test: readPreviewTest(parseProgram(code, file)),
+      tags: isStringArray(tags) ? tags : [],
+    };
+  } catch (error) {
+    log.warn(
+      `${packageName}: could not parse ${file}, so its parameters.test is unknown and its tags are left out: ${String(error)}`,
+    );
 
-function readPreview(configDir: string): ResetSettings {
-  const file = getInterpretedFile(join(configDir, 'preview'));
-
-  if (file === undefined) {
-    return {};
-  }
-
-  try {
-    return readPreviewTest(parseProgram(readFileSync(file, 'utf8'), file));
-  } catch {
-    return unreadableSettings;
+    return { test: unreadableSettings, tags: [] };
   }
 }
 
@@ -229,37 +247,55 @@ function loadStorybook(
       ],
       { stdio: 'ignore' },
     );
-    const value: unknown = JSON.parse(readFileSync(resultFile, 'utf8'));
 
-    return {
-      storybook: parseResult(value),
-      vitestTags: parseTestTags(field(value, 'testTags')),
-    };
+    return parseLoaderResult(JSON.parse(readFileSync(resultFile, 'utf8')));
   } finally {
     rmSync(resultDir, { recursive: true, force: true });
   }
 }
 
+/** Parses the result file of the Storybook loader child, which `LoaderResult` describes. */
+export function parseLoaderResult(value: unknown): {
+  readonly storybook: LoadResult;
+  readonly vitestTags: VitestTags;
+} {
+  return {
+    storybook: parseResult(value),
+    vitestTags: parseTestTags(field(value, 'testTags')),
+  };
+}
+
 function parseTestTags(value: unknown): VitestTags {
+  const kind = field(value, 'kind');
   const error = field(value, 'error');
 
-  if (field(value, 'kind') === 'failed' && typeof error === 'string') {
-    return { kind: 'failed', error };
+  if (kind === 'failed' && typeof error === 'string') {
+    return { kind, error };
   }
 
-  const tagList = (key: string): readonly string[] => {
-    const tags = field(value, key);
+  if (kind === 'no-vitest') {
+    return { kind };
+  }
 
-    return typeof tags === 'string' ? tags.split(',').filter(Boolean) : [];
-  };
-  const include = tagList('include');
+  const values = ['include', 'exclude', 'skip'].map((key) => field(value, key));
+
+  if (
+    kind !== 'resolved' ||
+    !values.every((tags) => tags === undefined || typeof tags === 'string')
+  ) {
+    return { kind: 'unreadable' };
+  }
+
+  const [include, exclude, skip] = values.map((tags) =>
+    typeof tags === 'string' ? tags.split(',').filter(Boolean) : undefined,
+  );
 
   return {
     kind: 'resolved',
     tags: {
-      include: include.length > 0 ? include : defaultTestTags.include,
-      exclude: tagList('exclude'),
-      skip: tagList('skip'),
+      include: include ?? defaultTestTags.include,
+      exclude: exclude ?? [],
+      skip: skip ?? [],
     },
   };
 }
