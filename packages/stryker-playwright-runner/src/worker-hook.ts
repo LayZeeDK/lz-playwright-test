@@ -28,6 +28,7 @@ import {
 } from './playwright-internals.ts';
 import {
   frameReadTimeoutMs,
+  hookNamespaceEnv,
   installErrorSuffix,
   type PageSettings,
   readRunSettings,
@@ -136,7 +137,7 @@ if (
   Reflect.set(globalThis, installed, installed);
 
   try {
-    install(createRequire(entry), settings);
+    install(createRequire(entry), settings, process.env[hookNamespaceEnv]);
   } catch (error) {
     try {
       fs.writeFileSync(

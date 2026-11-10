@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 import { Instrumenter } from '@stryker-mutator/instrumenter';
 
-import { readSnapshotDir } from '../../src/protocol.ts';
+import { hookNamespaceEnv, readSnapshotDir } from '../../src/protocol.ts';
 import { mergeCoverage } from '../../src/run-result.ts';
 import {
   type ServerControl,
@@ -18,7 +18,7 @@ import {
   testIdHeader,
   writeServerControl,
 } from '../../src/server-protocol.ts';
-import { logger, tempTree } from './doubles.ts';
+import { hookNamespace, logger, tempTree } from './doubles.ts';
 import { serverHookUrl } from './server-fake.ts';
 
 export const tlsCertPath = fileURLToPath(
@@ -41,10 +41,8 @@ export const smallRequestIds = ['1', '2', '3', '4', '5', '7'];
 export const moduleScopeAndBigRequestIds = ['0', ...bigRequestIds];
 export const moduleScopeAndSmallRequestIds = ['0', ...smallRequestIds];
 const testIdsTheseTestsSend = ['big', 'small'];
-const withoutTestRunnerHooksAndActiveMutant = {
-  NODE_OPTIONS: undefined,
-  [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: undefined,
-};
+// Under Stryker the runner's active mutant reaches the server, where it is the hook's, not the app's.
+export const appActiveMutantEnv = '__STRYKER_HOOK_TEST_ACTIVE_MUTANT__';
 type ServerProgram =
   | 'answer'
   | 'answer-continue'
@@ -63,7 +61,6 @@ type ServerProgram =
   | 'window-read-while-open'
   | 'wrapped-emit';
 let instrumented = '';
-let appMutantIds: ReadonlySet<string> = new Set();
 
 export async function instrumentApp() {
   const result = await new Instrumenter(logger().log).instrument(
@@ -85,8 +82,12 @@ export async function instrumentApp() {
       '7 ""',
     ],
   );
-  instrumented = file.content;
-  appMutantIds = new Set(result.mutants.map(({ id }) => id));
+  instrumented = file.content
+    .replaceAll(INSTRUMENTER_CONSTANTS.NAMESPACE, hookNamespace)
+    .replaceAll(
+      INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE,
+      appActiveMutantEnv,
+    );
 }
 
 export async function startServer(
@@ -117,6 +118,8 @@ export async function startServer(
   const child = spawn(
     process.execPath,
     [
+      '--import',
+      new URL('exit-when-stdin-ends.mjs', import.meta.url).href,
       ...hooks.flatMap((hook) => ['--import', hook]),
       path.join(dir, 'server.mjs'),
       ...args,
@@ -124,11 +127,11 @@ export async function startServer(
     {
       env: {
         ...process.env,
-        ...withoutTestRunnerHooksAndActiveMutant,
         [serverDirEnv]: serverDir,
+        [hookNamespaceEnv]: hookNamespace,
         ...env,
       },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     },
   );
   let stderr = '';
@@ -138,8 +141,10 @@ export async function startServer(
   });
   const exited = once(child, 'exit');
   exited.catch(() => undefined);
+  // Not a kill: on Windows that runs no exit listener, so the test runner's hook in the server would lose the
+  // coverage it writes as the server exits.
   t.after(async () => {
-    child.kill();
+    child.stdin.end();
     await exited;
   });
   const exitedFirst = exited.then(([code]) => {
@@ -224,7 +229,5 @@ export function perTestKeysOf(outDir: string): string[] {
 export function appMutantIdsOf(
   hits: Record<string, number> | undefined,
 ): string[] {
-  return Object.keys(hits ?? {})
-    .filter((id) => appMutantIds.has(id))
-    .sort();
+  return Object.keys(hits ?? {}).sort();
 }

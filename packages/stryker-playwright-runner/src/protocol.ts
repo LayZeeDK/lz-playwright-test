@@ -8,6 +8,12 @@ import { serverSnapshotPrefix } from './server-protocol.ts';
 
 export const runSettingsEnv = 'LZ_STRYKER_PLAYWRIGHT_RUN';
 
+/**
+ * The global the hooks manage in place of Stryker's, for the hooks' own tests: under Stryker the test's
+ * instrumented copy of a hook keeps Stryker's global.
+ */
+export const hookNamespaceEnv = 'LZ_STRYKER_PLAYWRIGHT_NAMESPACE';
+
 export const snapshotSuffix = '.ndjson';
 
 export const workerFilePrefix = 'worker-';

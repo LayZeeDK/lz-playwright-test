@@ -7,8 +7,6 @@ import https from 'node:https';
 import path from 'node:path';
 import { before, test } from 'node:test';
 
-import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
-
 import { readSnapshotDir } from '../src/protocol.ts';
 import {
   anyHooked,
@@ -19,6 +17,7 @@ import {
 } from '../src/server-protocol.ts';
 import { withoutPrototypes } from './support/doubles.ts';
 import {
+  appActiveMutantEnv,
   appMutantIdsOf,
   bigRequestIds,
   coverageOf,
@@ -183,7 +182,7 @@ test('a mutant run once at module scope is active only in a server started with 
   assert.equal(await switched.ask({ n: 2 }), 'hi many');
 
   const started = await startServer(t, {
-    env: { [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: '0' },
+    env: { [appActiveMutantEnv]: '0' },
   });
   started.run({ perTest: false, activeMutant: '0' });
 
@@ -203,7 +202,7 @@ test('code the server runs in a vm realm reports no coverage and gets only the m
 
   const started = await startServer(t, {
     server: 'vm-realm-answer',
-    env: { [INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE]: '2' },
+    env: { [appActiveMutantEnv]: '2' },
   });
   started.run({ perTest: false });
 

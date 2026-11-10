@@ -1,6 +1,6 @@
 import http from 'node:http';
 
-const ns = globalThis.__stryker__;
+const ns = globalThis.__stryker_hook_test__;
 const waiting = [];
 setInterval(
   () => waiting.splice(0).forEach((resolve) => resolve(ns.currentTestId)),

@@ -1,7 +1,7 @@
 import http from 'node:http';
 
 const server = http.createServer(async (request, response) => {
-  const ns = globalThis.__stryker__;
+  const ns = globalThis.__stryker_hook_test__;
   const during = ns.currentTestId;
   await null;
   response.end(JSON.stringify([during, ns.currentTestId]));
