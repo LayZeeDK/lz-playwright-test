@@ -4,7 +4,7 @@ import { csfIgnorer, csfIgnorerName } from './csf-ignorer.ts';
 import { playModes } from './options.ts';
 import { storybookReporter } from './reporter.ts';
 import { stubIgnorer } from './stub-ignorer.ts';
-import { stubIgnorerName } from './stub-verdict.ts';
+import { storybookPluginName } from './stub-verdict.ts';
 
 export type { LzStorybookCsfOptions, LzStorybookOptions } from './options.ts';
 export type { LzStorybookReport } from './reporter.ts';
@@ -51,6 +51,10 @@ export const strykerValidationSchema = {
 
 export const strykerPlugins = [
   declareFactoryPlugin(PluginKind.Ignore, csfIgnorerName, csfIgnorer),
-  declareFactoryPlugin(PluginKind.Ignore, stubIgnorerName, stubIgnorer),
-  declareFactoryPlugin(PluginKind.Reporter, stubIgnorerName, storybookReporter),
+  declareFactoryPlugin(PluginKind.Ignore, storybookPluginName, stubIgnorer),
+  declareFactoryPlugin(
+    PluginKind.Reporter,
+    storybookPluginName,
+    storybookReporter,
+  ),
 ];

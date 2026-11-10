@@ -6,7 +6,7 @@ import {
 } from './reset-setting.ts';
 import type { StorybookProject } from './storybook-project.ts';
 
-export const stubIgnorerName = 'lz-storybook';
+export const storybookPluginName = 'lz-storybook';
 
 export const spyStubName = 'LzStorybookSpyStub';
 
@@ -66,5 +66,5 @@ export function describeVerdict(verdict: ReasonVerdict): SpyStubReason {
 }
 
 export function spyStubReason(verdict: ReasonVerdict): string {
-  return `${stubIgnorerName}: ${verdict}: ${reasons[verdict]}; ${fix}`;
+  return `${storybookPluginName}: ${verdict}: ${reasons[verdict]}; ${fix}`;
 }
