@@ -403,7 +403,7 @@ function storyNode(init: unknown, bindings: Bindings): unknown {
     : init;
 }
 
-function isTemplateBind(init: unknown): boolean {
+export function isTemplateBind(init: unknown): boolean {
   const [context, ...more] = list(field(init, 'arguments'));
 
   return (

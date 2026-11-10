@@ -323,6 +323,51 @@ export function Primary() {
     assert.deepEqual(verdicts, ['kept']);
   });
 
+  it('reads an arrow function story as having no settings of its own', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+export const B = () => null;`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads a function expression story as having no settings of its own', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+export const B = function () {
+  return null;
+};`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads a Template.bind({}) story as having no settings of its own', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+const Template = (args) => null;
+export const B = Template.bind({});
+B.args = {};`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads a story made by a call other than a template bind as unknown', () => {
+    const verdicts = verdictsOf(
+      `import { makeStory } from './make-story';
+export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+export const B = makeStory({});`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
   it('reads a function story with parameters assigned after it as unknown', () => {
     const verdicts = verdictsOf(
       `export default {

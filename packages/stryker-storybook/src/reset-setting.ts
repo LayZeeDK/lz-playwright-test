@@ -1,5 +1,6 @@
 import {
   annotationFactories,
+  isTemplateBind,
   metaExpressions,
   namedExports,
   storyExports,
@@ -209,8 +210,13 @@ function evaluate(
     case 'BooleanLiteral': {
       return field(current, 'value');
     }
-    case 'FunctionDeclaration': {
+    case 'FunctionDeclaration':
+    case 'FunctionExpression':
+    case 'ArrowFunctionExpression': {
       return undefined;
+    }
+    case 'CallExpression': {
+      return isTemplateBind(current) ? undefined : unknownValue;
     }
     case 'Identifier': {
       const name = field(current, 'name');
