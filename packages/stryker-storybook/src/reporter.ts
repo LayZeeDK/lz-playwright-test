@@ -16,7 +16,7 @@ import type { Reporter } from '@stryker-mutator/api/report';
 import { field, list } from './node-field.ts';
 import { lzStorybookOptions } from './options.ts';
 import { packageName } from './package-name.ts';
-import { parseStoryFile, selfScan, silencedSites } from './self-scan.ts';
+import { selfScan } from './self-scan.ts';
 import {
   isStoryFile,
   storybookProject,
@@ -24,6 +24,7 @@ import {
   type StorybookProject,
 } from './storybook-project.ts';
 import { hasRecords, recordVariable } from './stryker-record.ts';
+import { parseStoryFile, silencedSites } from './stub-findings.ts';
 import { definitionTimeStubs } from './stub-shape.ts';
 import {
   parseSpyStubReason,
