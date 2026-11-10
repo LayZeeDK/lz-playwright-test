@@ -276,17 +276,40 @@ function evaluate(
         : unknownValue;
     }
     case 'ObjectExpression': {
-      return Object.fromEntries(
-        list(field(current, 'properties')).map((property) => [
-          String(field(property, 'key', 'name')),
-          evaluate(field(property, 'value'), bindings),
-        ]),
+      const parts = list(field(current, 'properties')).map((property) =>
+        objectPart(property, bindings),
       );
+
+      return parts.includes(unknownValue)
+        ? unknownValue
+        : Object.fromEntries(
+            parts.flatMap((part) =>
+              isRecord(part) ? Object.entries(part) : [],
+            ),
+          );
     }
     default: {
       return unknownValue;
     }
   }
+}
+
+function objectPart(
+  property: unknown,
+  bindings: ReadonlyMap<string, unknown>,
+): unknown {
+  if (field(property, 'type') === 'SpreadElement') {
+    return evaluate(field(property, 'argument'), bindings);
+  }
+
+  if (field(property, 'computed') === true) {
+    return unknownValue;
+  }
+
+  return {
+    [String(field(property, 'key', 'name') ?? field(property, 'key', 'value'))]:
+      evaluate(field(property, 'value'), bindings),
+  };
 }
 
 const unknownValue = Symbol('unknown');

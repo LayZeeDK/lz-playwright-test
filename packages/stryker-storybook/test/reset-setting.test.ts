@@ -147,6 +147,68 @@ describe('classifyStubs stub verdicts', () => {
   });
 });
 
+describe('classifyStubs parameter reading', () => {
+  function verdictsOf(source: string): readonly StubVerdict[] {
+    return classifyStubs(
+      parseProgram(
+        `import { fn } from 'storybook/test';\n${source}`,
+        'X.stories.ts',
+      ),
+      {},
+    ).stubs.map(({ verdict }) => verdict);
+  }
+
+  it('reads a quoted key by its value', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { 'test': { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads parameters with a spread element as unknown', () => {
+    const verdicts = verdictsOf(
+      `import { shared } from './shared';
+export default { parameters: { ...shared } };
+export const A = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads the settings a story spreads in from a local object', () => {
+    const verdicts = verdictsOf(
+      `export default {};
+const Base = { parameters: { test: { restoreMocks: false } } };
+export const A = { ...Base, args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads parameters with a computed key as unknown', () => {
+    const verdicts = verdictsOf(
+      `import { key } from './key';
+export default { parameters: { [key]: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a preview whose parameters spread an import as unreadable', () => {
+    const settings = readPreviewTest(
+      parseProgram(
+        `import { shared } from './shared';\nexport default { parameters: { ...shared } };\n`,
+        'preview.ts',
+      ),
+    );
+
+    assert.equal(settings, 'unreadable');
+  });
+});
+
 describe('classifyStubs', () => {
   const recordedPreviews = ['default', 'clear', 'off', 'reset'] as const;
   const recordedRows = Object.keys(isRecord(outcomes) ? outcomes : {}).flatMap(
