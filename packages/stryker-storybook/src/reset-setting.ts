@@ -1,11 +1,11 @@
 import { combineTags } from 'storybook/internal/csf';
 
 import {
-  type Assignment,
   csfFile,
   defaultExport,
   isTemplateBind,
   namedExports,
+  runtimeAssignments,
   storyArgument,
   topLevelBindings,
   unwrap,
@@ -181,22 +181,6 @@ function storyValue(
   return field(unwrap(init), 'callee', 'property', 'name') === 'extend'
     ? unknownValue
     : evaluate(storyArgument(init), bindings);
-}
-
-/** Storybook 10.6.5 composes a factory story from the keys of the `input` that `defineStory` closed over, so only writes below `input` count. */
-function runtimeAssignments(
-  assignments: readonly Assignment[],
-  isFactory: boolean,
-): readonly Assignment[] {
-  if (!isFactory) {
-    return assignments;
-  }
-
-  return assignments.flatMap((assignment) =>
-    assignment.path[0] === 'input' && assignment.path.length > 1
-      ? [{ ...assignment, path: assignment.path.slice(1) }]
-      : [],
-  );
 }
 
 function written(
