@@ -27,8 +27,8 @@ mutators from there, so build first (the Nx targets below do).
   `@layzee/stryker-playwright-mutators`.
 - `packages/stryker-mutator-install`: the private code that both mutator packages use to put their mutators into
   Stryker, package `@layzee/stryker-mutator-install`.
-- `packages/<package>/stryker.config.mjs`: in the JSX mutators, the Playwright mutators and the install code, a
-  Stryker config that mutates the package's own source.
+- `packages/<package>/stryker.config.mjs`: in the runner, the JSX mutators, the Playwright mutators and the install
+  code, a Stryker config that mutates the package's own source with its unit tests (`test/*.test.ts`).
 - `apps/demo-app` (Nx project `@layzee/demo-app`): the demo app and its Playwright component tests
   (`playwright.components.config.mts`).
 - `apps/demo-app-e2e`: the demo app's Playwright e2e tests.
@@ -36,7 +36,7 @@ mutators from there, so build first (the Nx targets below do).
   `stryker.e2e.ui.config.ts` adds the JSX mutators to the e2e run.
 - `stryker.base.ts`: the settings that all four Stryker configs share. The package configs share its reporters
   and ignore list.
-- `stryker.package.ts`: `packageConfig(name)`, the shared body of the three package `stryker.config.mjs` files.
+- `stryker.package.ts`: `packageConfig(name)`, the shared body of the four package `stryker.config.mjs` files.
 - `stryker.e2e.command.config.ts`: the demo baselines on Stryker's `command` runner, selected with
   `STRYKER_BASELINE=define` or `STRYKER_BASELINE=off`.
 - `oss/`: the configs, patches, and scripts that copies of four open-source repos needed for a Stryker
