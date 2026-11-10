@@ -10,8 +10,9 @@ import { isRecord } from '../src/is-record.ts';
 import { instrument } from './support/instrument.ts';
 
 const root = fileURLToPath(new URL('fixtures/csf-oracle/', import.meta.url));
-const configDir = `${root}.storybook`;
-const fileName = `${root}src/Button.stories.tsx`;
+const noMain = fileURLToPath(new URL('fixtures/no-main/', import.meta.url));
+const configDir = `${noMain}.storybook`;
+const fileName = `${noMain}src/Button.stories.tsx`;
 const fixtures = [
   ...parseFixtures(JSON.parse(readFileSync(`${root}fixtures.json`, 'utf8'))),
   {
