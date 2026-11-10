@@ -54,7 +54,7 @@ export function csfShapes(program: unknown): CsfShapes {
       initOf(field(specifier, 'local', 'name'), body),
     ),
   ]
-    .map((init) => storyNode(unwrap(init)))
+    .map((init) => storyNode(unwrap(init), body))
     .filter(
       (init) =>
         (field(init, 'type') === 'ObjectExpression' ||
@@ -143,8 +143,12 @@ function assigned(statement: unknown, property: string): readonly unknown[] {
     : [];
 }
 
-function storyNode(init: unknown): unknown {
+function storyNode(init: unknown, body: readonly unknown[]): unknown {
   const method = field(init, 'callee', 'property', 'name');
+
+  if (method === 'bind') {
+    return followed(field(init, 'callee', 'object'), body);
+  }
 
   return method === 'story' || method === 'extend'
     ? list(field(init, 'arguments'))[0]

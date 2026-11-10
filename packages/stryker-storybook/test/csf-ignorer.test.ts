@@ -235,6 +235,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('keeps the template of a CSF2 Template.bind({}) story as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nconst Template = (args) =>\n  render(args);\nexport const A = Template.bind({});",
+        )
+      ).filter((outcome) => outcome.includes('ArrowFunction')),
+      [`2 ArrowFunction ${storyReason}`],
+    );
+  });
+
   it('keeps the object passed to meta.story() as written', async () => {
     const { outcomes } = setup();
 
