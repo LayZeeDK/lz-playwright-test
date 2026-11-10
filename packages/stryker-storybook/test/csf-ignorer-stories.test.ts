@@ -311,6 +311,23 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('places the mutants of a definePreview() call exported from a story file', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const P = sb.definePreview({ tags: ['a'] });",
+        )
+      ).filter((outcome) => outcome.startsWith('2 ')),
+      [
+        '2 ObjectLiteral placed',
+        '2 ArrayDeclaration placed',
+        '2 StringLiteral placed',
+      ],
+    );
+  });
+
   it("places a story's globals in 'mutate' mode", async () => {
     const { outcomes } = setup('mutate');
 
