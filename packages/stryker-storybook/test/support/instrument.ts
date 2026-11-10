@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 
 import type { Ignorer } from '@stryker-mutator/api/ignore';
 
-import { isRecord } from '../../src/is-record.ts';
+import { field } from '../../src/node-field.ts';
 
 export interface Instrumented {
   readonly code: string;
@@ -102,11 +102,4 @@ export async function instrument(
       };
     }),
   };
-}
-
-function field(value: unknown, ...keys: readonly string[]): unknown {
-  return keys.reduce<unknown>(
-    (found, key) => (isRecord(found) ? found[key] : undefined),
-    value,
-  );
 }
