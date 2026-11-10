@@ -1092,7 +1092,7 @@ export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
     assert.deepEqual(verdicts, ['kept']);
   });
 
-  it('leaves out a factory story with a tag that skip names when the .test() call that negates it is named by a template literal, which the index leaves out', () => {
+  it('reads a factory story with a tag that skip names as unknown when a .test() call is named by a template literal, which the index leaves out', () => {
     const verdicts = verdictsOf(
       `import preview from '../.storybook/preview';
 const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
@@ -1102,7 +1102,7 @@ export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
       testTags({ skip: ['slow'] }),
     );
 
-    assert.deepEqual(verdicts, ['kept']);
+    assert.deepEqual(verdicts, ['unknown']);
   });
 
   it('reads a story with a tag that skip names as unknown when a .test() call whose name cannot be read comes before the call the index names', () => {
@@ -1148,6 +1148,140 @@ export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
     assert.deepEqual(verdicts, ['unknown']);
   });
 
+  it('reads a story with a tag that skip names as unknown when a .test() call through a computed member comes before a top-level call of the same name', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ tags: ['slow'], parameters: { test: { mockReset: true } } });
+A['test']('runs', { tags: ['!slow'] }, async () => undefined);
+A.test('runs', async () => undefined);
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story with a tag that skip names as unknown when a nested .test() call and a top-level optional call of the same name give as many calls as the index lists', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ tags: ['slow'], parameters: { test: { mockReset: true } } });
+{ A.test('runs', { tags: ['!slow'] }, async () => undefined); }
+A.test?.('runs', async () => undefined);
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a factory story with a tag that skip names as unknown when a top-level .test() call is optional, which the index leaves out', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ tags: ['slow'], parameters: { test: { mockReset: true } } });
+A.test?.('runs', { tags: ['!slow'] }, async () => undefined);
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a factory story as unknown when a top-level .test() call has one argument, which the index leaves out', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ tags: ['slow'], parameters: { test: { mockReset: true } } });
+A.test('runs');
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a factory story as unknown when its input is given parameters by a logical assignment', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({});
+A.input.parameters ??= { test: { mockReset: true } };
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a factory story as unknown when a function returns it', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({});
+function same() { return A; }
+same().input.parameters = { test: { mockReset: true } };
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story with a tag that skip names as unknown when it is passed to a function inside a spread', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+import { addSmoke } from './smoke';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ tags: ['slow'], parameters: { test: { mockReset: true } } });
+const smoke = { ...addSmoke(A) };
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story with a tag that skip names as unknown when it is passed to a function', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+import { addSmoke } from './smoke';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ tags: ['slow'], parameters: { test: { mockReset: true } } });
+addSmoke(A);
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a factory story as unknown when an alias of it is assigned parameters', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({});
+const alias = A;
+alias.input.parameters = { test: { mockReset: true } };
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a factory story named only by its declaration, its export, an indexed .test() call and a member assignment', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ tags: ['slow'] });
+A.input.parameters = { test: { mockReset: true } };
+A.test('runs', { tags: ['!slow'] }, async () => undefined);
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
   it('keeps a factory story with a tag that skip names when its first of two differently named .test() calls negates that tag', () => {
     const verdicts = verdictsOf(
       `import preview from '../.storybook/preview';
@@ -1155,6 +1289,20 @@ const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
 export const A = meta.story({ tags: ['slow'], parameters: { test: { mockReset: true } } });
 A.test('first', { tags: ['!slow'] }, async () => undefined);
 A.test('second', async () => undefined);
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('keeps a factory story with a tag that skip names when its second of two differently named .test() calls negates that tag', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ tags: ['slow'], parameters: { test: { mockReset: true } } });
+A.test('first', async () => undefined);
+A.test('second', { tags: ['!slow'] }, async () => undefined);
 export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
       testTags({ skip: ['slow'] }),
     );
