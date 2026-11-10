@@ -44,15 +44,8 @@ export function csfShapes(program: unknown): CsfShapes {
   ];
 
   const stories = [
-    ...body.flatMap((statement) => [
-      ...list(field(statement, 'declaration', 'declarations')).map(
-        (declarator) => field(declarator, 'init'),
-      ),
-      ...assigned(statement, 'story'),
-    ]),
-    ...specifiers.map((specifier) =>
-      initOf(field(specifier, 'local', 'name'), body),
-    ),
+    ...namedExports(program).map(({ init }) => init),
+    ...body.flatMap((statement) => assigned(statement, 'story')),
   ]
     .map((init) => storyNode(unwrap(init)))
     .filter(
@@ -101,6 +94,35 @@ export function csfShapes(program: unknown): CsfShapes {
       ...specifiers.map((specifier) => field(specifier, 'exported')),
     ]),
   };
+}
+
+export interface NamedExport {
+  readonly name: string;
+  readonly init: unknown;
+}
+
+export function namedExports(program: unknown): readonly NamedExport[] {
+  const body = list(field(program, 'body'));
+
+  return body
+    .filter(
+      (statement) => field(statement, 'type') === 'ExportNamedDeclaration',
+    )
+    .flatMap((statement) => [
+      ...list(field(statement, 'declaration', 'declarations')).map(
+        (declarator) => ({
+          name: field(declarator, 'id', 'name'),
+          init: field(declarator, 'init'),
+        }),
+      ),
+      ...list(field(statement, 'specifiers')).map((specifier) => ({
+        name: field(specifier, 'exported', 'name'),
+        init: initOf(field(specifier, 'local', 'name'), body),
+      })),
+    ])
+    .flatMap(({ name, init }) =>
+      typeof name === 'string' && name !== 'default' ? [{ name, init }] : [],
+    );
 }
 
 function withInit(

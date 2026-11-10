@@ -1,3 +1,4 @@
+import { namedExports } from './csf.ts';
 import { isRecord } from './is-record.ts';
 import { definitionTimeStubs } from './stub-shape.ts';
 
@@ -37,14 +38,12 @@ export function readPreviewTest(program: unknown): ResetSettings {
     return testSettings(member(exported, 'parameters'));
   }
 
-  const parameters = namedExports(body).find(
-    (declarator) => field(declarator, 'id', 'name') === 'parameters',
+  const parameters = namedExports(program).find(
+    ({ name }) => name === 'parameters',
   );
 
   return testSettings(
-    parameters === undefined
-      ? undefined
-      : evaluate(field(parameters, 'init'), bindings),
+    parameters === undefined ? undefined : evaluate(parameters.init, bindings),
   );
 }
 
@@ -68,14 +67,6 @@ function testSettings(parameters: unknown): ResetSettings {
   );
 }
 
-function namedExports(body: readonly unknown[]): readonly unknown[] {
-  return body.flatMap((statement) =>
-    field(statement, 'type') === 'ExportNamedDeclaration'
-      ? list(field(statement, 'declaration', 'declarations'))
-      : [],
-  );
-}
-
 export function classifyStubs(
   program: unknown,
   previewTest: ResetSettings,
@@ -92,24 +83,15 @@ export function classifyStubs(
       'parameters',
     ),
   );
-  const declared = namedExports(body).flatMap((declarator) => {
-    const name = field(declarator, 'id', 'name');
-    const init = field(declarator, 'init');
+  const declared = namedExports(program).map(({ name, init }) => {
     const storyTest = testSettings(
       member(evaluate(annotations(init), bindings), 'parameters'),
     );
 
-    return typeof name === 'string'
-      ? [
-          {
-            story: {
-              name,
-              branch: branchOf([previewTest, metaTest, storyTest]),
-            },
-            init,
-          },
-        ]
-      : [];
+    return {
+      story: { name, branch: branchOf([previewTest, metaTest, storyTest]) },
+      init,
+    };
   });
   const stories = declared.map(({ story }) => story);
   const stubs = definitionTimeStubs(program).map(({ start }) => {

@@ -207,6 +207,19 @@ export const A = { args: { g: fn().mockReturnValue(1) } };`,
 
     assert.equal(settings, 'unreadable');
   });
+
+  it('finds a story exported through an export specifier', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+const A = {
+  parameters: { test: { mockReset: true } },
+  args: { g: fn().mockReturnValue(1) },
+};
+export { A };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
 });
 
 describe('classifyStubs', () => {
