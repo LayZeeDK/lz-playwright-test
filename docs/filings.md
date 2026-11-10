@@ -899,6 +899,18 @@ predicate. Evidence: `sb-s3f/cycles.log` cycles 5 and 6.
 union type `declareFactoryPlugin` returns is a type error that node:test under type stripping never reports; red and
 green both ran clean, and the gate's typecheck found it. Evidence: `sb-s3f/notes.md`, `sb-s3f/gate1.log`.
 
+**O121. No case for the right transformation with one wrong detail.** S3 part (e), cycle 1: the first green was the
+right change with one line wrong (a Node module-hook quirk: the fallback resolve kept the failed attempt's parent URL),
+and it broke four earlier tests. `test-first.md` Green says to undo a failed attempt and apply `lz-tpp` again; redoing
+the same transformation would only add churn, so the worker fixed the line in place and logged it. Neither the
+reference nor `lz-tpp` separates a wrong transformation from a right one with a defect. Evidence: `sb-s3g/cycles.log`
+cycle 1.
+
+**O122. The not-implemented stub assumes a function under test.** S3 part (e), cycle 1: the change was how a child
+process resolves a module, so there was no production symbol to stub; the red came straight from an assertion, because
+the loader already returned a wrong value (its fallback). `lz-red` step 5's "add the production symbol with a
+not-implemented body" reads as if every red needs one. Close to O113. Evidence: `sb-s3g/notes.md`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
