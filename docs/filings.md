@@ -996,6 +996,25 @@ first gave those tests the import (green before and after), then wrote the red. 
 `test-after` pin, nor a source refactoring (O126). Evidence: the main checkout's commit 2f3e9cf, its six rewritten
 tests.
 
+**O135. A change that slows the spec slows every later cycle, and a narrowed run changes the summary.** In the
+Storybook tag filter work, each project load started resolving a Vitest config in a child process, so the project
+spec went from about 10 s to 18-26 s per run, paid by every Red, Green, refactor and condition-check run of cycles
+9-13. Running one test with `--test-name-pattern` would cut that, but its summary lines count only the matched tests,
+and neither `lz-red` nor `lz-tpp` says whether a narrowed run is enough for Green or a refactor step. Evidence:
+`tagsfix/cycles.log` cycles 9-13 and their runs' `duration_ms` lines.
+
+**O136. Fixture files written for a red have no place in the cycle.** In the same work, cycles 9-13 each needed new
+fixture files (a Storybook `main.ts`, a story, a Vitest config) before the test could go red, and the fixture layout
+changed once after a gate run (a lint rule only reads fixture configs at one depth). The cycle log has no field for
+them, and `lz-red` treats the test file as the whole red. Evidence: commit 6214801's `test/fixtures/vitest-tags*`
+files.
+
+**O137. Adding a defaulted parameter changes a function passed point-free to an array method.** In the same work, a
+Green attempt gave `annotations(key, from = assignments)` a second parameter; `staticKeys.flatMap(annotations)` then
+passed the index as `from`, and all 38 tests of the spec failed. The undo-and-retry rule caught it, but neither
+`lz-tpp` nor `lz-refactor` (Add Parameter, Parameterize Function) warns that such a function receives the index.
+Evidence: `tagsfix/cycles.log` cycle 19 and its first Green run (`fail 38`).
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
