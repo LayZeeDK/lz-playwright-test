@@ -53,24 +53,13 @@ export function csfShapes(program: unknown): CsfShapes {
       .find((value) => value !== undefined),
   );
   const stories = [
-    ...body.flatMap((statement) => [
-      ...list(field(statement, 'declaration', 'declarations')).map(
-        (declarator) => ({
-          name: field(declarator, 'id', 'name'),
-          init: field(declarator, 'init'),
-        }),
-      ),
-      ...assigned(statement, 'story').map((init) => ({
+    ...namedExports(program),
+    ...body.flatMap((statement) =>
+      assigned(statement, 'story').map((init) => ({
         name: field(statement, 'expression', 'left', 'object', 'name'),
         init,
       })),
-    ]),
-    ...specifiers.map((specifier) => ({
-      name:
-        field(specifier, 'exported', 'name') ??
-        field(specifier, 'exported', 'value'),
-      init: initOf(field(specifier, 'local', 'name'), body),
-    })),
+    ),
   ]
     .filter(({ name }) => isExportStory(name, includeStories, excludeStories))
     .map(({ init }) => storyNode(unwrap(init), body))
@@ -132,6 +121,37 @@ export function csfShapes(program: unknown): CsfShapes {
 
 function nodeSet(values: readonly unknown[]): ReadonlySet<unknown> {
   return new Set(values.filter((value) => value !== undefined));
+}
+
+export interface NamedExport {
+  readonly name: string;
+  readonly init: unknown;
+}
+
+export function namedExports(program: unknown): readonly NamedExport[] {
+  const body = list(field(program, 'body'));
+
+  return body
+    .filter(
+      (statement) => field(statement, 'type') === 'ExportNamedDeclaration',
+    )
+    .flatMap((statement) => [
+      ...list(field(statement, 'declaration', 'declarations')).map(
+        (declarator) => ({
+          name: field(declarator, 'id', 'name'),
+          init: field(declarator, 'init'),
+        }),
+      ),
+      ...list(field(statement, 'specifiers')).map((specifier) => ({
+        name:
+          field(specifier, 'exported', 'name') ??
+          field(specifier, 'exported', 'value'),
+        init: initOf(field(specifier, 'local', 'name'), body),
+      })),
+    ])
+    .flatMap(({ name, init }) =>
+      typeof name === 'string' && name !== 'default' ? [{ name, init }] : [],
+    );
 }
 
 function withInit(

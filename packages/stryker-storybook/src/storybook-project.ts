@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { globSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { extname, join, resolve } from 'node:path';
+import { basename, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { getInterpretedFile } from 'storybook/internal/common';
@@ -9,7 +9,7 @@ import { getInterpretedFile } from 'storybook/internal/common';
 import { isRecord } from './is-record.ts';
 import { packageName } from './package-name.ts';
 import { parseProgram } from './parse.ts';
-import { readPreviewTest } from './reset-setting.ts';
+import { readPreviewTest, type ResetSettings } from './reset-setting.ts';
 import { mockTransformerPluginName } from './stryker-record.ts';
 
 export interface ProjectLog {
@@ -21,7 +21,7 @@ export interface StorybookProject {
   readonly configDir: string;
   readonly storyFiles: ReadonlySet<string> | 'fallback';
   readonly transformer: 'seen' | 'not-seen';
-  readonly previewTest: unknown;
+  readonly previewTest: ResetSettings;
 }
 
 type LoadResult =
@@ -55,6 +55,7 @@ export function storybookProject(
 
 function loadProject(configDir: string, log: ProjectLog): StorybookProject {
   const result = loadStorybook(configDir);
+  const previewTest = readPreview(configDir);
 
   switch (result.kind) {
     case 'loaded': {
@@ -64,7 +65,7 @@ function loadProject(configDir: string, log: ProjectLog): StorybookProject {
         transformer: result.pluginNames.includes(mockTransformerPluginName)
           ? 'seen'
           : 'not-seen',
-        previewTest: readPreview(configDir),
+        previewTest,
       };
     }
     case 'no-main': {
@@ -72,14 +73,14 @@ function loadProject(configDir: string, log: ProjectLog): StorybookProject {
         `${packageName}: no Storybook main file in ${configDir}; story files are the files named *.stories.* or *.story.*`,
       );
 
-      return fallbackProject(configDir);
+      return fallbackProject(configDir, previewTest);
     }
     case 'failed': {
       log.warn(
         `${packageName}: Storybook could not load ${configDir}, so story files are the files named *.stories.* or *.story.*: ${result.error}`,
       );
 
-      return fallbackProject(configDir);
+      return fallbackProject(configDir, previewTest);
     }
   }
 }
@@ -89,10 +90,20 @@ export function isStoryFile(
   fileName: string,
 ): boolean {
   if (project.storyFiles === 'fallback') {
-    return fileName.includes('.stories.') || fileName.includes('.story.');
+    return /\.(?:stories|story)\./.test(basename(fileName));
   }
 
   return project.storyFiles.has(normalizePath(fileName));
+}
+
+export function storyFilePaths(project: StorybookProject): readonly string[] {
+  return project.storyFiles === 'fallback'
+    ? globSync('**/*', {
+        exclude: (path) => basename(path) === 'node_modules',
+      })
+        .map((file) => resolve(file))
+        .filter((file) => isStoryFile(project, file))
+    : [...project.storyFiles];
 }
 
 function normalizePath(path: string): string {
@@ -101,21 +112,30 @@ function normalizePath(path: string): string {
     .replace(/^[a-z]:/, (drive) => drive.toUpperCase());
 }
 
-function fallbackProject(configDir: string): StorybookProject {
+function fallbackProject(
+  configDir: string,
+  previewTest: ResetSettings,
+): StorybookProject {
   return {
     configDir,
     storyFiles: 'fallback',
     transformer: 'not-seen',
-    previewTest: readPreview(configDir),
+    previewTest,
   };
 }
 
-function readPreview(configDir: string): unknown {
+function readPreview(configDir: string): ResetSettings {
   const file = getInterpretedFile(join(configDir, 'preview'));
 
-  return file === undefined
-    ? undefined
-    : readPreviewTest(parseProgram(readFileSync(file, 'utf8'), file));
+  if (file === undefined) {
+    return {};
+  }
+
+  try {
+    return readPreviewTest(parseProgram(readFileSync(file, 'utf8'), file));
+  } catch {
+    return 'unreadable';
+  }
 }
 
 function loadStorybook(configDir: string): LoadResult {

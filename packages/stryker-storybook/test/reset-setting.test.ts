@@ -7,6 +7,7 @@ import { parseProgram } from '../src/parse.ts';
 import {
   classifyStubs,
   readPreviewTest,
+  type ResetSettings,
   type StoryReset,
   type StubVerdict,
 } from '../src/reset-setting.ts';
@@ -55,7 +56,7 @@ function fixture(name: string): URL {
   return new URL(`fixtures/reset-cases/${name}`, import.meta.url);
 }
 
-function previewTest(preview: keyof typeof previews): unknown {
+function previewTest(preview: keyof typeof previews): ResetSettings {
   return readPreviewTest(parseProgram(previews[preview].source, 'preview.ts'));
 }
 
@@ -137,12 +138,92 @@ describe('classifyStubs stub verdicts', () => {
 
       assert.deepEqual(
         stubs,
-        definitionTimeStubs(program).map(({ start }, index) => ({
-          start,
-          verdict: verdicts[index],
-        })),
+        definitionTimeStubs(program).map(
+          ({ start, end, line, once }, index) => ({
+            start,
+            end,
+            line,
+            once,
+            verdict: verdicts[index],
+          }),
+        ),
       );
     });
+  });
+});
+
+describe('classifyStubs parameter reading', () => {
+  function verdictsOf(source: string): readonly StubVerdict[] {
+    return classifyStubs(
+      parseProgram(
+        `import { fn } from 'storybook/test';\n${source}`,
+        'X.stories.ts',
+      ),
+      {},
+    ).stubs.map(({ verdict }) => verdict);
+  }
+
+  it('reads a quoted key by its value', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { 'test': { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads parameters with a spread element as unknown', () => {
+    const verdicts = verdictsOf(
+      `import { shared } from './shared';
+export default { parameters: { ...shared } };
+export const A = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads the settings a story spreads in from a local object', () => {
+    const verdicts = verdictsOf(
+      `export default {};
+const Base = { parameters: { test: { restoreMocks: false } } };
+export const A = { ...Base, args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads parameters with a computed key as unknown', () => {
+    const verdicts = verdictsOf(
+      `import { key } from './key';
+export default { parameters: { [key]: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a preview whose parameters spread an import as unreadable', () => {
+    const settings = readPreviewTest(
+      parseProgram(
+        `import { shared } from './shared';\nexport default { parameters: { ...shared } };\n`,
+        'preview.ts',
+      ),
+    );
+
+    assert.equal(settings, 'unreadable');
+  });
+
+  it('finds a story exported through an export specifier', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+const A = {
+  parameters: { test: { mockReset: true } },
+  args: { g: fn().mockReturnValue(1) },
+};
+export { A };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
   });
 });
 

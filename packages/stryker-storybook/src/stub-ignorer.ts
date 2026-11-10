@@ -3,18 +3,15 @@ import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
 import { isRecord } from './is-record.ts';
 import { lzStorybookOptions } from './options.ts';
-import { classifyStubs } from './reset-setting.ts';
 import {
   isStoryFile,
   storybookProject,
   type ProjectLog,
-  type StorybookProject,
 } from './storybook-project.ts';
-import { definitionTimeStubs } from './stub-shape.ts';
-import { spyStubReason, type ReasonVerdict } from './stub-verdict.ts';
+import { reasonSites, spyStubReason, type ReasonSite } from './stub-verdict.ts';
 
 export function stubIgnorer(options: object, log: ProjectLog): Ignorer {
-  let reasons: ReadonlyMap<unknown, string> = new Map();
+  let sites: readonly ReasonSite[] = [];
 
   return {
     shouldIgnore(path) {
@@ -26,57 +23,23 @@ export function stubIgnorer(options: object, log: ProjectLog): Ignorer {
           lzStorybookOptions(options).configDir,
           log,
         );
-        reasons =
+        sites =
           typeof fileName === 'string' && isStoryFile(project, fileName)
-            ? siteReasons(node, project)
-            : new Map();
+            ? reasonSites(node, project)
+            : [];
       }
 
-      return reasons.get(field(node, 'start'));
+      const site = sites.find(
+        ({ start, end }) =>
+          field(node, 'start') === start && field(node, 'end') === end,
+      );
+
+      return site === undefined ? undefined : spyStubReason(site.verdict);
     },
   };
 }
 
 stubIgnorer.inject = tokens(commonTokens.options, commonTokens.logger);
-
-function siteReasons(
-  program: unknown,
-  project: StorybookProject,
-): ReadonlyMap<unknown, string> {
-  return new Map(
-    [...siteVerdicts(program, project)].map(([start, verdict]) => [
-      start,
-      spyStubReason(verdict),
-    ]),
-  );
-}
-
-export function siteVerdicts(
-  program: unknown,
-  project: StorybookProject,
-): ReadonlyMap<number, ReasonVerdict> {
-  const onceSites = new Set(
-    definitionTimeStubs(program).flatMap(({ start, once }) =>
-      once ? [start] : [],
-    ),
-  );
-
-  return new Map(
-    classifyStubs(program, project.previewTest).stubs.flatMap(
-      ({ start, verdict }): readonly (readonly [number, ReasonVerdict])[] => {
-        if (verdict === 'kept') {
-          return [];
-        }
-
-        if (project.transformer === 'seen') {
-          return onceSites.has(start) ? [[start, 'once-not-rewritten']] : [];
-        }
-
-        return [[start, verdict]];
-      },
-    ),
-  );
-}
 
 function field(value: unknown, ...keys: readonly string[]): unknown {
   return keys.reduce<unknown>(

@@ -3,14 +3,20 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, sep } from 'node:path';
 
-import { PlanKind } from '@stryker-mutator/api/core';
+import {
+  PlanKind,
+  type MutantEarlyResultPlan,
+  type MutantRunPlan,
+  type MutantTestCoverage,
+  type schema,
+} from '@stryker-mutator/api/core';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 import type { Reporter } from '@stryker-mutator/api/report';
 
 import { isRecord } from './is-record.ts';
 import { lzStorybookOptions } from './options.ts';
 import { packageName } from './package-name.ts';
-import { selfScan } from './self-scan.ts';
+import { parseStoryFile, selfScan, silencedSites } from './self-scan.ts';
 import {
   isStoryFile,
   storybookProject,
@@ -18,6 +24,7 @@ import {
   type StorybookProject,
 } from './storybook-project.ts';
 import { hasRecords, recordVariable } from './stryker-record.ts';
+import { definitionTimeStubs } from './stub-shape.ts';
 import {
   parseSpyStubReason,
   spyStubName,
@@ -43,16 +50,19 @@ interface StubFinding {
   readonly fix: string;
 }
 
-interface ReportMutant {
-  readonly mutatorName: string;
-  readonly status: string;
-  readonly statusReason?: string | undefined;
-  readonly location: { readonly start: { readonly line: number } };
-}
+type ReportMutant = Pick<
+  schema.MutantResult,
+  'mutatorName' | 'status' | 'statusReason' | 'location'
+>;
 
 interface ReportInput {
   readonly files: Readonly<
-    Record<string, { readonly mutants: readonly ReportMutant[] }>
+    Record<
+      string,
+      Pick<schema.FileResult, 'source'> & {
+        readonly mutants: readonly ReportMutant[];
+      }
+    >
   >;
 }
 
@@ -63,20 +73,15 @@ interface StaticStoryMutant {
   readonly netTime: number;
 }
 
-interface PlanMutant {
-  readonly fileName: string;
-  readonly mutatorName: string;
-  readonly static?: boolean | undefined;
-  readonly location: { readonly start: { readonly line: number } };
-}
-
-type MutantPlan =
-  | {
-      readonly plan: PlanKind.Run;
-      readonly netTime: number;
-      readonly mutant: PlanMutant;
-    }
-  | { readonly plan: PlanKind.EarlyResult; readonly mutant: PlanMutant };
+type MutantPlan = (
+  | Pick<MutantRunPlan, 'plan' | 'netTime'>
+  | Pick<MutantEarlyResultPlan, 'plan'>
+) & {
+  readonly mutant: Pick<
+    MutantTestCoverage,
+    'fileName' | 'mutatorName' | 'static' | 'location'
+  >;
+};
 
 interface PlanEvent {
   readonly mutantPlans: readonly MutantPlan[];
@@ -126,18 +131,23 @@ export function storybookReporter(options: object, log: ProjectLog) {
       );
     },
     onMutationTestReportReady({ files }: ReportInput): void {
-      const findings = [
-        ...reportFindings(files),
-        ...(excludesSpyStub(options)
-          ? []
-          : selfScan(
+      const warnUnparsable = (fileName: string, error: unknown): void =>
+        log.warn(
+          `${packageName}: Babel could not parse ${projectPath(fileName)}, so lz-storybook skipped its spy stubs: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      const findings = excludesSpyStub(options)
+        ? []
+        : [
+            ...reportFindings(files, warnUnparsable),
+            ...selfScan(
               storybook(),
               (fileName) => projectPath(fileName) in files,
+              warnUnparsable,
             ).map(({ fileName, ...finding }) => ({
               file: projectPath(fileName),
               ...finding,
-            }))),
-      ];
+            })),
+          ];
       const report: LzStorybookReport = { findings, staticStoryMutants };
       mkdirSync('reports', { recursive: true });
       writeFileSync(
@@ -182,16 +192,58 @@ function consoleBlock({
   ].join('\n');
 }
 
-function reportFindings(files: ReportInput['files']): readonly StubFinding[] {
-  return Object.entries(files).flatMap(([file, { mutants }]) =>
-    mutants.flatMap((mutant) => {
-      const verdict = stubVerdict(mutant);
+function reportFindings(
+  files: ReportInput['files'],
+  onUnparsable: (fileName: string, error: unknown) => void,
+): readonly StubFinding[] {
+  return Object.entries(files).flatMap(([file, { source, mutants }]) => {
+    const stubbed = mutants.flatMap(({ statusReason, location }) => {
+      const reason =
+        statusReason === undefined
+          ? undefined
+          : parseSpyStubReason(statusReason);
 
-      return verdict === undefined
+      return reason === undefined
         ? []
-        : [{ file, line: mutant.location.start.line, ...verdict }];
-    }),
-  );
+        : [{ offset: offsetOf(source, location.start), reason }];
+    });
+    const program =
+      stubbed.length === 0
+        ? undefined
+        : parseStoryFile(source, file, onUnparsable);
+    const sites = program === undefined ? [] : definitionTimeStubs(program);
+    const silenced = silencedSites(program, sites);
+
+    return [
+      ...sites.flatMap((site) => {
+        const found = stubbed.find(
+          ({ offset }) => site.start <= offset && offset < site.end,
+        );
+
+        return found === undefined || silenced.has(site)
+          ? []
+          : [{ file, line: site.line, ...found.reason }];
+      }),
+      ...mutants.flatMap(({ mutatorName, status, location }) =>
+        mutatorName === spyStubName && status === 'Survived'
+          ? [{ file, line: location.start.line, ...unchecked }]
+          : [],
+      ),
+    ];
+  });
+}
+
+// Babel's line terminators; report columns are 1-based
+function offsetOf(source: string, { line, column }: schema.Position): number {
+  const previousBreak = [...source.matchAll(/\r\n?|[\n\p{Zl}\p{Zp}]/gu)]
+    .slice(0, line - 1)
+    .at(-1);
+  const lineStart =
+    previousBreak === undefined
+      ? 0
+      : previousBreak.index + previousBreak[0].length;
+
+  return lineStart + column - 1;
 }
 
 function excludesSpyStub(options: object): boolean {
@@ -203,14 +255,4 @@ function excludesSpyStub(options: object): boolean {
 
 function projectPath(fileName: string): string {
   return relative(process.cwd(), fileName).split(sep).join('/');
-}
-
-function stubVerdict({ mutatorName, status, statusReason }: ReportMutant) {
-  if (mutatorName === spyStubName && status === 'Survived') {
-    return unchecked;
-  }
-
-  return statusReason === undefined
-    ? undefined
-    : parseSpyStubReason(statusReason);
 }

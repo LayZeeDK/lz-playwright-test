@@ -155,6 +155,22 @@ describe('stubIgnorer', () => {
     });
   });
 
+  it('leaves the mutants of an expression around the stub placed', async () => {
+    const { reasonsOf } = await setup(
+      'no-main',
+      'F01AllDefault.stories.tsx',
+      resetCase('F01AllDefault').replace(
+        "mockReturnValue('stubbed')",
+        "mockReturnValue('stubbed') ?? 'fallback'",
+      ),
+    );
+
+    assert.deepEqual(reasonsOf("mockReturnValue('stubbed')"), [
+      spyStubReason('erased'),
+      undefined,
+    ]);
+  });
+
   it('leaves a file that is not a story file alone', async () => {
     const { reasonsOf } = await setup(
       'no-main',
