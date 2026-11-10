@@ -191,6 +191,8 @@ export function defaultExport(body: readonly unknown[]): unknown {
 export interface CsfFile {
   readonly metaObjects: readonly unknown[];
   readonly stories: readonly StoryExport[];
+  /** The top-level names in a family with a written member, so what the file declares for them is not what runs. */
+  readonly written: ReadonlySet<unknown>;
 }
 
 /** `index` gives the stories and their `.test()` children, as Storybook's story index lists them, in place of the package's own reading of the exports. */
@@ -205,6 +207,7 @@ export function csfFile(
     ...metas.map((init) => list(field(init, 'arguments'))[0]),
   ].flatMap((meta) => objectOf(meta, bindings));
   const isFactoryFile = metas.length > 0;
+  const { elsewhere, written } = namesReadElsewhere(body, bindings);
 
   return {
     metaObjects,
@@ -216,7 +219,9 @@ export function csfFile(
         ? storyFilter(metaObjects, isFactoryFile)
         : ({ name }) => index.has(name),
       (name) => index?.get(name)?.tests ?? [],
+      elsewhere,
     ),
+    written,
   };
 }
 
@@ -245,10 +250,10 @@ function storyExports(
   isFactoryFile: boolean,
   isStory: (named: NamedExport) => boolean,
   testNames: (name: string) => readonly unknown[],
+  otherReferences: ReadonlySet<unknown>,
 ): readonly StoryExport[] {
   const assignments = body.flatMap(assignmentOf);
   const testCalls = body.flatMap(testCallOf);
-  const otherReferences = namesReadElsewhere(body);
 
   return namedExports(body, bindings)
     .filter(isStory)
@@ -285,7 +290,7 @@ export interface StoryExport {
   readonly children: readonly TestChild[];
   /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
   readonly tested: boolean;
-  /** The file names the story outside its declaration, its export, the `.test()` calls Storybook 10.6.5 CsfFile indexes, member assignments and top-level spreads, or writes to an object that shares nested objects with it through top-level spreads, so what runs can differ from what the package reads. */
+  /** The file names the story outside its declaration, its export, the `.test()` calls Storybook 10.6.5 CsfFile indexes, member assignments and the values of top-level objects, or writes to a top-level object that shares nested objects with it, so what runs can differ from what the package reads. */
   readonly referencedElsewhere: boolean;
   readonly assignments: readonly Assignment[];
   /** The writes that the story Storybook runs is composed from, with a factory story's `input` stripped from the path. */
@@ -619,7 +624,9 @@ function identifiersInReadForms(statement: unknown): readonly unknown[] {
     ...(field(statement, 'expression', 'operator') === '='
       ? [rootObject(field(statement, 'expression', 'left', 'object'))]
       : []),
-    ...spreadCopiesOf(statement).map(({ source }) => source),
+    ...(field(statement, 'type') === 'ExportDefaultDeclaration'
+      ? [unwrap(field(statement, 'declaration'))]
+      : []),
   ];
 }
 
@@ -629,15 +636,26 @@ function rootObject(node: unknown): unknown {
     : node;
 }
 
-/** The names the file uses outside the forms the package reads, plus every name in a spread family that has a written member; a shadowing local or an object key counts too, as no scopes are resolved. */
-function namesReadElsewhere(body: readonly unknown[]): ReadonlySet<unknown> {
-  const read = new Set(body.flatMap(identifiersInReadForms));
+/** The names the file uses outside the forms the package reads, plus every name in a family of two or more that has a written member, and every name in a written family; a shadowing local or an object key counts too, as no scopes are resolved. */
+function namesReadElsewhere(
+  body: readonly unknown[],
+  bindings: Bindings,
+): {
+  readonly elsewhere: ReadonlySet<unknown>;
+  readonly written: ReadonlySet<unknown>;
+} {
+  const spreads = spreadCopiesOf(bindings);
+  const read = new Set([
+    ...body.flatMap(identifiersInReadForms),
+    ...spreads.map(({ source }) => source),
+  ]);
   const referenced = identifiersIn(body)
     .filter((identifier) => !read.has(identifier))
     .map((identifier) => field(identifier, 'name'));
-  const copies = body
-    .flatMap(spreadCopiesOf)
-    .map(({ copy, source }) => ({ copy, source: field(source, 'name') }));
+  const copies = spreads.map(({ copy, source }) => ({
+    copy,
+    source: field(source, 'name'),
+  }));
   const written = withSpreadFamilies(
     new Set([
       ...referenced,
@@ -646,12 +664,15 @@ function namesReadElsewhere(body: readonly unknown[]): ReadonlySet<unknown> {
     copies,
   );
 
-  return new Set([
-    ...referenced,
-    ...copies
-      .filter(({ copy }) => written.has(copy))
-      .flatMap(({ copy, source }) => [copy, source]),
-  ]);
+  return {
+    elsewhere: new Set([
+      ...referenced,
+      ...copies
+        .filter(({ copy }) => written.has(copy))
+        .flatMap(({ copy, source }) => [copy, source]),
+    ]),
+    written,
+  };
 }
 
 function withSpreadFamilies(
@@ -672,18 +693,38 @@ interface SpreadCopy {
   readonly source: unknown;
 }
 
-/** A top-level `const C = { ...A }` shares A's nested objects with C, so a write through either changes what the other runs with. */
-function spreadCopiesOf(statement: unknown): readonly SpreadCopy[] {
-  return list(field(declarationOf(statement), 'declarations'))
-    .filter((declarator) => field(declarator, 'id', 'type') === 'Identifier')
-    .flatMap((declarator) =>
-      list(field(unwrap(field(declarator, 'init')), 'properties'))
-        .filter((property) => field(property, 'type') === 'SpreadElement')
-        .map((property) => ({
-          copy: field(declarator, 'id', 'name'),
-          source: field(property, 'argument'),
-        })),
-    );
+/** A top-level `const C = { ...A, b: { c: B } }` or `const C = A` shares A's and B's nested objects with C, so a write through any of them changes what the others run with. */
+function spreadCopiesOf(bindings: Bindings): readonly SpreadCopy[] {
+  return [...bindings].flatMap(([copy, init]) =>
+    spreadSourcesIn(init)
+      .filter((source) => {
+        const name = field(source, 'name');
+
+        return (
+          field(source, 'type') === 'Identifier' &&
+          typeof name === 'string' &&
+          bindings.has(name)
+        );
+      })
+      .map((source) => ({ copy, source })),
+  );
+}
+
+function spreadSourcesIn(node: unknown): readonly unknown[] {
+  const current = unwrap(node);
+
+  if (field(current, 'type') === 'Identifier') {
+    return [current];
+  }
+
+  return list(field(current, 'properties')).flatMap((property) =>
+    spreadSourcesIn(
+      field(
+        property,
+        field(property, 'type') === 'SpreadElement' ? 'argument' : 'value',
+      ),
+    ),
+  );
 }
 
 function identifiersIn(node: unknown): readonly unknown[] {
@@ -693,6 +734,10 @@ function identifiersIn(node: unknown): readonly unknown[] {
 
   if (node['type'] === 'Identifier') {
     return [node];
+  }
+
+  if (node['type'] === 'TSTypeQuery') {
+    return [];
   }
 
   return Object.values(node).flatMap(identifiersIn);

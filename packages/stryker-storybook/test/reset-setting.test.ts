@@ -1415,6 +1415,174 @@ export const B = { ...A, args: { g: fn().mockReturnValue(1) } };`,
     assert.deepEqual(verdicts, ['kept']);
   });
 
+  it('reads a story as unknown when the local object it spreads under as is written below its parameters', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+const base = { parameters: { test: { restoreMocks: false } } };
+export const C = { ...(base as object), args: { g: fn().mockReturnValue(1) } };
+base.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story as unknown when the local object it spreads under satisfies is written below its parameters', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+const base = { parameters: { test: { restoreMocks: false } } };
+export const C = { ...(base satisfies object), args: { g: fn().mockReturnValue(1) } };
+base.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story as unknown when the local object it spreads under a non-null assertion is written below its parameters', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+const base = { parameters: { test: { restoreMocks: false } } };
+export const C = { ...base!, args: { g: fn().mockReturnValue(1) } };
+base.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('keeps a story that spreads one local object under as apart from a written story that spreads another under as', () => {
+    const { stories } = classifyStubs(
+      storyFile(
+        `export default { parameters: { test: { restoreMocks: false } } };
+const base = { parameters: { test: { restoreMocks: false } } };
+const other = {};
+export const C = { ...(base as object) };
+export const A = { ...(other as object) };
+A.parameters = {};`,
+        'X.stories.ts',
+      ),
+      {},
+      defaultTestTags,
+    );
+
+    assert.deepEqual(stories, [
+      { name: 'C', branch: 'none' },
+      { name: 'A', branch: 'unknown' },
+    ]);
+  });
+
+  it('reads a story as unknown when the local object its parameters spread is written below it', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+const p = { test: { restoreMocks: false } };
+export const C = { parameters: { ...p }, args: { g: fn().mockReturnValue(1) } };
+p.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story whose parameters spread a local object when nothing writes to it', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+const p = { test: { restoreMocks: false } };
+export const C = { parameters: { ...p }, args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads a story as unknown when the local object it names as its parameters is written below it', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+const p = { test: { restoreMocks: false } };
+export const C = { parameters: p, args: { g: fn().mockReturnValue(1) } };
+p.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story as unknown when a local object it names below its parameters is written below it', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+const t = { restoreMocks: false };
+export const C = { parameters: { test: t }, args: { g: fn().mockReturnValue(1) } };
+t.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story that names a local object as its parameters when nothing writes to it', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+const p = { test: { restoreMocks: false } };
+export const C = { parameters: p, args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads a story as unknown when it is assigned a local object as its parameters and that object is written', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+const p = { test: { restoreMocks: false } };
+export const C = { args: { g: fn().mockReturnValue(1) } };
+C.parameters = p;
+p.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story alone in its family that is assigned args', () => {
+    const verdicts = verdictsOf(
+      `export default {};
+export const A = { parameters: { test: { restoreMocks: false } } };
+A.args = { g: fn().mockReturnValue(1) };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('keeps a story that spreads one local object under as when another story spreads another under as', () => {
+    const { stories } = classifyStubs(
+      storyFile(
+        `export default { parameters: { test: { restoreMocks: false } } };
+const base = { parameters: { test: { restoreMocks: false } } };
+const other = {};
+export const C = { ...(base as object) };
+export const A = { ...(other as object) };`,
+        'X.stories.ts',
+      ),
+      {},
+      defaultTestTags,
+    );
+
+    assert.deepEqual(stories, [
+      { name: 'C', branch: 'none' },
+      { name: 'A', branch: 'none' },
+    ]);
+  });
+
+  it('keeps two stories that spread object literals confident when one of them is assigned parameters', () => {
+    const { stories } = classifyStubs(
+      storyFile(
+        `export default { parameters: { test: { restoreMocks: false } } };
+export const C = { ...{ parameters: { test: { restoreMocks: false } } } };
+export const A = { ...{} };
+A.parameters = {};`,
+        'X.stories.ts',
+      ),
+      {},
+      defaultTestTags,
+    );
+
+    assert.deepEqual(stories, [
+      { name: 'C', branch: 'none' },
+      { name: 'A', branch: 'none' },
+    ]);
+  });
+
   it('reads a factory story named only by its declaration, its export, an indexed .test() call and a member assignment', () => {
     const verdicts = verdictsOf(
       `import preview from '../.storybook/preview';
