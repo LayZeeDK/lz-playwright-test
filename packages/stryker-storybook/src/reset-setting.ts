@@ -132,19 +132,22 @@ export function classifyStubs(
 
 function written(
   object: unknown,
-  [key, ...rest]: readonly unknown[],
+  path: readonly unknown[],
   value: unknown,
 ): unknown {
-  if (key === undefined) {
+  const [key, ...rest] = path;
+
+  if (path.length === 0) {
     return value;
+  }
+
+  if (typeof key !== 'string') {
+    return unknownValue;
   }
 
   const base = isRecord(object) ? object : {};
 
-  return {
-    ...base,
-    [String(key)]: written(member(base, String(key)), rest, value),
-  };
+  return { ...base, [key]: written(member(base, key), rest, value) };
 }
 
 function siteVerdict(

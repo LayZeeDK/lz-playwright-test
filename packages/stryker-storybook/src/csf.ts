@@ -409,8 +409,19 @@ function assignmentOf(statement: unknown): readonly Assignment[] {
 
 function memberChain(node: unknown): readonly unknown[] {
   return field(node, 'type') === 'MemberExpression'
-    ? [...memberChain(field(node, 'object')), field(node, 'property', 'name')]
+    ? [...memberChain(field(node, 'object')), keyOf(node)]
     : [field(node, 'name')];
+}
+
+/** Storybook 10.6.5 `keyOf`: a member's name, or `undefined` when only running the file gives it. */
+function keyOf(member: unknown): unknown {
+  if (field(member, 'property', 'type') === 'StringLiteral') {
+    return field(member, 'property', 'value');
+  }
+
+  return field(member, 'computed') === true
+    ? undefined
+    : field(member, 'property', 'name');
 }
 
 interface TestCall {

@@ -74,6 +74,23 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it("ignores a play function assigned to X['play']", async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nA['play'] = async () => {\n  await x(1 + 1);\n};",
+        )
+      ).filter((outcome) => /^[34] /.test(outcome)),
+      [
+        '3 StringLiteral placed',
+        `3 BlockStatement ${testReason}`,
+        `4 ArithmeticOperator ${testReason}`,
+      ],
+    );
+  });
+
   it('ignores the play function that X.play names', async () => {
     const { outcomes } = setup();
 

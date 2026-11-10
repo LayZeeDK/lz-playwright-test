@@ -460,6 +460,61 @@ A.parameters = { test: { mockReset: true } };`,
     assert.deepEqual(verdicts, ['erased']);
   });
 
+  it('reads the parameters assigned to a story through a quoted key', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+A['parameters'] = { test: { mockReset: true } };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('reads args assigned through a quoted key as args', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+A['args'] = { parameters: { test: { mockReset: true } } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('keeps the parameters of a story when args are assigned through a quoted key', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = {
+  parameters: { test: { mockReset: true } },
+  args: { g: fn().mockReturnValue(1) },
+};
+A['args'] = { x: 1 };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('reads a test parameter assigned through a quoted key of the parameters of a story', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+A.parameters = {};
+A.parameters['test'] = { mockReset: true };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('reads a story assigned to through a computed name as unknown', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+const k = 'parameters';
+A[k] = { test: { mockReset: true } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
   it('reads an import assigned to the parameters of a story as unknown', () => {
     const verdicts = verdictsOf(
       `import { shared } from './shared';
