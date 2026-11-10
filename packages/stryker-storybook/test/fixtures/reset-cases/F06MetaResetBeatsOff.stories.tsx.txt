@@ -1,0 +1,19 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect, fn } from 'storybook/test';
+
+import { Probe } from './Probe';
+
+const meta = {
+  title: 'ResetCases/F06',
+  component: Probe,
+  parameters: { test: { mockReset: true, restoreMocks: false } },
+} satisfies Meta<typeof Probe>;
+export default meta;
+type Story = StoryObj<typeof meta>;
+export const First: Story = {
+  args: { getValue: fn().mockReturnValue('stubbed') },
+  
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId('value')).toHaveTextContent('stubbed');
+  },
+};

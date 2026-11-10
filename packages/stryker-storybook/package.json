@@ -36,6 +36,9 @@
   "engines": {
     "node": ">=22.0.0"
   },
+  "dependencies": {
+    "@babel/parser": "7.29.11"
+  },
   "peerDependencies": {
     "@stryker-mutator/core": "~10.1.0",
     "storybook": "^10.6.0"

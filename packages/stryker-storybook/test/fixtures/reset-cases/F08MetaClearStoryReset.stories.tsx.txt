@@ -1,0 +1,33 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect, fn } from 'storybook/test';
+
+import { Probe } from './Probe';
+
+const meta = {
+  title: 'ResetCases/F08',
+  component: Probe,
+  parameters: { test: { clearMocks: true } },
+} satisfies Meta<typeof Probe>;
+export default meta;
+type Story = StoryObj<typeof meta>;
+export const First: Story = {
+  args: { getValue: fn().mockReturnValue('stubbed') },
+  
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId('value')).toHaveTextContent('stubbed');
+  },
+};
+export const Second: Story = {
+  args: { getValue: fn().mockReturnValue('stubbed') },
+  parameters: { test: { mockReset: true } },
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId('value')).toHaveTextContent('stubbed');
+  },
+};
+export const Third: Story = {
+  args: { getValue: fn().mockReturnValue('stubbed') },
+  
+  play: async ({ canvas }) => {
+    await expect(canvas.getByTestId('value')).toHaveTextContent('stubbed');
+  },
+};
