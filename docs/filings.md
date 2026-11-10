@@ -850,6 +850,13 @@ type is a union where only `Run` plans carry `netTime`, so the first green that 
 the plan kind to read `netTime`. The later early-result test passed on its first run and went in as test-after. Close to
 O63, where an oracle forced the condition; here the type checker does. Evidence: `sb-s3d/cycles.log` cycle 4.
 
+**O113. A dependency's throw at act time fits neither of `lz-red`'s failure kinds.** In S4 part (c) cycle 38 the red for
+a story exported under a string name was a `SyntaxError` from Stryker's instrumenter ("expressionMutantPlacer could not
+place mutants"), raised while the test acted, not in the code under test and not in load or collection. It was the
+right red: the missing behaviour is that the ignorer does not keep Stryker from placing that mutant, and the green
+turned it into an Ignored mutant. `lz-red` step 5 has "originates in the code under test" and "prerequisite to clear";
+a dependency's throw during the act step is neither. Evidence: `sb-s4/notes.md` F4, `sb-s4/cycles.log` cycle 38.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
