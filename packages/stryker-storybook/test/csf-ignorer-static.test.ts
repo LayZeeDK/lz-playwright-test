@@ -44,6 +44,28 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('keeps a meta object that the default export names through another name', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      await outcomes(
+        'const base = { component: B };\nconst meta = base;\nexport default meta;',
+      ),
+      [`1 ObjectLiteral ${metaReason}`],
+    );
+  });
+
+  it('places the mutants of a file whose default export names a binding cycle', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      await outcomes(
+        'const a = b;\nconst b = a;\nexport default a;\nexport const n = 1 + 1;',
+      ),
+      ['4 ArithmeticOperator placed'],
+    );
+  });
+
   it('keeps a meta object under satisfies as written', async () => {
     const { outcomes } = setup();
 

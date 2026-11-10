@@ -32,18 +32,16 @@ export function csfIgnorer(options: object, log: ProjectLog): Ignorer {
           lzStorybookOptions(options).configDir,
           log,
         );
-        const shapes =
-          typeof fileName === 'string' && isStoryFile(project, fileName)
-            ? csfShapes(node)
-            : undefined;
-
-        if (shapes !== undefined && ignoreMode) {
+        if (typeof fileName !== 'string' || !isStoryFile(project, fileName)) {
+          reasons = new Map();
+        } else if (ignoreMode) {
+          const shapes = csfShapes(node);
           // StrykerJS reads a node's leading comments when it enters that node, after the ignorer has seen the Program node.
           shapes.literalContainers.forEach(keepLiteralContainer);
+          reasons = ignoreModeReasons(shapes);
+        } else {
+          reasons = new Map(staticReasons(csfShapes(node)));
         }
-
-        reasons =
-          shapes === undefined ? new Map() : csfReasons(shapes, ignoreMode);
       }
 
       return reasons.get(node);
@@ -53,21 +51,14 @@ export function csfIgnorer(options: object, log: ProjectLog): Ignorer {
 
 csfIgnorer.inject = tokens(commonTokens.options, commonTokens.logger);
 
-function csfReasons(
-  shapes: CsfShapes,
-  ignoreMode: boolean,
-): ReadonlyMap<unknown, string> {
-  const staticReasons = [...shapes.staticValues].map(
-    (node) => [node, staticReason] as const,
-  );
+function staticReasons(shapes: CsfShapes) {
+  return [...shapes.staticValues].map((node) => [node, staticReason] as const);
+}
 
-  if (!ignoreMode) {
-    return new Map(staticReasons);
-  }
-
+function ignoreModeReasons(shapes: CsfShapes): ReadonlyMap<unknown, string> {
   // A later entry wins: meta over test code over msw over static values.
   return new Map([
-    ...staticReasons,
+    ...staticReasons(shapes),
     ...[...shapes.mswValues].map((node) => [node, mswReason] as const),
     ...[...shapes.testCode].map((node) => [node, testReason] as const),
     ...[...shapes.metaObjects].map((node) => [node, metaReason] as const),

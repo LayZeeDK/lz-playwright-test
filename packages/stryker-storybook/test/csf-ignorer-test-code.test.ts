@@ -219,6 +219,21 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('places the body of a call to another method of a story', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nA.other('name', async () => {\n  await x(1 + 1);\n});",
+        )
+      ).filter((outcome) =>
+        /^[34] (BlockStatement|ArithmeticOperator)/.test(outcome),
+      ),
+      ['3 BlockStatement placed', '4 ArithmeticOperator placed'],
+    );
+  });
+
   it("ignores a story's beforeEach", async () => {
     const { outcomes } = setup();
 
@@ -290,6 +305,24 @@ describe('lz-storybook-csf', () => {
         `4 ObjectLiteral ${mswReason}`,
         `5 ArrayDeclaration ${mswReason}`,
         `5 StringLiteral ${mswReason}`,
+      ],
+    );
+  });
+
+  it('ignores the msw value in the parameters that a story names', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nconst params = {\n  msw: {\n    handlers: [h('/a')],\n  },\n};\nexport const A = { parameters: params };",
+        )
+      ).filter((outcome) => /^[2-4] /.test(outcome)),
+      [
+        '2 ObjectLiteral placed',
+        `3 ObjectLiteral ${mswReason}`,
+        `4 ArrayDeclaration ${mswReason}`,
+        `4 StringLiteral ${mswReason}`,
       ],
     );
   });
