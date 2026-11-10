@@ -41,9 +41,12 @@ export type ResetSetting = boolean | 'unreadable';
 
 export type ResetSettings = Readonly<Partial<Record<ResetKey, ResetSetting>>>;
 
-type ResetKey = 'mockReset' | 'clearMocks' | 'restoreMocks';
+/** In the order Storybook 10.6.5's mock-reset loader checks them. */
+const resetKeys = ['mockReset', 'clearMocks', 'restoreMocks'] as const;
 
-export const unreadableSettings: ResetSettings = {
+type ResetKey = (typeof resetKeys)[number];
+
+export const unreadableSettings: Readonly<Record<ResetKey, ResetSetting>> = {
   mockReset: 'unreadable',
   clearMocks: 'unreadable',
   restoreMocks: 'unreadable',
@@ -86,8 +89,8 @@ function testSettings(parameters: unknown): ResetSettings {
     return unreadableSettings;
   }
 
-  return decisiveSettings.reduce<Partial<Record<ResetKey, ResetSetting>>>(
-    (settings, [key]) => {
+  return resetKeys.reduce<Partial<Record<ResetKey, ResetSetting>>>(
+    (settings, key) => {
       const value = member(test, key);
 
       if (value !== undefined) {
@@ -329,17 +332,19 @@ function contains(node: unknown, position: number): boolean {
   );
 }
 
-const decisiveSettings: readonly (readonly [ResetKey, boolean, ResetBranch])[] =
-  [
-    ['mockReset', true, 'reset'],
-    ['clearMocks', true, 'clear'],
-    ['restoreMocks', false, 'none'],
-  ];
+const decisiveSettings: Readonly<
+  Record<ResetKey, readonly [boolean, ResetBranch]>
+> = {
+  mockReset: [true, 'reset'],
+  clearMocks: [true, 'clear'],
+  restoreMocks: [false, 'none'],
+};
 
 function branchOf(levels: readonly ResetSettings[]): ResetBranch {
   return (
-    decisiveSettings
-      .map(([key, decisive, branch]) => {
+    resetKeys
+      .map((key) => {
+        const [decisive, branch] = decisiveSettings[key];
         const setting = levels.reduce<ResetSetting | undefined>(
           (value, level) => level[key] ?? value,
           undefined,
