@@ -1,5 +1,7 @@
 import { writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { register } from 'node:module';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { isRecord } from './is-record.ts';
 
@@ -9,9 +11,40 @@ if (configDir === undefined || resultFile === undefined) {
   throw new Error('Usage: load-storybook.child <configDir> <resultFile>');
 }
 
-writeFileSync(resultFile, JSON.stringify(await load(configDir)));
+const projectFirstResolve = `
+let child;
+let project;
 
-async function load(configDir: string): Promise<object> {
+export function initialize(data) {
+  ({ child, project } = data);
+}
+
+export async function resolve(specifier, context, nextResolve) {
+  if (context.parentURL === child) {
+    try {
+      return await nextResolve(specifier, { ...context, parentURL: project });
+    } catch {
+      // Without parentURL here, Node resolves from the failed attempt's parentURL again.
+      return nextResolve(specifier, { ...context, parentURL: child });
+    }
+  }
+
+  return nextResolve(specifier, context);
+}
+`;
+
+const projectDir = resolve(configDir, '..');
+
+register(`data:text/javascript,${encodeURIComponent(projectFirstResolve)}`, {
+  data: {
+    child: import.meta.url,
+    project: pathToFileURL(join(projectDir, 'package.json')).href,
+  },
+});
+
+writeFileSync(resultFile, JSON.stringify(await load(configDir, projectDir)));
+
+async function load(configDir: string, projectDir: string): Promise<object> {
   try {
     const { experimental_loadStorybook, getStoriesPathsFromConfig } =
       await import('storybook/internal/core-server');
@@ -25,7 +58,7 @@ async function load(configDir: string): Promise<object> {
       workingDir: process.cwd(),
     });
     const viteConfig: unknown = await presets.apply('viteFinal', {
-      root: resolve(configDir, '..'),
+      root: projectDir,
     });
     const plugins =
       isRecord(viteConfig) && Array.isArray(viteConfig['plugins'])
