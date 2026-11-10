@@ -1344,6 +1344,77 @@ export const B = { args: { g: fn().mockReturnValue(1) } };`,
     assert.deepEqual(verdicts, ['unknown']);
   });
 
+  it('reads a factory story as unknown when a destructured spread copy of it is assigned parameters', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({});
+const { input } = { ...A };
+input.parameters = { test: { mockReset: true } };
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a factory story as unknown when a rest copy of a spread of it is assigned parameters', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({});
+const { ...C } = { ...A };
+C.input.parameters = { test: { mockReset: true } };
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story as unknown when a destructured spread copy of it is written below its parameters', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { parameters: { test: { restoreMocks: false } } };
+const { parameters } = { ...A };
+parameters.test.mockReset = true;
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story as unknown when the story it spreads is written below its parameters after the spread', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { tags: ['slow'], parameters: { test: { restoreMocks: false } } };
+export const C = { ...A, tags: [], args: { g: fn().mockReturnValue(1) } };
+A.parameters.test.mockReset = true;`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story as unknown when the local object it spreads is written below its parameters after the spread', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+const base = { parameters: { test: { restoreMocks: false } } };
+export const C = { ...base, args: { g: fn().mockReturnValue(1) } };
+base.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story that spreads another story when nothing writes to either', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { parameters: { test: { restoreMocks: false } } };
+export const B = { ...A, args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
   it('reads a factory story named only by its declaration, its export, an indexed .test() call and a member assignment', () => {
     const verdicts = verdictsOf(
       `import preview from '../.storybook/preview';

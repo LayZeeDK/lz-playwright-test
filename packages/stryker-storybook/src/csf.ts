@@ -285,7 +285,7 @@ export interface StoryExport {
   readonly children: readonly TestChild[];
   /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
   readonly tested: boolean;
-  /** The file names the story outside its declaration, its export, the `.test()` calls Storybook 10.6.5 CsfFile indexes, member assignments and top-level spread copies that nothing writes through, so what runs can differ from what the package reads. */
+  /** The file names the story outside its declaration, its export, the `.test()` calls Storybook 10.6.5 CsfFile indexes, member assignments and top-level spreads, or writes to an object that shares nested objects with it through top-level spreads, so what runs can differ from what the package reads. */
   readonly referencedElsewhere: boolean;
   readonly assignments: readonly Assignment[];
   /** The writes that the story Storybook runs is composed from, with a factory story's `input` stripped from the path. */
@@ -629,7 +629,7 @@ function rootObject(node: unknown): unknown {
     : node;
 }
 
-/** The names the file uses outside the forms the package reads, plus the sources of the spread copies the file writes through; a shadowing local or an object key counts too, as no scopes are resolved. */
+/** The names the file uses outside the forms the package reads, plus every name in a spread family that has a written member; a shadowing local or an object key counts too, as no scopes are resolved. */
 function namesReadElsewhere(body: readonly unknown[]): ReadonlySet<unknown> {
   const read = new Set(body.flatMap(identifiersInReadForms));
   const referenced = identifiersIn(body)
@@ -650,7 +650,7 @@ function namesReadElsewhere(body: readonly unknown[]): ReadonlySet<unknown> {
     ...referenced,
     ...copies
       .filter(({ copy }) => written.has(copy))
-      .map(({ source }) => source),
+      .flatMap(({ copy, source }) => [copy, source]),
   ]);
 }
 
@@ -659,8 +659,8 @@ function withSpreadSources(
   copies: readonly SpreadCopy[],
 ): ReadonlySet<unknown> {
   const sources = copies
-    .filter(({ copy, source }) => names.has(copy) && !names.has(source))
-    .map(({ source }) => source);
+    .filter(({ copy, source }) => names.has(copy) !== names.has(source))
+    .flatMap(({ copy, source }) => [copy, source]);
 
   return sources.length === 0
     ? names
@@ -672,17 +672,18 @@ interface SpreadCopy {
   readonly source: unknown;
 }
 
-/** A top-level `const C = { ...A }` shares A's nested objects, so a write through C changes what A runs with. */
+/** A top-level `const C = { ...A }` shares A's nested objects with C, so a write through either changes what the other runs with. */
 function spreadCopiesOf(statement: unknown): readonly SpreadCopy[] {
-  return list(field(declarationOf(statement), 'declarations')).flatMap(
-    (declarator) =>
+  return list(field(declarationOf(statement), 'declarations'))
+    .filter((declarator) => field(declarator, 'id', 'type') === 'Identifier')
+    .flatMap((declarator) =>
       list(field(unwrap(field(declarator, 'init')), 'properties'))
         .filter((property) => field(property, 'type') === 'SpreadElement')
         .map((property) => ({
           copy: field(declarator, 'id', 'name'),
           source: field(property, 'argument'),
         })),
-  );
+    );
 }
 
 function identifiersIn(node: unknown): readonly unknown[] {
