@@ -735,6 +735,126 @@ export const A = {
 
     assert.deepEqual(verdicts, ['kept']);
   });
+
+  it('reads every story as unknown when the file writes a story through a namespace import of itself', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+import * as self from './X.stories';
+export const C = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+self.C.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads every story as unknown when the file writes the meta through a namespace import of itself', () => {
+    const verdicts = verdictsOf(
+      `import * as self from './X.stories';
+export default { parameters: { test: { restoreMocks: false } } };
+self.default.parameters.test.mockReset = true;
+export const C = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('keeps the stories of a file that writes through a namespace import of another stories file', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+import * as other from './Other.stories';
+export const C = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+other.C.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads every story as unknown when the file writes a story through a dynamic import of itself', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const C = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+(await import('./X.stories')).C.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads every story as unknown when the file writes a story through a require() of itself', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const C = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+require('./X.stories').C.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads every story as unknown when the file re-exports from itself', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const C = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+export * as self from './X.stories';`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads every story as unknown when the file imports itself by a specifier with its extension', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+import * as self from './X.stories.ts';
+export const C = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+self.C.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads every story as unknown when the file has a dynamic import whose argument is not a string literal', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const C = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+const name = 'X';
+(await import(\`./\${name}.stories\`)).C.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('keeps the stories of a file that imports a package spelled like the file name', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+import * as other from 'X.stories';
+export const C = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+other.C.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
 });
 
 describe('classifyStubs tag filter', () => {

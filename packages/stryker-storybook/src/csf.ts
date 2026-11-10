@@ -1,3 +1,5 @@
+import { dirname, extname, resolve } from 'node:path';
+
 import { loadCsf } from 'storybook/internal/csf-tools';
 
 import { isRecord, isStringArray } from './is-record.ts';
@@ -657,7 +659,7 @@ function rootObject(node: unknown): unknown {
     : node;
 }
 
-/** The names the file uses outside the forms the package reads, plus every name in a family of two or more that has a written member, and every name in a written family; a shadowing local or an object key counts too, as no scopes are resolved. The meta joins the families as the default export and as each factory meta. */
+/** `elsewhere` holds the names the file uses outside the forms the package reads, plus every name in a family of two or more that has a written member; `written` holds every name in a written family. A shadowing local or an object key counts too, as no scopes are resolved. The meta joins the families as the default export and as each factory meta. */
 function namesReadElsewhere(
   body: readonly unknown[],
   bindings: Bindings,
@@ -764,6 +766,46 @@ function identifiersIn(node: unknown): readonly unknown[] {
   }
 
   return Object.values(node).flatMap(identifiersIn);
+}
+
+/** The file imports, re-exports or requires itself, or loads a module whose specifier is not a string literal. Storybook 10.6.5's Vitest transform composes each story from the file's own bindings, so a write through such an import changes what runs without naming the story. */
+export function mayImportItself(
+  body: readonly unknown[],
+  fileName: string,
+): boolean {
+  const file = resolve(fileName);
+  const withoutExtension = file.slice(0, file.length - extname(file).length);
+
+  return [
+    ...body
+      .map((statement) => field(statement, 'source'))
+      .filter((source) => isRecord(source)),
+    ...importCallArgumentsIn(body),
+  ].some((source) => {
+    const specifier = field(source, 'value');
+
+    return (
+      field(source, 'type') !== 'StringLiteral' ||
+      (typeof specifier === 'string' &&
+        specifier.startsWith('.') &&
+        [file, withoutExtension].includes(resolve(dirname(file), specifier)))
+    );
+  });
+}
+
+function importCallArgumentsIn(node: unknown): readonly unknown[] {
+  if (!isRecord(node)) {
+    return [];
+  }
+
+  return [
+    ...(node['type'] === 'CallExpression' &&
+    (field(node, 'callee', 'type') === 'Import' ||
+      field(node, 'callee', 'name') === 'require')
+      ? [list(node['arguments'])[0]]
+      : []),
+    ...Object.values(node).flatMap(importCallArgumentsIn),
+  ];
 }
 
 function propertyValue(object: unknown, key: string): unknown {
