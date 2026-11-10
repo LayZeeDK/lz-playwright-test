@@ -30,14 +30,12 @@ export function csfShapes(program: unknown): CsfShapes {
   );
   const metaObjects = metaObjectsOf(body, bindings);
   const isStory = storyFilter(metaObjects);
+  const assignments = body.map(assignmentOf);
   const storyExports = [
     ...namedExports(body, bindings),
-    ...body.flatMap((statement) =>
-      assigned(statement, 'story').map((init) => ({
-        name: field(statement, 'expression', 'left', 'object', 'name'),
-        init,
-      })),
-    ),
+    ...assignments
+      .filter(({ key }) => key === 'story')
+      .map(({ target, value }) => ({ name: target, init: value })),
   ].filter(({ name }) => isStory(name));
   const storyNames = storyExports.map(({ name }) => name);
   const stories = storyExports
@@ -48,42 +46,41 @@ export function csfShapes(program: unknown): CsfShapes {
           field(init, 'type') === 'ArrowFunctionExpression') &&
         !metaObjects.includes(init),
     );
-  const storyAnnotations = (key: string): readonly unknown[] => [
-    ...stories.map((story) => propertyValue(story, key)),
-    ...body.flatMap((statement) =>
-      storyNames.includes(
-        field(statement, 'expression', 'left', 'object', 'name'),
-      )
-        ? assigned(statement, key)
-        : [],
-    ),
-  ];
-  const annotations = (key: string): readonly unknown[] =>
+  const storyAssignments = assignments.filter(({ target }) =>
+    storyNames.includes(target),
+  );
+  const storyAnnotations = (key: string): readonly unknown[] =>
     [
-      ...metaObjects.map((meta) => propertyValue(meta, key)),
-      ...storyAnnotations(key),
+      ...stories.map((story) => propertyValue(story, key)),
+      ...storyAssignments
+        .filter((assignment) => assignment.key === key)
+        .map(({ value }) => value),
     ].flatMap((value) => withInit(value, bindings));
+  const annotations = (key: string): readonly unknown[] => [
+    ...metaObjects.flatMap((meta) =>
+      withInit(propertyValue(meta, key), bindings),
+    ),
+    ...storyAnnotations(key),
+  ];
   const idParameters = stories
     .map((story) => propertyValue(story, 'parameters'))
     .filter((parameters) => propertyValue(parameters, '__id') !== undefined);
-  const testCalls = body.flatMap((statement) => {
-    const [name, ...rest] = testArguments(statement);
-
-    return name !== undefined &&
-      storyNames.includes(
-        field(statement, 'expression', 'callee', 'object', 'name'),
-      )
-      ? [
-          {
-            statement,
-            name,
-            options:
-              rest.length > 1 ? followed(rest[0], bindings) : undefined,
-            testFunction: followed(rest.at(-1), bindings),
-          },
-        ]
-      : [];
-  });
+  const testCalls = body
+    .flatMap(testCallOf)
+    .filter(({ target }) => storyNames.includes(target))
+    .flatMap(({ statement, args: [name, ...rest] }) =>
+      name === undefined
+        ? []
+        : [
+            {
+              statement,
+              name,
+              options:
+                rest.length > 1 ? followed(rest[0], bindings) : undefined,
+              testFunction: followed(rest.at(-1), bindings),
+            },
+          ],
+    );
 
   return {
     metaObjects: nodeSet(metaObjects),
@@ -302,9 +299,39 @@ function matchesStories(name: unknown, descriptor: unknown): boolean {
   );
 }
 
-function testArguments(statement: unknown): readonly unknown[] {
-  return field(statement, 'expression', 'callee', 'property', 'name') === 'test'
-    ? list(field(statement, 'expression', 'arguments'))
+interface Assignment {
+  readonly target: unknown;
+  readonly key: unknown;
+  readonly value: unknown;
+}
+
+function assignmentOf(statement: unknown): Assignment {
+  const left = field(statement, 'expression', 'left');
+
+  return {
+    target: field(left, 'object', 'name'),
+    key: field(left, 'property', 'name'),
+    value: field(statement, 'expression', 'right'),
+  };
+}
+
+interface TestCall {
+  readonly statement: unknown;
+  readonly target: unknown;
+  readonly args: readonly unknown[];
+}
+
+function testCallOf(statement: unknown): readonly TestCall[] {
+  const callee = field(statement, 'expression', 'callee');
+
+  return field(callee, 'property', 'name') === 'test'
+    ? [
+        {
+          statement,
+          target: field(callee, 'object', 'name'),
+          args: list(field(statement, 'expression', 'arguments')),
+        },
+      ]
     : [];
 }
 
@@ -316,12 +343,6 @@ function propertyValue(object: unknown, key: string): unknown {
   return field(property, 'type') === 'ObjectMethod'
     ? property
     : field(property, 'value');
-}
-
-function assigned(statement: unknown, property: string): readonly unknown[] {
-  return field(statement, 'expression', 'left', 'property', 'name') === property
-    ? [field(statement, 'expression', 'right')]
-    : [];
 }
 
 function storyNode(init: unknown, bindings: Bindings): unknown {
