@@ -9,9 +9,11 @@ import type {
 } from '../src/instrumenter.ts';
 import {
   checkNames,
+  isSelfCheckFile,
   markOf,
   register,
   selfCheck,
+  selfCheckFile,
   undoOnThrow,
   warnUntested,
 } from '../src/install.ts';
@@ -214,6 +216,14 @@ describe('selfCheck', () => {
     await assert.rejects(selfCheck(packageName, instrumenter, samples), {
       message: /made no mutants of LzOne, LzTwo from/,
     });
+  });
+});
+
+describe('isSelfCheckFile', () => {
+  it('tells the sample files of the self-check from other files', () => {
+    assert.equal(isSelfCheckFile(selfCheckFile('LzOne')), true);
+    assert.equal(isSelfCheckFile('src/LzOne.self-check.tsx'), true);
+    assert.equal(isSelfCheckFile('src/LzOne.tsx'), false);
   });
 });
 
