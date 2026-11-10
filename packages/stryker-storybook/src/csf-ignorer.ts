@@ -4,18 +4,22 @@ import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 import { csfShapes, type CsfShapes } from './csf.ts';
 import { isRecord } from './is-record.ts';
 import { field, list } from './node-field.ts';
-import { packageName } from './package-name.ts';
 import {
   isStoryFile,
   strykerStorybookProject,
   type ProjectLog,
 } from './storybook-project.ts';
 
-const staticReason = `${packageName}: Storybook reads this CSF value without running the file, so it stays as written`;
-const metaReason = `${packageName}: Storybook reads the meta object without running the file, so it stays an object literal`;
-const containerReason = `${packageName}: Storybook reads this story, its parameters or its test options without running the file, so it stays an object or a function`;
-const testReason = `${packageName}: test code in a story file is mutated by the Stryker config with lzStorybookCsf.play set to mutate`;
-const mswReason = `${packageName}: msw handlers in a story file are mutated by the Stryker config with lzStorybookCsf.play set to mutate`;
+const staticReason =
+  'lz-storybook-csf: Storybook reads this CSF value without running the file, so it stays as written';
+const metaReason =
+  'lz-storybook-csf: Storybook reads the meta object without running the file, so it stays an object literal';
+const containerReason =
+  'lz-storybook-csf: Storybook reads this story, its parameters or its test options without running the file, so it stays an object or a function';
+const testReason =
+  'lz-storybook-csf: test code in a story file is mutated by the Stryker config with lzStorybookCsf.play set to mutate';
+const mswReason =
+  'lz-storybook-csf: msw handlers in a story file are mutated by the Stryker config with lzStorybookCsf.play set to mutate';
 
 export function csfIgnorer(options: object, log: ProjectLog): Ignorer {
   const ignoreMode = field(options, 'lzStorybookCsf', 'play') !== 'mutate';

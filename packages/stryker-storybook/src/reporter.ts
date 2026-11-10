@@ -39,7 +39,7 @@ interface StubFinding {
   readonly file: string;
   readonly line: number;
   readonly verdict: ReasonVerdict | (typeof uncheckedFinding)['verdict'];
-  readonly why: string;
+  readonly reason: string;
   readonly fix: string;
 }
 
@@ -164,8 +164,8 @@ function consoleBlock({
       ? `${packageName}: no spy stub findings`
       : `${packageName}: ${findings.length} spy stub findings (${counts.join(', ')})`,
     ...findings.map(
-      ({ verdict, file, line, why, fix }) =>
-        `  ${verdict}  ${file}:${line}  ${why}; ${fix}`,
+      ({ verdict, file, line, reason, fix }) =>
+        `  ${verdict}  ${file}:${line}  ${reason}; ${fix}`,
     ),
     ...(staticStoryMutants.length === 0
       ? []

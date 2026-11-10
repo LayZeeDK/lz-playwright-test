@@ -14,7 +14,7 @@ export interface ReasonSite extends Omit<ClassifiedStub, 'verdict' | 'once'> {
   readonly verdict: ReasonVerdict;
 }
 
-const whys: Readonly<Record<ReasonVerdict, string>> = {
+const reasons: Readonly<Record<ReasonVerdict, string>> = {
   erased:
     'the mock reset runs before the story renders, so this stub never takes effect',
   'order-dependent':
@@ -30,13 +30,13 @@ const fix =
 
 export const uncheckedFinding = {
   verdict: 'unchecked',
-  why: 'no test fails without this stub, so no play checks what it changes',
+  reason: 'no test fails without this stub, so no play checks what it changes',
   fix: 'assert in the play what the stubbed value changes',
 } as const;
 
 export interface SpyStubReason {
   readonly verdict: ReasonVerdict;
-  readonly why: string;
+  readonly reason: string;
   readonly fix: string;
 }
 
@@ -60,9 +60,9 @@ export function reasonSites(
 }
 
 export function describeVerdict(verdict: ReasonVerdict): SpyStubReason {
-  return { verdict, why: whys[verdict], fix };
+  return { verdict, reason: reasons[verdict], fix };
 }
 
 export function spyStubReason(verdict: ReasonVerdict): string {
-  return `${spyStubName}: ${verdict}: ${whys[verdict]}; ${fix}`;
+  return `lz-storybook: ${verdict}: ${reasons[verdict]}; ${fix}`;
 }

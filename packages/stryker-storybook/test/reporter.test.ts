@@ -333,7 +333,8 @@ describe('storybookReporter', () => {
           file: 'src/SpyStubMetaOff.stories.tsx',
           line: 24,
           verdict: 'unchecked',
-          why: 'no test fails without this stub, so no play checks what it changes',
+          reason:
+            'no test fails without this stub, so no play checks what it changes',
           fix: 'assert in the play what the stubbed value changes',
         },
       ],
@@ -436,7 +437,7 @@ describe('storybookReporter', () => {
 
     assert.equal(
       consoleBlock()[3],
-      `  erased  src/SpyStubDefault.stories.tsx:15  ${erased.why}; ${erased.fix}`,
+      `  erased  src/SpyStubDefault.stories.tsx:15  ${erased.reason}; ${erased.fix}`,
     );
   });
 
@@ -582,7 +583,7 @@ describe('storybookReporter', () => {
 
     assert.deepEqual(consoleBlock(), [
       'info: @layzee/stryker-storybook: 1 spy stub findings (1 erased)',
-      `  erased  src/Meta.stories.tsx:3  ${erased.why}; ${erased.fix}`,
+      `  erased  src/Meta.stories.tsx:3  ${erased.reason}; ${erased.fix}`,
     ]);
   });
 

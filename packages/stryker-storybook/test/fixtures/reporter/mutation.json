@@ -55,7 +55,7 @@
           "id": "4",
           "mutatorName": "LzStorybookSpyStub",
           "replacement": "fn()",
-          "statusReason": "LzStorybookSpyStub: unknown: the file's parameters.test cannot be read statically, so whether the reset erases this stub is unknown; pass the implementation to fn() (fn(() => value)) or set the stub in beforeEach",
+          "statusReason": "lz-storybook: unknown: the file's parameters.test cannot be read statically, so whether the reset erases this stub is unknown; pass the implementation to fn() (fn(() => value)) or set the stub in beforeEach",
           "status": "Ignored",
           "static": false,
           "location": {
@@ -169,7 +169,7 @@
           "id": "13",
           "mutatorName": "LzStorybookSpyStub",
           "replacement": "fn()",
-          "statusReason": "LzStorybookSpyStub: order-dependent: a story with the default mock reset in this file erases this stub when it renders first (Storybook UI, Docs page, shuffled runs); pass the implementation to fn() (fn(() => value)) or set the stub in beforeEach, or turn the reset off in meta",
+          "statusReason": "lz-storybook: order-dependent: a story with the default mock reset in this file erases this stub when it renders first (Storybook UI, Docs page, shuffled runs); pass the implementation to fn() (fn(() => value)) or set the stub in beforeEach, or turn the reset off in meta",
           "status": "Ignored",
           "static": false,
           "location": {
@@ -403,7 +403,7 @@
           "id": "32",
           "mutatorName": "LzStorybookSpyStub",
           "replacement": "fn()",
-          "statusReason": "LzStorybookSpyStub: erased: this story's mock reset runs before it renders, so the stub never takes effect; pass the implementation to fn() (fn(() => value)) or set the stub in beforeEach",
+          "statusReason": "lz-storybook: erased: this story's mock reset runs before it renders, so the stub never takes effect; pass the implementation to fn() (fn(() => value)) or set the stub in beforeEach",
           "status": "Ignored",
           "static": false,
           "location": {
