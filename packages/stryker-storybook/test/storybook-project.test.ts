@@ -65,6 +65,14 @@ describe('storybookProject', () => {
     });
   });
 
+  describe('with a preview file in the config folder', () => {
+    it("reads the preview's parameters.test", () => {
+      const { project } = setup('preview-off');
+
+      assert.deepEqual(project.previewTest, { restoreMocks: false });
+    });
+  });
+
   describe('with a main file that lists story globs', () => {
     it('logs nothing', () => {
       const { lines } = setup('globs');
@@ -97,6 +105,12 @@ describe('storybookProject', () => {
       assert.equal(project.transformer, 'not-seen');
     });
 
+    it("reads the preview's parameters.test", () => {
+      const { project } = setup('globs');
+
+      assert.deepEqual(project.previewTest, { clearMocks: true });
+    });
+
     it('does not count a *.stories.* file outside the globs', () => {
       const { project, file } = setup('globs');
 
@@ -119,6 +133,12 @@ describe('storybookProject', () => {
 
       assert.equal(project.transformer, 'seen');
     });
+
+    it('has no preview settings without a preview file', () => {
+      const { project } = setup('transformer');
+
+      assert.equal(project.previewTest, undefined);
+    });
   });
 
   describe('with a main.js file', () => {
@@ -126,6 +146,12 @@ describe('storybookProject', () => {
       const { lines } = setup('main-js');
 
       assert.deepEqual(lines, []);
+    });
+
+    it("reads a preview.js file's parameters.test", () => {
+      const { project } = setup('main-js');
+
+      assert.deepEqual(project.previewTest, { mockReset: true });
     });
   });
 
