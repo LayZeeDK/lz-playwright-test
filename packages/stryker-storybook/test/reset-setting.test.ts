@@ -7,6 +7,7 @@ import { field } from '../src/node-field.ts';
 import { parseProgram } from '../src/parse.ts';
 import {
   classifyStubs,
+  defaultTestTags,
   readPreviewTest,
   type ResetSettings,
   type StoryReset,
@@ -94,7 +95,8 @@ function storiesOf(
   file: string,
   preview: keyof typeof previews,
 ): readonly StoryReset[] {
-  return classifyStubs(storyProgram(file), previewTest(preview)).stories;
+  return classifyStubs(storyProgram(file), previewTest(preview), defaultTestTags)
+    .stories;
 }
 
 function storyProgram(file: string): unknown {
@@ -133,7 +135,11 @@ describe('classifyStubs stub verdicts', () => {
     it(`gives the stubs of ${file} under the ${preview} preview the verdicts ${verdicts.join(', ')}`, () => {
       const program = storyProgram(file);
 
-      const { stubs } = classifyStubs(program, previewTest(preview));
+      const { stubs } = classifyStubs(
+        program,
+        previewTest(preview),
+        defaultTestTags,
+      );
 
       assert.deepEqual(
         stubs,
@@ -159,6 +165,7 @@ describe('classifyStubs parameter reading', () => {
         'X.stories.ts',
       ),
       {},
+      defaultTestTags,
     ).stubs.map(({ verdict }) => verdict);
   }
 
@@ -695,7 +702,7 @@ export const A = {
 describe('classifyStubs tag filter', () => {
   function verdictsOf(
     source: string,
-    testTags?: TestTags,
+    testTags = defaultTestTags,
   ): readonly StubVerdict[] {
     return classifyStubs(
       parseProgram(
@@ -708,13 +715,7 @@ describe('classifyStubs tag filter', () => {
   }
 
   function testTags(rule: Partial<TestTags>): TestTags {
-    return {
-      previewTags: [],
-      include: ['test'],
-      exclude: [],
-      skip: [],
-      ...rule,
-    };
+    return { ...defaultTestTags, ...rule };
   }
 
   it('leaves out a story without a tag that include names', () => {
@@ -726,6 +727,17 @@ export const B = { tags: ['smoke'], args: { g: fn().mockReturnValue(1) } };`,
     );
 
     assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('keeps a story without the test tag when include is empty', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { tags: ['!test'], parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ include: [] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
   });
 
   it('leaves out a story with a tag that exclude names', () => {

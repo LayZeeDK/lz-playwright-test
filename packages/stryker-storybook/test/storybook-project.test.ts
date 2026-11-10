@@ -249,6 +249,32 @@ describe('storybookProject', () => {
       );
     });
 
+    it('reads an empty include as no include filter', () => {
+      const { project } = vitestSetup(
+        'vitest-tags',
+        'vitest.empty-include.config.ts',
+      );
+
+      assert.deepEqual(project.testTags.include, []);
+    });
+
+    it('counts the stories tagged test and logs nothing when no project runs storybookTest', () => {
+      const { lines, project } = vitestSetup(
+        'vitest-tags',
+        'vitest.plain.config.ts',
+      );
+
+      assert.deepEqual(
+        [
+          project.testTags.include,
+          project.testTags.exclude,
+          project.testTags.skip,
+          lines,
+        ],
+        [['test'], [], [], []],
+      );
+    });
+
     it('reads the tag filter of the Storybook project in test.projects', () => {
       const { project } = vitestSetup(
         'vitest-tags',

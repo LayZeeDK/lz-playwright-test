@@ -247,19 +247,18 @@ function parseTestTags(value: unknown): VitestTags {
     return { kind: 'failed', error };
   }
 
-  const tagList = (key: string): readonly string[] => {
+  const tagList = (key: string): readonly string[] | undefined => {
     const tags = field(value, key);
 
-    return typeof tags === 'string' ? tags.split(',').filter(Boolean) : [];
+    return typeof tags === 'string' ? tags.split(',').filter(Boolean) : undefined;
   };
-  const include = tagList('include');
 
   return {
     kind: 'resolved',
     tags: {
-      include: include.length > 0 ? include : defaultTestTags.include,
-      exclude: tagList('exclude'),
-      skip: tagList('skip'),
+      include: tagList('include') ?? defaultTestTags.include,
+      exclude: tagList('exclude') ?? [],
+      skip: tagList('skip') ?? [],
     },
   };
 }

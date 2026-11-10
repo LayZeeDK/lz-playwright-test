@@ -111,7 +111,7 @@ export const defaultTestTags: TestTags = {
 export function classifyStubs(
   program: unknown,
   previewTest: ResetSettings,
-  testTags = defaultTestTags,
+  testTags: TestTags,
 ): StubClassification {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
@@ -166,7 +166,7 @@ function isTestedByTags(
   const tags = combineTags('test', 'dev', ...previewTags, ...fileTags);
 
   return (
-    include.some((tag) => tags.includes(tag)) &&
+    (include.length === 0 || include.some((tag) => tags.includes(tag))) &&
     ![...exclude, ...skip].some((tag) => tags.includes(tag))
   );
 }
