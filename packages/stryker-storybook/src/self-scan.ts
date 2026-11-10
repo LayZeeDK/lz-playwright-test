@@ -1,9 +1,8 @@
-import { globSync, readFileSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
 
 import { isRecord } from './is-record.ts';
 import { parseProgram } from './parse.ts';
-import type { StorybookProject } from './storybook-project.ts';
+import { storyFilePaths, type StorybookProject } from './storybook-project.ts';
 import { siteVerdicts } from './stub-ignorer.ts';
 import {
   describeVerdict,
@@ -81,14 +80,6 @@ function parseStoryFile(
 
     return undefined;
   }
-}
-
-function storyFilePaths(project: StorybookProject): readonly string[] {
-  return project.storyFiles === 'fallback'
-    ? globSync('**/*.{stories,story}.*', {
-        exclude: (path) => basename(path) === 'node_modules',
-      }).map((file) => resolve(file))
-    : [...project.storyFiles];
 }
 
 function stubSites(

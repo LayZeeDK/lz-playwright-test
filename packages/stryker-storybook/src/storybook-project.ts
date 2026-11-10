@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { globSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { extname, join, resolve } from 'node:path';
+import { basename, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { getInterpretedFile } from 'storybook/internal/common';
@@ -90,10 +90,20 @@ export function isStoryFile(
   fileName: string,
 ): boolean {
   if (project.storyFiles === 'fallback') {
-    return fileName.includes('.stories.') || fileName.includes('.story.');
+    return /\.(?:stories|story)\./.test(basename(fileName));
   }
 
   return project.storyFiles.has(normalizePath(fileName));
+}
+
+export function storyFilePaths(project: StorybookProject): readonly string[] {
+  return project.storyFiles === 'fallback'
+    ? globSync('**/*', {
+        exclude: (path) => basename(path) === 'node_modules',
+      })
+        .map((file) => resolve(file))
+        .filter((file) => isStoryFile(project, file))
+    : [...project.storyFiles];
 }
 
 function normalizePath(path: string): string {
