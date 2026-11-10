@@ -188,9 +188,14 @@ export function defaultExport(body: readonly unknown[]): unknown {
   return declaration ?? field(defaultSpecifier, 'local');
 }
 
+/** The family name of the default export, which no identifier can have. */
+const defaultExportName = Symbol('export default');
+
 export interface CsfFile {
   readonly metaObjects: readonly unknown[];
   readonly stories: readonly StoryExport[];
+  /** The top-level names in a family with a written member, so what the file declares for them is not what runs. */
+  readonly written: ReadonlySet<unknown>;
 }
 
 /** `index` gives the stories and their `.test()` children, as Storybook's story index lists them, in place of the package's own reading of the exports. */
@@ -205,6 +210,19 @@ export function csfFile(
     ...metas.map((init) => list(field(init, 'arguments'))[0]),
   ].flatMap((meta) => objectOf(meta, bindings));
   const isFactoryFile = metas.length > 0;
+  const metaBindings: readonly (readonly [unknown, unknown])[] = [
+    [defaultExportName, defaultExport(body)],
+    ...[...bindings]
+      .filter(([, init]) => metas.includes(init))
+      .map(
+        ([name, init]) => [name, list(field(init, 'arguments'))[0]] as const,
+      ),
+  ];
+  const { elsewhere, written } = namesReadElsewhere(
+    body,
+    bindings,
+    metaBindings,
+  );
 
   return {
     metaObjects,
@@ -216,7 +234,11 @@ export function csfFile(
         ? storyFilter(metaObjects, isFactoryFile)
         : ({ name }) => index.has(name),
       (name) => index?.get(name)?.tests ?? [],
+      (local) =>
+        metaBindings.some(([name]) => written.has(name)) ||
+        elsewhere.has(local),
     ),
+    written,
   };
 }
 
@@ -245,10 +267,10 @@ function storyExports(
   isFactoryFile: boolean,
   isStory: (named: NamedExport) => boolean,
   testNames: (name: string) => readonly unknown[],
+  isReadElsewhere: (local: unknown) => boolean,
 ): readonly StoryExport[] {
   const assignments = body.flatMap(assignmentOf);
   const testCalls = body.flatMap(testCallOf);
-  const otherReferences = namesReadElsewhere(body);
 
   return namedExports(body, bindings)
     .filter(isStory)
@@ -268,7 +290,7 @@ function storyExports(
         tested:
           form === 'declaration' ||
           (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
-        referencedElsewhere: otherReferences.has(local),
+        referencedElsewhere: isReadElsewhere(local),
         assignments: storyAssignments,
         runtimeAssignments: runtimeAssignments(storyAssignments, isFactoryFile),
         extendsBase:
@@ -285,7 +307,7 @@ export interface StoryExport {
   readonly children: readonly TestChild[];
   /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
   readonly tested: boolean;
-  /** The file names the story outside its declaration, its export, the `.test()` calls Storybook 10.6.5 CsfFile indexes, member assignments and top-level spreads, or writes to an object that shares nested objects with it through top-level spreads, so what runs can differ from what the package reads. */
+  /** The file names the story outside its declaration, its export, the `.test()` calls Storybook 10.6.5 CsfFile indexes, member assignments and the values of top-level objects, or writes to a top-level object that shares nested objects with it or with the meta, so what runs can differ from what the package reads. */
   readonly referencedElsewhere: boolean;
   readonly assignments: readonly Assignment[];
   /** The writes that the story Storybook runs is composed from, with a factory story's `input` stripped from the path. */
@@ -606,9 +628,16 @@ function identifiersInReadForms(statement: unknown): readonly unknown[] {
 
   return [
     field(declaration, 'id'),
-    ...list(field(declaration, 'declarations')).map((declarator) =>
-      field(declarator, 'id'),
-    ),
+    ...list(field(declaration, 'declarations')).flatMap((declarator) => {
+      const init = unwrap(field(declarator, 'init'));
+
+      return [
+        field(declarator, 'id'),
+        ...(field(init, 'callee', 'property', 'name') === 'story'
+          ? [field(init, 'callee', 'object')]
+          : []),
+      ];
+    }),
     ...list(field(statement, 'specifiers')).flatMap((specifier) => [
       field(specifier, 'local'),
       field(specifier, 'exported'),
@@ -619,7 +648,6 @@ function identifiersInReadForms(statement: unknown): readonly unknown[] {
     ...(field(statement, 'expression', 'operator') === '='
       ? [rootObject(field(statement, 'expression', 'left', 'object'))]
       : []),
-    ...spreadCopiesOf(statement).map(({ source }) => source),
   ];
 }
 
@@ -629,61 +657,93 @@ function rootObject(node: unknown): unknown {
     : node;
 }
 
-/** The names the file uses outside the forms the package reads, plus every name in a spread family that has a written member; a shadowing local or an object key counts too, as no scopes are resolved. */
-function namesReadElsewhere(body: readonly unknown[]): ReadonlySet<unknown> {
-  const read = new Set(body.flatMap(identifiersInReadForms));
+/** The names the file uses outside the forms the package reads, plus every name in a family of two or more that has a written member, and every name in a written family; a shadowing local or an object key counts too, as no scopes are resolved. The meta joins the families as the default export and as each factory meta. */
+function namesReadElsewhere(
+  body: readonly unknown[],
+  bindings: Bindings,
+  metaBindings: readonly (readonly [unknown, unknown])[],
+): {
+  readonly elsewhere: ReadonlySet<unknown>;
+  readonly written: ReadonlySet<unknown>;
+} {
+  const reaches = reachesOf([...bindings, ...metaBindings], bindings);
+  const read = new Set([
+    ...body.flatMap(identifiersInReadForms),
+    ...reaches.map(({ identifier }) => identifier),
+  ]);
   const referenced = identifiersIn(body)
     .filter((identifier) => !read.has(identifier))
     .map((identifier) => field(identifier, 'name'));
-  const copies = body
-    .flatMap(spreadCopiesOf)
-    .map(({ copy, source }) => ({ copy, source: field(source, 'name') }));
-  const written = withSpreadFamilies(
+  const written = withFamilies(
     new Set([
       ...referenced,
       ...body.flatMap(assignmentOf).map(({ target }) => target),
     ]),
-    copies,
+    reaches,
   );
 
-  return new Set([
-    ...referenced,
-    ...copies
-      .filter(({ copy }) => written.has(copy))
-      .flatMap(({ copy, source }) => [copy, source]),
-  ]);
+  return {
+    elsewhere: new Set([
+      ...referenced,
+      ...reaches
+        .filter(({ from }) => written.has(from))
+        .flatMap(({ from, to }) => [from, to]),
+    ]),
+    written,
+  };
 }
 
-function withSpreadFamilies(
+function withFamilies(
   names: ReadonlySet<unknown>,
-  copies: readonly SpreadCopy[],
+  reaches: readonly Reach[],
 ): ReadonlySet<unknown> {
-  const reached = copies
-    .filter(({ copy, source }) => names.has(copy) !== names.has(source))
-    .flatMap(({ copy, source }) => [copy, source]);
+  const reached = reaches
+    .filter(({ from, to }) => names.has(from) !== names.has(to))
+    .flatMap(({ from, to }) => [from, to]);
 
   return reached.length === 0
     ? names
-    : withSpreadFamilies(new Set([...names, ...reached]), copies);
+    : withFamilies(new Set([...names, ...reached]), reaches);
 }
 
-interface SpreadCopy {
-  readonly copy: unknown;
-  readonly source: unknown;
+interface Reach {
+  readonly from: unknown;
+  readonly to: string;
+  readonly identifier: unknown;
 }
 
-/** A top-level `const C = { ...A }` shares A's nested objects with C, so a write through either changes what the other runs with. */
-function spreadCopiesOf(statement: unknown): readonly SpreadCopy[] {
-  return list(field(declarationOf(statement), 'declarations'))
-    .filter((declarator) => field(declarator, 'id', 'type') === 'Identifier')
-    .flatMap((declarator) =>
-      list(field(unwrap(field(declarator, 'init')), 'properties'))
-        .filter((property) => field(property, 'type') === 'SpreadElement')
-        .map((property) => ({
-          copy: field(declarator, 'id', 'name'),
-          source: field(property, 'argument'),
-        })),
-    );
+/** A top-level `const C = { ...A, b: { c: B } }` or `const C = A` shares A's and B's nested objects with C, so a write through any of them changes what the others run with. */
+function reachesOf(
+  inits: readonly (readonly [unknown, unknown])[],
+  bindings: Bindings,
+): readonly Reach[] {
+  return inits.flatMap(([from, init]) =>
+    identifiersReachedFrom(init).flatMap((identifier) => {
+      const to = field(identifier, 'name');
+
+      return typeof to === 'string' && bindings.has(to)
+        ? [{ from, to, identifier }]
+        : [];
+    }),
+  );
+}
+
+/** The identifiers `evaluate` in reset-setting.ts follows from a value. */
+function identifiersReachedFrom(node: unknown): readonly unknown[] {
+  const current = unwrap(node);
+
+  if (field(current, 'type') === 'Identifier') {
+    return [current];
+  }
+
+  return list(field(current, 'properties')).flatMap((property) =>
+    identifiersReachedFrom(
+      field(
+        property,
+        field(property, 'type') === 'SpreadElement' ? 'argument' : 'value',
+      ),
+    ),
+  );
 }
 
 function identifiersIn(node: unknown): readonly unknown[] {
@@ -693,6 +753,14 @@ function identifiersIn(node: unknown): readonly unknown[] {
 
   if (node['type'] === 'Identifier') {
     return [node];
+  }
+
+  if (node['type'] === 'TSTypeQuery') {
+    return [];
+  }
+
+  if (node['type'] === 'MemberExpression' && node['computed'] === false) {
+    return identifiersIn(node['object']);
   }
 
   return Object.values(node).flatMap(identifiersIn);
