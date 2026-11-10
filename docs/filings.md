@@ -857,6 +857,18 @@ right red: the missing behaviour is that the ignorer does not keep Stryker from 
 turned it into an Ignored mutant. `lz-red` step 5 has "originates in the code under test" and "prerequisite to clear";
 a dependency's throw during the act step is neither. Evidence: `sb-s4/notes.md` F4, `sb-s4/cycles.log` cycle 38.
 
+**O114 (lz-refactor). No threshold for extracting duplicated code.** Step 4's net-cost count (what a refactoring removes
+against what it adds) is written for pattern-directed refactorings. For Extract Variable or Extract Function on
+Duplicated Code it gives no point at which two copies justify extracting. The S4 workers read it as the rule of three:
+declined at two copies in cycles 19, 38 and 42, applied at three in cycle 41. Related to O12, which is about copies that
+do not exist yet. Evidence: `sb-s4/notes.md` F5.
+
+**O115. Nothing asks to show that a characterization pin can fail.** `lz-red` step 5 calls a characterization test green
+by construction and stops there. For the S4 oracle (133 generated rows over Storybook's own fixtures, all passing on the
+first run), the only evidence it compares anything was a control run without the ignorer (12 of 133 pass). Neither
+`lz-red` nor `test-first.md` names that control, or says whether 133 data rows are 133 `test-after` lines or one (logged
+as one). Evidence: `sb-s4/notes.md` F6, `sb-s4/cycles.log` part (e) line.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
