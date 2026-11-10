@@ -8,15 +8,42 @@ import {
   classifyStubs,
   readPreviewTest,
   type StoryReset,
+  type StubVerdict,
 } from '../src/reset-setting.ts';
+import { definitionTimeStubs } from '../src/stub-shape.ts';
 
 type Prediction = 'passed' | 'failed' | 'unknown' | 'either';
 
+function typedPreview(annotations: string): string {
+  return `import type { Preview } from '@storybook/react-vite';\n\nconst preview: Preview = ${annotations};\n\nexport default preview;\n`;
+}
+
 const previews = {
-  default: '{}',
-  clear: '{ parameters: { test: { clearMocks: true } } }',
-  off: '{ parameters: { test: { restoreMocks: false } } }',
-  reset: '{ parameters: { test: { mockReset: true } } }',
+  default: { recorded: 'default', source: typedPreview('{}') },
+  clear: {
+    recorded: 'clear',
+    source: typedPreview('{ parameters: { test: { clearMocks: true } } }'),
+  },
+  off: {
+    recorded: 'off',
+    source: typedPreview('{ parameters: { test: { restoreMocks: false } } }'),
+  },
+  reset: {
+    recorded: 'reset',
+    source: typedPreview('{ parameters: { test: { mockReset: true } } }'),
+  },
+  'definePreview off': {
+    recorded: 'off',
+    source: `import { definePreview } from '@storybook/react-vite';\n\nexport default definePreview({ parameters: { test: { restoreMocks: false } } });\n`,
+  },
+  'named parameters off': {
+    recorded: 'off',
+    source: `export const parameters = { test: { restoreMocks: false } };\n`,
+  },
+  'named decorators only': {
+    recorded: 'default',
+    source: `export const decorators = [];\n`,
+  },
 };
 const seeds = ['none', '1', '2', '3'];
 const unreadableFiles: readonly string[] = ['F11Imported'];
@@ -29,12 +56,7 @@ function fixture(name: string): URL {
 }
 
 function previewTest(preview: keyof typeof previews): unknown {
-  return readPreviewTest(
-    parseProgram(
-      `import type { Preview } from '@storybook/react-vite';\n\nconst preview: Preview = ${previews[preview]};\n\nexport default preview;\n`,
-      'preview.ts',
-    ),
-  );
+  return readPreviewTest(parseProgram(previews[preview].source, 'preview.ts'));
 }
 
 function recorded(...keys: readonly string[]): unknown {
@@ -68,29 +90,92 @@ function predict(
   return stories.some(erases) ? 'either' : 'passed';
 }
 
-describe('classifyStubs', () => {
-  const rows: readonly (readonly [string, keyof typeof previews])[] = [
-    ['F01AllDefault', 'default'],
-    ['F02MetaOff', 'default'],
-    ['F01AllDefault', 'off'],
+function storiesOf(
+  file: string,
+  preview: keyof typeof previews,
+): readonly StoryReset[] {
+  return classifyStubs(storyProgram(file), previewTest(preview)).stories;
+}
+
+function storyProgram(file: string): unknown {
+  return parseProgram(
+    readFileSync(fixture(`${file}.stories.tsx.txt`), 'utf8'),
+    `${file}.stories.tsx`,
+  );
+}
+
+function predictions(
+  stories: readonly StoryReset[],
+): readonly (readonly [string, string, Prediction])[] {
+  return seeds.flatMap((seed) =>
+    stories.map(
+      (story, index) =>
+        [seed, story.name, predict(stories, index, seed)] as const,
+    ),
+  );
+}
+
+describe('classifyStubs stub verdicts', () => {
+  const rows: readonly (readonly [
+    string,
+    keyof typeof previews,
+    readonly StubVerdict[],
+  ])[] = [
+    ['F01AllDefault', 'default', ['erased', 'erased']],
+    ['F02MetaOff', 'default', ['kept', 'kept']],
+    ['F04OffBeforeDefault', 'default', ['order-dependent', 'erased']],
+    ['F11Imported', 'default', ['unknown']],
+    ['F09MetaArgsStub', 'reset', ['erased']],
+    ['F07MetaOffStoryOn', 'default', ['order-dependent', 'erased', 'erased']],
   ];
+
+  rows.forEach(([file, preview, verdicts]) => {
+    it(`gives the stubs of ${file} under the ${preview} preview the verdicts ${verdicts.join(', ')}`, () => {
+      const program = storyProgram(file);
+
+      const { stubs } = classifyStubs(program, previewTest(preview));
+
+      assert.deepEqual(
+        stubs,
+        definitionTimeStubs(program).map(({ start }, index) => ({
+          start,
+          verdict: verdicts[index],
+        })),
+      );
+    });
+  });
+});
+
+describe('classifyStubs', () => {
+  const recordedPreviews = ['default', 'clear', 'off', 'reset'] as const;
+  const recordedRows = Object.keys(isRecord(outcomes) ? outcomes : {}).flatMap(
+    (file) => recordedPreviews.map((preview) => [file, preview] as const),
+  );
+  const rows: readonly (readonly [string, keyof typeof previews])[] = [
+    ...recordedRows,
+    ['F01AllDefault', 'definePreview off'],
+    ['F01AllDefault', 'named parameters off'],
+    ['F01AllDefault', 'named decorators only'],
+    ['F01AllDefault.factories', 'default'],
+    ['F02MetaOff.factories', 'default'],
+  ];
+
+  it('checks the 348 recorded outcomes that a definite prediction covers', () => {
+    const checked = recordedRows
+      .flatMap(([file, preview]) => predictions(storiesOf(file, preview)))
+      .filter(
+        ([, , prediction]) =>
+          prediction === 'passed' || prediction === 'failed',
+      );
+
+    assert.equal(checked.length, 348);
+  });
 
   rows.forEach(([file, preview]) => {
     it(`predicts the recorded story outcomes of ${file} under the ${preview} preview`, () => {
-      const { stories } = classifyStubs(
-        parseProgram(
-          readFileSync(fixture(`${file}.stories.tsx.txt`), 'utf8'),
-          `${file}.stories.tsx`,
-        ),
-        previewTest(preview),
-      );
-      const predicted = seeds.flatMap((seed) =>
-        stories.map((story, index) => [
-          seed,
-          story.name,
-          predict(stories, index, seed),
-        ]),
-      );
+      const [recordedFile = file] = file.split('.');
+      const stories = storiesOf(file, preview);
+      const predicted = predictions(stories);
       const expected = predicted.map(([seed = '', name = '', prediction]) => [
         seed,
         name,
@@ -98,10 +183,14 @@ describe('classifyStubs', () => {
           ? prediction
           : unreadableFiles.includes(file)
             ? 'unknown'
-            : recorded(file, preview, seed, name),
+            : recorded(recordedFile, previews[preview].recorded, seed, name),
       ]);
 
-      const definitionOrder = recorded(file, preview, 'none');
+      const definitionOrder = recorded(
+        recordedFile,
+        previews[preview].recorded,
+        'none',
+      );
 
       assert.deepEqual(
         stories.map((story) => story.name),
