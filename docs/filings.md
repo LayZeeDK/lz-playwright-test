@@ -1089,6 +1089,19 @@ is certain: a child that Storybook never runs, for example. `lz-red` asks for te
 no case for a test that pins a deliberately cautious answer over the true one. Evidence: `r10fix/notes.md`, "lz-tdd
 friction"; `r10fix/cycles.log`.
 
+**O150. A green whose rule is right but needs a second change in another function.** In the round 13 fixes, the green
+made `evaluate` read a written family as unknown. That broke 5 earlier tests in cycle 5 and 19 in cycle 7, because
+`typeof meta`, `export default meta`, the `.story()` callee and the `preview.meta` property each counted as a write.
+The fix was a companion read-form change in another function, landed in the same green. `lz-tpp` names one
+transformation per green and has no case for a green that needs an unrelated second change before the spec passes.
+Evidence: `r13fix/notes.md`, "lz-tdd friction"; `r13fix/cycles.log`, cycles 5 and 7.
+
+**O151. A red that fails with the right message for the wrong reason.** In the same fixes, a drafted red for the
+shared `undefined` name used member spreads. It failed with the expected assertion, but `evaluate` cannot read a
+member spread at all, so no change to the families could turn it green. Only applying the green and seeing it stay
+red showed this; the input was then swapped for literal spreads. `lz-red` step 5 checks that the failure comes from
+the code under test, and the message was the same in both cases. Evidence: `r13fix/notes.md`, "lz-tdd friction".
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
