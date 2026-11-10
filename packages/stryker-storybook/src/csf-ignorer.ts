@@ -58,7 +58,7 @@ function csfReasons(
     return new Map(staticReasons);
   }
 
-  shapes.storyContainers.forEach(keepStoryContainer);
+  shapes.literalContainers.forEach(keepLiteralContainer);
 
   // A later entry wins: meta over test code over msw over static values.
   return new Map([
@@ -71,7 +71,7 @@ function csfReasons(
 
 // A Stryker ignorer skips a whole subtree; a next-line directive skips only the mutants on the container's first line.
 // StrykerJS reads a node's leading comments when it enters that node, after the ignorer has seen the Program node.
-function keepStoryContainer(container: unknown): void {
+function keepLiteralContainer(container: unknown): void {
   if (!isRecord(container)) {
     return;
   }

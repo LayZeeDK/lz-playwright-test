@@ -1,6 +1,7 @@
 export interface CsfShapes {
   readonly metaObjects: ReadonlySet<unknown>;
-  readonly storyContainers: ReadonlySet<unknown>;
+  /** Story objects and functions, `parameters` objects that hold `__id`, and `.test()` options objects. */
+  readonly literalContainers: ReadonlySet<unknown>;
   readonly testCode: ReadonlySet<unknown>;
   readonly mswValues: ReadonlySet<unknown>;
   readonly staticValues: ReadonlySet<unknown>;
@@ -92,7 +93,7 @@ export function csfShapes(program: unknown): CsfShapes {
 
   return {
     metaObjects: nodeSet(metaObjects),
-    storyContainers: nodeSet([...stories, ...idParameters, ...testOptions]),
+    literalContainers: nodeSet([...stories, ...idParameters, ...testOptions]),
     testCode: nodeSet([
       ...[...metaObjects, ...stories].flatMap((object) =>
         testKeys.flatMap((key) => withInit(propertyValue(object, key), body)),
