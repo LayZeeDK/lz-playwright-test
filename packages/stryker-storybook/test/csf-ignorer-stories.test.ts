@@ -285,6 +285,32 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('places an object assigned to a member of X.story', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = () => null;\nA.story.parameters = {\n  a: 1,\n};",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      ['3 ObjectLiteral placed'],
+    );
+  });
+
+  it('places the object passed to .story() for an export that the excludeStories of a later meta matches', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "import preview from '#.storybook/preview';\nconst base = preview.meta({});\nconst meta = preview.meta({ excludeStories: ['C'] });\nexport const A = meta.story();\nexport const C = meta.story({\n  args: { a: 1 },\n});",
+        )
+      ).filter((outcome) => outcome.startsWith('5 ')),
+      ['5 ObjectLiteral placed'],
+    );
+  });
+
   it("keeps a story's parameters object that holds __id as written and places what it holds", async () => {
     const { outcomes } = setup();
 

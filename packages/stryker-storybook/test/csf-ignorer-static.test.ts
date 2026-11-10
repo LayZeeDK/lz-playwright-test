@@ -127,6 +127,32 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('keeps the object passed to preview.meta() as written when the file also exports preview', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "import preview from '#.storybook/preview';\nconst meta = preview.meta({\n  title: 'a/b',\n});\nexport const A = meta.story();\nexport { preview };",
+        )
+      ).filter((outcome) => /^[23] /.test(outcome)),
+      [`2 ObjectLiteral ${metaReason}`, `3 StringLiteral ${metaReason}`],
+    );
+  });
+
+  it('places the object passed to .meta() on an import from a file in a preview folder', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "import sb from '../preview/sb';\nconst meta = sb.meta({\n  title: 'a/b',\n});",
+        )
+      ).filter((outcome) => /^[23] /.test(outcome)),
+      ['2 ObjectLiteral placed', '3 StringLiteral placed'],
+    );
+  });
+
   it("places a title in a story's args", async () => {
     const { outcomes } = setup();
 

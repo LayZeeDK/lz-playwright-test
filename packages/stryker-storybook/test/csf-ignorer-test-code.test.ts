@@ -305,6 +305,32 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('ignores the arrow function of a .test() call without options', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nA.test('name', () =>\n  x(1 + 1),\n);",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ArrowFunction')),
+      [`3 ArrowFunction ${testReason}`],
+    );
+  });
+
+  it('places a .test() call on a story without arguments', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = {};\nA.test();",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      ['3 CallExpression placed'],
+    );
+  });
+
   it('places a .test() call on an object that is not a story', async () => {
     const { outcomes } = setup();
 

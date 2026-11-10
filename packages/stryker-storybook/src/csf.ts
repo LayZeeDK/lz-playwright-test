@@ -54,6 +54,7 @@ function indexInputs(code: string, fileName: string): unknown {
       makeTitle: (title: string | undefined) => title ?? fileName,
     }).parse().indexInputs;
   } catch {
+    // Stryker disable next-line ArrayDeclaration: storyIndex lists a row only when its subtype is 'story', which a string row has not, so any array of strings lists no story
     return [];
   }
 }
