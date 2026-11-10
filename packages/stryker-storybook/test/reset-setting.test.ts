@@ -568,6 +568,28 @@ export const helper = () => null;`,
     assert.deepEqual(verdicts, ['kept']);
   });
 
+  it('reads the parameters assigned to the input of a factory story', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ args: { g: fn().mockReturnValue(1) } });
+A.input.parameters = { test: { mockReset: true } };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('leaves out the parameters assigned to a factory story itself', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ args: { g: fn().mockReturnValue(1) } });
+A.parameters = { test: { mockReset: true } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
   it('keeps the stories of a file with a meta() call that is no CSF factory', () => {
     const verdicts = verdictsOf(
       `import { z } from 'zod';
