@@ -1051,6 +1051,13 @@ result of an earlier test. The output was an AssertionError on the value, which 
 red; only reading the actual value showed the code under test never ran. `lz-red` has no check for a red that comes
 from shared state. Evidence: `r6bfix/notes.md`, "lz-tdd friction"; `r6bfix/cycles.log`, the D3 cycle.
 
+**O144. A red from an input the upstream parser rejects looks like a red from the code under test (adds to O143).**
+In the round 7 fixes, the package mirrors Storybook's `CsfFile`. A test whose `.test()` options held an imported
+tag array failed with an AssertionError on the value, but `CsfFile` throws on that input, so the package read no
+stories at all and the new branch never ran. Only predicting the value the new code would give showed the mismatch.
+`lz-red` has no check that a test's input is one the mirrored upstream accepts. Evidence: `r7fix/notes.md`, "lz-tdd
+friction"; `r7fix/cycles.log` cycle 5.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
