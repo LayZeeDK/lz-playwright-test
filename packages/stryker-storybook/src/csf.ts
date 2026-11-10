@@ -377,7 +377,10 @@ function objectOf(expression: unknown, bindings: Bindings): readonly unknown[] {
       return [node];
     }
     case 'Identifier': {
-      return objectOf(followed(node, bindings), bindings);
+      return objectOf(
+        followed(node, bindings),
+        new Map([...bindings].filter(([name]) => name !== field(node, 'name'))),
+      );
     }
     default: {
       return [];
