@@ -188,6 +188,9 @@ export function defaultExport(body: readonly unknown[]): unknown {
   return declaration ?? field(defaultSpecifier, 'local');
 }
 
+/** The family name of the default export, which no identifier can have. */
+const defaultExportName = Symbol('export default');
+
 export interface CsfFile {
   readonly metaObjects: readonly unknown[];
   readonly stories: readonly StoryExport[];
@@ -207,7 +210,19 @@ export function csfFile(
     ...metas.map((init) => list(field(init, 'arguments'))[0]),
   ].flatMap((meta) => objectOf(meta, bindings));
   const isFactoryFile = metas.length > 0;
-  const { elsewhere, written } = namesReadElsewhere(body, bindings);
+  const metaBindings: readonly (readonly [unknown, unknown])[] = [
+    [defaultExportName, defaultExport(body)],
+    ...[...bindings]
+      .filter(([, init]) => metas.includes(init))
+      .map(
+        ([name, init]) => [name, list(field(init, 'arguments'))[0]] as const,
+      ),
+  ];
+  const { elsewhere, written } = namesReadElsewhere(
+    body,
+    bindings,
+    metaBindings,
+  );
 
   return {
     metaObjects,
@@ -219,7 +234,9 @@ export function csfFile(
         ? storyFilter(metaObjects, isFactoryFile)
         : ({ name }) => index.has(name),
       (name) => index?.get(name)?.tests ?? [],
-      elsewhere,
+      (local) =>
+        metaBindings.some(([name]) => written.has(name)) ||
+        elsewhere.has(local),
     ),
     written,
   };
@@ -250,7 +267,7 @@ function storyExports(
   isFactoryFile: boolean,
   isStory: (named: NamedExport) => boolean,
   testNames: (name: string) => readonly unknown[],
-  otherReferences: ReadonlySet<unknown>,
+  isReadElsewhere: (local: unknown) => boolean,
 ): readonly StoryExport[] {
   const assignments = body.flatMap(assignmentOf);
   const testCalls = body.flatMap(testCallOf);
@@ -273,7 +290,7 @@ function storyExports(
         tested:
           form === 'declaration' ||
           (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
-        referencedElsewhere: otherReferences.has(local),
+        referencedElsewhere: isReadElsewhere(local),
         assignments: storyAssignments,
         runtimeAssignments: runtimeAssignments(storyAssignments, isFactoryFile),
         extendsBase:
@@ -290,7 +307,7 @@ export interface StoryExport {
   readonly children: readonly TestChild[];
   /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
   readonly tested: boolean;
-  /** The file names the story outside its declaration, its export, the `.test()` calls Storybook 10.6.5 CsfFile indexes, member assignments and the values of top-level objects, or writes to a top-level object that shares nested objects with it, so what runs can differ from what the package reads. */
+  /** The file names the story outside its declaration, its export, the `.test()` calls Storybook 10.6.5 CsfFile indexes, member assignments and the values of top-level objects, or writes to a top-level object that shares nested objects with it or with the meta, so what runs can differ from what the package reads. */
   readonly referencedElsewhere: boolean;
   readonly assignments: readonly Assignment[];
   /** The writes that the story Storybook runs is composed from, with a factory story's `input` stripped from the path. */
@@ -611,9 +628,16 @@ function identifiersInReadForms(statement: unknown): readonly unknown[] {
 
   return [
     field(declaration, 'id'),
-    ...list(field(declaration, 'declarations')).map((declarator) =>
-      field(declarator, 'id'),
-    ),
+    ...list(field(declaration, 'declarations')).flatMap((declarator) => {
+      const init = unwrap(field(declarator, 'init'));
+
+      return [
+        field(declarator, 'id'),
+        ...(field(init, 'callee', 'property', 'name') === 'story'
+          ? [field(init, 'callee', 'object')]
+          : []),
+      ];
+    }),
     ...list(field(statement, 'specifiers')).flatMap((specifier) => [
       field(specifier, 'local'),
       field(specifier, 'exported'),
@@ -636,15 +660,16 @@ function rootObject(node: unknown): unknown {
     : node;
 }
 
-/** The names the file uses outside the forms the package reads, plus every name in a family of two or more that has a written member, and every name in a written family; a shadowing local or an object key counts too, as no scopes are resolved. */
+/** The names the file uses outside the forms the package reads, plus every name in a family of two or more that has a written member, and every name in a written family; a shadowing local or an object key counts too, as no scopes are resolved. The meta joins the families as the default export and as each factory meta. */
 function namesReadElsewhere(
   body: readonly unknown[],
   bindings: Bindings,
+  metaBindings: readonly (readonly [unknown, unknown])[],
 ): {
   readonly elsewhere: ReadonlySet<unknown>;
   readonly written: ReadonlySet<unknown>;
 } {
-  const spreads = spreadCopiesOf(bindings);
+  const spreads = spreadCopiesOf([...bindings, ...metaBindings], bindings);
   const read = new Set([
     ...body.flatMap(identifiersInReadForms),
     ...spreads.map(({ source }) => source),
@@ -694,8 +719,11 @@ interface SpreadCopy {
 }
 
 /** A top-level `const C = { ...A, b: { c: B } }` or `const C = A` shares A's and B's nested objects with C, so a write through any of them changes what the others run with. */
-function spreadCopiesOf(bindings: Bindings): readonly SpreadCopy[] {
-  return [...bindings].flatMap(([copy, init]) =>
+function spreadCopiesOf(
+  inits: readonly (readonly [unknown, unknown])[],
+  bindings: Bindings,
+): readonly SpreadCopy[] {
+  return inits.flatMap(([copy, init]) =>
     spreadSourcesIn(init)
       .filter((source) => {
         const name = field(source, 'name');
@@ -738,6 +766,10 @@ function identifiersIn(node: unknown): readonly unknown[] {
 
   if (node['type'] === 'TSTypeQuery') {
     return [];
+  }
+
+  if (node['type'] === 'MemberExpression' && node['computed'] === false) {
+    return identifiersIn(node['object']);
   }
 
   return Object.values(node).flatMap(identifiersIn);

@@ -1534,6 +1534,96 @@ p.test.mockReset = true;`,
     assert.deepEqual(verdicts, ['unknown']);
   });
 
+  it('reads every story as unknown when the meta is written below its parameters', () => {
+    const verdicts = verdictsOf(
+      `const meta = { parameters: { test: { restoreMocks: false } } };
+export default meta;
+meta.parameters.test.mockReset = true;
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads every story as unknown when the default export spreads a local object that is written below it', () => {
+    const verdicts = verdictsOf(
+      `const base = { parameters: { test: { restoreMocks: false } } };
+export default { ...base };
+base.parameters.test.mockReset = true;
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads every story as unknown when the meta spreads a local object that is written below it', () => {
+    const verdicts = verdictsOf(
+      `const base = { parameters: { test: { restoreMocks: false } } };
+const meta = { ...base };
+export default meta;
+base.parameters.test.mockReset = true;
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads the stories of a default export that spreads a story when nothing writes to either', () => {
+    const verdicts = verdictsOf(
+      `export const A = { parameters: { test: { restoreMocks: false } } };
+export default { ...A };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads every factory story as unknown when the factory meta is written below its parameters', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+meta.input.parameters.test.mockReset = true;
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads every factory story as unknown when the factory meta spreads a local object that is written below it', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const base = { parameters: { test: { restoreMocks: false } } };
+const meta = preview.meta({ ...base });
+base.parameters.test.mockReset = true;
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads the stories of a factory meta that spreads a local object when nothing writes to it', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const base = { parameters: { test: { restoreMocks: false } } };
+const meta = preview.meta({ ...base });
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads a story as unknown when a computed member key passes it to a function', () => {
+    const verdicts = verdictsOf(
+      `import { register } from './register';
+export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+const registry = {};
+registry[register(A)] = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
   it('reads a story alone in its family that is assigned args', () => {
     const verdicts = verdictsOf(
       `export default {};
