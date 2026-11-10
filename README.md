@@ -30,7 +30,7 @@ mutators from there, so build first (the Nx targets below do).
 - `packages/<package>/stryker.config.mjs`: in the JSX mutators, the Playwright mutators and the install code, a
   Stryker config that mutates the package's own source. The runner has none: its hooks run inside the worker,
   page and server processes whose Stryker namespace they manage, so instrumented hook code would mark those
-  processes instrumented and record coverage of its own mutants, and its unit tests fail.
+  processes instrumented and record coverage of its own mutants, and its unit tests would fail.
 - `apps/demo-app` (Nx project `@layzee/demo-app`): the demo app and its Playwright component tests
   (`playwright.components.config.mts`).
 - `apps/demo-app-e2e`: the demo app's Playwright e2e tests.
