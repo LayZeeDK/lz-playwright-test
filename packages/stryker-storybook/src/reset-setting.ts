@@ -1,9 +1,13 @@
 import {
   annotationFactories,
+  assignmentOf,
+  isTemplateBind,
+  metaExpressions,
   namedExports,
   storyExports,
   topLevelBindings,
   unwrap,
+  withoutBinding,
 } from './csf.ts';
 import { isRecord } from './is-record.ts';
 import { field, list } from './node-field.ts';
@@ -46,10 +50,12 @@ export const unreadableSettings: ResetSettings = {
 export function readPreviewTest(program: unknown): ResetSettings {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
-  const exported = defaultExport(body, bindings);
+  const [exported] = metaExpressions(body, bindings);
 
   if (exported !== undefined) {
-    return testSettings(member(exported, 'parameters'));
+    return testSettings(
+      member(evaluate(factoryArgument(exported), bindings), 'parameters'),
+    );
   }
 
   const parameters = namedExports(body, bindings).find(
@@ -83,27 +89,31 @@ export function classifyStubs(
 ): StubClassification {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
-  const factoryMeta = [...bindings.values()].find(
-    (init) => field(unwrap(init), 'callee', 'property', 'name') === 'meta',
-  );
+  const [meta] = metaExpressions(body, bindings);
   const metaTest = testSettings(
-    member(
-      defaultExport(body, bindings) ??
-        evaluate(factoryArgument(factoryMeta), bindings),
-      'parameters',
-    ),
+    member(evaluate(factoryArgument(meta), bindings), 'parameters'),
   );
-  // Storybook 10.6.5's Vitest transform makes no test of an export without a local variable or function
+  const assignments = body.map(assignmentOf);
   const declared = storyExports(body, bindings)
-    .filter(({ init }) => init !== undefined)
-    .map(({ name, init }) => {
+    .filter(({ tested }) => tested)
+    .map(({ name, local, init }) => {
+      const story = assignments
+        .filter(({ target }) => target === local)
+        .reduce(
+          (value, assignment) =>
+            written(
+              value,
+              assignment.path,
+              evaluate(assignment.value, bindings),
+            ),
+          evaluate(factoryArgument(init), bindings),
+        );
+      // Storybook 10.6.5 normalizeStory: { ...story.story?.parameters, ...story.parameters }
       const storyTest = testSettings(
-        member(
-          assignsParameters(body, name)
-            ? unknownValue
-            : evaluate(factoryArgument(init), bindings),
-          'parameters',
-        ),
+        spread([
+          member(member(story, 'story'), 'parameters'),
+          member(story, 'parameters'),
+        ]),
       );
 
       return {
@@ -124,14 +134,21 @@ export function classifyStubs(
   return { stories, stubs };
 }
 
-function assignsParameters(body: readonly unknown[], name: string): boolean {
-  return body.some(
-    (statement) =>
-      field(statement, 'expression', 'type') === 'AssignmentExpression' &&
-      field(statement, 'expression', 'left', 'object', 'name') === name &&
-      field(statement, 'expression', 'left', 'property', 'name') ===
-        'parameters',
-  );
+function written(
+  object: unknown,
+  [key, ...rest]: readonly unknown[],
+  value: unknown,
+): unknown {
+  if (key === undefined) {
+    return value;
+  }
+
+  const base = isRecord(object) ? object : {};
+
+  return {
+    ...base,
+    [String(key)]: written(member(base, String(key)), rest, value),
+  };
 }
 
 function siteVerdict(
@@ -191,26 +208,6 @@ function branchOf(levels: readonly ResetSettings[]): ResetBranch {
   );
 }
 
-function defaultExport(
-  body: readonly unknown[],
-  bindings: ReadonlyMap<string, unknown>,
-): unknown {
-  const declaration = unwrap(
-    field(
-      body.find(
-        (statement) => field(statement, 'type') === 'ExportDefaultDeclaration',
-      ),
-      'declaration',
-    ),
-  );
-
-  if (declaration === undefined) {
-    return undefined;
-  }
-
-  return evaluate(factoryArgument(declaration), bindings);
-}
-
 function factoryArgument(node: unknown): unknown {
   const current = unwrap(node);
 
@@ -233,8 +230,13 @@ function evaluate(
     case 'BooleanLiteral': {
       return field(current, 'value');
     }
-    case 'FunctionDeclaration': {
+    case 'FunctionDeclaration':
+    case 'FunctionExpression':
+    case 'ArrowFunctionExpression': {
       return undefined;
+    }
+    case 'CallExpression': {
+      return isTemplateBind(current) ? undefined : unknownValue;
     }
     case 'Identifier': {
       const name = field(current, 'name');
@@ -244,33 +246,33 @@ function evaluate(
       }
 
       return typeof name === 'string' && bindings.has(name)
-        ? evaluate(
-            bindings.get(name),
-            new Map([...bindings].filter(([bound]) => bound !== name)),
-          )
+        ? evaluate(bindings.get(name), withoutBinding(bindings, name))
         : unknownValue;
     }
     case 'ObjectExpression': {
-      return list(field(current, 'properties')).reduce<
-        Readonly<Record<PropertyKey, unknown>>
-      >((object, property) => {
-        const part = objectPart(property, bindings);
-
-        if (part === unknownValue) {
-          return { [unknownRest]: true };
-        }
-
-        if (!isRecord(part)) {
-          return object;
-        }
-
-        return Object.hasOwn(part, unknownRest) ? part : { ...object, ...part };
-      }, {});
+      return spread(
+        list(field(current, 'properties')).map((property) =>
+          objectPart(property, bindings),
+        ),
+      );
     }
     default: {
       return unknownValue;
     }
   }
+}
+
+function spread(parts: readonly unknown[]): unknown {
+  return parts.reduce<Readonly<Record<PropertyKey, unknown>>>(
+    (object, part) => {
+      if (!isRecord(part)) {
+        return object;
+      }
+
+      return Object.hasOwn(part, unknownRest) ? part : { ...object, ...part };
+    },
+    {},
+  );
 }
 
 function objectPart(
@@ -291,16 +293,15 @@ function objectPart(
   };
 }
 
-const unknownValue = Symbol('unknown');
-
 const unknownRest = Symbol('unknown rest');
+
+const unknownValue: Readonly<Record<symbol, true>> = { [unknownRest]: true };
 
 function member(value: unknown, key: string): unknown {
   if (
-    value === unknownValue ||
-    (isRecord(value) &&
-      !Object.hasOwn(value, key) &&
-      Object.hasOwn(value, unknownRest))
+    isRecord(value) &&
+    !Object.hasOwn(value, key) &&
+    Object.hasOwn(value, unknownRest)
   ) {
     return unknownValue;
   }

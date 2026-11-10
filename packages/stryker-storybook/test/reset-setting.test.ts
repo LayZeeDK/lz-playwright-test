@@ -323,7 +323,52 @@ export function Primary() {
     assert.deepEqual(verdicts, ['kept']);
   });
 
-  it('reads a function story with parameters assigned after it as unknown', () => {
+  it('reads an arrow function story as having no settings of its own', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+export const B = () => null;`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads a function expression story as having no settings of its own', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+export const B = function () {
+  return null;
+};`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads a Template.bind({}) story as having no settings of its own', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+const Template = (args) => null;
+export const B = Template.bind({});
+B.args = {};`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads a story made by a call other than a template bind as unknown', () => {
+    const verdicts = verdictsOf(
+      `import { makeStory } from './make-story';
+export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+export const B = makeStory({});`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads the parameters assigned to a function story after it', () => {
     const verdicts = verdictsOf(
       `export default {
   parameters: { test: { restoreMocks: false } },
@@ -335,14 +380,81 @@ export function Primary() {
 Primary.parameters = { test: { mockReset: true } };`,
     );
 
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('reads the parameters of a story annotation assigned to a story', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+A.story = { parameters: { test: { mockReset: true } } };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it("reads a story's own test parameter over its story annotation's", () => {
+    const verdicts = verdictsOf(
+      `export default {};
+export const A = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+A.story = { parameters: { test: { mockReset: true } } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads the parameters assigned to the local binding of a renamed story', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+const Local = { args: { g: fn().mockReturnValue(1) } };
+export { Local as A };
+Local.parameters = { test: { mockReset: true } };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('reads a test parameter assigned through the parameters of a story', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { parameters: {}, args: { g: fn().mockReturnValue(1) } };
+A.parameters.test = { mockReset: true };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('keeps an unreadable story unknown when args are assigned to it', () => {
+    const verdicts = verdictsOf(
+      `import { makeStory } from './make-story';
+export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+export const B = makeStory({});
+B.args = {};`,
+    );
+
     assert.deepEqual(verdicts, ['unknown']);
   });
 
-  it('reads an object story with parameters assigned after it as unknown', () => {
+  it('reads the parameters assigned to an object story after it', () => {
     const verdicts = verdictsOf(
       `export default { parameters: { test: { restoreMocks: false } } };
 export const A = { args: { g: fn().mockReturnValue(1) } };
 A.parameters = { test: { mockReset: true } };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('reads an import assigned to the parameters of a story as unknown', () => {
+    const verdicts = verdictsOf(
+      `import { shared } from './shared';
+export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+A.parameters = shared;`,
     );
 
     assert.deepEqual(verdicts, ['unknown']);
@@ -357,6 +469,51 @@ export { Other };`,
     );
 
     assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads a meta exported through an export specifier', () => {
+    const verdicts = verdictsOf(
+      `const meta = { parameters: { test: { restoreMocks: false } } };
+export { meta as default };
+export const A = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('leaves __namedExportsOrder out of the stories', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { args: { g: fn().mockReturnValue(1) } };
+export const __namedExportsOrder = ['A'];`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('leaves a non-factory export of a CSF factory file out of the stories', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ args: { g: fn().mockReturnValue(1) } });
+export const helper = () => null;`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('keeps the stories of a file with a meta() call that is no CSF factory', () => {
+    const verdicts = verdictsOf(
+      `import { z } from 'zod';
+const schema = z.string().meta({ id: 'label' });
+export default { parameters: { test: { restoreMocks: false } } };
+export const A = {
+  parameters: { test: { mockReset: true } },
+  args: { g: fn().mockReturnValue(1) },
+};`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
   });
 
   it('leaves a function declaration exported by specifier out of the stories', () => {

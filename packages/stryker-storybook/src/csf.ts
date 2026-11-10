@@ -31,14 +31,14 @@ export function csfShapes(program: unknown): CsfShapes {
   const metaObjects = metaObjectsOf(body, bindings);
   const isStory = storyFilter(metaObjects);
   const assignments = body.map(assignmentOf);
-  const storyExports = [
-    ...namedExports(body, bindings),
+  const storyInits = [
+    ...storyExports(body, bindings),
     ...assignments
-      .filter(({ key }) => key === 'story')
+      .filter(({ target, key }) => key === 'story' && isStory(target))
       .map(({ target, value }) => ({ name: target, init: value })),
-  ].filter(({ name }) => isStory(name));
-  const storyNames = storyExports.map(({ name }) => name);
-  const stories = storyExports
+  ];
+  const storyNames = storyInits.map(({ name }) => name);
+  const stories = storyInits
     .map(({ init }) => storyNode(unwrap(init), bindings))
     .filter(
       (init) =>
@@ -122,6 +122,15 @@ function metaObjectsOf(
   body: readonly unknown[],
   bindings: Bindings,
 ): readonly unknown[] {
+  return metaExpressions(body, bindings).flatMap((meta) =>
+    objectOf(meta, bindings),
+  );
+}
+
+export function metaExpressions(
+  body: readonly unknown[],
+  bindings: Bindings,
+): readonly unknown[] {
   const declaration = field(
     body.find(
       (statement) => field(statement, 'type') === 'ExportDefaultDeclaration',
@@ -133,11 +142,11 @@ function metaObjectsOf(
     .find((specifier) => field(specifier, 'exported', 'name') === 'default');
 
   return [
-    ...objectOf(declaration ?? field(defaultSpecifier, 'local'), bindings),
+    declaration ?? field(defaultSpecifier, 'local'),
     ...[...bindings.values()]
-      .filter((init) => field(init, 'callee', 'property', 'name') === 'meta')
+      .filter(isFactoryMeta)
       .map((init) => list(field(init, 'arguments'))[0]),
-  ];
+  ].filter((meta) => meta !== undefined);
 }
 
 function storyFilter(
@@ -158,15 +167,49 @@ function storyFilter(
 export function storyExports(
   body: readonly unknown[],
   bindings: Bindings,
-): readonly NamedExport[] {
+): readonly StoryExport[] {
   const isStory = storyFilter(metaObjectsOf(body, bindings));
+  const exports = namedExports(body, bindings);
+  const isFactoryStory = ({ init }: NamedExport): boolean =>
+    storyFactories.includes(field(unwrap(init), 'callee', 'property', 'name'));
+  const isFactoryFile = exports.some(isFactoryStory);
 
-  return namedExports(body, bindings).filter(({ name }) => isStory(name));
+  return exports
+    .filter(
+      (named) =>
+        named.name !== '__namedExportsOrder' &&
+        isStory(named.name) &&
+        (!isFactoryFile || isFactoryStory(named)),
+    )
+    .map(({ name, local, init, form }) => ({
+      name,
+      local,
+      init,
+      tested:
+        form === 'declaration' ||
+        (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
+    }));
+}
+
+export interface StoryExport {
+  readonly name: string;
+  readonly local: unknown;
+  readonly init: unknown;
+  /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
+  readonly tested: boolean;
+}
+
+const storyFactories: readonly unknown[] = ['story', 'extend'];
+
+function isFactoryMeta(init: unknown): boolean {
+  return field(init, 'callee', 'property', 'name') === 'meta';
 }
 
 export interface NamedExport {
   readonly name: string;
+  readonly local: unknown;
   readonly init: unknown;
+  readonly form: 'declaration' | 'specifier';
 }
 
 export function namedExports(
@@ -183,33 +226,34 @@ export function namedExports(
       ...list(field(statement, 'declaration', 'declarations')).map(
         (declarator) => ({
           name: field(declarator, 'id', 'name'),
+          local: field(declarator, 'id', 'name'),
           init: field(declarator, 'init'),
+          form: 'declaration' as const,
         }),
       ),
       ...(field(statement, 'declaration', 'type') === 'FunctionDeclaration'
         ? [
             {
               name: field(statement, 'declaration', 'id', 'name'),
+              local: field(statement, 'declaration', 'id', 'name'),
               init: field(statement, 'declaration'),
+              form: 'declaration' as const,
             },
           ]
         : []),
       ...list(field(statement, 'specifiers'))
         .filter((specifier) => field(specifier, 'exportKind') !== 'type')
-        .map((specifier) => {
-          const init = followed(field(specifier, 'local'), bindings);
-
-          return {
-            name:
-              field(specifier, 'exported', 'name') ??
-              field(specifier, 'exported', 'value'),
-            init:
-              field(init, 'type') === 'FunctionDeclaration' ? undefined : init,
-          };
-        }),
+        .map((specifier) => ({
+          name:
+            field(specifier, 'exported', 'name') ??
+            field(specifier, 'exported', 'value'),
+          local: field(specifier, 'local', 'name'),
+          init: followed(field(specifier, 'local'), bindings),
+          form: 'specifier' as const,
+        })),
     ])
-    .flatMap(({ name, init }) =>
-      typeof name === 'string' && name !== 'default' ? [{ name, init }] : [],
+    .flatMap(({ name, ...named }) =>
+      typeof name === 'string' && name !== 'default' ? [{ name, ...named }] : [],
     );
 }
 
@@ -263,6 +307,11 @@ function followed(value: unknown, bindings: Bindings): unknown {
     : value;
 }
 
+/** The bindings a name's init reads, so that following a cycle of names ends. */
+export function withoutBinding(bindings: Bindings, name: unknown): Bindings {
+  return new Map([...bindings].filter(([bound]) => bound !== name));
+}
+
 function withInit(value: unknown, bindings: Bindings): readonly unknown[] {
   return [value, followed(value, bindings)];
 }
@@ -301,18 +350,29 @@ function matchesStories(name: unknown, descriptor: unknown): boolean {
 
 interface Assignment {
   readonly target: unknown;
+  /** The one key of a `Target.key = value` assignment. */
   readonly key: unknown;
+  readonly path: readonly unknown[];
   readonly value: unknown;
 }
 
-function assignmentOf(statement: unknown): Assignment {
-  const left = field(statement, 'expression', 'left');
+export function assignmentOf(statement: unknown): Assignment {
+  const [target, ...path] = memberChain(
+    field(statement, 'expression', 'left'),
+  );
 
   return {
-    target: field(left, 'object', 'name'),
-    key: field(left, 'property', 'name'),
+    target,
+    key: path.length === 1 ? path[0] : undefined,
+    path,
     value: field(statement, 'expression', 'right'),
   };
+}
+
+function memberChain(node: unknown): readonly unknown[] {
+  return field(node, 'type') === 'MemberExpression'
+    ? [...memberChain(field(node, 'object')), field(node, 'property', 'name')]
+    : [field(node, 'name')];
 }
 
 interface TestCall {
@@ -363,7 +423,7 @@ function storyNode(init: unknown, bindings: Bindings): unknown {
     : init;
 }
 
-function isTemplateBind(init: unknown): boolean {
+export function isTemplateBind(init: unknown): boolean {
   const [context, ...more] = list(field(init, 'arguments'));
 
   return (
@@ -385,7 +445,7 @@ function objectOf(expression: unknown, bindings: Bindings): readonly unknown[] {
     case 'Identifier': {
       return objectOf(
         followed(node, bindings),
-        new Map([...bindings].filter(([name]) => name !== field(node, 'name'))),
+        withoutBinding(bindings, field(node, 'name')),
       );
     }
     default: {

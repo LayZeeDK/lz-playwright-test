@@ -181,6 +181,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('places the mutants of a non-factory export of a CSF factory file', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          'const meta = preview.meta({ component: B });\nexport const A = meta.story();\nexport const helper = {\n  a: () => null,\n};',
+        )
+      ).filter((outcome) => /^[34] /.test(outcome)),
+      ['3 ObjectLiteral placed', '4 ArrowFunction placed'],
+    );
+  });
+
   it('places the mutants of an export that excludeStories matches', async () => {
     const { outcomes } = setup();
 
