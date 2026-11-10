@@ -1,4 +1,5 @@
 import type { Ignorer } from '@stryker-mutator/api/ignore';
+import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 
 import { csfShapes, type CsfShapes } from './csf.ts';
 import { isRecord } from './is-record.ts';
@@ -58,6 +59,8 @@ export function csfIgnorer(options: object, log: ProjectLog): Ignorer {
     },
   };
 }
+
+csfIgnorer.inject = tokens(commonTokens.options, commonTokens.logger);
 
 // A Stryker ignorer skips a whole subtree; a next-line directive skips only the mutants on the container's first line.
 function keepStoryContainer(container: unknown): void {
