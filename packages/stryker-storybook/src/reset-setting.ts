@@ -2,7 +2,6 @@ import {
   type Assignment,
   csfFile,
   defaultExport,
-  definePreviewArgument,
   isTemplateBind,
   namedExports,
   storyArgument,
@@ -66,6 +65,15 @@ export function readPreviewTest(program: unknown): ResetSettings {
   return testSettings(
     parameters === undefined ? undefined : evaluate(parameters.init, bindings),
   );
+}
+
+function definePreviewArgument(node: unknown): unknown {
+  const current = unwrap(node);
+
+  return field(current, 'type') === 'CallExpression' &&
+    field(current, 'callee', 'name') === 'definePreview'
+    ? field(current, 'arguments', '0')
+    : current;
 }
 
 function testSettings(parameters: unknown): ResetSettings {

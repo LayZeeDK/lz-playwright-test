@@ -458,15 +458,6 @@ function propertyValue(object: unknown, key: string): unknown {
     : field(property, 'value');
 }
 
-export function definePreviewArgument(node: unknown): unknown {
-  const current = unwrap(node);
-
-  return field(current, 'type') === 'CallExpression' &&
-    field(current, 'callee', 'name') === 'definePreview'
-    ? field(current, 'arguments', '0')
-    : current;
-}
-
 function storyNode(init: unknown, bindings: Bindings): unknown {
   if (isTemplateBind(init)) {
     return followed(field(init, 'callee', 'object'), bindings);
