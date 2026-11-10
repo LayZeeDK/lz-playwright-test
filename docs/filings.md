@@ -1467,6 +1467,7 @@ Status: draft, not filed (2026-11-05). Same searches as the entry above, nothing
 all spies created with `fn()` from `storybook/test` when a story unmounts".
 
 **What happens (measured).**
+
 1. The reset runs as a loader before the story renders (`code/core/src/test/preview.ts:15-25,188`), not when a story
    unmounts. A stub chained on `fn()` in `args` is erased before the first render.
 2. It reaches every spy `fn()` has created in the module, so one story's reset erases the stubs of other stories in
@@ -1476,7 +1477,7 @@ all spies created with `fn()` from `storybook/test` when a story unmounts".
    - renders the stub on a fresh load of its story page, and `undefined` after the reader opens a default-reset story
      and comes back without a reload;
    - renders `undefined` on the Docs page.
-   With `restoreMocks: false` in the file's `meta`, both such stories pass.
+     With `restoreMocks: false` in the file's `meta`, both such stories pass.
 
 **Suggested change.** Say that the reset runs before each story renders, that it reaches all spies created with `fn()`
 (including other stories' spies when they share a module), and that stubs belong in `fn(impl)` or `beforeEach`; and
