@@ -960,6 +960,15 @@ place for the test-after pin the gap calls for. And the only way to show that pi
 and revert it (close to O84 and O115). The same check found an unpinned case in a new cycle guard. Evidence:
 `g2r3fix/cycles.log`, both `test-after` lines.
 
+**O130. A minimal green for a ported rule can be wider than the rule (adds to O117).** Third review fixes for the
+spy-stub path, cycle 2, needed to decide "is this a CSF factory file". The highest-priority green tested for any
+`.meta()` call, and it passed its own test and every listed test. Storybook's rule also requires the callee's root to
+be imported from the preview file, and Storybook's own suite has a negative case for this: a Zod `.meta()` call. The
+gap showed only because the gate ran the CsfFile oracle tests, whose names appeared in the log. `lz-red`'s test-list
+moves add cases for the behaviour being driven, not the cases where the upstream rule says no. `lz-tpp` ranks by the
+test in hand. Neither prompts the worker, when porting an upstream rule, to put the upstream's negative tests into the
+test list. Evidence: `g1r3fix/cycles.log` cycles 2 and 5, and `g1r3fix/gate-b.log`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
