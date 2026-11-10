@@ -4,6 +4,7 @@ import {
   csfFile,
   defaultExport,
   isTemplateBind,
+  mayImportItself,
   namedExports,
   storyArgument,
   storyIndex,
@@ -140,6 +141,7 @@ export function classifyStubs(
   const bindings = new Map(
     [...topLevel].filter(([name]) => !writtenNames.has(name)),
   );
+  const isSelfImported = mayImportItself(body, fileName);
   const metaValue = evaluate(meta, bindings);
   const metaTest = testSettings(member(metaValue, 'parameters'));
   const declared = exported
@@ -166,22 +168,23 @@ export function classifyStubs(
             ),
           extendsBase ? unknownValue : evaluate(storyArgument(init), bindings),
         );
-        const isSkipped = referencedElsewhere
-          ? 'unknown'
-          : storySkipped(
-              testTags,
-              member(metaValue, 'tags'),
-              story,
-              children.map((child) => {
-                if (child === 'unmatched') {
-                  return unknownValue;
-                }
+        const isSkipped =
+          referencedElsewhere || isSelfImported
+            ? 'unknown'
+            : storySkipped(
+                testTags,
+                member(metaValue, 'tags'),
+                story,
+                children.map((child) => {
+                  if (child === 'unmatched') {
+                    return unknownValue;
+                  }
 
-                return child.options === undefined
-                  ? undefined
-                  : evaluate(child.options, bindings);
-              }),
-            );
+                  return child.options === undefined
+                    ? undefined
+                    : evaluate(child.options, bindings);
+                }),
+              );
 
         if (isSkipped === true) {
           return [];
