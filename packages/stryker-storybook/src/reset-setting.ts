@@ -84,8 +84,8 @@ function definePreviewArgument(node: unknown): unknown {
 function testSettings(parameters: unknown): ResetSettings {
   const test = member(parameters, 'test');
 
-  // Storybook 10.6.5 combineParameters lets an array replace an object instead of merging into it.
-  if (Array.isArray(test)) {
+  // Storybook 10.6.5 combineParameters lets any value that is not a plain object replace an object instead of merging into it.
+  if (test !== undefined && (!isRecord(test) || Array.isArray(test))) {
     return unreadableSettings;
   }
 
