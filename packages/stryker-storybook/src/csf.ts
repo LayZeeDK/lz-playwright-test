@@ -122,6 +122,15 @@ function metaObjectsOf(
   body: readonly unknown[],
   bindings: Bindings,
 ): readonly unknown[] {
+  return metaExpressions(body, bindings).flatMap((meta) =>
+    objectOf(meta, bindings),
+  );
+}
+
+export function metaExpressions(
+  body: readonly unknown[],
+  bindings: Bindings,
+): readonly unknown[] {
   const declaration = field(
     body.find(
       (statement) => field(statement, 'type') === 'ExportDefaultDeclaration',
@@ -133,11 +142,11 @@ function metaObjectsOf(
     .find((specifier) => field(specifier, 'exported', 'name') === 'default');
 
   return [
-    ...objectOf(declaration ?? field(defaultSpecifier, 'local'), bindings),
+    declaration ?? field(defaultSpecifier, 'local'),
     ...[...bindings.values()]
       .filter(isFactoryMeta)
       .map((init) => list(field(init, 'arguments'))[0]),
-  ];
+  ].filter((meta) => meta !== undefined);
 }
 
 function storyFilter(

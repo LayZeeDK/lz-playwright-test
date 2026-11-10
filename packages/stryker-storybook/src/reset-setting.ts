@@ -1,5 +1,6 @@
 import {
   annotationFactories,
+  metaExpressions,
   namedExports,
   storyExports,
   topLevelBindings,
@@ -46,10 +47,12 @@ export const unreadableSettings: ResetSettings = {
 export function readPreviewTest(program: unknown): ResetSettings {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
-  const exported = defaultExport(body, bindings);
+  const [exported] = metaExpressions(body, bindings);
 
   if (exported !== undefined) {
-    return testSettings(member(exported, 'parameters'));
+    return testSettings(
+      member(evaluate(factoryArgument(exported), bindings), 'parameters'),
+    );
   }
 
   const parameters = namedExports(body, bindings).find(
@@ -83,15 +86,9 @@ export function classifyStubs(
 ): StubClassification {
   const body = list(field(program, 'body'));
   const bindings = topLevelBindings(body);
-  const factoryMeta = [...bindings.values()].find(
-    (init) => field(unwrap(init), 'callee', 'property', 'name') === 'meta',
-  );
+  const [meta] = metaExpressions(body, bindings);
   const metaTest = testSettings(
-    member(
-      defaultExport(body, bindings) ??
-        evaluate(factoryArgument(factoryMeta), bindings),
-      'parameters',
-    ),
+    member(evaluate(factoryArgument(meta), bindings), 'parameters'),
   );
   const declared = storyExports(body, bindings)
     .filter(({ tested }) => tested)
@@ -188,26 +185,6 @@ function branchOf(levels: readonly ResetSettings[]): ResetBranch {
       })
       .find((branch) => branch !== undefined) ?? 'restore'
   );
-}
-
-function defaultExport(
-  body: readonly unknown[],
-  bindings: ReadonlyMap<string, unknown>,
-): unknown {
-  const declaration = unwrap(
-    field(
-      body.find(
-        (statement) => field(statement, 'type') === 'ExportDefaultDeclaration',
-      ),
-      'declaration',
-    ),
-  );
-
-  if (declaration === undefined) {
-    return undefined;
-  }
-
-  return evaluate(factoryArgument(declaration), bindings);
 }
 
 function factoryArgument(node: unknown): unknown {

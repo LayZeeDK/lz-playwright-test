@@ -359,6 +359,16 @@ export { Other };`,
     assert.deepEqual(verdicts, ['kept']);
   });
 
+  it('reads a meta exported through an export specifier', () => {
+    const verdicts = verdictsOf(
+      `const meta = { parameters: { test: { restoreMocks: false } } };
+export { meta as default };
+export const A = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
   it('leaves __namedExportsOrder out of the stories', () => {
     const verdicts = verdictsOf(
       `export default { parameters: { test: { restoreMocks: false } } };
