@@ -1,4 +1,37 @@
+import { loadCsf } from 'storybook/internal/csf-tools';
+
+import { isStringArray } from './is-record.ts';
 import { field, list } from './node-field.ts';
+
+/** Each story's static tags, the meta's first, as Storybook's CsfFile reads them; none when Storybook cannot read the file. */
+export function storyTags(
+  code: string,
+  fileName: string,
+): ReadonlyMap<string, readonly string[]> {
+  return new Map(
+    list(indexInputs(code, fileName)).flatMap((input) => {
+      const exportName = field(input, 'exportName');
+      const tags = field(input, 'tags');
+
+      return field(input, 'subtype') === 'story' &&
+        typeof exportName === 'string' &&
+        isStringArray(tags)
+        ? [[exportName, tags] as const]
+        : [];
+    }),
+  );
+}
+
+function indexInputs(code: string, fileName: string): unknown {
+  try {
+    return loadCsf(code, {
+      fileName,
+      makeTitle: (title: string | undefined) => title ?? fileName,
+    }).parse().indexInputs;
+  } catch {
+    return [];
+  }
+}
 
 export interface CsfShapes {
   readonly metaObjects: ReadonlySet<unknown>;
@@ -134,7 +167,6 @@ export function defaultExport(body: readonly unknown[]): unknown {
 
 export interface CsfFile {
   readonly metaObjects: readonly unknown[];
-  readonly metaTags: readonly string[];
   readonly stories: readonly StoryExport[];
 }
 
@@ -147,11 +179,6 @@ export function csfFile(body: readonly unknown[], bindings: Bindings): CsfFile {
 
   return {
     metaObjects,
-    metaTags: tagsOf(
-      propertyValue(metaObjects[0], 'tags'),
-      propertyValue(metaObjects[0], 'play'),
-      bindings,
-    ),
     stories: storyExports(body, bindings, metaObjects, metas.length > 0),
   };
 }
@@ -194,9 +221,6 @@ function storyExports(
       const storyAssignments = assignments.filter(
         ({ target }) => target === local,
       );
-      const annotation = (key: string): unknown =>
-        assignedIn(storyAssignments, key).at(-1)?.value ??
-        propertyValue(storyArgument(init), key);
 
       return {
         name,
@@ -205,7 +229,6 @@ function storyExports(
         tested:
           form === 'declaration' ||
           (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
-        tags: tagsOf(annotation('tags'), annotation('play'), bindings),
         assignments: storyAssignments,
         runtimeAssignments: runtimeAssignments(storyAssignments, isFactoryFile),
         extendsBase:
@@ -214,36 +237,12 @@ function storyExports(
     });
 }
 
-/** Storybook 10.6.5 CsfFile adds `Tag.PLAY_FN` to the tags of a meta or story that has a play. */
-function tagsOf(
-  tags: unknown,
-  play: unknown,
-  bindings: Bindings,
-): readonly string[] {
-  return [
-    ...stringList(tags, bindings),
-    ...(play === undefined ? [] : ['play-fn']),
-  ];
-}
-
-/** Storybook 10.6.5 CsfFile `parseTags`, after `findVarInitialization` for a name. */
-function stringList(node: unknown, bindings: Bindings): readonly string[] {
-  return list(field(followed(node, bindings), 'elements')).flatMap(
-    (element) => {
-      const value = field(element, 'value');
-
-      return typeof value === 'string' ? [value] : [];
-    },
-  );
-}
-
 export interface StoryExport {
   readonly name: string;
   readonly local: unknown;
   readonly init: unknown;
   /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
   readonly tested: boolean;
-  readonly tags: readonly string[];
   readonly assignments: readonly Assignment[];
   /** The writes that the story Storybook runs is composed from, with a factory story's `input` stripped from the path. */
   readonly runtimeAssignments: readonly Assignment[];

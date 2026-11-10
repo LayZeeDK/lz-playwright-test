@@ -1,6 +1,7 @@
 import {
   classifyStubs,
   type ClassifiedStub,
+  type StoryFile,
   type StubVerdict,
 } from './reset-setting.ts';
 import type { StorybookProject } from './storybook-project.ts';
@@ -40,10 +41,10 @@ export interface SpyStubReason {
 }
 
 export function reasonSites(
-  program: unknown,
+  file: StoryFile,
   { previewTest, testTags, transformer }: StorybookProject,
 ): readonly ReasonSite[] {
-  return classifyStubs(program, previewTest, testTags).stubs.flatMap(
+  return classifyStubs(file, previewTest, testTags).stubs.flatMap(
     ({ once, verdict, ...site }): readonly ReasonSite[] => {
       if (verdict === 'kept') {
         return [];

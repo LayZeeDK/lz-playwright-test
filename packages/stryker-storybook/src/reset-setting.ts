@@ -6,11 +6,12 @@ import {
   isTemplateBind,
   namedExports,
   storyArgument,
+  storyTags,
   topLevelBindings,
   unwrap,
   withoutBinding,
 } from './csf.ts';
-import { isRecord } from './is-record.ts';
+import { isRecord, isStringArray } from './is-record.ts';
 import { field, list } from './node-field.ts';
 import { definitionTimeStubs } from './stub-shape.ts';
 
@@ -109,8 +110,14 @@ export const defaultTestTags: TestTags = {
   skip: [],
 };
 
+export interface StoryFile {
+  readonly program: unknown;
+  readonly code: string;
+  readonly fileName: string;
+}
+
 export function classifyStubs(
-  program: unknown,
+  { program, code, fileName }: StoryFile,
   previewTest: ResetSettings,
   testTags: TestTags,
 ): StubClassification {
@@ -118,21 +125,33 @@ export function classifyStubs(
   const bindings = topLevelBindings(body);
   const {
     metaObjects: [meta],
-    metaTags,
     stories: exported,
   } = csfFile(body, bindings);
-  const metaTest = testSettings(member(evaluate(meta, bindings), 'parameters'));
+  const tagsByStory = storyTags(code, fileName);
+  const metaValue = evaluate(meta, bindings);
+  const metaTest = testSettings(member(metaValue, 'parameters'));
   const declared = exported
-    .filter(
-      ({ tested, tags }) =>
-        tested && isTestedByTags(testTags, [...metaTags, ...tags]),
-    )
-    .map(({ name, init, runtimeAssignments, extendsBase }) => {
+    .filter(({ name, tested }) => {
+      const tags = tagsByStory.get(name);
+
+      return tested && tags !== undefined && isTestedByTags(testTags, tags);
+    })
+    .flatMap(({ name, init, runtimeAssignments, extendsBase }) => {
       const story = runtimeAssignments.reduce(
         (value, assignment) =>
           written(value, assignment.path, evaluate(assignment.value, bindings)),
         extendsBase ? unknownValue : evaluate(storyArgument(init), bindings),
       );
+      const isSkipped = skipped(
+        testTags,
+        member(metaValue, 'tags'),
+        member(story, 'tags'),
+      );
+
+      if (isSkipped === true) {
+        return [];
+      }
+
       // Storybook 10.6.5 normalizeStory: { ...story.story?.parameters, ...story.parameters }
       const storyTest = testSettings(
         spread([
@@ -141,10 +160,18 @@ export function classifyStubs(
         ]),
       );
 
-      return {
-        story: { name, branch: branchOf([previewTest, metaTest, storyTest]) },
-        init,
-      };
+      return [
+        {
+          story: {
+            name,
+            branch:
+              isSkipped === 'unknown'
+                ? 'unknown'
+                : branchOf([previewTest, metaTest, storyTest]),
+          },
+          init,
+        },
+      ];
     });
   const stories = declared.map(({ story }) => story);
   const stubs = definitionTimeStubs(program).map(
@@ -159,16 +186,46 @@ export function classifyStubs(
   return { stories, stubs };
 }
 
-/** Storybook 10.6.5 vitest-plugin transformer.ts `isValidTest`, plus test-utils.ts `testStory`, which skips a story before it runs. */
+/** Storybook 10.6.5 test-utils.ts `testStory` checks skip tags on the tags prepareStory.ts composes at run time, which hold no play-fn. */
+function skipped(
+  { previewTags, skip }: TestTags,
+  metaTags: unknown,
+  storyTags: unknown,
+): boolean | 'unknown' {
+  if (skip.length === 0) {
+    return false;
+  }
+
+  const meta = tagList(metaTags);
+  const story = tagList(storyTags);
+
+  if (meta === undefined || story === undefined) {
+    return 'unknown';
+  }
+
+  const tags = combineTags('dev', 'test', ...previewTags, ...meta, ...story);
+
+  return skip.some((tag) => tags.includes(tag));
+}
+
+function tagList(value: unknown): readonly string[] | undefined {
+  if (value === undefined) {
+    return [];
+  }
+
+  return isStringArray(value) ? value : undefined;
+}
+
+/** Storybook 10.6.5 vitest-plugin transformer.ts `isValidTest`. */
 function isTestedByTags(
-  { previewTags, include, exclude, skip }: TestTags,
+  { previewTags, include, exclude }: TestTags,
   fileTags: readonly string[],
 ): boolean {
   const tags = combineTags('test', 'dev', ...previewTags, ...fileTags);
 
   return (
     (include.length === 0 || include.some((tag) => tags.includes(tag))) &&
-    ![...exclude, ...skip].some((tag) => tags.includes(tag))
+    !exclude.some((tag) => tags.includes(tag))
   );
 }
 
@@ -278,6 +335,13 @@ function evaluate(
       return typeof name === 'string' && bindings.has(name)
         ? evaluate(bindings.get(name), withoutBinding(bindings, name))
         : unknownValue;
+    }
+    case 'ArrayExpression': {
+      return list(field(current, 'elements')).map((element) =>
+        field(element, 'type') === 'StringLiteral'
+          ? field(element, 'value')
+          : unknownValue,
+      );
     }
     case 'ObjectExpression': {
       return spread(

@@ -456,6 +456,42 @@ describe('storybookProject', () => {
     });
   });
 
+  describe('with a Vitest import that fails for another reason', () => {
+    it('counts the stories tagged test and warns once, naming the config and the error', (t) => {
+      const nodeOptions = process.env['NODE_OPTIONS'];
+      t.after(() => {
+        process.env['NODE_OPTIONS'] = nodeOptions;
+      });
+      process.env['NODE_OPTIONS'] =
+        `--import=${pathToFileURL(join(fixtures, 'broken-vitest', 'register.mjs')).href}`;
+      const lines: string[] = [];
+      const configFile = join(
+        fixtures,
+        'vitest-tags',
+        'vitest.plain.config.ts',
+      );
+
+      const project = storybookProject(
+        join(fixtures, 'broken-vitest', '.storybook'),
+        {
+          info: () => undefined,
+          warn: (message: string) => lines.push(`warn: ${message}`),
+        },
+        configFile,
+      );
+
+      assert.deepEqual(
+        [project.testTags.include, lines],
+        [
+          ['test'],
+          [
+            `warn: @layzee/stryker-storybook: Vitest could not load ${configFile}, so the tested stories are the stories tagged test: Error: vitest/node of the broken-vitest fixture`,
+          ],
+        ],
+      );
+    });
+  });
+
   describe('parseLoaderResult', () => {
     it('reads a tag filter of an unknown kind as unreadable', () => {
       const { vitestTags } = parseLoaderResult({

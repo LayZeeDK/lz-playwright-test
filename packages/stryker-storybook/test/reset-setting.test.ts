@@ -10,6 +10,7 @@ import {
   defaultTestTags,
   readPreviewTest,
   type ResetSettings,
+  type StoryFile,
   type StoryReset,
   type StubVerdict,
   type TestTags,
@@ -95,15 +96,16 @@ function storiesOf(
   file: string,
   preview: keyof typeof previews,
 ): readonly StoryReset[] {
-  return classifyStubs(
-    storyProgram(file),
-    previewTest(preview),
-    defaultTestTags,
-  ).stories;
+  return classifyStubs(fixtureFile(file), previewTest(preview), defaultTestTags)
+    .stories;
 }
 
-function storyProgram(file: string): unknown {
-  return parseProgram(
+function storyFile(code: string, fileName: string): StoryFile {
+  return { program: parseProgram(code, fileName), code, fileName };
+}
+
+function fixtureFile(file: string): StoryFile {
+  return storyFile(
     readFileSync(fixture(`${file}.stories.tsx.txt`), 'utf8'),
     `${file}.stories.tsx`,
   );
@@ -136,17 +138,17 @@ describe('classifyStubs stub verdicts', () => {
 
   rows.forEach(([file, preview, verdicts]) => {
     it(`gives the stubs of ${file} under the ${preview} preview the verdicts ${verdicts.join(', ')}`, () => {
-      const program = storyProgram(file);
+      const story = fixtureFile(file);
 
       const { stubs } = classifyStubs(
-        program,
+        story,
         previewTest(preview),
         defaultTestTags,
       );
 
       assert.deepEqual(
         stubs,
-        definitionTimeStubs(program).map(
+        definitionTimeStubs(story.program).map(
           ({ start, end, line, once }, index) => ({
             start,
             end,
@@ -163,7 +165,7 @@ describe('classifyStubs stub verdicts', () => {
 describe('classifyStubs parameter reading', () => {
   function verdictsOf(source: string): readonly StubVerdict[] {
     return classifyStubs(
-      parseProgram(
+      storyFile(
         `import { fn } from 'storybook/test';\n${source}`,
         'X.stories.ts',
       ),
@@ -708,7 +710,7 @@ describe('classifyStubs tag filter', () => {
     testTags = defaultTestTags,
   ): readonly StubVerdict[] {
     return classifyStubs(
-      parseProgram(
+      storyFile(
         `import { fn } from 'storybook/test';\n${source}`,
         'X.stories.ts',
       ),
@@ -907,6 +909,124 @@ export const B = A.extend({ args: { g: fn().mockReturnValue(1) } });`,
     );
 
     assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('leaves out a factory story whose input is assigned a tag that skip names', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ parameters: { test: { mockReset: true } } });
+A.input.tags = ['slow'];
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('keeps a story with a play when skip names play-fn, a tag only the index gives it', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { play: async () => undefined, parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ skip: ['play-fn'] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('leaves out the stories of a meta with a tag that skip names', () => {
+    const verdicts = verdictsOf(
+      `export default { tags: ['slow'] };
+export const A = { parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it("leaves out the stories when the preview's tags hold a tag that skip names", () => {
+    const verdicts = verdictsOf(
+      `export default {};
+export const A = { parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ previewTags: ['slow'], skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it("keeps a story that negates its meta's tag that skip names", () => {
+    const verdicts = verdictsOf(
+      `export default { tags: ['slow'] };
+export const A = { tags: ['!slow'], parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('reads a story as unknown when skip is set and its run-time tags cannot be read', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+import { sharedTags } from './tags';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ parameters: { test: { mockReset: true } } });
+A.input.tags = sharedTags;
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story whose run-time tags cannot be read when skip is empty', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+import { sharedTags } from './tags';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ parameters: { test: { mockReset: true } } });
+A.input.tags = sharedTags;
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it("reads a story as unknown when skip is set and its meta's run-time tags cannot be read", () => {
+    const verdicts = verdictsOf(
+      `import { shared } from './shared';
+export default { ...shared, parameters: { test: { restoreMocks: false } } };
+export const A = { parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('leaves out every story when skip names dev, a tag every story starts with', () => {
+    const verdicts = verdictsOf(
+      `export default {};
+export const A = { parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ skip: ['dev'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('leaves out every story when skip names test, a tag every story starts with', () => {
+    const verdicts = verdictsOf(
+      `export default {};
+export const A = { parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ skip: ['test'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
   });
 });
 
