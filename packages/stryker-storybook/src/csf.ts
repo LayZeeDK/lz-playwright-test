@@ -82,15 +82,18 @@ export function csfShapes(program: unknown): CsfShapes {
   const idParameters = stories
     .map((story) => propertyValue(story, 'parameters'))
     .filter((parameters) => propertyValue(parameters, '__id') !== undefined);
-  const testCalls = body.map(testArguments);
+  const testStatements = body.filter(
+    (statement) => testArguments(statement).length > 0,
+  );
+  const testCalls = testStatements.map(testArguments);
   const testOptions = testCalls
     .filter((testArgs) => testArgs.length === 3)
     .map((testArgs) => followed(testArgs[1], body));
 
   return {
-    metaObjects: new Set(metaObjects),
-    storyContainers: new Set([...stories, ...idParameters, ...testOptions]),
-    testCode: new Set([
+    metaObjects: nodeSet(metaObjects),
+    storyContainers: nodeSet([...stories, ...idParameters, ...testOptions]),
+    testCode: nodeSet([
       ...[...metaObjects, ...stories].flatMap((object) =>
         testKeys.flatMap((key) => withInit(propertyValue(object, key), body)),
       ),
@@ -99,15 +102,15 @@ export function csfShapes(program: unknown): CsfShapes {
           assigned(statement, key).flatMap((value) => withInit(value, body)),
         ),
       ),
-      ...body.filter((statement) => testArguments(statement).length > 0),
+      ...testStatements,
     ]),
-    mswValues: new Set(
+    mswValues: nodeSet(
       [
         ...stories.map((story) => propertyValue(story, 'parameters')),
         ...body.flatMap((statement) => assigned(statement, 'parameters')),
       ].map((parameters) => propertyValue(parameters, 'msw')),
     ),
-    staticValues: new Set([
+    staticValues: nodeSet([
       ...[...metaObjects, ...stories].flatMap((object) =>
         staticKeys.flatMap((key) => withInit(propertyValue(object, key), body)),
       ),
@@ -124,6 +127,10 @@ export function csfShapes(program: unknown): CsfShapes {
       ...specifiers.map((specifier) => field(specifier, 'exported')),
     ]),
   };
+}
+
+function nodeSet(values: readonly unknown[]): ReadonlySet<unknown> {
+  return new Set(values.filter((value) => value !== undefined));
 }
 
 function withInit(
