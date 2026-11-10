@@ -648,9 +648,6 @@ function identifiersInReadForms(statement: unknown): readonly unknown[] {
     ...(field(statement, 'expression', 'operator') === '='
       ? [rootObject(field(statement, 'expression', 'left', 'object'))]
       : []),
-    ...(field(statement, 'type') === 'ExportDefaultDeclaration'
-      ? [unwrap(field(statement, 'declaration'))]
-      : []),
   ];
 }
 
@@ -669,76 +666,70 @@ function namesReadElsewhere(
   readonly elsewhere: ReadonlySet<unknown>;
   readonly written: ReadonlySet<unknown>;
 } {
-  const spreads = spreadCopiesOf([...bindings, ...metaBindings], bindings);
+  const reaches = reachesOf([...bindings, ...metaBindings], bindings);
   const read = new Set([
     ...body.flatMap(identifiersInReadForms),
-    ...spreads.map(({ source }) => source),
+    ...reaches.map(({ identifier }) => identifier),
   ]);
   const referenced = identifiersIn(body)
     .filter((identifier) => !read.has(identifier))
     .map((identifier) => field(identifier, 'name'));
-  const copies = spreads.map(({ copy, source }) => ({
-    copy,
-    source: field(source, 'name'),
-  }));
-  const written = withSpreadFamilies(
+  const written = withFamilies(
     new Set([
       ...referenced,
       ...body.flatMap(assignmentOf).map(({ target }) => target),
     ]),
-    copies,
+    reaches,
   );
 
   return {
     elsewhere: new Set([
       ...referenced,
-      ...copies
-        .filter(({ copy }) => written.has(copy))
-        .flatMap(({ copy, source }) => [copy, source]),
+      ...reaches
+        .filter(({ from }) => written.has(from))
+        .flatMap(({ from, to }) => [from, to]),
     ]),
     written,
   };
 }
 
-function withSpreadFamilies(
+function withFamilies(
   names: ReadonlySet<unknown>,
-  copies: readonly SpreadCopy[],
+  reaches: readonly Reach[],
 ): ReadonlySet<unknown> {
-  const reached = copies
-    .filter(({ copy, source }) => names.has(copy) !== names.has(source))
-    .flatMap(({ copy, source }) => [copy, source]);
+  const reached = reaches
+    .filter(({ from, to }) => names.has(from) !== names.has(to))
+    .flatMap(({ from, to }) => [from, to]);
 
   return reached.length === 0
     ? names
-    : withSpreadFamilies(new Set([...names, ...reached]), copies);
+    : withFamilies(new Set([...names, ...reached]), reaches);
 }
 
-interface SpreadCopy {
-  readonly copy: unknown;
-  readonly source: unknown;
+interface Reach {
+  readonly from: unknown;
+  readonly to: string;
+  readonly identifier: unknown;
 }
 
 /** A top-level `const C = { ...A, b: { c: B } }` or `const C = A` shares A's and B's nested objects with C, so a write through any of them changes what the others run with. */
-function spreadCopiesOf(
+function reachesOf(
   inits: readonly (readonly [unknown, unknown])[],
   bindings: Bindings,
-): readonly SpreadCopy[] {
-  return inits.flatMap(([copy, init]) =>
-    spreadSourcesIn(init)
-      .filter((source) => {
-        const name = field(source, 'name');
+): readonly Reach[] {
+  return inits.flatMap(([from, init]) =>
+    identifiersReachedFrom(init).flatMap((identifier) => {
+      const to = field(identifier, 'name');
 
-        return (
-          field(source, 'type') === 'Identifier' &&
-          typeof name === 'string' &&
-          bindings.has(name)
-        );
-      })
-      .map((source) => ({ copy, source })),
+      return typeof to === 'string' && bindings.has(to)
+        ? [{ from, to, identifier }]
+        : [];
+    }),
   );
 }
 
-function spreadSourcesIn(node: unknown): readonly unknown[] {
+/** The identifiers `evaluate` in reset-setting.ts follows from a value. */
+function identifiersReachedFrom(node: unknown): readonly unknown[] {
   const current = unwrap(node);
 
   if (field(current, 'type') === 'Identifier') {
@@ -746,7 +737,7 @@ function spreadSourcesIn(node: unknown): readonly unknown[] {
   }
 
   return list(field(current, 'properties')).flatMap((property) =>
-    spreadSourcesIn(
+    identifiersReachedFrom(
       field(
         property,
         field(property, 'type') === 'SpreadElement' ? 'argument' : 'value',
