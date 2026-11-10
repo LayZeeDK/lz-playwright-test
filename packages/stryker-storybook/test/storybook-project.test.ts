@@ -127,6 +127,29 @@ describe('storybookProject', () => {
     );
   });
 
+  it('reads a preview it cannot read as unreadable, with no tags', (t) => {
+    const root = mkdtempSync(join(tmpdir(), 'lz-storybook-project-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    mkdirSync(join(root, '.storybook', 'preview.ts'), { recursive: true });
+
+    const project = storybookProject(join(root, '.storybook'), {
+      info: () => undefined,
+      warn: () => undefined,
+    });
+
+    assert.deepEqual(
+      [project.previewTest, project.testTags.previewTags],
+      [
+        {
+          mockReset: 'unreadable',
+          clearMocks: 'unreadable',
+          restoreMocks: 'unreadable',
+        },
+        [],
+      ],
+    );
+  });
+
   it('warns once, naming a preview it cannot parse and the error', (t) => {
     const root = mkdtempSync(join(tmpdir(), 'lz-storybook-project-'));
     t.after(() => rmSync(root, { recursive: true, force: true }));
