@@ -272,6 +272,58 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('places the mutants of an export that excludeStories matches', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default {\n  title: 'a/b',\n  excludeStories: /.*Data$/,\n};\nexport const userData = {\n  name: 'Bob',\n};\nexport const A = {};",
+        )
+      ).filter((outcome) => /^[56] /.test(outcome)),
+      ['5 ObjectLiteral placed', '6 StringLiteral placed'],
+    );
+  });
+
+  it('places the mutants of an export that includeStories leaves out', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default {\n  title: 'a/b',\n  includeStories: ['A'],\n};\nexport const userData = {\n  name: 'Bob',\n};\nexport const A = {};",
+        )
+      ).filter((outcome) => /^[56] /.test(outcome)),
+      ['5 ObjectLiteral placed', '6 StringLiteral placed'],
+    );
+  });
+
+  it('places the mutants of an export that an excludeStories string matches', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default {\n  title: 'a/b',\n  excludeStories: 'Data$',\n};\nexport const userData = {\n  name: 'Bob',\n};\nexport const A = {};",
+        )
+      ).filter((outcome) => /^[56] /.test(outcome)),
+      ['5 ObjectLiteral placed', '6 StringLiteral placed'],
+    );
+  });
+
+  it('keeps a story that includeStories names by its string export name', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default {\n  title: 'a/b',\n  includeStories: ['B c'],\n};\nconst A = {\n  args: { a: 1 },\n};\nexport { A as 'B c' };",
+        )
+      ).filter((outcome) => outcome.startsWith('5 ')),
+      [`5 ObjectLiteral ${storyReason}`],
+    );
+  });
+
   it('keeps a story object exported under another name as written', async () => {
     const { outcomes } = setup();
 

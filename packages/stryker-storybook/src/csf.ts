@@ -43,18 +43,36 @@ export function csfShapes(program: unknown): CsfShapes {
       .map((init) => list(field(init, 'arguments'))[0]),
   ];
 
+  const [includeStories, excludeStories] = [
+    'includeStories',
+    'excludeStories',
+  ].map((key) =>
+    metaObjects
+      .map((meta) => propertyValue(meta, key))
+      .find((value) => value !== undefined),
+  );
   const stories = [
     ...body.flatMap((statement) => [
       ...list(field(statement, 'declaration', 'declarations')).map(
-        (declarator) => field(declarator, 'init'),
+        (declarator) => ({
+          name: field(declarator, 'id', 'name'),
+          init: field(declarator, 'init'),
+        }),
       ),
-      ...assigned(statement, 'story'),
+      ...assigned(statement, 'story').map((init) => ({
+        name: field(statement, 'expression', 'left', 'object', 'name'),
+        init,
+      })),
     ]),
-    ...specifiers.map((specifier) =>
-      initOf(field(specifier, 'local', 'name'), body),
-    ),
+    ...specifiers.map((specifier) => ({
+      name:
+        field(specifier, 'exported', 'name') ??
+        field(specifier, 'exported', 'value'),
+      init: initOf(field(specifier, 'local', 'name'), body),
+    })),
   ]
-    .map((init) => storyNode(unwrap(init), body))
+    .filter(({ name }) => isExportStory(name, includeStories, excludeStories))
+    .map(({ init }) => storyNode(unwrap(init), body))
     .filter(
       (init) =>
         (field(init, 'type') === 'ObjectExpression' ||
@@ -113,6 +131,38 @@ function withInit(
   body: readonly unknown[],
 ): readonly unknown[] {
   return [value, followed(value, body)];
+}
+
+function isExportStory(
+  name: unknown,
+  includeStories: unknown,
+  excludeStories: unknown,
+): boolean {
+  return (
+    (includeStories === undefined || matchesStories(name, includeStories)) &&
+    !matchesStories(name, excludeStories)
+  );
+}
+
+function matchesStories(name: unknown, descriptor: unknown): boolean {
+  if (field(descriptor, 'type') === 'ArrayExpression') {
+    return list(field(descriptor, 'elements')).some(
+      (element) => field(element, 'value') === name,
+    );
+  }
+
+  const pattern =
+    field(descriptor, 'type') === 'StringLiteral'
+      ? field(descriptor, 'value')
+      : field(descriptor, 'pattern');
+  const flags = field(descriptor, 'flags') ?? '';
+
+  return (
+    typeof name === 'string' &&
+    typeof pattern === 'string' &&
+    typeof flags === 'string' &&
+    new RegExp(pattern, flags).test(name)
+  );
 }
 
 function followed(value: unknown, body: readonly unknown[]): unknown {
