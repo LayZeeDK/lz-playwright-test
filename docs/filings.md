@@ -1015,6 +1015,29 @@ passed the index as `from`, and all 38 tests of the spec failed. The undo-and-re
 `lz-tpp` nor `lz-refactor` (Add Parameter, Parameterize Function) warns that such a function receives the index.
 Evidence: `tagsfix/cycles.log` cycle 19 and its first Green run (`fail 38`).
 
+**O138. A red that needs an installed dependency to be missing has no seam.** In the sixth review fixes, the case
+"Vitest is not installed" could not happen in the repository, where Vitest is installed. The worker made it with a
+fixture `--import` resolve hook passed through `NODE_OPTIONS`, which the test sets and restores. It works, but it is
+test-process global state, and `lz-red`'s seams guidance has no route for making a resolvable package unresolvable.
+Evidence: `r6fix/cycles.log` cycle 10.
+
+**O139. A parse rule for shapes the typed producer can no longer write cannot go red through the public path (adds to
+O52).** In the same fixes, shared types between the child process and its parent ruled out an unknown result shape at
+compile time, so the parent's rule for one could only go red with the parser exported for the test. Neither `lz-red`
+nor `lz-refactor` weighs a test-only export against leaving the branch unpinned. Evidence: `r6fix/cycles.log` cycles
+8 and 9.
+
+**O140. A green made wider on purpose so the next case can narrow it (adds to O132 and O37).** In the same fixes, one
+change would have turned both measured msw cases green, so the second test would have been `test-after`. The worker
+made the first green a union of the old and new reads, which kept the second test red, and the second green removed
+the old read. `lz-tpp` has no entry for a green that is wider than the rule by design. Evidence: `r6fix/cycles.log`
+cycles 1 and 2.
+
+**O141. A pin added as one more assertion in an existing test has no log shape.** In the same fixes, the tags of an
+unparseable preview were left unpinned after a fix, and the natural pin was one more value in an existing test's
+assertion, not a new test. The log's `test-after` line assumes a new test. Evidence: `r6fix/cycles.log`, the last
+`test-after` line.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
