@@ -7,6 +7,7 @@ import {
   storyExports,
   topLevelBindings,
   unwrap,
+  withoutBinding,
 } from './csf.ts';
 import { isRecord } from './is-record.ts';
 import { field, list } from './node-field.ts';
@@ -142,12 +143,7 @@ function written(
     return value;
   }
 
-  const base =
-    object === unknownValue
-      ? { [unknownRest]: true }
-      : isRecord(object)
-        ? object
-        : {};
+  const base = isRecord(object) ? object : {};
 
   return {
     ...base,
@@ -250,10 +246,7 @@ function evaluate(
       }
 
       return typeof name === 'string' && bindings.has(name)
-        ? evaluate(
-            bindings.get(name),
-            new Map([...bindings].filter(([bound]) => bound !== name)),
-          )
+        ? evaluate(bindings.get(name), withoutBinding(bindings, name))
         : unknownValue;
     }
     case 'ObjectExpression': {
@@ -272,10 +265,6 @@ function evaluate(
 function spread(parts: readonly unknown[]): unknown {
   return parts.reduce<Readonly<Record<PropertyKey, unknown>>>(
     (object, part) => {
-      if (part === unknownValue) {
-        return { [unknownRest]: true };
-      }
-
       if (!isRecord(part)) {
         return object;
       }
@@ -304,16 +293,15 @@ function objectPart(
   };
 }
 
-const unknownValue = Symbol('unknown');
-
 const unknownRest = Symbol('unknown rest');
+
+const unknownValue: Readonly<Record<symbol, true>> = { [unknownRest]: true };
 
 function member(value: unknown, key: string): unknown {
   if (
-    value === unknownValue ||
-    (isRecord(value) &&
-      !Object.hasOwn(value, key) &&
-      Object.hasOwn(value, unknownRest))
+    isRecord(value) &&
+    !Object.hasOwn(value, key) &&
+    Object.hasOwn(value, unknownRest)
   ) {
     return unknownValue;
   }

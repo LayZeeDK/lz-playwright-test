@@ -307,6 +307,11 @@ function followed(value: unknown, bindings: Bindings): unknown {
     : value;
 }
 
+/** The bindings a name's init reads, so that following a cycle of names ends. */
+export function withoutBinding(bindings: Bindings, name: unknown): Bindings {
+  return new Map([...bindings].filter(([bound]) => bound !== name));
+}
+
 function withInit(value: unknown, bindings: Bindings): readonly unknown[] {
   return [value, followed(value, bindings)];
 }
@@ -440,7 +445,7 @@ function objectOf(expression: unknown, bindings: Bindings): readonly unknown[] {
     case 'Identifier': {
       return objectOf(
         followed(node, bindings),
-        new Map([...bindings].filter(([name]) => name !== field(node, 'name'))),
+        withoutBinding(bindings, field(node, 'name')),
       );
     }
     default: {
