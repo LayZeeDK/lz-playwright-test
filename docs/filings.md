@@ -1082,6 +1082,13 @@ fixes, the new count check made a `call === undefined` guard unreachable. `lz-re
 type needs it, and `lz-red` cannot pin it. The cycle log has no place to record that a green turned a pinnable part
 into a type-only one. Evidence: `r9fix/notes.md`, "lz-tdd friction".
 
+**O149. A part of a condition that only a test asserting a cautious answer can pin.** In the round 10 fixes, the new
+rule reads a story as unknown when its name appears outside the forms the package reads. Four parts of that condition
+survived the worker's hand checks, and the only inputs that pin them assert `unknown` where Storybook's real outcome
+is certain: a child that Storybook never runs, for example. `lz-red` asks for tests of observable behaviour, and has
+no case for a test that pins a deliberately cautious answer over the true one. Evidence: `r10fix/notes.md`, "lz-tdd
+friction"; `r10fix/cycles.log`.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
