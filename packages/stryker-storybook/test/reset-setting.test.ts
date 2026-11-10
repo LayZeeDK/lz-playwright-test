@@ -180,6 +180,53 @@ export const A = { args: { g: fn().mockReturnValue(1) } };`,
     assert.deepEqual(verdicts, ['unknown']);
   });
 
+  it('reads a key set after a spread of an import', () => {
+    const verdicts = verdictsOf(
+      `import { shared } from './shared';
+export default {};
+export const A = {
+  parameters: { ...shared, test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads a key set before a spread of an import as unknown', () => {
+    const verdicts = verdictsOf(
+      `import { shared } from './shared';
+export default {};
+export const A = {
+  parameters: { test: { restoreMocks: false }, ...shared },
+  args: { g: fn().mockReturnValue(1) },
+};`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a spread of an object that spreads itself as unknown', () => {
+    const verdicts = verdictsOf(
+      `export default {};
+var a = { ...a };
+export const A = { ...a, args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a spread of two objects that spread each other as unknown', () => {
+    const verdicts = verdictsOf(
+      `export default {};
+var a = { ...b };
+var b = { ...a };
+export const A = { ...a, args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
   it('reads the settings a story spreads in from a local object', () => {
     const verdicts = verdictsOf(
       `export default {};

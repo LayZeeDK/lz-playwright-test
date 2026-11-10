@@ -245,21 +245,28 @@ function evaluate(
       }
 
       return typeof name === 'string' && bindings.has(name)
-        ? evaluate(bindings.get(name), bindings)
+        ? evaluate(
+            bindings.get(name),
+            new Map([...bindings].filter(([bound]) => bound !== name)),
+          )
         : unknownValue;
     }
     case 'ObjectExpression': {
-      const parts = list(field(current, 'properties')).map((property) =>
-        objectPart(property, bindings),
-      );
+      return list(field(current, 'properties')).reduce<
+        Readonly<Record<PropertyKey, unknown>>
+      >((object, property) => {
+        const part = objectPart(property, bindings);
 
-      return parts.includes(unknownValue)
-        ? unknownValue
-        : Object.fromEntries(
-            parts.flatMap((part) =>
-              isRecord(part) ? Object.entries(part) : [],
-            ),
-          );
+        if (part === unknownValue) {
+          return { [unknownRest]: true };
+        }
+
+        if (!isRecord(part)) {
+          return object;
+        }
+
+        return Object.hasOwn(part, unknownRest) ? part : { ...object, ...part };
+      }, {});
     }
     default: {
       return unknownValue;
@@ -287,8 +294,15 @@ function objectPart(
 
 const unknownValue = Symbol('unknown');
 
+const unknownRest = Symbol('unknown rest');
+
 function member(value: unknown, key: string): unknown {
-  if (value === unknownValue) {
+  if (
+    value === unknownValue ||
+    (isRecord(value) &&
+      !Object.hasOwn(value, key) &&
+      Object.hasOwn(value, unknownRest))
+  ) {
     return unknownValue;
   }
 
