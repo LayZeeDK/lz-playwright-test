@@ -26,7 +26,9 @@ import { dryRunBudget } from '../../src/timeouts.ts';
 
 export type Outcome = ReturnType<TestCase['outcome']>;
 
-export const hookNamespace = '__stryker_hook_test__';
+export const hookTestNamespace = '__stryker_hook_test__';
+// Under Stryker the runner's active mutant reaches the server, where it is the hook's, not the app's.
+export const hookTestActiveMutantEnv = '__STRYKER_HOOK_TEST_ACTIVE_MUTANT__';
 
 export function tempTree(
   t: TestContext,

@@ -19,7 +19,7 @@ import {
 import { testIdHeader } from '../src/server-protocol.ts';
 import type * as Hook from '../src/worker-hook.ts';
 import type { StrykerNamespace } from '../src/namespace.ts';
-import { codedError, hookNamespace, tempTree } from './support/doubles.ts';
+import { codedError, hookTestNamespace, tempTree } from './support/doubles.ts';
 import { fakeInstall, type Runnable } from './support/fake-worker.ts';
 
 let hook: typeof Hook;
@@ -119,7 +119,7 @@ function runWorker(
       env: {
         ...process.env,
         [runSettingsEnv]: JSON.stringify({ outDir, perTest: false }),
-        [hookTestNamespaceEnv]: hookNamespace,
+        [hookTestNamespaceEnv]: hookTestNamespace,
       },
     },
   );

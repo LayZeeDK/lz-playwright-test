@@ -10,16 +10,13 @@ import {
   type ProjectLog,
 } from './storybook-project.ts';
 
-const staticReason =
-  'lz-storybook-csf: Storybook reads this CSF value without running the file, so it stays as written';
-const metaReason =
-  'lz-storybook-csf: Storybook reads the meta object without running the file, so it stays an object literal';
-const containerReason =
-  'lz-storybook-csf: Storybook reads this story, its parameters or its test options without running the file, so it stays an object or a function';
-const testReason =
-  'lz-storybook-csf: test code in a story file is mutated by the Stryker config with lzStorybookCsf.play set to mutate';
-const mswReason =
-  'lz-storybook-csf: msw handlers in a story file are mutated by the Stryker config with lzStorybookCsf.play set to mutate';
+export const csfIgnorerName = 'lz-storybook-csf';
+
+const staticReason = `${csfIgnorerName}: Storybook reads this CSF value without running the file, so it stays as written`;
+const metaReason = `${csfIgnorerName}: Storybook reads the meta object without running the file, so it stays an object literal`;
+const containerReason = `${csfIgnorerName}: Storybook reads this story, its parameters or its test options without running the file, so it stays an object or a function`;
+const testReason = `${csfIgnorerName}: test code in a story file is mutated by the Stryker config with lzStorybookCsf.play set to mutate`;
+const mswReason = `${csfIgnorerName}: msw handlers in a story file are mutated by the Stryker config with lzStorybookCsf.play set to mutate`;
 
 export function csfIgnorer(options: object, log: ProjectLog): Ignorer {
   const ignoreMode = field(options, 'lzStorybookCsf', 'play') !== 'mutate';

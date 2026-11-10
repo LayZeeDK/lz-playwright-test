@@ -19,7 +19,12 @@ import {
   testIdHeader,
   writeServerControl,
 } from '../../src/server-protocol.ts';
-import { hookNamespace, logger, tempTree } from './doubles.ts';
+import {
+  hookTestActiveMutantEnv,
+  hookTestNamespace,
+  logger,
+  tempTree,
+} from './doubles.ts';
 import { serverHookUrl } from './server-fake.ts';
 
 export const tlsCertPath = fileURLToPath(
@@ -43,8 +48,6 @@ export const moduleScopeAndBigRequestIds = ['0', ...bigRequestIds];
 export const moduleScopeAndSmallRequestIds = ['0', ...smallRequestIds];
 const testIdsTheseTestsSend = ['big', 'small'];
 const stopTimeoutMs = 5000;
-// Under Stryker the runner's active mutant reaches the server, where it is the hook's, not the app's.
-export const appActiveMutantEnv = '__STRYKER_HOOK_TEST_ACTIVE_MUTANT__';
 
 type ServerProgram =
   | 'answer'
@@ -86,10 +89,10 @@ export async function instrumentApp() {
     ],
   );
   instrumented = file.content
-    .replaceAll(INSTRUMENTER_CONSTANTS.NAMESPACE, hookNamespace)
+    .replaceAll(INSTRUMENTER_CONSTANTS.NAMESPACE, hookTestNamespace)
     .replaceAll(
       INSTRUMENTER_CONSTANTS.ACTIVE_MUTANT_ENV_VARIABLE,
-      appActiveMutantEnv,
+      hookTestActiveMutantEnv,
     );
 }
 
@@ -112,7 +115,7 @@ export async function startServer(
     'server.mjs': readFileSync(
       new URL(`servers/${server}.mjs`, import.meta.url),
       'utf8',
-    ).replaceAll(INSTRUMENTER_CONSTANTS.NAMESPACE, hookNamespace),
+    ).replaceAll(INSTRUMENTER_CONSTANTS.NAMESPACE, hookTestNamespace),
     'tls/localhost-key.pem': readFileSync(tlsKeyPath, 'utf8'),
     'tls/localhost-cert.pem': readFileSync(tlsCertPath, 'utf8'),
   });
@@ -131,7 +134,7 @@ export async function startServer(
       env: {
         ...process.env,
         [serverDirEnv]: serverDir,
-        [hookTestNamespaceEnv]: hookNamespace,
+        [hookTestNamespaceEnv]: hookTestNamespace,
         ...env,
       },
       stdio: ['pipe', 'pipe', 'pipe'],

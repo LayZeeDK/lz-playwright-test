@@ -457,6 +457,7 @@ async function readNamespace(
   const { promise: lost, resolve } = Promise.withResolvers<FrameRead>();
   const timer = setTimeout(() => resolve({ lost: true }), frameReadTimeoutMs);
   const read = frame
+    // Reaches the page as source text, like initPage.
     .evaluate((name) => {
       const scope: Record<string, unknown> = globalThis;
       const found = scope[name];
@@ -492,6 +493,8 @@ function frameRead(value: unknown): FrameRead | undefined {
     : undefined;
 }
 
+// Reaches the page as source text, where an instrumented copy calls a namespace the page lacks: mutating it is
+// safe only while no test in the Stryker run opens a real page.
 export function initPage({
   ns,
   activeMutant,

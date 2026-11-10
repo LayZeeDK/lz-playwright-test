@@ -239,7 +239,7 @@ test('a request the server sends itself with fetch and the test id header name a
   );
 });
 
-test("messages without a request on undici's request channel leave the server answering, and its next fetch still names the test", async (t) => {
+test("messages without a request object on undici's request channel leave the server answering, and its next fetch still names the test", async (t) => {
   const selfRequesting = await startServer(t, { server });
   const outDir = selfRequesting.run({ perTest: true });
 

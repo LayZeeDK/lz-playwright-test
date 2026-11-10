@@ -7,7 +7,7 @@ const fix =
   'pass the implementation to fn(), as in fn(() => value), or set the stub in beforeEach';
 
 describe('spyStubReason', () => {
-  it('names the ignorer, the erased verdict, why and the fix', () => {
+  it('names the ignorer, the erased verdict, the reason and the fix', () => {
     assert.equal(
       spyStubReason('erased'),
       `lz-storybook: erased: the mock reset runs before the story renders, so this stub never takes effect; ${fix}`,
