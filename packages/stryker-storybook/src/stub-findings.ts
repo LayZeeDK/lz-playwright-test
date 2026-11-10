@@ -1,7 +1,18 @@
 import { isRecord } from './is-record.ts';
 import { field, list } from './node-field.ts';
 import { parseProgram } from './parse.ts';
-import { spyStubName, type ReasonSite } from './stub-verdict.ts';
+import type { StorybookProject } from './storybook-project.ts';
+import {
+  describeVerdict,
+  reasonSites,
+  spyStubName,
+  type ReasonSite,
+  type SpyStubReason,
+} from './stub-verdict.ts';
+
+export interface SiteFinding extends SpyStubReason {
+  readonly line: number;
+}
 
 interface DirectiveRule {
   readonly disable: boolean;
@@ -19,7 +30,27 @@ const commentKeys = new Set([
   'innerComments',
 ]);
 
-export function parseStoryFile(
+export function siteFindings(
+  code: string,
+  fileName: string,
+  project: StorybookProject,
+  onUnparsable: (fileName: string, error: unknown) => void,
+): readonly SiteFinding[] {
+  const program = parseStoryFile(code, fileName, onUnparsable);
+
+  if (program === undefined) {
+    return [];
+  }
+
+  const sites = reasonSites(program, project);
+  const silenced = silencedSites(program, sites);
+
+  return sites
+    .filter((site) => !silenced.has(site))
+    .map(({ line, verdict }) => ({ line, ...describeVerdict(verdict) }));
+}
+
+function parseStoryFile(
   code: string,
   fileName: string,
   onUnparsable: (fileName: string, error: unknown) => void,
@@ -33,10 +64,11 @@ export function parseStoryFile(
   }
 }
 
-export function silencedSites<
-  TSite extends Pick<ReasonSite, 'start' | 'end' | 'line'>,
->(program: unknown, sites: readonly TSite[]): ReadonlySet<TSite> {
-  const silenced = new Set<TSite>();
+function silencedSites(
+  program: unknown,
+  sites: readonly ReasonSite[],
+): ReadonlySet<ReasonSite> {
+  const silenced = new Set<ReasonSite>();
   const rules: DirectiveRule[] = [];
   const visit = (node: unknown): void => {
     if (!isRecord(node) || typeof node['type'] !== 'string') {

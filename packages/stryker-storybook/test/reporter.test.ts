@@ -16,7 +16,7 @@ import { PlanKind, type schema } from '@stryker-mutator/api/core';
 import { isRecord } from '../src/is-record.ts';
 import { storybookReporter } from '../src/reporter.ts';
 import { appendRecord, recordVariable } from '../src/stryker-record.ts';
-import { parseSpyStubReason, spyStubReason } from '../src/stub-verdict.ts';
+import { describeVerdict, spyStubReason } from '../src/stub-verdict.ts';
 import recorded from './fixtures/reporter/mutation.json' with { type: 'json' };
 
 const fixtures = fileURLToPath(new URL('fixtures/', import.meta.url));
@@ -181,7 +181,7 @@ describe('storybookReporter', () => {
     assert.deepEqual(written(), { findings: [], staticStoryMutants: [] });
   });
 
-  it('reports an Ignored mutant with the erased reason as an erased stub', (t) => {
+  it('reports an erased stub in a story file in the mutation report', (t) => {
     const { reporter, findings } = setup(t);
 
     reporter.onMutationTestReportReady(recordedReport);
@@ -194,13 +194,13 @@ describe('storybookReporter', () => {
         {
           file: 'src/SpyStubDefault.stories.tsx',
           line: 15,
-          ...parseSpyStubReason(spyStubReason('erased')),
+          ...describeVerdict('erased'),
         },
       ],
     );
   });
 
-  it('reports the order-dependent and unknown reasons with their files and lines', (t) => {
+  it('reports the order-dependent and unknown stubs with their files and lines', (t) => {
     const { reporter, findings } = setup(t);
 
     reporter.onMutationTestReportReady(recordedReport);
@@ -216,12 +216,12 @@ describe('storybookReporter', () => {
         {
           file: 'src/lzsb/Imported.stories.tsx',
           line: 14,
-          ...parseSpyStubReason(spyStubReason('unknown')),
+          ...describeVerdict('unknown'),
         },
         {
           file: 'src/lzsb/OrderDep.stories.tsx',
           line: 13,
-          ...parseSpyStubReason(spyStubReason('order-dependent')),
+          ...describeVerdict('order-dependent'),
         },
       ],
     );
@@ -247,7 +247,24 @@ describe('storybookReporter', () => {
       {
         file: 'src/Literal.stories.tsx',
         line: 4,
-        ...parseSpyStubReason(spyStubReason('erased')),
+        ...describeVerdict('erased'),
+      },
+    ]);
+  });
+
+  it('reports a stub that holds no mutant in a story file in the mutation report', (t) => {
+    const { reporter, findings } = setup(t);
+    const source = erasedStub.replace("'stubbed'", '42');
+
+    reporter.onMutationTestReportReady({
+      files: { 'src/Meta.stories.tsx': { source, mutants: [] } },
+    });
+
+    assert.deepEqual(findings(), [
+      {
+        file: 'src/Meta.stories.tsx',
+        line: 3,
+        ...describeVerdict('erased'),
       },
     ]);
   });
@@ -399,13 +416,13 @@ describe('storybookReporter', () => {
 
   it('prints one line per finding with its verdict, place, cause and fix', (t) => {
     const { reporter, consoleBlock } = setup(t);
-    const erased = parseSpyStubReason(spyStubReason('erased'));
+    const erased = describeVerdict('erased');
 
     reporter.onMutationTestReportReady(recordedReport);
 
     assert.equal(
       consoleBlock()[3],
-      `  erased  src/SpyStubDefault.stories.tsx:15  ${erased?.why}; ${erased?.fix}`,
+      `  erased  src/SpyStubDefault.stories.tsx:15  ${erased.why}; ${erased.fix}`,
     );
   });
 
@@ -515,33 +532,38 @@ describe('storybookReporter', () => {
       {
         file: 'src/Meta.stories.tsx',
         line: 3,
-        ...parseSpyStubReason(spyStubReason('erased')),
+        ...describeVerdict('erased'),
       },
     ]);
   });
 
   it('prints a scanned finding in its console block', (t) => {
     const { reporter, consoleBlock, projectDir } = setup(t);
-    const erased = parseSpyStubReason(spyStubReason('erased'));
+    const erased = describeVerdict('erased');
     writeStory(projectDir, 'Meta.stories.tsx', erasedStub);
 
     reporter.onMutationTestReportReady({ files: {} });
 
     assert.deepEqual(consoleBlock(), [
       'info: @layzee/stryker-storybook: 1 spy stub findings (1 erased)',
-      `  erased  src/Meta.stories.tsx:3  ${erased?.why}; ${erased?.fix}`,
+      `  erased  src/Meta.stories.tsx:3  ${erased.why}; ${erased.fix}`,
     ]);
   });
 
-  it('leaves a story file in the mutation report to the report', (t) => {
+  it('reads a story file in the mutation report from the report, not from disk', (t) => {
     const { reporter, findings, projectDir } = setup(t);
     writeStory(projectDir, 'Meta.stories.tsx', erasedStub);
 
     reporter.onMutationTestReportReady({
-      files: { 'src/Meta.stories.tsx': { source: erasedStub, mutants: [] } },
+      files: {
+        'src/Meta.stories.tsx': { source: `\n${erasedStub}`, mutants: [] },
+      },
     });
 
-    assert.deepEqual(findings(), []);
+    assert.deepEqual(
+      findings().map((finding) => isRecord(finding) && finding['line']),
+      [4],
+    );
   });
 
   it('leaves out a scanned stub under a disable next-line comment naming the spy stub mutator', (t) => {

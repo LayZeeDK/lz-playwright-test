@@ -58,18 +58,6 @@ export function reasonSites(
   );
 }
 
-export function parseSpyStubReason(reason: string): SpyStubReason | undefined {
-  const verdict = Object.keys(whys)
-    .filter(isReasonVerdict)
-    .find((candidate) => reason.startsWith(`${spyStubName}: ${candidate}: `));
-
-  return verdict === undefined ? undefined : describeVerdict(verdict);
-}
-
-function isReasonVerdict(value: string): value is ReasonVerdict {
-  return Object.hasOwn(whys, value);
-}
-
 export function describeVerdict(verdict: ReasonVerdict): SpyStubReason {
   return { verdict, why: whys[verdict], fix };
 }

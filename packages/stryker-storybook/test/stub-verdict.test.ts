@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { parseSpyStubReason, spyStubReason } from '../src/stub-verdict.ts';
+import { spyStubReason } from '../src/stub-verdict.ts';
 
 const fix =
   'pass the implementation to fn(), as in fn(() => value), or set the stub in beforeEach';
@@ -33,26 +33,5 @@ describe('spyStubReason', () => {
       spyStubReason('once-not-rewritten'),
       `LzStorybookSpyStub: once-not-rewritten: the mock transformer does not rewrite *Once stubs, so the mock reset still erases this stub; ${fix}`,
     );
-  });
-});
-
-describe('parseSpyStubReason', () => {
-  it('reads the verdict, why and the fix back from a built reason', () => {
-    assert.deepEqual(parseSpyStubReason(spyStubReason('order-dependent')), {
-      verdict: 'order-dependent',
-      why: 'another story in this file resets mocks before it renders, which erases this stub when that story renders first',
-      fix,
-    });
-  });
-
-  it('reads the erased verdict back from its reason', () => {
-    assert.equal(
-      parseSpyStubReason(spyStubReason('erased'))?.verdict,
-      'erased',
-    );
-  });
-
-  it("finds nothing in a Stryker disable comment's reason", () => {
-    assert.equal(parseSpyStubReason('Ignored using a comment'), undefined);
   });
 });
