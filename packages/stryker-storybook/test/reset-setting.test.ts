@@ -740,6 +740,40 @@ export const B = { args: { g: fn().mockReturnValue(1) } };`,
     assert.deepEqual(verdicts, ['erased']);
   });
 
+  it('gives a story with a play the play-fn tag', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { play: () => undefined, parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ include: ['play-fn'] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('gives a story assigned a play the play-fn tag', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { parameters: { test: { mockReset: true } } };
+A.play = () => undefined;
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ include: ['play-fn'] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('gives the stories of a meta with a play the play-fn tag', () => {
+    const verdicts = verdictsOf(
+      `export default { play: () => undefined, parameters: { test: { restoreMocks: false } } };
+export const A = { parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ include: ['play-fn'] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
   it('leaves out a story with a tag that exclude names', () => {
     const verdicts = verdictsOf(
       `export default { parameters: { test: { restoreMocks: false } } };
@@ -824,6 +858,17 @@ export const B = { args: { g: fn().mockReturnValue(1) } };`,
     );
 
     assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('reads tags assigned to a story over the tags it declares', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { tags: ['!test'], parameters: { test: { mockReset: true } } };
+A.tags = ['test'];
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
   });
 
   it('keeps a factory story whose input is assigned the tag !test', () => {

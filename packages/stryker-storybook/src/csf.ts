@@ -147,7 +147,11 @@ export function csfFile(body: readonly unknown[], bindings: Bindings): CsfFile {
 
   return {
     metaObjects,
-    metaTags: stringList(propertyValue(metaObjects[0], 'tags'), bindings),
+    metaTags: tagsOf(
+      propertyValue(metaObjects[0], 'tags'),
+      propertyValue(metaObjects[0], 'play'),
+      bindings,
+    ),
     stories: storyExports(body, bindings, metaObjects, metas.length > 0),
   };
 }
@@ -190,9 +194,9 @@ function storyExports(
       const storyAssignments = assignments.filter(
         ({ target }) => target === local,
       );
-      const assignedTags = storyAssignments.findLast(
-        ({ path }) => path.length === 1 && path[0] === 'tags',
-      );
+      const annotation = (key: string): unknown =>
+        assignedIn(storyAssignments, key).at(-1)?.value ??
+        propertyValue(storyArgument(init), key);
 
       return {
         name,
@@ -201,18 +205,25 @@ function storyExports(
         tested:
           form === 'declaration' ||
           (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
-        tags: stringList(
-          assignedTags === undefined
-            ? propertyValue(storyArgument(init), 'tags')
-            : assignedTags.value,
-          bindings,
-        ),
+        tags: tagsOf(annotation('tags'), annotation('play'), bindings),
         assignments: storyAssignments,
         runtimeAssignments: runtimeAssignments(storyAssignments, isFactoryFile),
         extendsBase:
           field(unwrap(init), 'callee', 'property', 'name') === 'extend',
       };
     });
+}
+
+/** Storybook 10.6.5 CsfFile adds `Tag.PLAY_FN` to the tags of a meta or story that has a play. */
+function tagsOf(
+  tags: unknown,
+  play: unknown,
+  bindings: Bindings,
+): readonly string[] {
+  return [
+    ...stringList(tags, bindings),
+    ...(play === undefined ? [] : ['play-fn']),
+  ];
 }
 
 /** Storybook 10.6.5 CsfFile `parseTags`, after `findVarInitialization` for a name. */
