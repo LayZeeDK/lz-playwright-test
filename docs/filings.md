@@ -952,6 +952,14 @@ condition the last green added from one example may have parts no test pins. The
 diff, restored the check, and added two test-after pins. Related to O94. Evidence: `g2r2fix/cycles.log` cycle 7 and
 the test-after lines after it.
 
+**O129. Pinning each part of a condition finds old gaps in conditions a refactoring only moved.** Third review fixes
+for the CSF ignorer. One refactoring moved the `.test()` method-name check into a new reader without changing it. Then
+the worker forced the condition to true with a temporary source edit, and all 215 specs stayed green: no test had ever
+pinned the check. `lz-refactor` has no step for this (O128 covers a condition the refactoring drops). It also has no
+place for the test-after pin the gap calls for. And the only way to show that pin's red is to edit the source by hand
+and revert it (close to O84 and O115). The same check found an unpinned case in a new cycle guard. Evidence:
+`g2r3fix/cycles.log`, both `test-after` lines.
+
 ### Suggestions
 
 **S1 (from O1).** Give `lz-red` step 5 a third kind beside driver and pin, a guard test: it passes on the current
