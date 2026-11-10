@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import { isRecord } from './is-record.ts';
 import { packageName } from './package-name.ts';
+import { mockTransformerPluginName } from './stryker-record.ts';
 
 export interface ProjectLog {
   readonly info: (message: string) => void;
@@ -26,8 +27,6 @@ type LoadResult =
     }
   | { readonly kind: 'no-main' }
   | { readonly kind: 'failed'; readonly error: string };
-
-const mockTransformerPluginName = 'lz-storybook-mock-transformer';
 
 const childFile = fileURLToPath(
   new URL(

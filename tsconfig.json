@@ -23,6 +23,9 @@
     },
     {
       "path": "./packages/stryker-storybook"
+    },
+    {
+      "path": "./packages/storybook-mock-transformer"
     }
   ]
 }
