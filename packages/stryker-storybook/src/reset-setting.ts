@@ -112,7 +112,9 @@ export interface TestTags {
   readonly skip: readonly string[];
 }
 
-export const defaultTestTags: Omit<TestTags, 'previewTags'> = {
+export type TagFilter = Omit<TestTags, 'previewTags'>;
+
+export const defaultTestTags: TagFilter = {
   include: ['test'],
   exclude: [],
   skip: [],
@@ -356,7 +358,6 @@ function contains(node: unknown, position: number): boolean {
     typeof start === 'number' &&
     typeof end === 'number' &&
     start <= position &&
-    // Stryker disable next-line EqualityOperator: a stub starts with its spy's name, and no syntax lets a name start right at the last character's end of a story's init, so position is never end
     position < end
   );
 }

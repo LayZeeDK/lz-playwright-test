@@ -216,7 +216,7 @@ export interface CsfFile {
   readonly written: ReadonlySet<unknown>;
 }
 
-/** `index` gives the stories and their `.test()` children, as Storybook's story index lists them, in place of the package's own reading of the exports, and drops every story of a file whose meta object is exported by specifier: only Storybook's Vitest transform rejects that shape, and its indexer, which the ignorer follows, still lists the stories. */
+/** `index` gives the stories and their `.test()` children, as Storybook's story index lists them, in place of the package's own reading of the exports. */
 export function csfFile(
   body: readonly unknown[],
   bindings: Bindings,
@@ -244,21 +244,18 @@ export function csfFile(
 
   return {
     metaObjects,
-    stories:
-      index !== undefined && isMetaObjectExportedBySpecifier(body, bindings)
-        ? []
-        : storyExports(
-            body,
-            bindings,
-            isFactoryFile,
-            index === undefined
-              ? storyFilter(metaObjects, isFactoryFile)
-              : ({ name }) => index.has(name),
-            (name) => list(index?.get(name)?.tests),
-            (local) =>
-              metaBindings.some(([name]) => written.has(name)) ||
-              elsewhere.has(local),
-          ),
+    stories: storyExports(
+      body,
+      bindings,
+      isFactoryFile,
+      index === undefined
+        ? storyFilter(metaObjects, isFactoryFile)
+        : ({ name }) => index.has(name),
+      (name) => list(index?.get(name)?.tests),
+      (local) =>
+        metaBindings.some(([name]) => written.has(name)) ||
+        elsewhere.has(local),
+    ),
     written,
   };
 }
@@ -292,6 +289,7 @@ function storyExports(
 ): readonly StoryExport[] {
   const assignments = body.flatMap(assignmentOf);
   const testCalls = body.flatMap(testCallOf);
+  const metaBySpecifier = isMetaObjectExportedBySpecifier(body, bindings);
 
   return namedExports(body, bindings)
     .filter(isStory)
@@ -309,8 +307,10 @@ function storyExports(
           ? testNames(name).map((testName) => childOf(testName, storyCalls))
           : [],
         tested:
-          form === 'declaration' ||
-          (init !== undefined && field(init, 'type') !== 'FunctionDeclaration'),
+          !metaBySpecifier &&
+          (form === 'declaration' ||
+            (init !== undefined &&
+              field(init, 'type') !== 'FunctionDeclaration')),
         referencedElsewhere: isReadElsewhere(local),
         assignments: storyAssignments,
         runtimeAssignments: runtimeAssignments(storyAssignments, isFactoryFile),
@@ -326,7 +326,7 @@ export interface StoryExport {
   readonly init: unknown;
   /** Each `.test()` child of a factory story that the index lists; Storybook 10.6.5 runs other stories' `.test()` calls as the story itself. */
   readonly children: readonly TestChild[];
-  /** Storybook 10.6.5's Vitest transform tests a story only when its export declares it or names a local variable. */
+  /** Storybook 10.6.5's Vitest transform tests a story only when the file's meta object is not exported by specifier and the story's export declares it or names a local variable. */
   readonly tested: boolean;
   /** The file names the story outside its declaration, its export, the `.test()` calls Storybook 10.6.5 CsfFile indexes, member assignments and the values of top-level objects, or writes to a top-level object that shares nested objects with it or with the meta, so what runs can differ from what the package reads. */
   readonly referencedElsewhere: boolean;
@@ -415,12 +415,7 @@ export function namedExports(
   body: readonly unknown[],
   bindings: Bindings,
 ): readonly NamedExport[] {
-  // Stryker disable next-line MethodExpression: the only statements this filter drops that the reading below picks up are default-exported function declarations; Storybook 10.6.5 rejects such a story file (its default export must be an object), and readPreviewTest never reaches here for a preview with a default export
   return body
-    .filter(
-      // Stryker disable next-line ConditionalExpression: the only statements this filter drops that the reading below picks up are default-exported function declarations; Storybook 10.6.5 rejects such a story file (its default export must be an object), and readPreviewTest never reaches here for a preview with a default export
-      (statement) => field(statement, 'type') === 'ExportNamedDeclaration',
-    )
     .flatMap((statement) => {
       const typeOnly = field(statement, 'exportKind') === 'type';
 

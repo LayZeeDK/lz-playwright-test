@@ -188,6 +188,16 @@ export const B = { parameters: { test: { mockReset: true } } };`,
     assert.deepEqual(verdicts, ['order-dependent']);
   });
 
+  it("does not count a stub that starts where a story's function declaration ends as that story's", () => {
+    const verdicts = verdictsOf(
+      `export default {};
+export const B = { parameters: { test: { mockReset: false, restoreMocks: false } } };
+export function A() {}fn().mockReturnValue(1);`,
+    );
+
+    assert.deepEqual(verdicts, ['order-dependent']);
+  });
+
   it('gives a stub the verdict of the story that holds it when stories are exported in another order than they are declared', () => {
     const verdicts = verdictsOf(
       `export default { parameters: { test: { restoreMocks: false } } };

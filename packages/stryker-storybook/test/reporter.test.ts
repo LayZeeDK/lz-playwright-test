@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -125,7 +127,12 @@ function runPlan(fileName: string, line: number, isStatic = true) {
   } as const;
 }
 
-function setup(t: TestContext, fixture = 'no-main', options: object = {}) {
+function setup(
+  t: TestContext,
+  fixture = 'no-main',
+  options: object = {},
+  root = fixtures,
+) {
   const previousDir = process.cwd();
   const projectDir = mkdtempSync(join(tmpdir(), 'lz-storybook-reporter-'));
   const previousRecord = process.env[recordVariable];
@@ -143,7 +150,7 @@ function setup(t: TestContext, fixture = 'no-main', options: object = {}) {
   const reporter = storybookReporter(
     {
       ...options,
-      lzStorybook: { configDir: join(fixtures, fixture, '.storybook') },
+      lzStorybook: { configDir: join(root, fixture, '.storybook') },
     },
     {
       info: (message) => lines.push(`info: ${message}`),
@@ -174,6 +181,20 @@ function setup(t: TestContext, fixture = 'no-main', options: object = {}) {
       return report['findings'];
     },
   };
+}
+
+/** Storybook finds no story file from a working directory on another drive than the main file's globs, so the main file's fixture goes beside the temporary working directory. */
+function copiedFixture(t: TestContext): string {
+  const root = mkdtempSync(join(tmpdir(), 'lz-storybook-reporter-fixture-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  cpSync(join(fixtures, 'main-cts'), join(root, 'main-cts'), {
+    recursive: true,
+  });
+  cpSync(join(fixtures, 'framework'), join(root, 'framework'), {
+    recursive: true,
+  });
+
+  return root;
 }
 
 describe('storybookReporter', () => {
@@ -860,5 +881,31 @@ describe('storybookReporter', () => {
     reporter.onMutationTestReportReady({ files: {} });
 
     assert.deepEqual(findings(), []);
+  });
+
+  it("reports a stub in a .stories.cts file that the main file's globs match", (t) => {
+    const { reporter, findings } = setup(t, 'main-cts', {}, copiedFixture(t));
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(
+      findings().map(
+        (finding) =>
+          isRecord(finding) &&
+          `${String(finding['file']).split('/').slice(-2).join('/')} ${String(finding['verdict'])}`,
+      ),
+      ['src/Button.stories.cts erased'],
+    );
+  });
+
+  it("does not read an .mdx file that the main file's globs match as a story file", (t) => {
+    const { reporter, lines } = setup(t, 'main-cts', {}, copiedFixture(t));
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(
+      lines.filter((line) => line.startsWith('warn: ')),
+      [],
+    );
   });
 });

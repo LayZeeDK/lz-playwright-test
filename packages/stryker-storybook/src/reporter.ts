@@ -12,7 +12,6 @@ import {
 } from '@stryker-mutator/api/core';
 import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 import type { Reporter } from '@stryker-mutator/api/report';
-import { STORY_FILE_TEST_REGEXP } from 'storybook/internal/common';
 
 import { field, list } from './node-field.ts';
 import { packageName } from './package-name.ts';
@@ -183,9 +182,7 @@ function stubFindings(
 ): readonly StubFinding[] {
   const storyFiles = new Set([
     ...Object.keys(files).filter((file) => isStoryFile(project, resolve(file))),
-    ...storyFilePaths(project)
-      .filter((fileName) => STORY_FILE_TEST_REGEXP.test(fileName))
-      .map(projectPath),
+    ...storyFilePaths(project).map(projectPath),
   ]);
 
   return [

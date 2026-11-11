@@ -21,6 +21,7 @@ import {
   readPreviewTest,
   unreadableSettings,
   type ResetSettings,
+  type TagFilter,
   type TestTags,
 } from './reset-setting.ts';
 import { mockTransformerPluginName } from './stryker-record.ts';
@@ -41,7 +42,7 @@ export interface StorybookProject {
 type VitestTags =
   | {
       readonly kind: 'resolved';
-      readonly tags: Omit<TestTags, 'previewTags'>;
+      readonly tags: TagFilter;
     }
   | { readonly kind: 'failed'; readonly error: string }
   | { readonly kind: 'no-vitest' }
@@ -55,6 +56,9 @@ const childFile = fileURLToPath(
 );
 
 const projects = new Map<string, StorybookProject>();
+
+const fallbackStoryFiles =
+  "story files are guessed by the name pattern of Storybook's CSF indexer: names ending in stories or story with a .js, .jsx, .mjs, .mjsx, .ts or .tsx extension";
 
 export function strykerStorybookProject(
   options: object,
@@ -102,7 +106,11 @@ function loadProject(
     case 'loaded': {
       return {
         configDir,
-        storyFiles: new Set(result.storyFiles.map(normalizePath)),
+        storyFiles: new Set(
+          result.storyFiles
+            .filter((file) => extname(file) !== '.mdx')
+            .map(normalizePath),
+        ),
         transformer: result.pluginNames.includes(mockTransformerPluginName)
           ? 'seen'
           : 'not-seen',
@@ -112,14 +120,14 @@ function loadProject(
     }
     case 'no-main': {
       log.info(
-        `${packageName}: no Storybook main file in ${configDir}; story files are the files whose names end in stories or story with a .js, .jsx, .mjs, .mjsx, .ts or .tsx extension`,
+        `${packageName}: no Storybook main file in ${configDir}, so ${fallbackStoryFiles}`,
       );
 
       return fallbackProject(configDir, previewTest, testTags);
     }
     case 'failed': {
       log.warn(
-        `${packageName}: Storybook could not load ${configDir}, so story files are the files whose names end in stories or story with a .js, .jsx, .mjs, .mjsx, .ts or .tsx extension: ${result.error}`,
+        `${packageName}: Storybook could not load ${configDir}, so ${fallbackStoryFiles}: ${result.error}`,
       );
 
       return fallbackProject(configDir, previewTest, testTags);
@@ -131,7 +139,7 @@ function tagFilter(
   vitestTags: VitestTags,
   vitestConfigFile: string | undefined,
   log: ProjectLog,
-): Omit<TestTags, 'previewTags'> {
+): TagFilter {
   switch (vitestTags.kind) {
     case 'resolved': {
       return vitestTags.tags;
