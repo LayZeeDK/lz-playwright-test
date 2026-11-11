@@ -336,8 +336,7 @@ function siteVerdict(
   const erasesBy = (index: number): boolean =>
     stories.slice(0, index + 1).some(({ branch }) => erases(branch));
 
-  // Stryker disable next-line ArithmeticOperator: slice clamps its end to the length, so stories.slice(0, stories.length + 2) is every story, as stories.slice(0, stories.length) is
-  if (!erasesBy(stories.length - 1)) {
+  if (!stories.some(({ branch }) => erases(branch))) {
     return stories.some(({ branch }) => branch === 'unknown')
       ? 'unknown'
       : 'kept';
