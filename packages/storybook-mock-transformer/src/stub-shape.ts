@@ -77,11 +77,11 @@ function stubSite(
   );
 
   if (
-    field(node, 'type') !== 'CallExpression' ||
+    (field(node, 'type') !== 'CallExpression' &&
+      field(node, 'type') !== 'OptionalCallExpression') ||
     typeof start !== 'number' ||
     typeof end !== 'number' ||
     typeof line !== 'number' ||
-    field(node, 'callee', 'type') !== 'MemberExpression' ||
     field(node, 'callee', 'computed') === true ||
     field(node, 'callee', 'object', 'type') !== 'CallExpression' ||
     field(node, 'callee', 'object', 'callee', 'type') !== 'Identifier' ||
