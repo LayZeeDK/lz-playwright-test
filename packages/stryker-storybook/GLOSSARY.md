@@ -1,7 +1,8 @@
 # Storybook
 
-Stryker plugins for Storybook story files, and two Vite plugins: one rewrites definition-time stubs so they survive
-the mock reset, the other lets Storybook's tests run in Stryker's sandbox. This context covers both `@layzee/stryker-storybook` and `@layzee/storybook-mock-transformer`: the
+Stryker plugins for Storybook story files, and three Vite plugins: one rewrites definition-time stubs so they survive
+the mock reset, one resets module mock spies before each test, and one lets Storybook's tests run in Stryker's
+sandbox. This context covers both `@layzee/stryker-storybook` and `@layzee/storybook-mock-transformer`: the
 transformer exists only to rewrite the stubs this package diagnoses, and both read the same spy stub shape.
 
 ## Language
@@ -54,6 +55,17 @@ What Storybook does to every spy before a story renders: reset, clear or restore
 `parameters.test` chooses. Storybook restores by default.
 _Avoid_: reset loader, mock cleanup
 
+**Module mock spy**:
+A spy that `sb.mock(import(...), { spy: true })` puts in place of a module's export. Storybook keeps every one in
+a single registry for the whole test run, apart from the spies a story makes with `fn()`.
+_Avoid_: automock, module spy
+
+**Module mock leak**:
+A spy stub on a module mock spy that one story sets and a later story still sees, because Storybook's default mock
+reset only clears module mock spies. A story that relies on the leak fails when it runs alone, as it does for a
+Stryker mutant it alone covers, so Stryker reports that mutant Killed whatever the mutant does.
+_Avoid_: stub leak, cross-story leak
+
 **Reset setting**:
 One of the `parameters.test` keys `mockReset`, `clearMocks` and `restoreMocks`, as a preview, a meta or a story
 sets it; Storybook merges them, and the merged settings pick the story's reset branch.
@@ -95,6 +107,11 @@ _Avoid_: slow mutant
 The Vite plugin `lz-storybook-mock-transformer` that rewrites each definition-time stub into `fn(implementation)`
 form, which survives the mock reset. It leaves the `Once` forms as they are.
 _Avoid_: stub rewriter, mock plugin
+
+**Mock reset plugin**:
+The Vite plugin `lz-storybook-mock-reset` that resets every module mock spy before each test, in every run of the
+Vitest configuration, so a story that relies on a module mock leak fails in every run, not only under Stryker.
+_Avoid_: module mock reset plugin, reset plugin
 
 **Sandbox plugin**:
 The Vite plugin `lz-storybook-stryker` that lets Storybook's tests run in Stryker's sandbox, where the project's
