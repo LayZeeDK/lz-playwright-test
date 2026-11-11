@@ -20,15 +20,9 @@ interface DirectiveRule {
   readonly names: readonly string[];
 }
 
-// Stryker 10.1.1 instrumenter, src/transformers/directive-bookkeeper.ts
+// Stryker 10.1.1 instrumenter, src/transformers/directive-bookkeeper.ts, without the reason group
 const directive =
-  /^\s?Stryker (disable|restore)(?: (next-line))? ([a-zA-Z, ]+)(?::(.+)?)?/;
-
-const commentKeys = new Set([
-  'leadingComments',
-  'trailingComments',
-  'innerComments',
-]);
+  /^\s?Stryker (disable|restore)(?: (next-line))? ([a-zA-Z, ]+)/;
 
 export function siteFindings(
   code: string,
@@ -36,9 +30,13 @@ export function siteFindings(
   project: StorybookProject,
   onUnparsable: (fileName: string, error: unknown) => void,
 ): readonly SiteFinding[] {
-  const program = parseStoryFile(code, fileName, onUnparsable);
+  let program: ReturnType<typeof parseProgram>;
 
-  if (program === undefined) {
+  try {
+    program = parseProgram(code, fileName);
+  } catch (error) {
+    onUnparsable(fileName, error);
+
     return [];
   }
 
@@ -50,20 +48,6 @@ export function siteFindings(
     .map(({ line, verdict }) => ({ line, ...describeVerdict(verdict) }));
 }
 
-function parseStoryFile(
-  code: string,
-  fileName: string,
-  onUnparsable: (fileName: string, error: unknown) => void,
-): ReturnType<typeof parseProgram> | undefined {
-  try {
-    return parseProgram(code, fileName);
-  } catch (error) {
-    onUnparsable(fileName, error);
-
-    return undefined;
-  }
-}
-
 function silencedSites(
   program: unknown,
   sites: readonly ReasonSite[],
@@ -71,23 +55,19 @@ function silencedSites(
   const silenced = new Set<ReasonSite>();
   const rules: DirectiveRule[] = [];
   const visit = (node: unknown): void => {
-    if (!isRecord(node) || typeof node['type'] !== 'string') {
+    if (!isRecord(node)) {
       return;
     }
 
     rules.push(...directiveRules(node['leadingComments'], startLine(node)));
-    const site = sites.find(
-      ({ start, end }) => node['start'] === start && node['end'] === end,
-    );
+    const site = sites.find(({ start }) => node['start'] === start);
 
     if (site !== undefined && isSilenced(rules, site.line)) {
       silenced.add(site);
     }
 
-    Object.entries(node).forEach(([key, value]) => {
-      if (!commentKeys.has(key)) {
-        (Array.isArray(value) ? value : [value]).forEach(visit);
-      }
+    Object.values(node).forEach((value) => {
+      (Array.isArray(value) ? value : [value]).forEach(visit);
     });
   };
 
@@ -109,6 +89,7 @@ function directiveRules(
           {
             disable: match[1] === 'disable',
             line: match[2] === undefined ? undefined : line,
+            // Stryker disable next-line StringLiteral: group 3 takes part in every match, so the fallback never runs
             names: (match[3] ?? '')
               .split(',')
               .map((name) => name.trim().toLowerCase()),
