@@ -106,8 +106,7 @@ export function forgetHooked(dir: string) {
     .forEach((file) => fs.rmSync(path.join(dir, file), { force: true }));
 }
 
-const loopbackHosts: ReadonlySet<string> = new Set([
-  'localhost',
+const localhostAliases: ReadonlySet<string> = new Set([
   '127.0.0.1',
   '[::1]',
   '0.0.0.0',
@@ -115,7 +114,7 @@ const loopbackHosts: ReadonlySet<string> = new Set([
 ]);
 
 export function hostKey(url: URL): string {
-  const host = loopbackHosts.has(url.hostname) ? 'localhost' : url.hostname;
+  const host = localhostAliases.has(url.hostname) ? 'localhost' : url.hostname;
   const port = url.port || (url.protocol === 'https:' ? '443' : '80');
 
   return `${host}:${port}`;
