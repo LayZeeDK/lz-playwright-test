@@ -13,6 +13,7 @@ import {
   readServerControl,
   untaggedArrival,
   untaggedKey,
+  untaggedPrefix,
   writeServerControl,
 } from '../src/server-protocol.ts';
 import { tempTree } from './support/doubles.ts';
@@ -95,4 +96,6 @@ test('an untagged key carries its arrival time, and no other key reads as untagg
   assert.equal(untaggedArrival('a1b2-c3'), undefined);
   assert.equal(untaggedArrival(untaggedKey(1).slice(0, -1)), undefined);
   assert.equal(untaggedArrival(`${untaggedKey(1)}x`), undefined);
+  assert.equal(untaggedArrival(`${untaggedPrefix}x1`), undefined);
+  assert.equal(untaggedArrival('1'.repeat(25)), undefined);
 });
