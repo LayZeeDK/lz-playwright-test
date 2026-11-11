@@ -26,8 +26,8 @@ export function runSwitch(
   let control: ServerControl | undefined;
   let text: string | undefined;
   let issued: ReadonlySet<string> = new Set();
-  let writtenHits = 0;
-  let writtenInstrumented = false;
+  let writtenHits: number;
+  let writtenInstrumented: boolean;
   let warnedRead = false;
 
   function currentControl(): ServerControl | undefined {
@@ -51,7 +51,7 @@ export function runSwitch(
     }
 
     text = read;
-    const next = read === undefined ? undefined : parseServerControl(read);
+    const next = parseServerControl(read);
     issued = new Set(next?.issuedTestIds);
 
     if (read !== undefined && next === undefined) {

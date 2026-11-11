@@ -10,6 +10,7 @@ import { before, test } from 'node:test';
 import { readSnapshotDir } from '../src/protocol.ts';
 import {
   anyHooked,
+  forgetHooked,
   serverSnapshotPrefix,
   testIdHeader,
   untaggedArrival,
@@ -80,6 +81,14 @@ test('the active mutant switches per request from the control file, without a re
   server.run({ perTest: false });
 
   assert.equal(await server.ask({ n: 0 }), 'one');
+});
+
+test('a server process that the runner forgot as hooked does not mark itself hooked again when it listens again', async (t) => {
+  const server = await startServer(t, { server: 'listen-again' });
+  forgetHooked(server.serverDir);
+
+  assert.equal(await server.ask({ n: 0 }), 'listened again');
+  assert.equal(anyHooked(server.serverDir), false);
 });
 
 test('an http2 server switches the active mutant per request too', async (t) => {
@@ -156,8 +165,8 @@ test("a server that answers 'Expect: 100-continue' itself switches the active mu
   assert.equal((await response.toArray()).join(''), 'hi many');
 });
 
-test('instrumentation that wraps emit after the hook, by assignment and by redefining it, still runs, and the mutant still switches', async (t) => {
-  const server = await startServer(t, { server: 'wrapped-emit' });
+test("instrumentation that wraps emit, an agent's addRequest or a response's end after the hook, by assignment and by redefining it, wraps them, and the mutant still switches", async (t) => {
+  const server = await startServer(t, { server: 'wrapped-after-hook' });
   server.run({ perTest: false, activeMutant: '2' });
 
   assert.deepEqual(JSON.parse(await server.ask({ n: 0 })), {
@@ -343,6 +352,18 @@ test('a second copy of the hook leaves lazily evaluated module scope static', as
 
   assert.deepEqual(mutantIdsOf(coverage.static), ['0']);
   assert.deepEqual(mutantIdsOf(coverage.perTest['big']), bigRequestIds);
+});
+
+test('a copy of the hook from another install that loaded first leaves the server to it', async (t) => {
+  const otherInstall = `globalThis[Symbol.for('@layzee/stryker-playwright-runner/server-hook')] = true;`;
+  const server = await startServer(t, {
+    hooks: [
+      `data:text/javascript,${encodeURIComponent(otherInstall)}`,
+      serverHookUrl,
+    ],
+  });
+
+  assert.equal(anyHooked(server.serverDir), false);
 });
 
 test('without per-test coverage lazily evaluated module scope and the request are static', async (t) => {

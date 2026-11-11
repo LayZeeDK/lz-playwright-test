@@ -58,6 +58,7 @@ type ServerProgram =
   | 'assign-namespace'
   | 'fails-to-listen'
   | 'lazy-answer'
+  | 'listen-again'
   | 'load-only'
   | 'outside-any-request'
   | 'self-request'
@@ -65,7 +66,7 @@ type ServerProgram =
   | 'window-first-read'
   | 'window-read-then-later-window'
   | 'window-read-while-open'
-  | 'wrapped-emit';
+  | 'wrapped-after-hook';
 let instrumented = '';
 
 export async function instrumentApp() {
