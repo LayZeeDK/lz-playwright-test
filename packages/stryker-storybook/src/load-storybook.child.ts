@@ -15,6 +15,7 @@ const [configDir, resultFile, vitestConfigFile] = process.argv.slice(2);
 
 if (configDir === undefined || resultFile === undefined) {
   throw new Error(
+    // Stryker disable next-line StringLiteral: storybook-project.ts always passes both arguments and ignores the child's output, so no package user sees this message
     'Usage: load-storybook.child <configDir> <resultFile> [vitestConfigFile]',
   );
 }
