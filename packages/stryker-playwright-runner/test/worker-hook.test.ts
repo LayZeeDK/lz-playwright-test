@@ -981,6 +981,26 @@ test("a test's request fixture sends its test id with every fetch, keeping the h
   });
 });
 
+test('a request context still sends its test id when code running after the hook wraps its fetch by assignment and by redefinition', async (t) => {
+  const hooked = installed(t, { perTest: true, testIdHosts: webServerHosts });
+  hooked.setTest('t1');
+  const { context, calls } = requestContext();
+  await hooked.hooks.runAfterCreateRequestContext?.(context);
+  const hookFetch = context.fetch;
+  const assignedFetch: typeof hookFetch = (...args) => hookFetch(...args);
+  const redefinedFetch: typeof hookFetch = (...args) => assignedFetch(...args);
+
+  assert.ok(Reflect.set(context, 'fetch', assignedFetch), 'assigned');
+  Object.defineProperty(context, 'fetch', {
+    configurable: true,
+    writable: true,
+    value: redefinedFetch,
+  });
+  await context.fetch('/api');
+
+  assert.deepEqual(calls, [['/api', { headers: { [testIdHeader]: 't1' } }]]);
+});
+
 test('a request context that outlives its test sends the id of the test running at each fetch', async (t) => {
   const hooked = installed(t, { perTest: true, testIdHosts: webServerHosts });
   hooked.setTest('t1');
