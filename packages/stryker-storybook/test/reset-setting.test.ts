@@ -801,6 +801,20 @@ require('./X.stories').C.parameters.test.mockReset = true;`,
     assert.deepEqual(verdicts, ['unknown']);
   });
 
+  it('reads every story as unknown when the file writes a story through an optional require() call of itself', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const C = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+const self = require?.('./X.stories');
+self.C.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
   it('reads every story as unknown when the file re-exports from itself', () => {
     const verdicts = verdictsOf(
       `export default { parameters: { test: { restoreMocks: false } } };

@@ -809,9 +809,8 @@ function importCallArgumentsIn(node: unknown): readonly unknown[] {
   }
 
   return [
-    ...(node['type'] === 'CallExpression' &&
-    (field(node, 'callee', 'type') === 'Import' ||
-      field(node, 'callee', 'name') === 'require')
+    ...(field(node, 'callee', 'type') === 'Import' ||
+    field(node, 'callee', 'name') === 'require'
       ? [list(node['arguments'])[0]]
       : []),
     ...Object.values(node).flatMap(importCallArgumentsIn),
