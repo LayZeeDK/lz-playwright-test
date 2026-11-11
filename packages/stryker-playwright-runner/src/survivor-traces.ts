@@ -7,8 +7,8 @@ import type { Mutant, schema } from '@stryker-mutator/api/core';
 import type { ReportedTest } from './reporter.ts';
 import { testName } from './run-result.ts';
 
-export const tracesDirEnv = 'LZ_PLAYWRIGHT_TRACES_DIR';
-export const projectRootEnv = 'LZ_PLAYWRIGHT_PROJECT_ROOT';
+export const tracesDirEnv = 'LZ_STRYKER_PLAYWRIGHT_TRACES_DIR';
+export const projectRootEnv = 'LZ_STRYKER_PLAYWRIGHT_PROJECT_ROOT';
 
 export interface TracesTarget {
   readonly dir: string;
