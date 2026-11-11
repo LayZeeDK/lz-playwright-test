@@ -216,6 +216,23 @@ describe('transform', () => {
     );
   });
 
+  it('rewrites fn imported by a string name with its local name', () => {
+    const code = [
+      "import { 'fn' as spy } from 'storybook/test';",
+      "export const Checked = { args: { load: spy().mockReturnValue('stubbed') } };",
+      '',
+    ].join('\n');
+
+    assert.equal(
+      transform(code, storyFile)?.code,
+      [
+        "import { 'fn' as spy } from 'storybook/test';",
+        "export const Checked = { args: { load: ((value) => spy(() => value))('stubbed') } };",
+        '',
+      ].join('\n'),
+    );
+  });
+
   it('leaves a stub on an fn imported from another module alone', () => {
     const code = [
       "import { expect } from 'storybook/test';",

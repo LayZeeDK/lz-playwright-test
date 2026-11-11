@@ -38,6 +38,11 @@ describe('definitionTimeStubs', () => {
       [],
     ],
     [
+      'finds a stub on fn imported by a string name',
+      "import { 'fn' as spy } from 'storybook/test';\nspy().mockReturnValue(1);",
+      [{ spy: 'spy', method: 'mockReturnValue', once: false }],
+    ],
+    [
       'finds no stub on an fn imported from another module',
       "import { fn } from './fn';\nfn().mockReturnValue(1);",
       [],

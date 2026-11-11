@@ -30,7 +30,11 @@ function storybookTestFnNames(program: unknown): ReadonlySet<string> {
         (statement) => field(statement, 'source', 'value') === 'storybook/test',
       )
       .flatMap((statement) => list(field(statement, 'specifiers')))
-      .filter((specifier) => field(specifier, 'imported', 'name') === 'fn')
+      .filter(
+        (specifier) =>
+          (field(specifier, 'imported', 'name') ??
+            field(specifier, 'imported', 'value')) === 'fn',
+      )
       .map((specifier) => field(specifier, 'local', 'name'))
       .filter((local) => typeof local === 'string'),
   );
