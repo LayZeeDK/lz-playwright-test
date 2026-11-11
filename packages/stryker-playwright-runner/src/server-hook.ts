@@ -7,8 +7,6 @@ import http2 from 'node:http2';
 import https from 'node:https';
 import path from 'node:path';
 
-import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
-
 import { fieldOf, isRecord } from './is-record.ts';
 import { globalNamespace, markInstrumentedReads } from './namespace.ts';
 import { readHookTestNamespace, snapshotSuffix } from './protocol.ts';
@@ -44,7 +42,7 @@ if (serverDir !== undefined && !(installed in globalThis)) {
  */
 export function installServerHook(
   dir: string,
-  ns: string = INSTRUMENTER_CONSTANTS.NAMESPACE,
+  ns: string,
   now: () => number = Date.now,
 ): void {
   const namespace = globalNamespace(ns);

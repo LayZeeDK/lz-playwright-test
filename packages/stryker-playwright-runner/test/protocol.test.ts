@@ -77,11 +77,11 @@ test('a parsed line keeps no coverage that is not a map', () => {
   );
 });
 
-test("the hooks' test namespace is read from the environment, and an empty one counts as unset", () => {
-  assert.equal(readHookTestNamespace({}), undefined);
+test("the hooks' namespace is Stryker's unless the environment names a test namespace", () => {
+  assert.equal(readHookTestNamespace({}), '__stryker__');
   assert.equal(
     readHookTestNamespace({ [hookTestNamespaceEnv]: '' }),
-    undefined,
+    '__stryker__',
   );
   assert.equal(
     readHookTestNamespace({ [hookTestNamespaceEnv]: '__test__' }),

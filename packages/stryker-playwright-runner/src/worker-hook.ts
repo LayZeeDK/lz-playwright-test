@@ -158,7 +158,7 @@ if (
 export function install(
   playwrightRequire: (id: string) => unknown,
   { outDir, perTest, hitLimit, testIdHosts, pageHelpers }: RunSettings,
-  ns: string = INSTRUMENTER_CONSTANTS.NAMESPACE,
+  ns: string,
 ): void {
   const tagHosts = perTest ? testIdHosts : undefined;
   const version = playwrightVersion(playwrightRequire);

@@ -1,7 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import type { MutantCoverage } from '@stryker-mutator/api/core';
+import {
+  INSTRUMENTER_CONSTANTS,
+  type MutantCoverage,
+} from '@stryker-mutator/api/core';
 
 import { isRecord, isStringArray } from './is-record.ts';
 import { serverSnapshotPrefix } from './server-protocol.ts';
@@ -186,10 +189,8 @@ function coveredMutants(coverage: MutantCoverage | undefined): string[] {
   ];
 }
 
-export function readHookTestNamespace(
-  env: NodeJS.ProcessEnv,
-): string | undefined {
-  return env[hookTestNamespaceEnv] || undefined;
+export function readHookTestNamespace(env: NodeJS.ProcessEnv): string {
+  return env[hookTestNamespaceEnv] || INSTRUMENTER_CONSTANTS.NAMESPACE;
 }
 
 export function readRunSettings(
