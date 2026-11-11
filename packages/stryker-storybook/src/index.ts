@@ -14,7 +14,6 @@ export type { LzStorybookReport } from './reporter.ts';
  * `properties` into its own (meta-schema-builder.js:27).
  */
 export const strykerValidationSchema = {
-  $schema: 'http://json-schema.org/draft-07/schema#',
   type: 'object',
   properties: {
     lzStorybook: {
