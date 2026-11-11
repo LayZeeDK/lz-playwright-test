@@ -76,7 +76,6 @@ function keepLiteralContainer(container: unknown): void {
     {
       type: 'CommentLine',
       value: ` Stryker disable next-line ObjectLiteral,ArrowFunction: ${containerReason}`,
-      loc: container['loc'],
     },
   ];
 }
