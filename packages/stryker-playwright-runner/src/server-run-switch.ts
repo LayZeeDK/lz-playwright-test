@@ -51,7 +51,7 @@ export function runSwitch(
     }
 
     text = read;
-    const next = read === undefined ? undefined : parseServerControl(read);
+    const next = parseServerControl(read);
     issued = new Set(next?.issuedTestIds);
 
     if (read !== undefined && next === undefined) {

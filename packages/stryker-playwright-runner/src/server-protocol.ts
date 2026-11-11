@@ -21,7 +21,13 @@ export interface ServerControl extends RunSettings {
   readonly issuedTestIds?: readonly string[];
 }
 
-export function parseServerControl(raw: string): ServerControl | undefined {
+export function parseServerControl(
+  raw: string | undefined,
+): ServerControl | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+
   let value: unknown;
 
   try {
@@ -87,9 +93,7 @@ export function readServerControlText(dir: string): string | undefined {
 }
 
 export function readServerControl(dir: string): ServerControl | undefined {
-  const text = readServerControlText(dir);
-
-  return text === undefined ? undefined : parseServerControl(text);
+  return parseServerControl(readServerControlText(dir));
 }
 
 export function anyHooked(dir: string): boolean {
