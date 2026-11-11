@@ -55,6 +55,7 @@ export function installServerHook(
     namespace,
     `${serverSnapshotPrefix}${process.pid}-${randomUUID()}${snapshotSuffix}`,
   );
+  let marked = false;
   let moduleScopeRunning = false;
 
   // The instrumenter's preamble reads this global once per module, as the module starts to run
@@ -87,6 +88,17 @@ export function installServerHook(
     },
   });
 
+  function markHooked() {
+    if (marked) {
+      return;
+    }
+
+    marked = true;
+    const file = path.join(dir, `${hookedPrefix}${process.pid}`);
+    // Stryker disable next-line StringLiteral: the runner reads only the names of the hooked files
+    fs.writeFileSync(file, '');
+  }
+
   [
     http.Server.prototype,
     https.Server.prototype,
@@ -114,11 +126,7 @@ export function installServerHook(
             Reflect.apply(emit, this, [event, ...args]);
 
           if (event === 'listening') {
-            fs.writeFileSync(
-              path.join(dir, `${hookedPrefix}${process.pid}`),
-              // Stryker disable next-line StringLiteral: the runner reads only the names of the hooked files
-              '',
-            );
+            markHooked();
           }
 
           if (
