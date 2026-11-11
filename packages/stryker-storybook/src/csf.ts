@@ -450,7 +450,10 @@ export function namedExports(
             field(specifier, 'exported', 'name') ??
             field(specifier, 'exported', 'value'),
           local: field(specifier, 'local', 'name'),
-          init: followed(field(specifier, 'local'), bindings),
+          init:
+            field(specifier, 'local', 'type') === 'Identifier'
+              ? followed(field(specifier, 'local'), bindings)
+              : undefined,
           form: 'specifier' as const,
           typeOnly: typeOnly || field(specifier, 'exportKind') === 'type',
         })),

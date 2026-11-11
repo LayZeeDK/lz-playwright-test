@@ -228,6 +228,35 @@ export { A };
 export const B = {};
 `,
   },
+  {
+    name: 'a story re-exported by string name',
+    code: `export default {};
+export { 'A' as A } from './other';
+export const B = {};
+`,
+  },
+  {
+    name: 'a story re-exported by a string name alone',
+    code: `export default {};
+export { 'A' } from './other';
+export const B = {};
+`,
+  },
+  {
+    name: 'a story re-exported by name',
+    code: `export default {};
+export { A } from './other';
+export { A as C } from './other';
+export const B = {};
+`,
+  },
+  {
+    name: 'a namespace re-export',
+    code: `export default {};
+export * as A from './other';
+export const B = {};
+`,
+  },
 ];
 
 function packageStories(code: string, testTags: TestTags): readonly string[] {
