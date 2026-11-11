@@ -415,12 +415,7 @@ export function namedExports(
   body: readonly unknown[],
   bindings: Bindings,
 ): readonly NamedExport[] {
-  // Stryker disable next-line MethodExpression: the only statements this filter drops that the reading below picks up are default-exported function declarations; Storybook 10.6.5 rejects such a story file (its default export must be an object), and readPreviewTest never reaches here for a preview with a default export
   return body
-    .filter(
-      // Stryker disable next-line ConditionalExpression: the only statements this filter drops that the reading below picks up are default-exported function declarations; Storybook 10.6.5 rejects such a story file (its default export must be an object), and readPreviewTest never reaches here for a preview with a default export
-      (statement) => field(statement, 'type') === 'ExportNamedDeclaration',
-    )
     .flatMap((statement) => {
       const typeOnly = field(statement, 'exportKind') === 'type';
 
