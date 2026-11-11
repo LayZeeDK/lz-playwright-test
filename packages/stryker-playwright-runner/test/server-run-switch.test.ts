@@ -78,6 +78,20 @@ test('the issued test ids are those of the current control file only', (t) => {
   );
 });
 
+test('a control rewritten for the same run folder is the control a later request sees', (t) => {
+  const { dir, run, write } = switched(t);
+  const outDir = write({ perTest: true, testIdHosts: ['localhost:4200'] });
+  run.startRequest();
+  writeServerControl(dir, {
+    outDir,
+    perTest: true,
+    testIdHosts: ['localhost:4300'],
+  });
+  run.startRequest();
+
+  assert.deepEqual(run.control()?.testIdHosts, ['localhost:4300']);
+});
+
 test('a control file that is gone leaves no control, not the previous run', (t) => {
   const { dir, namespace, run, write } = switched(t);
   write({ perTest: false, activeMutant: '2' });
