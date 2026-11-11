@@ -81,6 +81,46 @@ describe('csfFile', () => {
       [['A', []]],
     );
   });
+
+  for (const { name, code, expected } of [
+    {
+      name: 'a story whose method a top-level declaration calls',
+      code: 'export default {};\nexport const A = {};\nconst b = A.toString();',
+      expected: [['A', true]],
+    },
+    {
+      name: 'a story held by an object property a call receives',
+      code: 'export default {};\nexport const A = {};\nconsole.log({ a: A });',
+      expected: [['A', true]],
+    },
+    {
+      name: 'a namespace re-export, which has no local name',
+      code: "export default {};\nexport * as ns from './x';",
+      expected: [['ns', false]],
+    },
+    {
+      name: 'a story named only in a typeof type query',
+      code: "export default {};\nexport const A = {};\ntype T = typeof A;\nexport * as ns from './x';",
+      expected: [
+        ['A', false],
+        ['ns', false],
+      ],
+    },
+  ]) {
+    it(`reports whether the file names a story elsewhere: ${name}`, () => {
+      const body = list(field(parseProgram(code, fileName), 'body'));
+
+      assert.deepEqual(
+        csfFile(body, topLevelBindings(body)).stories.map(
+          ({ name: story, referencedElsewhere }) => [
+            story,
+            referencedElsewhere,
+          ],
+        ),
+        expected,
+      );
+    });
+  }
 });
 
 describe('csfShapes', () => {

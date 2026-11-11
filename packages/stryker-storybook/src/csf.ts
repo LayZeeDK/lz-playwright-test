@@ -635,7 +635,8 @@ function identifiersInReadForms(statement: unknown): readonly unknown[] {
         field(declarator, 'id'),
         ...(field(init, 'callee', 'property', 'name') === 'story'
           ? [field(init, 'callee', 'object')]
-          : []),
+          : // Stryker disable next-line ArrayDeclaration: namesReadElsewhere asks this list only about identifier nodes, which no string equals
+            []),
       ];
     }),
     ...list(field(statement, 'specifiers')).flatMap((specifier) => [
@@ -644,10 +645,12 @@ function identifiersInReadForms(statement: unknown): readonly unknown[] {
     ]),
     ...(isIndexedTestCall(statement)
       ? [field(statement, 'expression', 'callee', 'object')]
-      : []),
+      : // Stryker disable next-line ArrayDeclaration: namesReadElsewhere asks this list only about identifier nodes, which no string equals
+        []),
     ...(field(statement, 'expression', 'operator') === '='
       ? [rootObject(field(statement, 'expression', 'left', 'object'))]
-      : []),
+      : // Stryker disable next-line ArrayDeclaration: namesReadElsewhere asks this list only about identifier nodes, which no string equals
+        []),
   ];
 }
 
@@ -806,9 +809,8 @@ function importCallArgumentsIn(node: unknown): readonly unknown[] {
   }
 
   return [
-    ...(node['type'] === 'CallExpression' &&
-    (field(node, 'callee', 'type') === 'Import' ||
-      field(node, 'callee', 'name') === 'require')
+    ...(field(node, 'callee', 'type') === 'Import' ||
+    field(node, 'callee', 'name') === 'require'
       ? [list(node['arguments'])[0]]
       : []),
     ...Object.values(node).flatMap(importCallArgumentsIn),
