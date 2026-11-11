@@ -112,7 +112,9 @@ export interface TestTags {
   readonly skip: readonly string[];
 }
 
-export const defaultTestTags: Omit<TestTags, 'previewTags'> = {
+export type TagFilter = Omit<TestTags, 'previewTags'>;
+
+export const defaultTestTags: TagFilter = {
   include: ['test'],
   exclude: [],
   skip: [],

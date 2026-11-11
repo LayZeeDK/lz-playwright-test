@@ -32,11 +32,12 @@ export function csfIgnorer(options: object, log: ProjectLog): Ignorer {
       return new Map();
     }
 
+    const shapes = csfShapes(program);
+
     if (!ignoreMode) {
-      return staticReasons(csfShapes(program));
+      return staticReasons(shapes);
     }
 
-    const shapes = csfShapes(program);
     // StrykerJS reads a node's leading comments when it enters that node, after the ignorer has seen the Program node.
     shapes.literalContainers.forEach(keepLiteralContainer);
 
@@ -86,7 +87,7 @@ function keepLiteralContainer(container: unknown): void {
   container['leadingComments'] = [
     ...list(container['leadingComments']),
     {
-      // Stryker disable next-line StringLiteral: Babel prints a comment of any type but CommentBlock as a line comment, and StrykerJS reads only its value
+      // Stryker disable next-line StringLiteral: the type keeps the node a well-formed Babel comment, but no output depends on its value: StrykerJS reads only the comment's value, and Babel's generator prints a comment of any type but CommentBlock as a line comment
       type: 'CommentLine',
       value: ` Stryker disable next-line ObjectLiteral,ArrowFunction: ${containerReason}`,
     },
