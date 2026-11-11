@@ -26,7 +26,6 @@ interface StrykerNamespaceFields {
 export function markInstrumentedReads(namespace: StrykerNamespace): void {
   let activeMutant = namespace.activeMutant;
   Object.defineProperty(namespace, 'activeMutant', {
-    configurable: true,
     get: () => {
       namespace.instrumented = true;
 

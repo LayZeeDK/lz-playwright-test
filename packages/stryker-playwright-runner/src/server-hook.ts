@@ -63,7 +63,6 @@ export function installServerHook(
   // hits until the next microtask are module scope and count as static. The preamble never assigns it once it
   // exists; the setter drops other assignments so they neither throw nor remove the getter.
   Object.defineProperty(globalThis, ns, {
-    configurable: true,
     get: () => {
       if (!moduleScopeRunning) {
         moduleScopeRunning = true;
@@ -78,7 +77,6 @@ export function installServerHook(
   });
 
   Object.defineProperty(namespace, 'currentTestId', {
-    configurable: true,
     get: () => {
       const tag = requests.getStore();
 
