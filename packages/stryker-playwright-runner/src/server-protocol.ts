@@ -24,14 +24,10 @@ export interface ServerControl extends RunSettings {
 export function parseServerControl(
   raw: string | undefined,
 ): ServerControl | undefined {
-  if (raw === undefined) {
-    return undefined;
-  }
-
   let value: unknown;
 
   try {
-    value = JSON.parse(raw);
+    value = raw === undefined ? undefined : JSON.parse(raw);
   } catch {
     // value stays undefined and reads as no control below.
   }
