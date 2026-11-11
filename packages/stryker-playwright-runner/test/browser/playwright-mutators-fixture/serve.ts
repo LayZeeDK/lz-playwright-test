@@ -49,4 +49,4 @@ createServer(async (request, response) => {
   } catch {
     response.writeHead(404).end();
   }
-}).listen(4323, '127.0.0.1');
+}).listen(Number(process.argv[2] ?? 4323), '127.0.0.1');
