@@ -9,7 +9,7 @@ import path from 'node:path';
 
 import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
 
-import { isRecord } from './is-record.ts';
+import { fieldOf, isRecord } from './is-record.ts';
 import { globalNamespace, markInstrumentedReads } from './namespace.ts';
 import { readHookTestNamespace, snapshotSuffix } from './protocol.ts';
 import {
@@ -215,19 +215,13 @@ export function installServerHook(
 }
 
 function agentTarget(options: unknown): URL | undefined {
-  if (!isRecord(options)) {
+  const host = fieldOf(options, 'host');
+
+  if (typeof host !== 'string') {
     return undefined;
   }
 
-  const { host, port } = options;
-
-  if (
-    typeof host !== 'string' ||
-    (typeof port !== 'number' && typeof port !== 'string')
-  ) {
-    return undefined;
-  }
-
+  const port = String(fieldOf(options, 'port'));
   const url = `http://${host.includes(':') ? `[${host}]` : host}:${port}`;
 
   return URL.canParse(url) ? new URL(url) : undefined;
