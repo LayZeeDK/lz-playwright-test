@@ -12,4 +12,17 @@ describe('parseProgram', () => {
 
     assert.equal(program.body[0]?.type, 'ClassDeclaration');
   });
+
+  ['Label.stories.ts', 'Label.stories.mts', 'Label.stories.cts'].forEach(
+    (fileName) => {
+      it(`parses an angle-bracket type assertion in ${fileName}`, () => {
+        const program = parseProgram(
+          'declare const value: unknown;\nexport const label = <string>value;\n',
+          fileName,
+        );
+
+        assert.equal(program.body[1]?.type, 'ExportNamedDeclaration');
+      });
+    },
+  );
 });

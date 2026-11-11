@@ -26,18 +26,18 @@ export function definitionTimeStubs(program: unknown): readonly StubSite[] {
 function storybookTestFnNames(program: unknown): ReadonlySet<string> {
   return new Set(
     list(field(program, 'body')).flatMap((statement) =>
-      field(statement, 'type') === 'ImportDeclaration' &&
       field(statement, 'source', 'value') === 'storybook/test'
         ? list(field(statement, 'specifiers')).flatMap((specifier) => {
             const local = field(specifier, 'local', 'name');
 
-            return field(specifier, 'type') === 'ImportSpecifier' &&
-              field(specifier, 'imported', 'name') === 'fn' &&
+            return field(specifier, 'imported', 'name') === 'fn' &&
               typeof local === 'string'
               ? [local]
-              : [];
+              : // Stryker disable next-line ArrayDeclaration: spies.has only ever gets an identifier's name, which has no spaces
+                [];
           })
-        : [],
+        : // Stryker disable next-line ArrayDeclaration: spies.has only ever gets an identifier's name, which has no spaces
+          [],
     ),
   );
 }
@@ -77,14 +77,13 @@ function stubSite(
   );
 
   if (
-    field(node, 'type') !== 'CallExpression' ||
+    (field(node, 'type') !== 'CallExpression' &&
+      field(node, 'type') !== 'OptionalCallExpression') ||
     typeof start !== 'number' ||
     typeof end !== 'number' ||
     typeof line !== 'number' ||
-    field(node, 'callee', 'type') !== 'MemberExpression' ||
     field(node, 'callee', 'computed') === true ||
     field(node, 'callee', 'object', 'type') !== 'CallExpression' ||
-    field(node, 'callee', 'object', 'callee', 'type') !== 'Identifier' ||
     typeof spy !== 'string' ||
     !spies.has(spy) ||
     method === undefined
@@ -114,6 +113,7 @@ function field(node: unknown, ...keys: readonly string[]): unknown {
 }
 
 function list(value: unknown): readonly unknown[] {
+  // Stryker disable next-line ArrayDeclaration: the only non-array input is a missing specifiers list, and a string element has no imported name
   return Array.isArray(value) ? value : [];
 }
 
