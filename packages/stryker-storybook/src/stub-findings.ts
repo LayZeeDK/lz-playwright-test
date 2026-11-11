@@ -60,6 +60,7 @@ function silencedSites(
     }
 
     rules.push(...directiveRules(node['leadingComments'], startLine(node)));
+    // Every node that starts where a site starts (its statement, the call, the inner fn()) belongs to that site, and the comment carrying a directive attaches to the outermost of them, so matching by start alone reaches the same rules.
     const site = sites.find(({ start }) => node['start'] === start);
 
     if (site !== undefined && isSilenced(rules, site.line)) {

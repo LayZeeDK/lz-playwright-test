@@ -179,6 +179,7 @@ export function defaultExport(body: readonly unknown[]): unknown {
     ),
     'declaration',
   );
+
   return declaration ?? field(defaultSpecifier(body), 'local');
 }
 
@@ -414,10 +415,10 @@ export function namedExports(
   body: readonly unknown[],
   bindings: Bindings,
 ): readonly NamedExport[] {
-  // Stryker disable next-line MethodExpression: the only statements this filter drops that the reading below picks up are default-exported function declarations, and Storybook 10.6.5 rejects such a file (its default export must be an object)
+  // Stryker disable next-line MethodExpression: the only statements this filter drops that the reading below picks up are default-exported function declarations; Storybook 10.6.5 rejects such a story file (its default export must be an object), and readPreviewTest never reaches here for a preview with a default export
   return body
     .filter(
-      // Stryker disable next-line ConditionalExpression: the only statements this filter drops that the reading below picks up are default-exported function declarations, and Storybook 10.6.5 rejects such a file (its default export must be an object)
+      // Stryker disable next-line ConditionalExpression: the only statements this filter drops that the reading below picks up are default-exported function declarations; Storybook 10.6.5 rejects such a story file (its default export must be an object), and readPreviewTest never reaches here for a preview with a default export
       (statement) => field(statement, 'type') === 'ExportNamedDeclaration',
     )
     .flatMap((statement) => {
@@ -507,6 +508,7 @@ export function unwrap(node: unknown): unknown {
     : node;
 }
 
+/** `value` is an export specifier's local, a call argument, a property or assigned value, or a `.bind()` callee's object; of these only an Identifier has a string `name`. */
 function followed(value: unknown, bindings: Bindings): unknown {
   const name = field(value, 'name');
 
@@ -773,7 +775,7 @@ function identifiersReachedFrom(node: unknown): readonly unknown[] {
 
 function identifiersIn(node: unknown): readonly unknown[] {
   if (!isRecord(node) || node['type'] === 'TSTypeQuery') {
-    // Stryker disable next-line ArrayDeclaration: namesReadElsewhere asks this list only about identifier nodes, which no string equals
+    // Stryker disable next-line ArrayDeclaration: a string in this list gives namesReadElsewhere an undefined name, which marks only a story whose local is undefined (a namespace re-export); Storybook 10.6.5's index never lists such a story, so classifyStubs drops it, and csfShapes never reads the flag
     return [];
   }
 
