@@ -26,13 +26,11 @@ export function definitionTimeStubs(program: unknown): readonly StubSite[] {
 function storybookTestFnNames(program: unknown): ReadonlySet<string> {
   return new Set(
     list(field(program, 'body')).flatMap((statement) =>
-      field(statement, 'type') === 'ImportDeclaration' &&
       field(statement, 'source', 'value') === 'storybook/test'
         ? list(field(statement, 'specifiers')).flatMap((specifier) => {
             const local = field(specifier, 'local', 'name');
 
-            return field(specifier, 'type') === 'ImportSpecifier' &&
-              field(specifier, 'imported', 'name') === 'fn' &&
+            return field(specifier, 'imported', 'name') === 'fn' &&
               typeof local === 'string'
               ? [local]
               : [];
@@ -84,7 +82,6 @@ function stubSite(
     typeof line !== 'number' ||
     field(node, 'callee', 'computed') === true ||
     field(node, 'callee', 'object', 'type') !== 'CallExpression' ||
-    field(node, 'callee', 'object', 'callee', 'type') !== 'Identifier' ||
     typeof spy !== 'string' ||
     !spies.has(spy) ||
     method === undefined
