@@ -827,8 +827,8 @@ export function mayImportItself(
   );
 }
 
-function nodesIn(node: unknown): readonly unknown[] {
-  return isRecord(node) ? [node, ...Object.values(node).flatMap(nodesIn)] : [];
+function nodesIn(node: object): readonly unknown[] {
+  return [node, ...Object.values(node).filter(isRecord).flatMap(nodesIn)];
 }
 
 function propertyValue(object: unknown, key: string): unknown {
