@@ -126,9 +126,9 @@ export function untaggedKey(arrivedAt: number): string {
 }
 
 export function untaggedArrival(key: string): number | undefined {
-  const arrivedAt = key.startsWith(untaggedPrefix)
-    ? key.slice(untaggedPrefix.length)
-    : '';
+  const arrivedAt = key.slice(untaggedPrefix.length);
 
-  return /^\d+$/.test(arrivedAt) ? Number(arrivedAt) : undefined;
+  return key.startsWith(untaggedPrefix) && /^\d+$/.test(arrivedAt)
+    ? Number(arrivedAt)
+    : undefined;
 }
