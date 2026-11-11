@@ -498,4 +498,17 @@ describe('lz-storybook-csf', () => {
       ['2 ObjectLiteral placed', '2 StringLiteral placed'],
     );
   });
+
+  it("keeps the story file's own disable comment on a story object", async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A =\n  // Stryker disable next-line StringLiteral: kept on purpose\n  { args: { label: 'Go' } };",
+        )
+      ).filter((outcome) => outcome.startsWith('4 StringLiteral')),
+      ['4 StringLiteral kept on purpose'],
+    );
+  });
 });
