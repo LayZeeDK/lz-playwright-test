@@ -20,12 +20,14 @@ export const strykerValidationSchema = {
       type: 'object',
       default: {},
       additionalProperties: false,
+      // Stryker disable next-line StringLiteral: no Stryker message or editor schema shows plugin option descriptions
       description: 'Options of the lz-storybook and lz-storybook-csf plugins.',
       properties: {
         configDir: {
           type: 'string',
           default: '.storybook',
           description:
+            // Stryker disable next-line StringLiteral: no Stryker message or editor schema shows plugin option descriptions
             'The Storybook config folder, as Storybook takes it with --config-dir. Its main file names the story files.',
         },
       },
@@ -34,14 +36,17 @@ export const strykerValidationSchema = {
       type: 'object',
       default: {},
       additionalProperties: false,
+      // Stryker disable next-line StringLiteral: no Stryker message or editor schema shows plugin option descriptions
       description: 'Options of the lz-storybook-csf ignorer.',
       properties: {
         play: {
           enum: playModes,
           default: 'ignore',
+          // Stryker disable StringLiteral: no Stryker message or editor schema shows plugin option descriptions
           description:
             'ignore (the default) keeps the mutants of plays, test hooks and msw handlers in story files out of ' +
             'the run, for a config that mutates app code. mutate keeps them in, for a config that mutates test code.',
+          // Stryker restore StringLiteral
         },
       },
     },

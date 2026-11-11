@@ -89,6 +89,7 @@ function directiveRules(
           {
             disable: match[1] === 'disable',
             line: match[2] === undefined ? undefined : line,
+            // Stryker disable next-line StringLiteral: group 3 takes part in every match, so the fallback never runs
             names: (match[3] ?? '')
               .split(',')
               .map((name) => name.trim().toLowerCase()),
