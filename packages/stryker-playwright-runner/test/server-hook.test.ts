@@ -10,6 +10,7 @@ import { before, test } from 'node:test';
 import { readSnapshotDir } from '../src/protocol.ts';
 import {
   anyHooked,
+  forgetHooked,
   serverSnapshotPrefix,
   testIdHeader,
   untaggedArrival,
@@ -80,6 +81,14 @@ test('the active mutant switches per request from the control file, without a re
   server.run({ perTest: false });
 
   assert.equal(await server.ask({ n: 0 }), 'one');
+});
+
+test('a server process that the runner forgot as hooked does not mark itself hooked again when it listens again', async (t) => {
+  const server = await startServer(t, { server: 'listen-again' });
+  forgetHooked(server.serverDir);
+
+  assert.equal(await server.ask({ n: 0 }), 'listened again');
+  assert.equal(anyHooked(server.serverDir), false);
 });
 
 test('an http2 server switches the active mutant per request too', async (t) => {

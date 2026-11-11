@@ -58,6 +58,7 @@ type ServerProgram =
   | 'assign-namespace'
   | 'fails-to-listen'
   | 'lazy-answer'
+  | 'listen-again'
   | 'load-only'
   | 'outside-any-request'
   | 'self-request'
