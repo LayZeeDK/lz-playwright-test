@@ -43,6 +43,11 @@ describe('csfFile', () => {
       expected: [['A', true]],
     },
     {
+      name: 'a story held by an object property a call receives',
+      code: 'export default {};\nexport const A = {};\nconsole.log({ a: A });',
+      expected: [['A', true]],
+    },
+    {
       name: 'a namespace re-export, which has no local name',
       code: "export default {};\nexport * as ns from './x';",
       expected: [['ns', false]],

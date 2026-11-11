@@ -168,6 +168,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('places the function that a .bind() call binds to an object with properties', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nconst fn = (args) =>\n  render(args);\nexport const A = fn.bind({ a: 1 });",
+        )
+      ).filter((outcome) => outcome.includes('ArrowFunction')),
+      ['2 ArrowFunction placed'],
+    );
+  });
+
   it('keeps the object passed to meta.story() as written', async () => {
     const { outcomes } = setup();
 

@@ -775,6 +775,19 @@ other.C.parameters.test.mockReset = true;`,
     assert.deepEqual(verdicts, ['kept']);
   });
 
+  it('keeps the stories of a file that loads another stories file by a dynamic import', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const C = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+(await import('./Other.stories')).C.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
   it('reads every story as unknown when the file writes a story through a dynamic import of itself', () => {
     const verdicts = verdictsOf(
       `export default { parameters: { test: { restoreMocks: false } } };
