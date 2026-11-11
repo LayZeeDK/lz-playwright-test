@@ -5,16 +5,23 @@ import base from './stryker.base.ts';
 // The src/index.ts of an @layzee/stryker-node-test-runner checkout; that runner is not on npm.
 const { LZ_NODE_TEST_RUNNER: nodeTestRunner } = process.env;
 
-/** The config that mutates the src of `packages/<name>` with that package's node:test files, run from the workspace root. */
-export function packageConfig(name: string): PartialStrykerOptions {
+/**
+ * The config that mutates the src of `packages/<name>` with that package's node:test files, run from the workspace root.
+ * `tests` names the test files in `test/` when only some of them can run against Stryker's instrumented sources.
+ */
+export function packageConfig(
+  name: string,
+  tests: readonly string[] = ['*.test.ts'],
+): PartialStrykerOptions {
   const dir = `packages/${name}`;
   const reportDir = `reports/mutation/${name}`;
+  const testFiles = tests.map((test) => `${dir}/test/${test}`);
   const runner: PartialStrykerOptions =
     nodeTestRunner === undefined || nodeTestRunner === ''
       ? {
           testRunner: 'command',
           commandRunner: {
-            command: `node --conditions=@layzee/source --test --test-concurrency=1 ${dir}/test/*.test.ts`,
+            command: `node --conditions=@layzee/source --test --test-concurrency=1 ${testFiles.join(' ')}`,
           },
           coverageAnalysis: 'off',
         }
@@ -22,7 +29,7 @@ export function packageConfig(name: string): PartialStrykerOptions {
           testRunner: 'lz-node-test',
           appendPlugins: [nodeTestRunner],
           lzNodeTest: {
-            testFiles: [`${dir}/test/*.test.ts`],
+            testFiles,
             nodeArgs: ['--conditions=@layzee/source'],
           },
           coverageAnalysis: 'perTest',

@@ -42,7 +42,8 @@ mutators from there, so build first (the Nx targets below do).
   `stryker.e2e.ui.config.ts` adds the JSX mutators to the e2e run.
 - `stryker.base.ts`: the settings that all four Stryker configs share. The package configs share its reporters
   and ignore list.
-- `stryker.package.ts`: `packageConfig(name)`, the shared body of the six package `stryker.config.mjs` files.
+- `stryker.package.ts`: `packageConfig(name, tests?)`, the shared body of the six package `stryker.config.mjs` files.
+  `tests` names the test files when only some can run against Stryker's instrumented sources.
 - `stryker.e2e.command.config.ts`: the demo baselines on Stryker's `command` runner, selected with
   `STRYKER_BASELINE=define` or `STRYKER_BASELINE=off`.
 - `oss/`: the configs, patches, and scripts that copies of four open-source repos needed for a Stryker
