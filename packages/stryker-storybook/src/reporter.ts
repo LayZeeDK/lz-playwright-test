@@ -157,7 +157,7 @@ function consoleBlock({
 
   const counts = Object.entries(
     Object.groupBy(findings, ({ verdict }) => verdict),
-  ).map(([verdict, group]) => `${group?.length ?? 0} ${verdict}`);
+  ).map(([verdict, group]) => `${group.length} ${verdict}`);
 
   return [
     findings.length === 0
