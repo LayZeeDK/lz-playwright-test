@@ -256,7 +256,7 @@ export function csfFile(
           index === undefined
             ? storyFilter(metaObjects, isFactoryFile)
             : ({ name }) => index.has(name),
-          (name) => index?.get(name)?.tests ?? [],
+          (name) => list(index?.get(name)?.tests),
           (local) =>
             metaBindings.some(([name]) => written.has(name)) ||
             elsewhere.has(local),
@@ -417,8 +417,10 @@ export function namedExports(
   body: readonly unknown[],
   bindings: Bindings,
 ): readonly NamedExport[] {
+  // Stryker disable next-line MethodExpression: the only statements this filter drops that the reading below picks up are default-exported function declarations, and Storybook 10.6.5 rejects such a file (its default export must be an object)
   return body
     .filter(
+      // Stryker disable next-line ConditionalExpression: the only statements this filter drops that the reading below picks up are default-exported function declarations, and Storybook 10.6.5 rejects such a file (its default export must be an object)
       (statement) => field(statement, 'type') === 'ExportNamedDeclaration',
     )
     .flatMap((statement) => {
@@ -773,23 +775,20 @@ function identifiersReachedFrom(node: unknown): readonly unknown[] {
 }
 
 function identifiersIn(node: unknown): readonly unknown[] {
-  if (!isRecord(node)) {
-    return [];
-  }
-
-  if (node['type'] === 'Identifier') {
+  if (field(node, 'type') === 'Identifier') {
     return [node];
   }
 
-  if (node['type'] === 'TSTypeQuery') {
-    return [];
+  if (
+    field(node, 'type') === 'MemberExpression' &&
+    field(node, 'computed') === false
+  ) {
+    return identifiersIn(field(node, 'object'));
   }
 
-  if (node['type'] === 'MemberExpression' && node['computed'] === false) {
-    return identifiersIn(node['object']);
-  }
-
-  return Object.values(node).flatMap(identifiersIn);
+  return Object.values(
+    isRecord(node) && node['type'] !== 'TSTypeQuery' ? node : {},
+  ).flatMap(identifiersIn);
 }
 
 /** The file holds a string literal that names this file, or loads a module whose specifier is not a string literal. Storybook 10.6.5's Vitest transform composes each story from the file's own bindings, so a write through an import of the file itself changes what runs without naming the story. */
