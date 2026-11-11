@@ -8,7 +8,7 @@ const wrapErrors = [];
 function wrap(target, key, wrapperOf) {
   ['assigned', 'redefined'].forEach((how) => {
     try {
-      const value = wrapperOf(how, target[key]);
+      const value = wrapperOf(target[key], how);
 
       if (how === 'assigned') {
         target[key] = value;
@@ -25,7 +25,7 @@ function wrap(target, key, wrapperOf) {
   });
 }
 
-function passThrough(how, before) {
+function passThrough(before) {
   return function (...args) {
     return before.apply(this, args);
   };
@@ -34,7 +34,7 @@ function passThrough(how, before) {
 wrap(
   http.Server.prototype,
   'emit',
-  (how, before) =>
+  (before, how) =>
     function (event, ...args) {
       if (event === 'request') {
         wrapped.push(how);

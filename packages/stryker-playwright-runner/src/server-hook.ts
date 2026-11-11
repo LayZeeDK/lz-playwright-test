@@ -7,8 +7,6 @@ import http2 from 'node:http2';
 import https from 'node:https';
 import path from 'node:path';
 
-import { INSTRUMENTER_CONSTANTS } from '@stryker-mutator/api/core';
-
 import { fieldOf, isRecord } from './is-record.ts';
 import { globalNamespace, markInstrumentedReads } from './namespace.ts';
 import { readHookTestNamespace, snapshotSuffix } from './protocol.ts';
@@ -44,7 +42,7 @@ if (serverDir !== undefined && !(installed in globalThis)) {
  */
 export function installServerHook(
   dir: string,
-  ns: string = INSTRUMENTER_CONSTANTS.NAMESPACE,
+  ns: string,
   now: () => number = Date.now,
 ): void {
   const namespace = globalNamespace(ns);
@@ -179,8 +177,6 @@ export function installServerHook(
       typeof origin === 'string' ? testIdFor(new URL(origin)) : undefined;
 
     if (
-      // Stryker disable next-line ConditionalExpression: undici's addHeader skips a header whose value is undefined, so the request goes out the same; the other mutants of this mutator here are compile errors
-      testId !== undefined &&
       typeof addHeader === 'function' &&
       Array.isArray(headers) &&
       !hasUndiciHeader(headers, testIdHeader)

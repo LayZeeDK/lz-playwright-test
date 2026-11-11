@@ -158,7 +158,7 @@ if (
 export function install(
   playwrightRequire: (id: string) => unknown,
   { outDir, perTest, hitLimit, testIdHosts, pageHelpers }: RunSettings,
-  ns: string = INSTRUMENTER_CONSTANTS.NAMESPACE,
+  ns: string,
 ): void {
   const tagHosts = perTest ? testIdHosts : undefined;
   const version = playwrightVersion(playwrightRequire);
@@ -493,8 +493,9 @@ function frameRead(value: unknown): FrameRead | undefined {
     : undefined;
 }
 
-// Reaches the page as source text, where an instrumented copy calls a namespace the page lacks: mutating it is
-// safe only while no test in the Stryker run opens a real page.
+// Reaches the page as source text, where an instrumented copy calls Stryker's per-file helper functions
+// (`stryNS_`, `stryCov_`, `stryMutAct_`), which the page lacks: mutating it is safe only while no test in the
+// Stryker run opens a real page.
 export function initPage({
   ns,
   activeMutant,
