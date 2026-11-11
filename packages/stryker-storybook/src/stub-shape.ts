@@ -33,9 +33,11 @@ function storybookTestFnNames(program: unknown): ReadonlySet<string> {
             return field(specifier, 'imported', 'name') === 'fn' &&
               typeof local === 'string'
               ? [local]
-              : [];
+              : // Stryker disable next-line ArrayDeclaration: spies.has only ever gets an identifier's name, which has no spaces
+                [];
           })
-        : [],
+        : // Stryker disable next-line ArrayDeclaration: spies.has only ever gets an identifier's name, which has no spaces
+          [],
     ),
   );
 }
@@ -111,6 +113,7 @@ function field(node: unknown, ...keys: readonly string[]): unknown {
 }
 
 function list(value: unknown): readonly unknown[] {
+  // Stryker disable next-line ArrayDeclaration: the only non-array input is a missing specifiers list, and a string element has no imported name
   return Array.isArray(value) ? value : [];
 }
 
