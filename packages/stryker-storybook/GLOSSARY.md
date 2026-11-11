@@ -1,7 +1,7 @@
 # Storybook
 
-Stryker plugins for Storybook story files, and the Vite plugin that rewrites definition-time stubs so they survive
-the mock reset. This context covers both `@layzee/stryker-storybook` and `@layzee/storybook-mock-transformer`: the
+Stryker plugins for Storybook story files, and two Vite plugins: one rewrites definition-time stubs so they survive
+the mock reset, the other lets Storybook's tests run in Stryker's sandbox. This context covers both `@layzee/stryker-storybook` and `@layzee/storybook-mock-transformer`: the
 transformer exists only to rewrite the stubs this package diagnoses, and both read the same spy stub shape.
 
 ## Language
@@ -95,6 +95,11 @@ _Avoid_: slow mutant
 The Vite plugin `lz-storybook-mock-transformer` that rewrites each definition-time stub into `fn(implementation)`
 form, which survives the mock reset. It leaves the `Once` forms as they are.
 _Avoid_: stub rewriter, mock plugin
+
+**Sandbox plugin**:
+The Vite plugin `lz-storybook-stryker` that lets Storybook's tests run in Stryker's sandbox, where the project's
+installed packages sit outside the folders Vite serves by default. It changes nothing outside a Stryker run.
+_Avoid_: fs-allow plugin
 
 **Rewritten stub**:
 A definition-time stub that the mock transformer has turned into `fn(implementation)` form; its verdict no longer

@@ -5,8 +5,10 @@ import { commonTokens } from '@stryker-mutator/api/plugin';
 import { Ajv } from 'ajv';
 
 import { csfIgnorer } from '../src/csf-ignorer.ts';
+import * as entry from '../src/index.ts';
 import { strykerPlugins, strykerValidationSchema } from '../src/index.ts';
 import { storybookReporter } from '../src/reporter.ts';
+import { lzStorybookStrykerPlugin } from '../src/stryker-vite-plugin.ts';
 import { stubIgnorer } from '../src/stub-ignorer.ts';
 
 describe('package entry', () => {
@@ -16,6 +18,10 @@ describe('package entry', () => {
       import.meta.resolve('@layzee/stryker-storybook'),
       new URL('../src/index.ts', import.meta.url).href,
     );
+  });
+
+  it('exports the Vite plugin for the Vitest config that Stryker runs', () => {
+    assert.equal(entry.lzStorybookStrykerPlugin, lzStorybookStrykerPlugin);
   });
 
   it('declares the CSF ignorer, the stub ignorer and the reporter', () => {

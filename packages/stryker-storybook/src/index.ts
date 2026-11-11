@@ -6,6 +6,7 @@ import { storybookReporter } from './reporter.ts';
 import { stubIgnorer } from './stub-ignorer.ts';
 import { storybookPluginName } from './stub-verdict.ts';
 
+export { lzStorybookStrykerPlugin } from './stryker-vite-plugin.ts';
 export type { LzStorybookCsfOptions, LzStorybookOptions } from './options.ts';
 export type { LzStorybookReport } from './reporter.ts';
 
