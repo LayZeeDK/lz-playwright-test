@@ -103,7 +103,7 @@ export function anyHooked(dir: string): boolean {
 export function forgetHooked(dir: string) {
   fs.readdirSync(dir)
     .filter((file) => file.startsWith(hookedPrefix))
-    .forEach((file) => fs.rmSync(path.join(dir, file), { force: true }));
+    .forEach((file) => fs.rmSync(path.join(dir, file)));
 }
 
 const localhostAliases: ReadonlySet<string> = new Set([
