@@ -113,6 +113,7 @@ export interface TestTags {
 }
 
 export const defaultTestTags: TestTags = {
+  // Stryker disable next-line ArrayDeclaration: loadProject in storybook-project.ts replaces previewTags with the preview's own tags, so this default never reaches a project's stories
   previewTags: [],
   include: ['test'],
   exclude: [],
@@ -288,6 +289,7 @@ function childTags(
 
 function tagList(value: unknown): readonly string[] | undefined {
   if (value === undefined) {
+    // Stryker disable next-line ArrayDeclaration: an extra tag changes which stories run only when include, exclude or skip names it, and no tag filter names Stryker's placeholder tag
     return [];
   }
 
@@ -334,6 +336,7 @@ function siteVerdict(
   const erasesBy = (index: number): boolean =>
     stories.slice(0, index + 1).some(({ branch }) => erases(branch));
 
+  // Stryker disable next-line ArithmeticOperator: slice clamps its end to the length, so stories.slice(0, stories.length + 2) is every story, as stories.slice(0, stories.length) is
   if (!erasesBy(stories.length - 1)) {
     return stories.some(({ branch }) => branch === 'unknown')
       ? 'unknown'
@@ -355,6 +358,7 @@ function contains(node: unknown, position: number): boolean {
     typeof start === 'number' &&
     typeof end === 'number' &&
     start <= position &&
+    // Stryker disable next-line EqualityOperator: a stub starts with its spy's name, and no syntax lets a name start right at the last character's end of a story's init, so position is never end
     position < end
   );
 }

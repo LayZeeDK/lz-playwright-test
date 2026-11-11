@@ -160,6 +160,49 @@ describe('classifyStubs stub verdicts', () => {
       );
     });
   });
+
+  function verdictsOf(source: string): readonly StubVerdict[] {
+    return classifyStubs(
+      storyFile(
+        `import { fn } from 'storybook/test';\n${source}`,
+        'X.stories.ts',
+      ),
+      {},
+      defaultTestTags,
+    ).stubs.map(({ verdict }) => verdict);
+  }
+
+  it('gives a meta stub that a story after the first one erases the verdict order-dependent', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } }, args: { g: fn().mockReturnValue(1) } };
+export const A = {};
+export const B = { parameters: { test: { mockReset: true } } };`,
+    );
+
+    assert.deepEqual(verdicts, ['order-dependent']);
+  });
+
+  it('gives a stub the verdict of the story that holds it when stories are exported in another order than they are declared', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+const B = { parameters: { test: { mockReset: true } }, args: { g: fn().mockReturnValue(1) } };
+const A = {};
+export { A, B };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('gives a story that is a stub itself the verdict of that story', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = {};
+export const B = { parameters: { test: { mockReset: true } } };
+export const C = fn().mockReturnValue(1);`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
 });
 
 describe('classifyStubs parameter reading', () => {
@@ -292,6 +335,37 @@ export const B = { args: { g: fn().mockReturnValue(1) } };`,
       mockReset: 'unreadable',
       clearMocks: 'unreadable',
       restoreMocks: 'unreadable',
+    });
+  });
+
+  const unreadablePreview: ResetSettings = {
+    mockReset: 'unreadable',
+    clearMocks: 'unreadable',
+    restoreMocks: 'unreadable',
+  };
+  const previewRows: readonly (readonly [string, string, ResetSettings])[] = [
+    [
+      'reads the parameters export of a preview that exports another value first',
+      `export const decorators = [];\nexport const parameters = { test: { restoreMocks: false } };\n`,
+      { restoreMocks: false },
+    ],
+    [
+      'reads a preview made by a call other than definePreview() as unreadable',
+      `export default withTheme({ parameters: { test: { restoreMocks: false } } });\n`,
+      unreadablePreview,
+    ],
+    [
+      'reads a preview made by new definePreview() as unreadable',
+      `export default new definePreview({ parameters: { test: { restoreMocks: false } } });\n`,
+      unreadablePreview,
+    ],
+  ];
+
+  previewRows.forEach(([title, source, expected]) => {
+    it(title, () => {
+      const settings = readPreviewTest(parseProgram(source, 'preview.ts'));
+
+      assert.deepEqual(settings, expected);
     });
   });
 
@@ -901,6 +975,17 @@ export const B = { tags: ['smoke'], args: { g: fn().mockReturnValue(1) } };`,
     assert.deepEqual(verdicts, ['kept']);
   });
 
+  it('keeps stories that each have one of the tags that include names', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { tags: ['smoke'], parameters: { test: { mockReset: true } } };
+export const B = { tags: ['fast'], args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ include: ['smoke', 'fast'] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
   it('keeps a story without the test tag when include is empty', () => {
     const verdicts = verdictsOf(
       `export default { parameters: { test: { restoreMocks: false } } };
@@ -963,6 +1048,17 @@ export const B = { args: { g: fn().mockReturnValue(1) } };`,
 export const A = { tags: ['slow'], parameters: { test: { mockReset: true } } };
 export const B = { args: { g: fn().mockReturnValue(1) } };`,
       testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('leaves out a story with one of the tags that skip names', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { tags: ['slow'], parameters: { test: { mockReset: true } } };
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+      testTags({ skip: ['slow', 'flaky'] }),
     );
 
     assert.deepEqual(verdicts, ['kept']);
@@ -1143,6 +1239,32 @@ export const A = meta.story({ tags: ['slow'], parameters: { test: { mockReset: t
 A.test('runs', { tags: ['!slow'] }, async () => undefined);
 export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
       testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
+  it('leaves out a factory story whose .test() call negates its tag that skip names when skip also names test-fn, a tag every .test() call gets', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ tags: ['slow'], parameters: { test: { mockReset: true } } });
+A.test('runs', { tags: ['!slow'] }, async () => undefined);
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow', 'test-fn'] }),
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
+  it('keeps a factory story with the autodocs tag that skip names when it has a .test() call, which takes autodocs away', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ tags: ['autodocs'], parameters: { test: { mockReset: true } } });
+A.test('runs', {}, async () => undefined);
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['autodocs'] }),
     );
 
     assert.deepEqual(verdicts, ['erased']);
@@ -1936,6 +2058,19 @@ import { sharedTags } from './tags';
 const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
 export const A = meta.story({ parameters: { test: { mockReset: true } } });
 A.input.tags = sharedTags;
+export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
+      testTags({ skip: ['slow'] }),
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story as unknown when skip is set and its run-time tags hold a value that is no string literal', () => {
+    const verdicts = verdictsOf(
+      `import preview from '../.storybook/preview';
+const meta = preview.meta({ parameters: { test: { restoreMocks: false } } });
+export const A = meta.story({ parameters: { test: { mockReset: true } } });
+A.input.tags = [1n];
 export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
       testTags({ skip: ['slow'] }),
     );
