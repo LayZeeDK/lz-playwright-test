@@ -23,6 +23,11 @@ describe('definitionTimeStubs', () => {
       [{ spy: 'fn', method: 'mockReturnValue', once: false }],
     ],
     [
+      'finds a stub on an optional call of fn',
+      "import { fn } from 'storybook/test';\nfn?.().mockReturnValue(1);",
+      [{ spy: 'fn', method: 'mockReturnValue', once: false }],
+    ],
+    [
       'names the stub method that the call uses',
       "import { fn } from 'storybook/test';\nfn().mockResolvedValue(1);",
       [{ spy: 'fn', method: 'mockResolvedValue', once: false }],

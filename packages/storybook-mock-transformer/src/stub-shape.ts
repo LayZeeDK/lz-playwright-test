@@ -77,13 +77,12 @@ function stubSite(
   );
 
   if (
-    (field(node, 'type') !== 'CallExpression' &&
-      field(node, 'type') !== 'OptionalCallExpression') ||
+    !isCall(node) ||
     typeof start !== 'number' ||
     typeof end !== 'number' ||
     typeof line !== 'number' ||
     field(node, 'callee', 'computed') === true ||
-    field(node, 'callee', 'object', 'type') !== 'CallExpression' ||
+    !isCall(field(node, 'callee', 'object')) ||
     typeof spy !== 'string' ||
     !spies.has(spy) ||
     method === undefined
@@ -103,6 +102,12 @@ function stubSite(
     argumentStart:
       typeof argumentStart === 'number' ? argumentStart : undefined,
   };
+}
+
+function isCall(node: unknown): boolean {
+  const type = field(node, 'type');
+
+  return type === 'CallExpression' || type === 'OptionalCallExpression';
 }
 
 function field(node: unknown, ...keys: readonly string[]): unknown {
