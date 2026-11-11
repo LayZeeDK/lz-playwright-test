@@ -50,6 +50,11 @@ mutators from there, so build first (the Nx targets below do).
   run. `oss/README.md` describes each copy.
 - `tools/`: the scripts that the Rerun section of `docs/VERDICT.md` calls: the benchmarks, the Linux
   container run (`linux-run.sh`), and the demo on the packed tarballs (`packed-demo/`).
+- `GLOSSARY-MAP.md`: the workspace's contexts, each with its glossary at `packages/<package>/GLOSSARY.md`, and how
+  they relate.
+- `docs/adr/`: the decisions that span contexts; the `docs/adr/` next to a context's glossary holds the decisions
+  inside that context.
+- `AGENTS.md` and `references/`: the instructions for coding agents.
 - `docs/research/`: the research behind the design.
 - `docs/filings.md`: drafts of upstream issues found while validating the runner, none filed.
 - `docs/design/`: the design for the JSX mutators.

@@ -16,9 +16,9 @@ are experimental. The package is private and not on npm yet.
 
 ## Turn the mutators on
 
-The package turns Stryker's built-in mutators off for every file in the run, production files included. Give it a
+The package turns Stryker's built-in mutators off for every file in the run, app code included. Give it a
 Stryker configuration whose `mutate` holds only Playwright test code: spec files, page objects and fixtures. Mutate
-production code in a separate configuration.
+app code in a separate configuration.
 
 A run in which no file makes a valid mutant exits 0 under every `thresholds.break`, 100 included. A threshold on
 this configuration proves something only when the report shows mutants in the spec files.
@@ -184,7 +184,7 @@ the URL of such a request.
 
 ## Why Stryker's built-in mutators are off
 
-Stryker's built-in mutators target production code. StrykerJS tells you not to mutate tests: its `mutate` option
+Stryker's built-in mutators target app code. StrykerJS tells you not to mutate tests: its `mutate` option
 "should be your _production code files_, and definitely not your test files"
 ([`docs/configuration.md`](https://github.com/stryker-mutator/stryker-js/blob/v10.1.1/docs/configuration.md#mutate-string)).
 Its maintainer, nicojs, said the same in

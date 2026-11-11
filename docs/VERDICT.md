@@ -95,9 +95,9 @@ tests cover all ten. The plugin patches StrykerJS internals, so it supports Stry
   instrumented code ran at all, neither in a page nor in a Playwright worker, it says so. When every
   frame failed to answer in time, it says that instead. A dry run that
   finds no tests and does not fail comes back empty, so Stryker's own `allowEmpty` decides.
-- In a mutant run, a test that fails and then passes on a retry counts as failed: retries set with
-  `describe.configure({ retries })` outrank the `retries: 0` that Playwright's `TestRunner.runTests`
-  sets. A test attempt that fails on its own kills the mutant even when another attempt or another test
+- In a mutant run, a test that fails and then passes on a retry passes, as in `npx playwright test`, unless
+  `failOnFlakyTests` is set; the runner README's Flaky tests section says where the retries come from. Among the
+  attempts of a test that does not pass, one that fails kills the mutant even when another attempt or another test
   timed out. A `test.fail()` test that fails as expected does not kill the mutant. In the dry run, a
   timed-out test is reported as a failed test.
 - App code that a Playwright test worker imports, outside any page, reports coverage and hits too. The

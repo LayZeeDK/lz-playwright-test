@@ -140,7 +140,7 @@ function warnAboutProgram(
     warn(
       `${file}: ${packageName} turned Stryker's built-in mutators off for every file in this run, and this ` +
         'file does not look like Playwright test code (no @playwright/ import, no top-level test call). Mutate ' +
-        'production code in a separate Stryker config.',
+        'app code in a separate Stryker config.',
     );
   }
 }

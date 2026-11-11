@@ -1,6 +1,6 @@
 # Researching, proposing and deciding on mutators
 
-How this repository finds new StrykerJS mutators for production code and for test code, and how it decides which
+How this repository finds new StrykerJS mutators for app code and for test code, and how it decides which
 built-in mutators a test-code configuration keeps. It is written from the Playwright and Storybook work of
 2026-11-03 to 2026-11-05 and is meant to be reused for other runners and APIs.
 
@@ -12,7 +12,7 @@ decision log; record Claude's own calls labelled as Claude's.
 
 Mutators are chosen per configuration, so settle which code each configuration mutates before proposing anything.
 
-- **Production (app) code configuration.** The code under test. Built-in mutators apply; custom mutators add
+- **App code configuration.** The code under test. Built-in mutators apply; custom mutators add
   domain knowledge the built-ins lack (for example JSX attributes, Storybook story `args`).
 - **Test code configuration.** Test files, fixtures, mocks and test doubles. A mutant here asks "would the suite
   notice if this test checked less?". Built-ins are reviewed one by one (section 6); custom mutators target the
@@ -29,7 +29,7 @@ Mutators are chosen per configuration, so settle which code each configuration m
 The research question is: **what mistakes do people commonly make with the target APIs and globals?** Ask it once
 per configuration:
 
-- **Production code:** mistakes when using the runtime or framework APIs and globals in the code under test (for
+- **App code:** mistakes when using the runtime or framework APIs and globals in the code under test (for
   Node.js: the `node:*` modules and globals; for a UI library: its components' inputs and story data). A mutator
   for one of these mistakes writes the mistake into the code; a survivor means the tests would not catch a developer
   making it.
@@ -47,7 +47,7 @@ Before cataloguing mistakes, list the whole public API surface the code under ea
 at the installed version: every entry point in each package's `exports` (for example `storybook`, every
 `storybook/*` entry point and the `@storybook/*` packages; for Node.js every `node:*` module and the globals), the
 annotations and conventions the framework reads (CSF fields, hooks), and what each recent major version added,
-renamed or removed. Give each API its home (production code, test code, configuration, or tooling only) and note
+renamed or removed. Give each API its home (app code, test code, configuration, or tooling only) and note
 which catalog covers it. A catalog written without the inventory misses whole entry points; this happened on
 2026-11-05, when no Storybook report had looked at `storybook/actions`, `storybook/preview-api` or CSF factories.
 
@@ -187,7 +187,7 @@ for a new kind of test code instead of assuming that result.
 2. **Join measured outcomes.** Where a run exists, join killed, survived and NoCoverage per mutator and site class.
 3. **Judge each cell** as Noise, Coverage or Useful (section 4). Typical results from the Playwright analysis:
    mutants that empty a test body or delete an assertion survive by construction (Noise); literals in mocks and
-   doubles behave like production code and keep every built-in (they are the server side of the test).
+   doubles behave like app code and keep every built-in (they are the server side of the test).
 4. **Verdict per built-in mutator:** keep, exclude, or replace with a named custom mutator that does the useful part
    without the noise. Note where the verdict differs between test kinds and why.
 5. **Apply it** in the test-code configuration, with `mutator.excludedMutations` or a mutator package's install call
