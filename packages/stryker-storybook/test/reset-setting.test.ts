@@ -362,6 +362,21 @@ export const B = { args: { g: fn().mockReturnValue(1) } };`,
       `export default new definePreview({ parameters: { test: { restoreMocks: false } } });\n`,
       unreadablePreview,
     ],
+    [
+      'reads no settings from a preview that exports its parameters by an export type statement, which has no value at run time',
+      `const parameters = { test: { restoreMocks: false } };\nexport type { parameters };\n`,
+      {},
+    ],
+    [
+      'reads no settings from a preview that exports its parameters by a type export specifier',
+      `const parameters = { test: { restoreMocks: false } };\nexport { type parameters };\n`,
+      {},
+    ],
+    [
+      'reads no settings from a preview that declares its parameters export without a value',
+      `export declare const parameters: { test: { restoreMocks: false } };\n`,
+      {},
+    ],
   ];
 
   previewRows.forEach(([title, source, expected]) => {

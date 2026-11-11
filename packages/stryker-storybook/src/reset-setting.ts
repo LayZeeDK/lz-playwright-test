@@ -65,7 +65,7 @@ export function readPreviewTest(program: unknown): ResetSettings {
   }
 
   const parameters = namedExports(body, bindings).find(
-    ({ name }) => name === 'parameters',
+    ({ name, typeOnly }) => name === 'parameters' && !typeOnly,
   );
 
   return testSettings(

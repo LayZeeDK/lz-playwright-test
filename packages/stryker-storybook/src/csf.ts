@@ -388,6 +388,8 @@ export interface NamedExport {
   readonly local: unknown;
   readonly init: unknown;
   readonly form: 'declaration' | 'specifier';
+  /** `export type`, `export { type A }` or `export declare`, which TypeScript erases. */
+  readonly typeOnly: boolean;
 }
 
 export function namedExports(
@@ -398,34 +400,41 @@ export function namedExports(
     .filter(
       (statement) => field(statement, 'type') === 'ExportNamedDeclaration',
     )
-    .flatMap((statement) => [
-      ...list(field(statement, 'declaration', 'declarations')).map(
-        (declarator) => ({
-          name: field(declarator, 'id', 'name'),
-          local: field(declarator, 'id', 'name'),
-          init: field(declarator, 'init'),
-          form: 'declaration' as const,
-        }),
-      ),
-      ...(field(statement, 'declaration', 'type') === 'FunctionDeclaration'
-        ? [
-            {
-              name: field(statement, 'declaration', 'id', 'name'),
-              local: field(statement, 'declaration', 'id', 'name'),
-              init: field(statement, 'declaration'),
-              form: 'declaration' as const,
-            },
-          ]
-        : []),
-      ...list(field(statement, 'specifiers')).map((specifier) => ({
-        name:
-          field(specifier, 'exported', 'name') ??
-          field(specifier, 'exported', 'value'),
-        local: field(specifier, 'local', 'name'),
-        init: followed(field(specifier, 'local'), bindings),
-        form: 'specifier' as const,
-      })),
-    ])
+    .flatMap((statement) => {
+      const typeOnly = field(statement, 'exportKind') === 'type';
+
+      return [
+        ...list(field(statement, 'declaration', 'declarations')).map(
+          (declarator) => ({
+            name: field(declarator, 'id', 'name'),
+            local: field(declarator, 'id', 'name'),
+            init: field(declarator, 'init'),
+            form: 'declaration' as const,
+            typeOnly,
+          }),
+        ),
+        ...(field(statement, 'declaration', 'type') === 'FunctionDeclaration'
+          ? [
+              {
+                name: field(statement, 'declaration', 'id', 'name'),
+                local: field(statement, 'declaration', 'id', 'name'),
+                init: field(statement, 'declaration'),
+                form: 'declaration' as const,
+                typeOnly,
+              },
+            ]
+          : []),
+        ...list(field(statement, 'specifiers')).map((specifier) => ({
+          name:
+            field(specifier, 'exported', 'name') ??
+            field(specifier, 'exported', 'value'),
+          local: field(specifier, 'local', 'name'),
+          init: followed(field(specifier, 'local'), bindings),
+          form: 'specifier' as const,
+          typeOnly: typeOnly || field(specifier, 'exportKind') === 'type',
+        })),
+      ];
+    })
     .flatMap(({ name, ...named }) =>
       typeof name === 'string' && name !== 'default'
         ? [{ name, ...named }]
