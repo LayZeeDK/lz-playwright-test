@@ -423,6 +423,32 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('places tags assigned to a meta object exported as default by name', async () => {
+    const { outcomes } = setup('mutate');
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "const meta = {};\nexport { meta as default };\nmeta.tags = ['x'];",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      ['3 ArrayDeclaration placed', '3 StringLiteral placed'],
+    );
+  });
+
+  it('places a name assigned to a member of a call result in a file with a namespace re-export', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport * as ns from './x';\nhelper().name = 'Go';",
+        )
+      ).filter((outcome) => /^3 StringLiteral/.test(outcome)),
+      ['3 StringLiteral placed'],
+    );
+  });
+
   it('keeps __namedExportsOrder as written', async () => {
     const { outcomes } = setup();
 

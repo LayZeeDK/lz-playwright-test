@@ -345,6 +345,11 @@ export const B = { args: { g: fn().mockReturnValue(1) } };`,
       { restoreMocks: false },
     ],
     [
+      'reads the parameters a preview exports by an export specifier',
+      `const parameters = { test: { restoreMocks: false } };\nexport { parameters };\n`,
+      { restoreMocks: false },
+    ],
+    [
       'reads a preview made by a call other than definePreview() as unreadable',
       `export default withTheme({ parameters: { test: { restoreMocks: false } } });\n`,
       unreadablePreview,
@@ -1021,6 +1026,33 @@ const name = 'X';
     );
 
     assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads every story as unknown when the file has a require() whose argument is not a string literal', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const C = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+const name = 'X';
+require(\`./\${name}.stories\`).C.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('keeps the stories of a file whose comment spells its own name', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+/*./X.stories*/
+export const C = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
   });
 
   it('keeps the stories of a file that imports a package spelled like the file name', () => {
