@@ -189,6 +189,41 @@ export const A = meta.story({});
 `,
   },
   {
+    name: '__namedExportsOrder',
+    code: `export default {};
+export const A = {};
+export const __namedExportsOrder = ['A'];
+`,
+  },
+  {
+    name: 'a default function export',
+    code: `export default function Meta() {}
+export const A = {};
+`,
+  },
+  {
+    name: 'an exported class',
+    code: `export default {};
+export class A {}
+export const B = {};
+`,
+  },
+  {
+    name: 'an includeStories array',
+    code: `export default { includeStories: ['A', 'B'] };
+export const A = {};
+export const B = {};
+export const C = {};
+`,
+  },
+  {
+    name: 'includeStories as a regular expression with flags',
+    code: `export default { includeStories: /^a$/i };
+export const A = {};
+export const B = {};
+`,
+  },
+  {
     name: 'a variable without an initializer exported by specifier',
     code: `export default {};
 let A;

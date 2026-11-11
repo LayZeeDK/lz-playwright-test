@@ -286,6 +286,61 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('keeps each story that an includeStories array names', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default {\n  title: 'a/b',\n  includeStories: ['A', 'B'],\n};\nexport const A = {\n  args: { a: 1 },\n};\nexport const B = {\n  args: { b: 1 },\n};",
+        )
+      ).filter((outcome) => /^[58] ObjectLiteral/.test(outcome)),
+      [
+        `5 ObjectLiteral ${containerReason}`,
+        `8 ObjectLiteral ${containerReason}`,
+      ],
+    );
+  });
+
+  it('keeps a story that includeStories matches with the flags of its regular expression', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default {\n  title: 'a/b',\n  includeStories: /^a$/i,\n};\nexport const A = {\n  args: { a: 1 },\n};",
+        )
+      ).filter((outcome) => outcome.startsWith('5 ')),
+      [`5 ObjectLiteral ${containerReason}`],
+    );
+  });
+
+  it('places the mutants of a .test() call on an exported class', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport class A {}\nA.test('x', () => {\n  run(1 + 1);\n});",
+        )
+      ).filter((outcome) => outcome.startsWith('4 ')),
+      ['4 ArithmeticOperator placed'],
+    );
+  });
+
+  it('places the mutants of a .test() call on __namedExportsOrder', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const __namedExportsOrder = [];\n__namedExportsOrder.test('x', () => {\n  run(1 + 1);\n});",
+        )
+      ).filter((outcome) => outcome.startsWith('4 ')),
+      ['4 ArithmeticOperator placed'],
+    );
+  });
+
   it('places the mutants of an export that an excludeStories string matches', async () => {
     const { outcomes } = setup();
 

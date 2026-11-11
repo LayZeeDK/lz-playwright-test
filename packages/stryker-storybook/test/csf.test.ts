@@ -20,63 +20,10 @@ function stories(
 }
 
 describe('csfFile', () => {
-  it('reports no __namedExportsOrder story', () => {
-    assert.deepEqual(
-      stories(
-        "export default {};\nexport const A = {};\nexport const __namedExportsOrder = ['A'];",
-      ),
-      [['A', []]],
-    );
-  });
-
   it('reports no .test() children without a story index', () => {
     assert.deepEqual(
       stories(
         "import preview from '#.storybook/preview';\nconst meta = preview.meta({});\nexport const A = meta.story();\nA.test('runs', async () => undefined);",
-      ),
-      [['A', []]],
-    );
-  });
-
-  it('reports no story for a default function export', () => {
-    assert.deepEqual(
-      stories('export default function Meta() {}\nexport const A = {};'),
-      [['A', []]],
-    );
-  });
-
-  it('reports no story for an exported class', () => {
-    assert.deepEqual(
-      stories('export default {};\nexport class A {}\nexport const B = {};'),
-      [['B', []]],
-    );
-  });
-
-  it('reports no story when a meta object is exported as default by specifier', () => {
-    assert.deepEqual(
-      stories(
-        'const meta = {};\nexport { meta as default };\nexport const A = {};',
-      ),
-      [],
-    );
-  });
-
-  it('reports each story that an includeStories array names', () => {
-    assert.deepEqual(
-      stories(
-        "export default { includeStories: ['A', 'B'] };\nexport const A = {};\nexport const B = {};\nexport const C = {};",
-      ),
-      [
-        ['A', []],
-        ['B', []],
-      ],
-    );
-  });
-
-  it('matches includeStories with the flags of its regular expression', () => {
-    assert.deepEqual(
-      stories(
-        'export default { includeStories: /^a$/i };\nexport const A = {};\nexport const B = {};',
       ),
       [['A', []]],
     );
