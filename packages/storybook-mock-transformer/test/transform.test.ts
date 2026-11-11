@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { SourceMap } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -255,6 +256,37 @@ describe('transform', () => {
     assert.equal(transform(code, storyFile), undefined);
   });
 
+  it('leaves a stub on a storybook/test import other than fn alone', () => {
+    const code = [
+      "import { spyOn } from 'storybook/test';",
+      'export const Quiet = { args: { log: spyOn(console, "log").mockReturnValue(undefined) } };',
+      '',
+    ].join('\n');
+
+    assert.equal(transform(code, storyFile), undefined);
+  });
+
+  it('leaves a computed member call alone when its key is named like a stub method', () => {
+    const code = [
+      "import { fn } from 'storybook/test';",
+      "const mockReturnValue = 'mockName';",
+      "export const Named = { args: { load: fn()[mockReturnValue]('load') } };",
+      '',
+    ].join('\n');
+
+    assert.equal(transform(code, storyFile), undefined);
+  });
+
+  it('leaves a stub on an object that new fn() creates alone', () => {
+    const code = [
+      "import { fn } from 'storybook/test';",
+      "export const Built = { args: { load: new fn().mockReturnValue('stubbed') } };",
+      '',
+    ].join('\n');
+
+    assert.equal(transform(code, storyFile), undefined);
+  });
+
   it('leaves a stub with no argument alone', () => {
     const code = [
       "import { fn } from 'storybook/test';",
@@ -295,6 +327,20 @@ describe('transform', () => {
       message:
         /^@layzee\/storybook-mock-transformer: cannot parse D:\/project\/src\/Button\.stories\.tsx: /,
     });
+  });
+
+  it('keeps the parser error as the cause of the error it throws', () => {
+    const code = ["import { fn } from 'storybook/test';", 'const = ;', ''].join(
+      '\n',
+    );
+
+    assert.throws(
+      () => transform(code, storyFile),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.cause instanceof SyntaxError &&
+        error.message.endsWith(error.cause.message),
+    );
   });
 
   it('parses a .ts module with an angle-bracket type assertion', () => {
@@ -342,6 +388,88 @@ describe('transform', () => {
     ].join('\n');
 
     assert.equal(transform(code, 'D:/project/src/Stubs.mdx'), undefined);
+  });
+
+  it('leaves a file that is not a script alone in a folder whose name ends like a script', () => {
+    const code = [
+      "import { Meta } from '@storybook/addon-docs/blocks';",
+      '',
+      '# Stubs come from `storybook/test`',
+      '',
+    ].join('\n');
+
+    assert.equal(
+      transform(code, 'D:/project/src/chart.js/Stubs.mdx'),
+      undefined,
+    );
+  });
+
+  it('parses an .mts module with an angle-bracket type assertion', () => {
+    const code = [
+      "import { fn } from 'storybook/test';",
+      "export const load = fn().mockReturnValue(<string>'stubbed');",
+      '',
+    ].join('\n');
+
+    assert.equal(
+      transform(code, 'D:/project/src/spies.mts')?.code,
+      [
+        "import { fn } from 'storybook/test';",
+        "export const load = ((value) => fn(() => value))(<string>'stubbed');",
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('parses JSX in a .tsx module', () => {
+    const code = [
+      "import { fn } from 'storybook/test';",
+      "export const Checked = { args: { load: fn().mockReturnValue('stubbed') }, render: () => <button /> };",
+      '',
+    ].join('\n');
+
+    assert.equal(
+      transform(code, storyFile)?.code,
+      [
+        "import { fn } from 'storybook/test';",
+        "export const Checked = { args: { load: ((value) => fn(() => value))('stubbed') }, render: () => <button /> };",
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('leaves a module that does not name storybook/test alone, even when it does not parse', () => {
+    const code = [
+      '// @flow',
+      'export function label(text: ?string) {}',
+      '',
+    ].join('\n');
+
+    assert.equal(transform(code, 'D:/project/src/label.js'), undefined);
+  });
+
+  it('maps a column inside an unchanged part of a rewritten line back to the same column', () => {
+    const line =
+      "export const Checked = { args: { load: fn().mockReturnValue('stubbed') } };";
+    const code = ["import { fn } from 'storybook/test';", line, ''].join('\n');
+    const map = transform(code, storyFile)?.map;
+
+    assert.ok(map);
+
+    const entry = new SourceMap({
+      file: storyFile,
+      version: map.version,
+      sources: map.sources,
+      sourcesContent: [],
+      names: map.names,
+      mappings: map.mappings,
+      sourceRoot: '',
+    }).findEntry(1, line.indexOf('load'));
+
+    assert.deepEqual(
+      'originalLine' in entry && [entry.originalLine, entry.originalColumn],
+      [1, line.indexOf('load')],
+    );
   });
 
   it('returns a source map of the file it rewrote', () => {
