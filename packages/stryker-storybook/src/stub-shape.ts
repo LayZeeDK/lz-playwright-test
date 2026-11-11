@@ -25,20 +25,14 @@ export function definitionTimeStubs(program: unknown): readonly StubSite[] {
 
 function storybookTestFnNames(program: unknown): ReadonlySet<string> {
   return new Set(
-    list(field(program, 'body')).flatMap((statement) =>
-      field(statement, 'source', 'value') === 'storybook/test'
-        ? list(field(statement, 'specifiers')).flatMap((specifier) => {
-            const local = field(specifier, 'local', 'name');
-
-            return field(specifier, 'imported', 'name') === 'fn' &&
-              typeof local === 'string'
-              ? [local]
-              : // Stryker disable next-line ArrayDeclaration: spies.has only ever gets an identifier's name, which has no spaces
-                [];
-          })
-        : // Stryker disable next-line ArrayDeclaration: spies.has only ever gets an identifier's name, which has no spaces
-          [],
-    ),
+    list(field(program, 'body'))
+      .filter(
+        (statement) => field(statement, 'source', 'value') === 'storybook/test',
+      )
+      .flatMap((statement) => list(field(statement, 'specifiers')))
+      .filter((specifier) => field(specifier, 'imported', 'name') === 'fn')
+      .map((specifier) => field(specifier, 'local', 'name'))
+      .filter((local) => typeof local === 'string'),
   );
 }
 
@@ -77,13 +71,12 @@ function stubSite(
   );
 
   if (
-    (field(node, 'type') !== 'CallExpression' &&
-      field(node, 'type') !== 'OptionalCallExpression') ||
+    !isCall(node) ||
     typeof start !== 'number' ||
     typeof end !== 'number' ||
     typeof line !== 'number' ||
     field(node, 'callee', 'computed') === true ||
-    field(node, 'callee', 'object', 'type') !== 'CallExpression' ||
+    !isCall(field(node, 'callee', 'object')) ||
     typeof spy !== 'string' ||
     !spies.has(spy) ||
     method === undefined
@@ -103,6 +96,12 @@ function stubSite(
     argumentStart:
       typeof argumentStart === 'number' ? argumentStart : undefined,
   };
+}
+
+function isCall(node: unknown): boolean {
+  const type = field(node, 'type');
+
+  return type === 'CallExpression' || type === 'OptionalCallExpression';
 }
 
 function field(node: unknown, ...keys: readonly string[]): unknown {

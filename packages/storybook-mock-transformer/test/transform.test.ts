@@ -130,6 +130,23 @@ describe('transform', () => {
     );
   });
 
+  it('turns a mockReturnValue on an optional call of fn into fn with an implementation that returns the value', () => {
+    const code = [
+      "import { fn } from 'storybook/test';",
+      "export const Checked = { args: { load: fn?.().mockReturnValue('stubbed') } };",
+      '',
+    ].join('\n');
+
+    assert.equal(
+      transform(code, storyFile)?.code,
+      [
+        "import { fn } from 'storybook/test';",
+        "export const Checked = { args: { load: ((value) => fn(() => value))('stubbed') } };",
+        '',
+      ].join('\n'),
+    );
+  });
+
   it('leaves a definition-time mockReturnValueOnce alone', () => {
     const code = [
       "import { fn } from 'storybook/test';",
