@@ -21,25 +21,37 @@ const mswReason = `${csfIgnorerName}: msw handlers in a story file are mutated b
 export function csfIgnorer(options: object, log: ProjectLog): Ignorer {
   const ignoreMode = field(options, 'lzStorybookCsf', 'play') !== 'mutate';
   let reasons: ReadonlyMap<unknown, string> = new Map();
+  const fileReasons = (
+    program: unknown,
+    fileName: unknown,
+  ): ReadonlyMap<unknown, string> => {
+    if (
+      typeof fileName !== 'string' ||
+      !isStoryFile(strykerStorybookProject(options, log), fileName)
+    ) {
+      return new Map();
+    }
+
+    if (!ignoreMode) {
+      return staticReasons(csfShapes(program));
+    }
+
+    const shapes = csfShapes(program);
+    // StrykerJS reads a node's leading comments when it enters that node, after the ignorer has seen the Program node.
+    shapes.literalContainers.forEach(keepLiteralContainer);
+
+    return ignoreModeReasons(shapes);
+  };
 
   return {
     shouldIgnore(path) {
       const node = field(path, 'node');
 
       if (field(node, 'type') === 'Program') {
-        const fileName = field(path, 'hub', 'file', 'opts', 'filename');
-        const project = strykerStorybookProject(options, log);
-
-        if (typeof fileName !== 'string' || !isStoryFile(project, fileName)) {
-          reasons = new Map();
-        } else if (ignoreMode) {
-          const shapes = csfShapes(node);
-          // StrykerJS reads a node's leading comments when it enters that node, after the ignorer has seen the Program node.
-          shapes.literalContainers.forEach(keepLiteralContainer);
-          reasons = ignoreModeReasons(shapes);
-        } else {
-          reasons = staticReasons(csfShapes(node));
-        }
+        reasons = fileReasons(
+          node,
+          field(path, 'hub', 'file', 'opts', 'filename'),
+        );
       }
 
       return reasons.get(node);
@@ -74,9 +86,9 @@ function keepLiteralContainer(container: unknown): void {
   container['leadingComments'] = [
     ...list(container['leadingComments']),
     {
+      // Stryker disable next-line StringLiteral: Babel prints a comment of any type but CommentBlock as a line comment, and StrykerJS reads only its value
       type: 'CommentLine',
       value: ` Stryker disable next-line ObjectLiteral,ArrowFunction: ${containerReason}`,
-      loc: container['loc'],
     },
   ];
 }

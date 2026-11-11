@@ -818,4 +818,47 @@ describe('storybookReporter', () => {
       [],
     );
   });
+
+  it('writes its report into a reports folder that an earlier run left', (t) => {
+    const { reporter, written, projectDir } = setup(t);
+    mkdirSync(join(projectDir, 'reports'));
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(written(), { findings: [], staticStoryMutants: [] });
+  });
+
+  it('reports no finding for a Survived mutant of another mutator in a story file', (t) => {
+    const { reporter, findings } = setup(t);
+    const source = 'export const Primary = { args: { label: 42 } };\n';
+
+    reporter.onMutationTestReportReady({
+      files: {
+        'src/Meta.stories.tsx': {
+          source,
+          mutants: [
+            {
+              mutatorName: 'ObjectLiteral',
+              status: 'Survived',
+              location: {
+                start: { line: 1, column: 30 },
+                end: { line: 1, column: 43 },
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    assert.deepEqual(findings(), []);
+  });
+
+  it("skips a story file whose extension Storybook's CSF indexer does not read", (t) => {
+    const { reporter, findings, projectDir } = setup(t);
+    writeStory(projectDir, 'Meta.stories.cts', erasedStub);
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(findings(), []);
+  });
 });

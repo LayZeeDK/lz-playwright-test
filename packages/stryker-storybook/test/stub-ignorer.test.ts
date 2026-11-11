@@ -211,4 +211,20 @@ describe('stubIgnorer', () => {
       [undefined],
     );
   });
+
+  it('leaves the mutants of an expression that ends with the stub placed', async () => {
+    const { reasonsOf } = await setup(
+      'no-main',
+      'F01AllDefault.stories.tsx',
+      resetCase('F01AllDefault').replace(
+        "fn().mockReturnValue('stubbed')",
+        "'fallback' ?? fn().mockReturnValue('stubbed')",
+      ),
+    );
+
+    assert.deepEqual(reasonsOf("mockReturnValue('stubbed')"), [
+      undefined,
+      spyStubReason('erased'),
+    ]);
+  });
 });
