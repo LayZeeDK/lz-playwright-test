@@ -5,3 +5,7 @@ export const untaggedPreviewTestTags: TestTags = {
   ...defaultTestTags,
   previewTags: [],
 };
+
+export function testTags(rule: Partial<TestTags>): TestTags {
+  return { ...untaggedPreviewTestTags, ...rule };
+}
