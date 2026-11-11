@@ -102,7 +102,11 @@ function loadProject(
     case 'loaded': {
       return {
         configDir,
-        storyFiles: new Set(result.storyFiles.map(normalizePath)),
+        storyFiles: new Set(
+          result.storyFiles
+            .filter((file) => extname(file) !== '.mdx')
+            .map(normalizePath),
+        ),
         transformer: result.pluginNames.includes(mockTransformerPluginName)
           ? 'seen'
           : 'not-seen',
@@ -112,14 +116,14 @@ function loadProject(
     }
     case 'no-main': {
       log.info(
-        `${packageName}: no Storybook main file in ${configDir}; story files are the files whose names end in stories or story with a .js, .jsx, .mjs, .mjsx, .ts or .tsx extension`,
+        `${packageName}: no Storybook main file in ${configDir}, so story files are guessed by the name pattern of Storybook's CSF indexer: names ending in stories or story with a .js, .jsx, .mjs, .mjsx, .ts or .tsx extension`,
       );
 
       return fallbackProject(configDir, previewTest, testTags);
     }
     case 'failed': {
       log.warn(
-        `${packageName}: Storybook could not load ${configDir}, so story files are the files whose names end in stories or story with a .js, .jsx, .mjs, .mjsx, .ts or .tsx extension: ${result.error}`,
+        `${packageName}: Storybook could not load ${configDir}, so story files are guessed by the name pattern of Storybook's CSF indexer: names ending in stories or story with a .js, .jsx, .mjs, .mjsx, .ts or .tsx extension: ${result.error}`,
       );
 
       return fallbackProject(configDir, previewTest, testTags);

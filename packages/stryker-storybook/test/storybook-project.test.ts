@@ -104,7 +104,7 @@ describe('storybookProject', () => {
       const { lines, project } = freshSetup(t, 'no-main');
 
       assert.deepEqual(lines, [
-        `info: @layzee/stryker-storybook: no Storybook main file in ${project.configDir}; story files are the files whose names end in stories or story with a .js, .jsx, .mjs, .mjsx, .ts or .tsx extension`,
+        `info: @layzee/stryker-storybook: no Storybook main file in ${project.configDir}, so story files are guessed by the name pattern of Storybook's CSF indexer: names ending in stories or story with a .js, .jsx, .mjs, .mjsx, .ts or .tsx extension`,
       ]);
     });
   });
@@ -254,6 +254,23 @@ describe('storybookProject', () => {
         isStoryFile(project, file('other', 'Outside.stories.tsx')),
         false,
       );
+    });
+  });
+
+  describe('with a main file whose globs match .mdx and .stories.cts files', () => {
+    it('counts a matched .stories.cts file as a story file', () => {
+      const { project, file } = setup('main-cts');
+
+      assert.equal(
+        isStoryFile(project, file('src', 'Button.stories.cts')),
+        true,
+      );
+    });
+
+    it('does not count a matched .mdx file as a story file', () => {
+      const { project, file } = setup('main-cts');
+
+      assert.equal(isStoryFile(project, file('src', 'Docs.mdx')), false);
     });
   });
 
@@ -588,7 +605,7 @@ describe('storybookProject', () => {
       assert.equal(lines.length, 1);
       assert.ok(
         lines[0]?.startsWith(
-          `warn: @layzee/stryker-storybook: Storybook could not load ${project.configDir}, so story files are the files whose names end in stories or story with a .js, .jsx, .mjs, .mjsx, .ts or .tsx extension: `,
+          `warn: @layzee/stryker-storybook: Storybook could not load ${project.configDir}, so story files are guessed by the name pattern of Storybook's CSF indexer: names ending in stories or story with a .js, .jsx, .mjs, .mjsx, .ts or .tsx extension: `,
         ),
         lines[0],
       );
