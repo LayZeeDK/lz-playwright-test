@@ -769,23 +769,20 @@ function identifiersReachedFrom(node: unknown): readonly unknown[] {
 }
 
 function identifiersIn(node: unknown): readonly unknown[] {
-  if (!isRecord(node)) {
-    return [];
-  }
-
-  if (node['type'] === 'Identifier') {
+  if (field(node, 'type') === 'Identifier') {
     return [node];
   }
 
-  if (node['type'] === 'TSTypeQuery') {
-    return [];
+  if (
+    field(node, 'type') === 'MemberExpression' &&
+    field(node, 'computed') === false
+  ) {
+    return identifiersIn(field(node, 'object'));
   }
 
-  if (node['type'] === 'MemberExpression' && node['computed'] === false) {
-    return identifiersIn(node['object']);
-  }
-
-  return Object.values(node).flatMap(identifiersIn);
+  return Object.values(
+    isRecord(node) && node['type'] !== 'TSTypeQuery' ? node : {},
+  ).flatMap(identifiersIn);
 }
 
 /** The file imports, re-exports or requires itself, or loads a module whose specifier is not a string literal. Storybook 10.6.5's Vitest transform composes each story from the file's own bindings, so a write through such an import changes what runs without naming the story. */

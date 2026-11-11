@@ -1566,6 +1566,39 @@ export const B = meta.story({ args: { g: fn().mockReturnValue(1) } });`,
     assert.deepEqual(verdicts, ['unknown']);
   });
 
+  it('reads a story as unknown when a top-level declaration calls its method', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { parameters: { test: { mockReset: true } } };
+const a = A.toString();
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story as unknown when an object property that a call receives holds it', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { parameters: { test: { mockReset: true } } };
+console.log({ a: A });
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads a story that a typeof type query names', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const A = { parameters: { test: { mockReset: true } } };
+type T = typeof A;
+export const B = { args: { g: fn().mockReturnValue(1) } };`,
+    );
+
+    assert.deepEqual(verdicts, ['erased']);
+  });
+
   it('reads a factory story as unknown when an alias of it is assigned parameters', () => {
     const verdicts = verdictsOf(
       `import preview from '../.storybook/preview';
