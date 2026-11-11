@@ -23,11 +23,15 @@ export function runSwitch(
   namespace: StrykerNamespace,
   fileName: string,
 ): RunSwitch {
-  let control: ServerControl | undefined;
+  let run:
+    | {
+        control: ServerControl;
+        writtenHits: number;
+        writtenInstrumented: boolean;
+      }
+    | undefined;
   let text: string | undefined;
   let issued: ReadonlySet<string> = new Set();
-  let writtenHits: number;
-  let writtenInstrumented: boolean;
   let warnedRead = false;
 
   function currentControl(): ServerControl | undefined {
@@ -43,11 +47,11 @@ export function runSwitch(
         );
       }
 
-      return control;
+      return run?.control;
     }
 
     if (read === text) {
-      return control;
+      return run?.control;
     }
 
     text = read;
@@ -64,29 +68,31 @@ export function runSwitch(
   }
 
   return {
-    control: () => control,
+    control: () => run?.control,
     isIssued: (testId) => issued.has(testId),
     startRequest: () => {
       const next = currentControl();
 
-      if (next?.outDir !== control?.outDir) {
+      if (run !== undefined && next?.outDir === run.control.outDir) {
+        run.control = next;
+      } else {
         namespace.hitLimit = next?.hitLimit;
         namespace.hitCount = next?.hitLimit === undefined ? undefined : 0;
-        writtenHits = 0;
-        writtenInstrumented = false;
+        run =
+          next === undefined
+            ? undefined
+            : { control: next, writtenHits: 0, writtenInstrumented: false };
       }
 
-      control = next;
-      namespace.activeMutant = control?.activeMutant;
+      namespace.activeMutant = next?.activeMutant;
     },
     // A throw here would end the server; after the run its folder is gone, so the write is dropped.
     flush: () => {
-      const outDir = control?.outDir;
-
-      if (outDir === undefined) {
+      if (run === undefined) {
         return;
       }
 
+      const { control, writtenHits, writtenInstrumented } = run;
       const hits =
         typeof namespace.hitCount === 'number' ? namespace.hitCount : 0;
       const coverage = takeCoverage(namespace);
@@ -102,7 +108,7 @@ export function runSwitch(
 
       try {
         fs.appendFileSync(
-          path.join(outDir, fileName),
+          path.join(control.outDir, fileName),
           serializeSnapshot({
             mutantCoverage: coverage,
             hitCount: hits - writtenHits,
@@ -114,8 +120,8 @@ export function runSwitch(
         // Dropped, as above.
       }
 
-      writtenHits = hits;
-      writtenInstrumented = instrumented;
+      run.writtenHits = hits;
+      run.writtenInstrumented = instrumented;
     },
   };
 }
