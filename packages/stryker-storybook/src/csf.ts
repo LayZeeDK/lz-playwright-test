@@ -257,7 +257,7 @@ export function csfFile(
           index === undefined
             ? storyFilter(metaObjects, isFactoryFile)
             : ({ name }) => index.has(name),
-          (name) => index?.get(name)?.tests ?? [],
+          (name) => list(index?.get(name)?.tests),
           (local) =>
             metaBindings.some(([name]) => written.has(name)) ||
             elsewhere.has(local),
