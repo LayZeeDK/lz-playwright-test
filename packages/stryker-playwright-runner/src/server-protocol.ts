@@ -33,7 +33,7 @@ export function parseServerControl(
   try {
     value = JSON.parse(raw);
   } catch {
-    return undefined;
+    // value stays undefined and reads as no control below.
   }
 
   if (!isRecord(value)) {
@@ -103,11 +103,10 @@ export function anyHooked(dir: string): boolean {
 export function forgetHooked(dir: string) {
   fs.readdirSync(dir)
     .filter((file) => file.startsWith(hookedPrefix))
-    .forEach((file) => fs.rmSync(path.join(dir, file), { force: true }));
+    .forEach((file) => fs.rmSync(path.join(dir, file)));
 }
 
-const loopbackHosts: ReadonlySet<string> = new Set([
-  'localhost',
+const localhostAliases: ReadonlySet<string> = new Set([
   '127.0.0.1',
   '[::1]',
   '0.0.0.0',
@@ -115,7 +114,7 @@ const loopbackHosts: ReadonlySet<string> = new Set([
 ]);
 
 export function hostKey(url: URL): string {
-  const host = loopbackHosts.has(url.hostname) ? 'localhost' : url.hostname;
+  const host = localhostAliases.has(url.hostname) ? 'localhost' : url.hostname;
   const port = url.port || (url.protocol === 'https:' ? '443' : '80');
 
   return `${host}:${port}`;
@@ -126,9 +125,9 @@ export function untaggedKey(arrivedAt: number): string {
 }
 
 export function untaggedArrival(key: string): number | undefined {
-  const arrivedAt = key.startsWith(untaggedPrefix)
-    ? key.slice(untaggedPrefix.length)
-    : '';
+  const arrivedAt = key.slice(untaggedPrefix.length);
 
-  return /^\d+$/.test(arrivedAt) ? Number(arrivedAt) : undefined;
+  return key.startsWith(untaggedPrefix) && /^\d+$/.test(arrivedAt)
+    ? Number(arrivedAt)
+    : undefined;
 }

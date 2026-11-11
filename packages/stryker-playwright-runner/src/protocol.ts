@@ -189,9 +189,7 @@ function coveredMutants(coverage: MutantCoverage | undefined): string[] {
 export function readHookTestNamespace(
   env: NodeJS.ProcessEnv,
 ): string | undefined {
-  const name = env[hookTestNamespaceEnv];
-
-  return name === undefined || name === '' ? undefined : name;
+  return env[hookTestNamespaceEnv] || undefined;
 }
 
 export function readRunSettings(
