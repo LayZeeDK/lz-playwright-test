@@ -345,6 +345,18 @@ test('a second copy of the hook leaves lazily evaluated module scope static', as
   assert.deepEqual(mutantIdsOf(coverage.perTest['big']), bigRequestIds);
 });
 
+test('a copy of the hook from another install that loaded first leaves the server to it', async (t) => {
+  const otherInstall = `globalThis[Symbol.for('@layzee/stryker-playwright-runner/server-hook')] = true;`;
+  const server = await startServer(t, {
+    hooks: [
+      `data:text/javascript,${encodeURIComponent(otherInstall)}`,
+      serverHookUrl,
+    ],
+  });
+
+  assert.equal(anyHooked(server.serverDir), false);
+});
+
 test('without per-test coverage lazily evaluated module scope and the request are static', async (t) => {
   const server = await startServer(t, { server: 'lazy-answer' });
   const outDir = server.run({ perTest: false });
