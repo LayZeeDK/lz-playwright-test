@@ -41,6 +41,23 @@ function freshSetup(t: TestContext, fixture: string) {
   return setup(fixture, root);
 }
 
+function importInLoader(t: TestContext, fixture: string): void {
+  const nodeOptions = process.env['NODE_OPTIONS'];
+  t.after(() => {
+    if (nodeOptions === undefined) {
+      delete process.env['NODE_OPTIONS'];
+    } else {
+      process.env['NODE_OPTIONS'] = nodeOptions;
+    }
+  });
+  process.env['NODE_OPTIONS'] = [
+    nodeOptions,
+    `--import=${pathToFileURL(join(fixtures, fixture, 'register.mjs')).href}`,
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
 describe('storybookProject', () => {
   describe('with no main file in the config folder', () => {
     it('counts a *.stories.* file as a story file', () => {
@@ -450,12 +467,7 @@ describe('storybookProject', () => {
 
   describe('without Vitest installed', () => {
     it('counts the stories tagged test and warns once that Vitest is not installed', (t) => {
-      const nodeOptions = process.env['NODE_OPTIONS'];
-      t.after(() => {
-        process.env['NODE_OPTIONS'] = nodeOptions;
-      });
-      process.env['NODE_OPTIONS'] =
-        `--import=${pathToFileURL(join(fixtures, 'no-vitest', 'register.mjs')).href}`;
+      importInLoader(t, 'no-vitest');
       const lines: string[] = [];
 
       const project = storybookProject(
@@ -481,12 +493,7 @@ describe('storybookProject', () => {
 
   describe('with a Vitest import that fails for another reason', () => {
     it('counts the stories tagged test and warns once, naming the config and the error', (t) => {
-      const nodeOptions = process.env['NODE_OPTIONS'];
-      t.after(() => {
-        process.env['NODE_OPTIONS'] = nodeOptions;
-      });
-      process.env['NODE_OPTIONS'] =
-        `--import=${pathToFileURL(join(fixtures, 'broken-vitest', 'register.mjs')).href}`;
+      importInLoader(t, 'broken-vitest');
       const lines: string[] = [];
       const configFile = join(
         fixtures,
@@ -513,6 +520,20 @@ describe('storybookProject', () => {
         ],
       );
     });
+
+    it('names the working folder when no Vitest config file is given', (t) => {
+      importInLoader(t, 'broken-vitest');
+      const lines: string[] = [];
+
+      storybookProject(join(fixtures, 'broken-vitest', '.storybook'), {
+        info: () => undefined,
+        warn: (message: string) => lines.push(`warn: ${message}`),
+      });
+
+      assert.deepEqual(lines, [
+        `warn: @layzee/stryker-storybook: Vitest could not load its config from ${process.cwd()}, so the tested stories are the stories tagged test: Error: vitest/node of the broken-vitest fixture`,
+      ]);
+    });
   });
 
   describe('parseLoaderResult', () => {
@@ -532,6 +553,13 @@ describe('storybookProject', () => {
       });
 
       assert.deepEqual(vitestTags, { kind: 'unreadable' });
+    });
+
+    it('throws on a result of an unknown kind', () => {
+      assert.throws(() => parseLoaderResult({ kind: 'other' }), {
+        message:
+          '@layzee/stryker-storybook: the Storybook loader wrote a result of an unknown shape',
+      });
     });
   });
 
