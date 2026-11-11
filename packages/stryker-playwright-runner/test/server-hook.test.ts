@@ -156,8 +156,8 @@ test("a server that answers 'Expect: 100-continue' itself switches the active mu
   assert.equal((await response.toArray()).join(''), 'hi many');
 });
 
-test('instrumentation that wraps emit after the hook, by assignment and by redefining it, still runs, and the mutant still switches', async (t) => {
-  const server = await startServer(t, { server: 'wrapped-emit' });
+test("instrumentation that wraps emit, an agent's addRequest or a response's end after the hook, by assignment and by redefining it, wraps them, and the mutant still switches", async (t) => {
+  const server = await startServer(t, { server: 'wrapped-after-hook' });
   server.run({ perTest: false, activeMutant: '2' });
 
   assert.deepEqual(JSON.parse(await server.ask({ n: 0 })), {
