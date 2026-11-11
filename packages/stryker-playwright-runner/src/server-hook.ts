@@ -171,6 +171,7 @@ export function installServerHook(
       typeof origin === 'string' ? testIdFor(new URL(origin)) : undefined;
 
     if (
+      // Stryker disable next-line ConditionalExpression: undici's addHeader skips a header whose value is undefined, so the request goes out the same; the other mutants of this mutator here are compile errors
       testId !== undefined &&
       typeof addHeader === 'function' &&
       Array.isArray(headers) &&
