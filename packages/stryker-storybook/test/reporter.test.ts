@@ -852,4 +852,13 @@ describe('storybookReporter', () => {
 
     assert.deepEqual(findings(), []);
   });
+
+  it("skips a story file whose extension Storybook's CSF indexer does not read", (t) => {
+    const { reporter, findings, projectDir } = setup(t);
+    writeStory(projectDir, 'Meta.stories.cts', erasedStub);
+
+    reporter.onMutationTestReportReady({ files: {} });
+
+    assert.deepEqual(findings(), []);
+  });
 });
