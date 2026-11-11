@@ -160,6 +160,35 @@ export const B = {};
 `,
   },
   {
+    name: 'a meta object exported by specifier as default',
+    code: `const meta = {};
+export { meta as default };
+export const A = {};
+`,
+  },
+  {
+    name: "a meta object exported by specifier as 'default'",
+    code: `const meta = {};
+export { meta as 'default' };
+export const A = {};
+`,
+  },
+  {
+    name: 'a meta object under satisfies exported by specifier as default',
+    code: `const meta = {} satisfies Meta;
+export { meta as default };
+export const A = {};
+`,
+  },
+  {
+    name: 'a factory meta exported by specifier as default',
+    code: `import preview from '../.storybook/preview';
+const meta = preview.meta({});
+export { meta as default };
+export const A = meta.story({});
+`,
+  },
+  {
     name: 'a variable without an initializer exported by specifier',
     code: `export default {};
 let A;

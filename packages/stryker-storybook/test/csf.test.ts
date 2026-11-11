@@ -52,12 +52,12 @@ describe('csfFile', () => {
     );
   });
 
-  it('reports no story for a meta exported as default by name', () => {
+  it('reports no story when a meta object is exported as default by specifier', () => {
     assert.deepEqual(
       stories(
         'const meta = {};\nexport { meta as default };\nexport const A = {};',
       ),
-      [['A', []]],
+      [],
     );
   });
 

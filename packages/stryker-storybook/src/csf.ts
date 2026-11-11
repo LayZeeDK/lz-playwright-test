@@ -184,11 +184,30 @@ export function defaultExport(body: readonly unknown[]): unknown {
     ),
     'declaration',
   );
-  const defaultSpecifier = body
-    .flatMap((statement) => list(field(statement, 'specifiers')))
-    .find((specifier) => field(specifier, 'exported', 'name') === 'default');
+  return declaration ?? field(defaultSpecifier(body), 'local');
+}
 
-  return declaration ?? field(defaultSpecifier, 'local');
+function defaultSpecifier(body: readonly unknown[]): unknown {
+  return body
+    .flatMap((statement) => list(field(statement, 'specifiers')))
+    .find(
+      (specifier) =>
+        (field(specifier, 'exported', 'name') ??
+          field(specifier, 'exported', 'value')) === 'default',
+    );
+}
+
+/** Storybook 10.6.5's Vitest transform names the meta only through `export default`, so it fails on a meta object exported by specifier as default and tests no story. */
+function isMetaObjectExportedBySpecifier(
+  body: readonly unknown[],
+  bindings: Bindings,
+): boolean {
+  return (
+    field(
+      unwrap(followed(field(defaultSpecifier(body), 'local'), bindings)),
+      'type',
+    ) === 'ObjectExpression'
+  );
 }
 
 /** The family name of the default export, which no identifier can have. */
@@ -229,18 +248,20 @@ export function csfFile(
 
   return {
     metaObjects,
-    stories: storyExports(
-      body,
-      bindings,
-      isFactoryFile,
-      index === undefined
-        ? storyFilter(metaObjects, isFactoryFile)
-        : ({ name }) => index.has(name),
-      (name) => index?.get(name)?.tests ?? [],
-      (local) =>
-        metaBindings.some(([name]) => written.has(name)) ||
-        elsewhere.has(local),
-    ),
+    stories: isMetaObjectExportedBySpecifier(body, bindings)
+      ? []
+      : storyExports(
+          body,
+          bindings,
+          isFactoryFile,
+          index === undefined
+            ? storyFilter(metaObjects, isFactoryFile)
+            : ({ name }) => index.has(name),
+          (name) => index?.get(name)?.tests ?? [],
+          (local) =>
+            metaBindings.some(([name]) => written.has(name)) ||
+            elsewhere.has(local),
+        ),
     written,
   };
 }
