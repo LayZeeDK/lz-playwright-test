@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { defaultTestTags } from '../src/reset-setting.ts';
 import type { StorybookProject } from '../src/storybook-project.ts';
 import { siteFindings } from '../src/stub-findings.ts';
+import { untaggedPreviewTestTags } from './support/test-tags.ts';
 
 function project(
   transformer: StorybookProject['transformer'],
-  testTags = defaultTestTags,
+  testTags = untaggedPreviewTestTags,
 ) {
   return {
     configDir: '.storybook',
@@ -52,7 +52,7 @@ describe('siteFindings', () => {
     const findings = siteFindings(
       code,
       'Tags.stories.tsx',
-      project('not-seen', { ...defaultTestTags, include: ['smoke'] }),
+      project('not-seen', { ...untaggedPreviewTestTags, include: ['smoke'] }),
       () => undefined,
     );
 

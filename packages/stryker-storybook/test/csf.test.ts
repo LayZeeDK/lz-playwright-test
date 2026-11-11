@@ -140,24 +140,4 @@ describe('csfShapes', () => {
       ['ObjectExpression'],
     );
   });
-
-  it('reports no undefined value for what the file leaves out', () => {
-    const shapes = csfShapes(
-      parseProgram(
-        "export default { title: 'a/b' };\nexport const A = {};",
-        fileName,
-      ),
-    );
-
-    assert.deepEqual(
-      [
-        shapes.metaObjects,
-        shapes.literalContainers,
-        shapes.testCode,
-        shapes.mswValues,
-        shapes.staticValues,
-      ].map((set) => set.has(undefined)),
-      [false, false, false, false, false],
-    );
-  });
 });

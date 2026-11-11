@@ -7,11 +7,8 @@ import { vitestTransform } from 'storybook/internal/csf-tools';
 import { csfFile, storyIndex, topLevelBindings } from '../src/csf.ts';
 import { field, list } from '../src/node-field.ts';
 import { parseProgram } from '../src/parse.ts';
-import {
-  classifyStubs,
-  defaultTestTags,
-  type TestTags,
-} from '../src/reset-setting.ts';
+import { classifyStubs, type TestTags } from '../src/reset-setting.ts';
+import { untaggedPreviewTestTags } from './support/test-tags.ts';
 
 const noMain = fileURLToPath(new URL('fixtures/no-main/', import.meta.url));
 const fileName = `${noMain}src/Button.stories.tsx`;
@@ -268,12 +265,12 @@ function packageChildren(code: string): readonly (readonly [string, number])[] {
 async function storybookChildren(
   code: string,
 ): Promise<readonly (readonly [string, number])[]> {
-  const text = await transformed(code, defaultTestTags);
+  const text = await transformed(code, untaggedPreviewTestTags);
   const children = [
     ...text.matchAll(/exportName: "([^"]*)",[^}]*testName: "/g),
   ].flatMap(([, name]) => (name === undefined ? [] : [name]));
 
-  return (await storybookStories(code, defaultTestTags)).map(
+  return (await storybookStories(code, untaggedPreviewTestTags)).map(
     (name) =>
       [name, children.filter((child) => child === name).length] as const,
   );
@@ -290,7 +287,7 @@ describe("csfFile counts the .test() children that Storybook's Vitest transform 
 describe("classifyStubs tests the stories that Storybook's Vitest transform tests", () => {
   rows.forEach(({ name, code, testTags, todo }) => {
     it(name, { todo }, async () => {
-      const tags = { ...defaultTestTags, ...testTags };
+      const tags = { ...untaggedPreviewTestTags, ...testTags };
 
       assert.deepEqual(
         packageStories(code, tags),

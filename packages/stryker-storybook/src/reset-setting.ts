@@ -65,7 +65,7 @@ export function readPreviewTest(program: unknown): ResetSettings {
   }
 
   const parameters = namedExports(body, bindings).find(
-    ({ name }) => name === 'parameters',
+    ({ name, typeOnly }) => name === 'parameters' && !typeOnly,
   );
 
   return testSettings(
@@ -112,9 +112,7 @@ export interface TestTags {
   readonly skip: readonly string[];
 }
 
-export const defaultTestTags: TestTags = {
-  // Stryker disable next-line ArrayDeclaration: loadProject in storybook-project.ts replaces previewTags with the preview's own tags, so this default never reaches a project's stories
-  previewTags: [],
+export const defaultTestTags: Omit<TestTags, 'previewTags'> = {
   include: ['test'],
   exclude: [],
   skip: [],
@@ -289,7 +287,7 @@ function childTags(
 
 function tagList(value: unknown): readonly string[] | undefined {
   if (value === undefined) {
-    // Stryker disable next-line ArrayDeclaration: an extra tag changes which stories run only when include, exclude or skip names it, and no tag filter names Stryker's placeholder tag
+    // Stryker disable next-line ArrayDeclaration: these tags reach only skipped(), which matches them against skip, and no skip list names Stryker's placeholder tag
     return [];
   }
 
@@ -333,16 +331,17 @@ function siteVerdict(
   stories: readonly StoryReset[],
   users: readonly number[],
 ): StubVerdict {
-  const erasesBy = (index: number): boolean =>
-    stories.slice(0, index + 1).some(({ branch }) => erases(branch));
+  const firstEraser = stories.findIndex(({ branch }) => erases(branch));
 
-  if (!stories.some(({ branch }) => erases(branch))) {
+  if (firstEraser === -1) {
     return stories.some(({ branch }) => branch === 'unknown')
       ? 'unknown'
       : 'kept';
   }
 
-  return users.every(erasesBy) ? 'erased' : 'order-dependent';
+  return users.every((user) => user >= firstEraser)
+    ? 'erased'
+    : 'order-dependent';
 }
 
 function erases(branch: ResetBranch): boolean {

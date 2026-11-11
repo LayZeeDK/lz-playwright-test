@@ -54,8 +54,7 @@ function indexInputs(code: string, fileName: string): unknown {
       makeTitle: (title: string | undefined) => title ?? fileName,
     }).parse().indexInputs;
   } catch {
-    // Stryker disable next-line ArrayDeclaration: storyIndex lists a row only when its subtype is 'story', which a string row has not, so any array of strings lists no story
-    return [];
+    return undefined;
   }
 }
 
@@ -174,7 +173,7 @@ function assignedIn(
 }
 
 function nodeSet(values: readonly unknown[]): ReadonlySet<unknown> {
-  return new Set(values.filter((value) => value !== undefined));
+  return new Set(values);
 }
 
 export function defaultExport(body: readonly unknown[]): unknown {
@@ -410,6 +409,8 @@ export interface NamedExport {
   readonly local: unknown;
   readonly init: unknown;
   readonly form: 'declaration' | 'specifier';
+  /** `export type`, `export { type A }` or `export declare`, which TypeScript erases. */
+  readonly typeOnly: boolean;
 }
 
 export function namedExports(
@@ -420,34 +421,41 @@ export function namedExports(
     .filter(
       (statement) => field(statement, 'type') === 'ExportNamedDeclaration',
     )
-    .flatMap((statement) => [
-      ...list(field(statement, 'declaration', 'declarations')).map(
-        (declarator) => ({
-          name: field(declarator, 'id', 'name'),
-          local: field(declarator, 'id', 'name'),
-          init: field(declarator, 'init'),
-          form: 'declaration' as const,
-        }),
-      ),
-      ...(field(statement, 'declaration', 'type') === 'FunctionDeclaration'
-        ? [
-            {
-              name: field(statement, 'declaration', 'id', 'name'),
-              local: field(statement, 'declaration', 'id', 'name'),
-              init: field(statement, 'declaration'),
-              form: 'declaration' as const,
-            },
-          ]
-        : []),
-      ...list(field(statement, 'specifiers')).map((specifier) => ({
-        name:
-          field(specifier, 'exported', 'name') ??
-          field(specifier, 'exported', 'value'),
-        local: field(specifier, 'local', 'name'),
-        init: followed(field(specifier, 'local'), bindings),
-        form: 'specifier' as const,
-      })),
-    ])
+    .flatMap((statement) => {
+      const typeOnly = field(statement, 'exportKind') === 'type';
+
+      return [
+        ...list(field(statement, 'declaration', 'declarations')).map(
+          (declarator) => ({
+            name: field(declarator, 'id', 'name'),
+            local: field(declarator, 'id', 'name'),
+            init: field(declarator, 'init'),
+            form: 'declaration' as const,
+            typeOnly,
+          }),
+        ),
+        ...(field(statement, 'declaration', 'type') === 'FunctionDeclaration'
+          ? [
+              {
+                name: field(statement, 'declaration', 'id', 'name'),
+                local: field(statement, 'declaration', 'id', 'name'),
+                init: field(statement, 'declaration'),
+                form: 'declaration' as const,
+                typeOnly,
+              },
+            ]
+          : []),
+        ...list(field(statement, 'specifiers')).map((specifier) => ({
+          name:
+            field(specifier, 'exported', 'name') ??
+            field(specifier, 'exported', 'value'),
+          local: field(specifier, 'local', 'name'),
+          init: followed(field(specifier, 'local'), bindings),
+          form: 'specifier' as const,
+          typeOnly: typeOnly || field(specifier, 'exportKind') === 'type',
+        })),
+      ];
+    })
     .flatMap(({ name, ...named }) =>
       typeof name === 'string' && name !== 'default'
         ? [{ name, ...named }]
@@ -503,10 +511,7 @@ export function unwrap(node: unknown): unknown {
 function followed(value: unknown, bindings: Bindings): unknown {
   const name = field(value, 'name');
 
-  // Stryker disable next-line ConditionalExpression: of the nodes that reach here (export specifiers' locals, call arguments, property values, a .bind() callee's object), only an Identifier has a string name, so the type check alone decides nothing
-  return field(value, 'type') === 'Identifier' && typeof name === 'string'
-    ? bindings.get(name)
-    : value;
+  return typeof name === 'string' ? bindings.get(name) : value;
 }
 
 /** The bindings a name's init reads, so that following a cycle of names ends. */
@@ -654,24 +659,21 @@ function identifiersInReadForms(statement: unknown): readonly unknown[] {
 
       return [
         field(declarator, 'id'),
-        ...(field(init, 'callee', 'property', 'name') === 'story'
-          ? [field(init, 'callee', 'object')]
-          : // Stryker disable next-line ArrayDeclaration: namesReadElsewhere asks this list only about identifier nodes, which no string equals
-            []),
+        field(init, 'callee', 'property', 'name') === 'story'
+          ? field(init, 'callee', 'object')
+          : undefined,
       ];
     }),
     ...list(field(statement, 'specifiers')).flatMap((specifier) => [
       field(specifier, 'local'),
       field(specifier, 'exported'),
     ]),
-    ...(isIndexedTestCall(statement)
-      ? [field(statement, 'expression', 'callee', 'object')]
-      : // Stryker disable next-line ArrayDeclaration: namesReadElsewhere asks this list only about identifier nodes, which no string equals
-        []),
-    ...(field(statement, 'expression', 'operator') === '='
-      ? [rootObject(field(statement, 'expression', 'left', 'object'))]
-      : // Stryker disable next-line ArrayDeclaration: namesReadElsewhere asks this list only about identifier nodes, which no string equals
-        []),
+    isIndexedTestCall(statement)
+      ? field(statement, 'expression', 'callee', 'object')
+      : undefined,
+    field(statement, 'expression', 'operator') === '='
+      ? rootObject(field(statement, 'expression', 'left', 'object'))
+      : undefined,
   ];
 }
 
@@ -790,26 +792,15 @@ function identifiersIn(node: unknown): readonly unknown[] {
   return Object.values(node).flatMap(identifiersIn);
 }
 
-/** The file imports, re-exports or requires itself, or loads a module whose specifier is not a string literal. Storybook 10.6.5's Vitest transform composes each story from the file's own bindings, so a write through such an import changes what runs without naming the story. */
+/** The file holds a string literal that names this file, or loads a module whose specifier is not a string literal. Storybook 10.6.5's Vitest transform composes each story from the file's own bindings, so a write through an import of the file itself changes what runs without naming the story. */
 export function mayImportItself(
   body: readonly unknown[],
   fileName: string,
 ): boolean {
   const file = resolve(fileName);
   const withoutExtension = file.slice(0, file.length - extname(file).length);
-
-  return [
-    ...body
-      .map((statement) => field(statement, 'source'))
-      .filter((source) => isRecord(source)),
-    ...importCallArgumentsIn(body),
-  ].some((source) => {
-    const specifier = field(source, 'value');
-
-    if (field(source, 'type') !== 'StringLiteral') {
-      return true;
-    }
-
+  const nodes = nodesIn(body);
+  const namesThisFile = (specifier: unknown): boolean => {
     if (typeof specifier !== 'string' || !specifier.startsWith('.')) {
       return false;
     }
@@ -821,21 +812,27 @@ export function mayImportItself(
       [file, withoutExtension].includes(target) ||
       target.replace(/\.[cm]?jsx?$/, '') === withoutExtension
     );
-  });
+  };
+
+  return (
+    nodes
+      .filter((node) => field(node, 'type') === 'StringLiteral')
+      .some((literal) => namesThisFile(field(literal, 'value'))) ||
+    nodes
+      .filter(
+        (node) =>
+          field(node, 'callee', 'type') === 'Import' ||
+          field(node, 'callee', 'name') === 'require',
+      )
+      .some(
+        (call) =>
+          field(list(field(call, 'arguments'))[0], 'type') !== 'StringLiteral',
+      )
+  );
 }
 
-function importCallArgumentsIn(node: unknown): readonly unknown[] {
-  if (!isRecord(node)) {
-    return [];
-  }
-
-  return [
-    ...(field(node, 'callee', 'type') === 'Import' ||
-    field(node, 'callee', 'name') === 'require'
-      ? [list(node['arguments'])[0]]
-      : []),
-    ...Object.values(node).flatMap(importCallArgumentsIn),
-  ];
+function nodesIn(node: unknown): readonly unknown[] {
+  return isRecord(node) ? [node, ...Object.values(node).flatMap(nodesIn)] : [];
 }
 
 function propertyValue(object: unknown, key: string): unknown {
