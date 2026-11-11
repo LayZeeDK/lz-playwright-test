@@ -81,6 +81,15 @@ describe('storybookProject', () => {
       assert.equal(isStoryFile(project, file('src', 'Button.tsx')), false);
     });
 
+    it("does not count a *.stories.* file that Storybook's CSF indexer does not read", () => {
+      const { project, file } = setup('no-main');
+
+      assert.equal(
+        isStoryFile(project, file('src', 'Button.stories.cts')),
+        false,
+      );
+    });
+
     it('names the config folder as an absolute path when given a relative one', () => {
       const { project } = setup('no-main');
       const relativeProject = storybookProject(
@@ -95,7 +104,7 @@ describe('storybookProject', () => {
       const { lines, project } = freshSetup(t, 'no-main');
 
       assert.deepEqual(lines, [
-        `info: @layzee/stryker-storybook: no Storybook main file in ${project.configDir}; story files are the files named *.stories.* or *.story.*`,
+        `info: @layzee/stryker-storybook: no Storybook main file in ${project.configDir}; story files are the files whose names end in stories or story with a .js, .jsx, .mjs, .mjsx, .ts or .tsx extension`,
       ]);
     });
   });
@@ -579,7 +588,7 @@ describe('storybookProject', () => {
       assert.equal(lines.length, 1);
       assert.ok(
         lines[0]?.startsWith(
-          `warn: @layzee/stryker-storybook: Storybook could not load ${project.configDir}, so story files are the files named *.stories.* or *.story.*: `,
+          `warn: @layzee/stryker-storybook: Storybook could not load ${project.configDir}, so story files are the files whose names end in stories or story with a .js, .jsx, .mjs, .mjsx, .ts or .tsx extension: `,
         ),
         lines[0],
       );

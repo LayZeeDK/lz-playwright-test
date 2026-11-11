@@ -4,7 +4,10 @@ import { tmpdir } from 'node:os';
 import { basename, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { getInterpretedFile } from 'storybook/internal/common';
+import {
+  getInterpretedFile,
+  STORY_FILE_TEST_REGEXP,
+} from 'storybook/internal/common';
 import { loadConfig } from 'storybook/internal/csf-tools';
 
 import { isRecord, isStringArray } from './is-record.ts';
@@ -109,14 +112,14 @@ function loadProject(
     }
     case 'no-main': {
       log.info(
-        `${packageName}: no Storybook main file in ${configDir}; story files are the files named *.stories.* or *.story.*`,
+        `${packageName}: no Storybook main file in ${configDir}; story files are the files whose names end in stories or story with a .js, .jsx, .mjs, .mjsx, .ts or .tsx extension`,
       );
 
       return fallbackProject(configDir, previewTest, testTags);
     }
     case 'failed': {
       log.warn(
-        `${packageName}: Storybook could not load ${configDir}, so story files are the files named *.stories.* or *.story.*: ${result.error}`,
+        `${packageName}: Storybook could not load ${configDir}, so story files are the files whose names end in stories or story with a .js, .jsx, .mjs, .mjsx, .ts or .tsx extension: ${result.error}`,
       );
 
       return fallbackProject(configDir, previewTest, testTags);
@@ -162,7 +165,7 @@ export function isStoryFile(
   fileName: string,
 ): boolean {
   if (project.storyFiles === 'fallback') {
-    return /\.(?:stories|story)\./.test(basename(fileName));
+    return STORY_FILE_TEST_REGEXP.test(basename(fileName));
   }
 
   return project.storyFiles.has(normalizePath(fileName));
