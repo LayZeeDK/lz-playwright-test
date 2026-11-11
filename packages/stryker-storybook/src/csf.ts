@@ -482,6 +482,7 @@ export function unwrap(node: unknown): unknown {
 function followed(value: unknown, bindings: Bindings): unknown {
   const name = field(value, 'name');
 
+  // Stryker disable next-line ConditionalExpression: of the nodes that reach here (export specifiers' locals, call arguments, property values, a .bind() callee's object), only an Identifier has a string name, so the type check alone decides nothing
   return field(value, 'type') === 'Identifier' && typeof name === 'string'
     ? bindings.get(name)
     : value;

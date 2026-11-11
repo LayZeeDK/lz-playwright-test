@@ -615,4 +615,17 @@ describe('lz-storybook-csf', () => {
       ['4 BlockStatement placed', '5 ArithmeticOperator placed'],
     );
   });
+
+  it('places a play function assigned below a member other than input in a factory file', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "import preview from '#.storybook/preview';\nconst meta = preview.meta({ component: B });\nexport const A = meta.story({});\nA.composed.play = async () => {\n  await x(1 + 1);\n};",
+        )
+      ).filter((outcome) => /^[45] /.test(outcome)),
+      ['4 BlockStatement placed', '5 ArithmeticOperator placed'],
+    );
+  });
 });

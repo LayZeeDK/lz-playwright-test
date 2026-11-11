@@ -308,6 +308,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('places a string appended to X.storyName', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = () => null;\nA.storyName += 'Go';",
+        )
+      ).filter((outcome) => outcome.startsWith('3 ')),
+      ['3 StringLiteral placed'],
+    );
+  });
+
   it('keeps a name assigned to X.storyName of a factory story as written', async () => {
     const { outcomes } = setup();
 

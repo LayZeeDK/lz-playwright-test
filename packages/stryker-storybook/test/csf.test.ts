@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { parse } from '@babel/parser';
+
 import { csfFile, csfShapes, topLevelBindings } from '../src/csf.ts';
 import { field, list } from '../src/node-field.ts';
 import { parseProgram } from '../src/parse.ts';
@@ -35,9 +37,70 @@ describe('csfFile', () => {
       [['A', []]],
     );
   });
+
+  it('reports no story for a default function export', () => {
+    assert.deepEqual(
+      stories('export default function Meta() {}\nexport const A = {};'),
+      [['A', []]],
+    );
+  });
+
+  it('reports no story for an exported class', () => {
+    assert.deepEqual(
+      stories('export default {};\nexport class A {}\nexport const B = {};'),
+      [['B', []]],
+    );
+  });
+
+  it('reports no story for a meta exported as default by name', () => {
+    assert.deepEqual(
+      stories(
+        'const meta = {};\nexport { meta as default };\nexport const A = {};',
+      ),
+      [['A', []]],
+    );
+  });
+
+  it('reports each story that an includeStories array names', () => {
+    assert.deepEqual(
+      stories(
+        "export default { includeStories: ['A', 'B'] };\nexport const A = {};\nexport const B = {};\nexport const C = {};",
+      ),
+      [
+        ['A', []],
+        ['B', []],
+      ],
+    );
+  });
+
+  it('matches includeStories with the flags of its regular expression', () => {
+    assert.deepEqual(
+      stories(
+        'export default { includeStories: /^a$/i };\nexport const A = {};\nexport const B = {};',
+      ),
+      [['A', []]],
+    );
+  });
 });
 
 describe('csfShapes', () => {
+  it('reads a parenthesized story object when the parser keeps parentheses as nodes', () => {
+    const shapes = csfShapes(
+      parse(
+        "export default { title: 'a/b' };\nexport const A = ({ args: {} });",
+        {
+          sourceType: 'module',
+          createParenthesizedExpressions: true,
+        },
+      ).program,
+    );
+
+    assert.deepEqual(
+      [...shapes.literalContainers].map((node) => field(node, 'type')),
+      ['ObjectExpression'],
+    );
+  });
+
   it('reports no undefined value for what the file leaves out', () => {
     const shapes = csfShapes(
       parseProgram(

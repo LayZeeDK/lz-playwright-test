@@ -151,6 +151,22 @@ export { type A };
 export const B = {};
 `,
   },
+  {
+    name: 'a type alias exported by specifier',
+    code: `export default {};
+type A = {};
+export { A };
+export const B = {};
+`,
+  },
+  {
+    name: 'a variable without an initializer exported by specifier',
+    code: `export default {};
+let A;
+export { A };
+export const B = {};
+`,
+  },
 ];
 
 function packageStories(code: string, testTags: TestTags): readonly string[] {

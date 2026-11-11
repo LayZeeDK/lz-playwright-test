@@ -77,6 +77,33 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('keeps a story object under a non-null assertion as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = { args: {} }!;",
+        )
+      ).filter((outcome) => outcome.startsWith('2 ')),
+      [`2 ObjectLiteral ${containerReason}`],
+    );
+  });
+
+  it('keeps a story object under an angle-bracket type assertion as written', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nexport const A = <Story>{ args: {} };",
+          'src/a.stories.ts',
+        )
+      ).filter((outcome) => outcome.startsWith('2 ')),
+      [`2 ObjectLiteral ${containerReason}`],
+    );
+  });
+
   it('keeps a story object under satisfies as written', async () => {
     const { outcomes } = setup();
 
