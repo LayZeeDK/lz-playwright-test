@@ -134,25 +134,25 @@ export function csfShapes(program: unknown): CsfShapes {
     );
 
   return {
-    metaObjects: nodeSet(metaObjects),
-    literalContainers: nodeSet([
+    metaObjects: new Set(metaObjects),
+    literalContainers: new Set([
       ...stories,
       ...idParameters,
       ...testCalls.map(({ options }) => options),
     ]),
-    testCode: nodeSet([
+    testCode: new Set([
       ...testKeys.flatMap((key) => testCodeOf(key)),
       ...testCalls.flatMap(({ statement, testFunction }) => [
         statement,
         testFunction,
       ]),
     ]),
-    mswValues: nodeSet(
+    mswValues: new Set(
       annotationsIn(runtime, 'parameters').flatMap((parameters) =>
         withInit(propertyValue(parameters, 'msw'), bindings),
       ),
     ),
-    staticValues: nodeSet([
+    staticValues: new Set([
       ...staticKeys.flatMap((key) => annotationsIn(assignments, key)),
       ...idParameters.map((parameters) => propertyValue(parameters, '__id')),
       bindings.get('__namedExportsOrder'),
@@ -170,10 +170,6 @@ function assignedIn(
   key: string,
 ): readonly Assignment[] {
   return from.filter(({ path }) => path.length === 1 && path[0] === key);
-}
-
-function nodeSet(values: readonly unknown[]): ReadonlySet<unknown> {
-  return new Set(values);
 }
 
 export function defaultExport(body: readonly unknown[]): unknown {
