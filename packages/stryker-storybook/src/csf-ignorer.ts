@@ -74,6 +74,7 @@ function keepLiteralContainer(container: unknown): void {
   container['leadingComments'] = [
     ...list(container['leadingComments']),
     {
+      // Stryker disable next-line StringLiteral: Babel prints a comment of any type but CommentBlock as a line comment, and StrykerJS reads only its value
       type: 'CommentLine',
       value: ` Stryker disable next-line ObjectLiteral,ArrowFunction: ${containerReason}`,
     },
