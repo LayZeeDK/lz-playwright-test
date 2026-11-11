@@ -856,6 +856,34 @@ self.C.parameters.test.mockReset = true;`,
     assert.deepEqual(verdicts, ['unknown']);
   });
 
+  it('reads every story as unknown when the file imports itself by its .mjs name, as Vite maps .mjs to .ts', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+import * as self from './X.stories.mjs';
+export const C = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+self.C.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('keeps the stories of a file that imports a file whose name holds .js before the stories suffix', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+import * as other from './X.js.stories';
+export const C = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+other.C.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['kept']);
+  });
+
   it('reads every story as unknown when the file has a dynamic import whose argument is not a string literal', () => {
     const verdicts = verdictsOf(
       `export default { parameters: { test: { restoreMocks: false } } };

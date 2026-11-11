@@ -129,6 +129,19 @@ describe('lz-storybook-csf', () => {
     );
   });
 
+  it('places the function that a .bind() call with an empty context and arguments binds', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          "export default { title: 'a/b' };\nconst fn = (args) =>\n  render(args);\nexport const A = fn.bind({}, 1 + 1);",
+        )
+      ).filter((outcome) => outcome.includes('ArrowFunction')),
+      ['2 ArrowFunction placed'],
+    );
+  });
+
   it('keeps the template of a CSF2 Template.bind() story as written', async () => {
     const { outcomes } = setup();
 
