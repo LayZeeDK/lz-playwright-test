@@ -33,7 +33,7 @@ export function parseServerControl(
   try {
     value = JSON.parse(raw);
   } catch {
-    return undefined;
+    // value stays undefined and reads as no control below.
   }
 
   if (!isRecord(value)) {
