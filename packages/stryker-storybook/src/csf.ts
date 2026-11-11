@@ -54,8 +54,7 @@ function indexInputs(code: string, fileName: string): unknown {
       makeTitle: (title: string | undefined) => title ?? fileName,
     }).parse().indexInputs;
   } catch {
-    // Stryker disable next-line ArrayDeclaration: storyIndex lists a row only when its subtype is 'story', which a string row has not, so any array of strings lists no story
-    return [];
+    return undefined;
   }
 }
 
@@ -174,7 +173,7 @@ function assignedIn(
 }
 
 function nodeSet(values: readonly unknown[]): ReadonlySet<unknown> {
-  return new Set(values.filter((value) => value !== undefined));
+  return new Set(values);
 }
 
 export function defaultExport(body: readonly unknown[]): unknown {
@@ -482,10 +481,7 @@ export function unwrap(node: unknown): unknown {
 function followed(value: unknown, bindings: Bindings): unknown {
   const name = field(value, 'name');
 
-  // Stryker disable next-line ConditionalExpression: of the nodes that reach here (export specifiers' locals, call arguments, property values, a .bind() callee's object), only an Identifier has a string name, so the type check alone decides nothing
-  return field(value, 'type') === 'Identifier' && typeof name === 'string'
-    ? bindings.get(name)
-    : value;
+  return typeof name === 'string' ? bindings.get(name) : value;
 }
 
 /** The bindings a name's init reads, so that following a cycle of names ends. */
@@ -633,24 +629,21 @@ function identifiersInReadForms(statement: unknown): readonly unknown[] {
 
       return [
         field(declarator, 'id'),
-        ...(field(init, 'callee', 'property', 'name') === 'story'
-          ? [field(init, 'callee', 'object')]
-          : // Stryker disable next-line ArrayDeclaration: namesReadElsewhere asks this list only about identifier nodes, which no string equals
-            []),
+        field(init, 'callee', 'property', 'name') === 'story'
+          ? field(init, 'callee', 'object')
+          : undefined,
       ];
     }),
     ...list(field(statement, 'specifiers')).flatMap((specifier) => [
       field(specifier, 'local'),
       field(specifier, 'exported'),
     ]),
-    ...(isIndexedTestCall(statement)
-      ? [field(statement, 'expression', 'callee', 'object')]
-      : // Stryker disable next-line ArrayDeclaration: namesReadElsewhere asks this list only about identifier nodes, which no string equals
-        []),
-    ...(field(statement, 'expression', 'operator') === '='
-      ? [rootObject(field(statement, 'expression', 'left', 'object'))]
-      : // Stryker disable next-line ArrayDeclaration: namesReadElsewhere asks this list only about identifier nodes, which no string equals
-        []),
+    isIndexedTestCall(statement)
+      ? field(statement, 'expression', 'callee', 'object')
+      : undefined,
+    field(statement, 'expression', 'operator') === '='
+      ? rootObject(field(statement, 'expression', 'left', 'object'))
+      : undefined,
   ];
 }
 

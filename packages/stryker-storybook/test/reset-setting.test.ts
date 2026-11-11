@@ -7,7 +7,6 @@ import { field } from '../src/node-field.ts';
 import { parseProgram } from '../src/parse.ts';
 import {
   classifyStubs,
-  defaultTestTags,
   readPreviewTest,
   type ResetSettings,
   type StoryFile,
@@ -16,6 +15,7 @@ import {
   type TestTags,
 } from '../src/reset-setting.ts';
 import { definitionTimeStubs } from '../src/stub-shape.ts';
+import { untaggedPreviewTestTags } from './support/test-tags.ts';
 
 type Prediction = 'passed' | 'failed' | 'unknown' | 'either';
 
@@ -96,8 +96,11 @@ function storiesOf(
   file: string,
   preview: keyof typeof previews,
 ): readonly StoryReset[] {
-  return classifyStubs(fixtureFile(file), previewTest(preview), defaultTestTags)
-    .stories;
+  return classifyStubs(
+    fixtureFile(file),
+    previewTest(preview),
+    untaggedPreviewTestTags,
+  ).stories;
 }
 
 function storyFile(code: string, fileName: string): StoryFile {
@@ -143,7 +146,7 @@ describe('classifyStubs stub verdicts', () => {
       const { stubs } = classifyStubs(
         story,
         previewTest(preview),
-        defaultTestTags,
+        untaggedPreviewTestTags,
       );
 
       assert.deepEqual(
@@ -168,7 +171,7 @@ describe('classifyStubs stub verdicts', () => {
         'X.stories.ts',
       ),
       {},
-      defaultTestTags,
+      untaggedPreviewTestTags,
     ).stubs.map(({ verdict }) => verdict);
   }
 
@@ -213,7 +216,7 @@ describe('classifyStubs parameter reading', () => {
         'X.stories.ts',
       ),
       {},
-      defaultTestTags,
+      untaggedPreviewTestTags,
     ).stubs.map(({ verdict }) => verdict);
   }
 
@@ -1003,7 +1006,7 @@ other.C.parameters.test.mockReset = true;`,
 describe('classifyStubs tag filter', () => {
   function verdictsOf(
     source: string,
-    testTags = defaultTestTags,
+    testTags = untaggedPreviewTestTags,
   ): readonly StubVerdict[] {
     return classifyStubs(
       storyFile(
@@ -1016,7 +1019,7 @@ describe('classifyStubs tag filter', () => {
   }
 
   function testTags(rule: Partial<TestTags>): TestTags {
-    return { ...defaultTestTags, ...rule };
+    return { ...untaggedPreviewTestTags, ...rule };
   }
 
   it('leaves out a story without a tag that include names', () => {
@@ -1771,7 +1774,7 @@ A.parameters = {};`,
         'X.stories.ts',
       ),
       {},
-      defaultTestTags,
+      untaggedPreviewTestTags,
     );
 
     assert.deepEqual(stories, [
@@ -1956,7 +1959,7 @@ export const A = { ...(other as object) };`,
         'X.stories.ts',
       ),
       {},
-      defaultTestTags,
+      untaggedPreviewTestTags,
     );
 
     assert.deepEqual(stories, [
@@ -1975,7 +1978,7 @@ A.parameters = {};`,
         'X.stories.ts',
       ),
       {},
-      defaultTestTags,
+      untaggedPreviewTestTags,
     );
 
     assert.deepEqual(stories, [

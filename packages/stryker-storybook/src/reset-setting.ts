@@ -112,9 +112,7 @@ export interface TestTags {
   readonly skip: readonly string[];
 }
 
-export const defaultTestTags: TestTags = {
-  // Stryker disable next-line ArrayDeclaration: loadProject in storybook-project.ts replaces previewTags with the preview's own tags, so this default never reaches a project's stories
-  previewTags: [],
+export const defaultTestTags: Omit<TestTags, 'previewTags'> = {
   include: ['test'],
   exclude: [],
   skip: [],
@@ -289,7 +287,7 @@ function childTags(
 
 function tagList(value: unknown): readonly string[] | undefined {
   if (value === undefined) {
-    // Stryker disable next-line ArrayDeclaration: an extra tag changes which stories run only when include, exclude or skip names it, and no tag filter names Stryker's placeholder tag
+    // Stryker disable next-line ArrayDeclaration: these tags reach only skipped(), which matches them against skip, and no skip list names Stryker's placeholder tag
     return [];
   }
 
