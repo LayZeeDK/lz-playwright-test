@@ -5,29 +5,28 @@ import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 import { listOption } from './list-option.ts';
 import { typeOf } from './type-of.ts';
 
+export const stylingIgnorerName = 'lz-jsx-styling';
+
 const classNamePattern = /^\S+$/;
 
 export const lzJsxStylingSchema = {
   type: 'object',
   additionalProperties: false,
-  description: 'Options of the lz-jsx-styling ignorer.',
+  description: `Options of the ${stylingIgnorerName} ignorer.`,
   properties: {
     visibilityClasses: {
       type: 'array',
       items: { type: 'string', pattern: classNamePattern.source },
       description:
-        'Class names that hide an element, added to the built-in ones. lz-jsx-styling keeps the mutants of ' +
+        `Class names that hide an element, added to the built-in ones. ${stylingIgnorerName} keeps the mutants of ` +
         'a class expression that holds one of them.',
     },
   },
 };
 
-const classReason =
-  'lz-jsx-styling: class names only style the element; DOM tests do not observe them';
-const builderReason =
-  'lz-jsx-styling: class-name builder call; DOM tests do not observe class names';
-const styleReason =
-  'lz-jsx-styling: inline styles only style the element; DOM tests do not observe them';
+const classReason = `${stylingIgnorerName}: class names only style the element; DOM tests do not observe them`;
+const builderReason = `${stylingIgnorerName}: class-name builder call; DOM tests do not observe class names`;
+const styleReason = `${stylingIgnorerName}: inline styles only style the element; DOM tests do not observe them`;
 const visibilityClasses = [
   'hidden',
   'invisible',

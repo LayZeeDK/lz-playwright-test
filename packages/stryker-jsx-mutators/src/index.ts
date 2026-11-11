@@ -1,13 +1,25 @@
 import { selectMutators } from '@layzee/stryker-mutator-install';
 import { declareFactoryPlugin, PluginKind } from '@stryker-mutator/api/plugin';
 
-import { consoleIgnorer, lzConsoleSchema } from './console-ignorer.ts';
+import {
+  consoleIgnorer,
+  consoleIgnorerName,
+  lzConsoleSchema,
+} from './console-ignorer.ts';
 import { implicitRoles } from './implicit-roles.ts';
 import { install } from './install.ts';
 import { mutatorsFor } from './mutators.ts';
 import { packageName } from './package-name.ts';
-import { lzJsxStylingSchema, stylingIgnorer } from './styling-ignorer.ts';
-import { lzTelemetrySchema, telemetryIgnorer } from './telemetry-ignorer.ts';
+import {
+  lzJsxStylingSchema,
+  stylingIgnorer,
+  stylingIgnorerName,
+} from './styling-ignorer.ts';
+import {
+  lzTelemetrySchema,
+  telemetryIgnorer,
+  telemetryIgnorerName,
+} from './telemetry-ignorer.ts';
 
 /**
  * Stryker reads one schema per plugin module, so it names the options of every ignorer here. Core merges its
@@ -44,7 +56,11 @@ export async function lzJsxMutators(
 }
 
 export const strykerPlugins = [
-  declareFactoryPlugin(PluginKind.Ignore, 'lz-jsx-styling', stylingIgnorer),
-  declareFactoryPlugin(PluginKind.Ignore, 'lz-telemetry', telemetryIgnorer),
-  declareFactoryPlugin(PluginKind.Ignore, 'lz-console', consoleIgnorer),
+  declareFactoryPlugin(PluginKind.Ignore, stylingIgnorerName, stylingIgnorer),
+  declareFactoryPlugin(
+    PluginKind.Ignore,
+    telemetryIgnorerName,
+    telemetryIgnorer,
+  ),
+  declareFactoryPlugin(PluginKind.Ignore, consoleIgnorerName, consoleIgnorer),
 ];

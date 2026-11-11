@@ -28,16 +28,18 @@ const consoleMethods: readonly unknown[] = [
 ];
 const defaultMethods: readonly string[] = ['log', 'debug', 'info', 'trace'];
 
+export const consoleIgnorerName = 'lz-console';
+
 export const lzConsoleSchema = {
   type: 'object',
   additionalProperties: false,
-  description: 'Options of the lz-console ignorer.',
+  description: `Options of the ${consoleIgnorerName} ignorer.`,
   properties: {
     methods: {
       type: 'array',
       items: { enum: consoleMethods },
       description:
-        'The console methods whose call statements lz-console hides, unless an argument can act on the ' +
+        `The console methods whose call statements ${consoleIgnorerName} hides, unless an argument can act on the ` +
         'page. Replaces the default list: log, debug, info and trace.',
     },
   },
@@ -56,7 +58,7 @@ export function consoleIgnorer(options: object): Ignorer {
   return {
     shouldIgnore(path) {
       if (callees.includes(hideableCallee(fieldOf(path, 'node')))) {
-        return 'lz-console: console output; DOM tests do not observe it';
+        return `${consoleIgnorerName}: console output; DOM tests do not observe it`;
       }
 
       return undefined;

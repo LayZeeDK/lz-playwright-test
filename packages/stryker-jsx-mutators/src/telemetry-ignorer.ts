@@ -5,25 +5,26 @@ import { commonTokens, tokens } from '@stryker-mutator/api/plugin';
 import { listOption } from './list-option.ts';
 import { hideableCallee } from './statement-call.ts';
 
+export const telemetryIgnorerName = 'lz-telemetry';
+
 const calleePattern = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*$/;
 
 export const lzTelemetrySchema = {
   type: 'object',
   additionalProperties: false,
-  description: 'Options of the lz-telemetry ignorer.',
+  description: `Options of the ${telemetryIgnorerName} ignorer.`,
   properties: {
     calls: {
       type: 'array',
       items: { type: 'string', pattern: calleePattern.source },
       description:
-        'Callees, such as track or analytics.track, added to the built-in ones. lz-telemetry hides the ' +
+        `Callees, such as track or analytics.track, added to the built-in ones. ${telemetryIgnorerName} hides the ` +
         'mutants of a statement that is just a call to one of them, unless an argument can act on the page.',
     },
   },
 };
 
-const analyticsReason =
-  'lz-telemetry: analytics call; DOM tests do not observe what it sends';
+const analyticsReason = `${telemetryIgnorerName}: analytics call; DOM tests do not observe what it sends`;
 const analyticsCalls: readonly unknown[] = [
   'gtag',
   'window.gtag',
@@ -54,8 +55,7 @@ const analyticsCalls: readonly unknown[] = [
   'amplitude.logEvent',
   'amplitude.identify',
 ];
-const errorReason =
-  'lz-telemetry: error-monitoring call; DOM tests do not observe what it reports';
+const errorReason = `${telemetryIgnorerName}: error-monitoring call; DOM tests do not observe what it reports`;
 const errorCalls: readonly unknown[] = [
   'Sentry.captureException',
   'Sentry.captureMessage',
@@ -72,8 +72,7 @@ const sentryImportedFunctions: readonly unknown[] = [
   'captureMessage',
 ];
 
-const callsReason =
-  'lz-telemetry: telemetry call from lzTelemetry.calls; DOM tests do not observe what it sends';
+const callsReason = `${telemetryIgnorerName}: telemetry call from lzTelemetry.calls; DOM tests do not observe what it sends`;
 
 export function telemetryIgnorer(options: object): Ignorer {
   const calls = listOption(
