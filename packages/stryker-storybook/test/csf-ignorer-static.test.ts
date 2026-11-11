@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { metaReason, setup, staticReason } from './support/csf-ignorer.ts';
+import {
+  containerReason,
+  metaReason,
+  setup,
+  staticReason,
+  testReason,
+} from './support/csf-ignorer.ts';
 
 describe('lz-storybook-csf', () => {
   it('keeps the meta title as written', async () => {
@@ -98,6 +104,24 @@ describe('lz-storybook-csf', () => {
         "const meta = {\n  title: 'a/b',\n};\nexport { meta as default };",
       ),
       [`1 ObjectLiteral ${metaReason}`, `2 StringLiteral ${metaReason}`],
+    );
+  });
+
+  it('keeps the stories of a file whose meta object is exported as default by name, as Storybook indexes them', async () => {
+    const { outcomes } = setup();
+
+    assert.deepEqual(
+      (
+        await outcomes(
+          'const meta = {};\nexport { meta as default };\nexport const A = {\n  args: { a: 1 },\n  play: async () => {\n    run(1 + 1);\n  },\n};',
+        )
+      ).filter((outcome) => /^[356] /.test(outcome)),
+      [
+        `3 ObjectLiteral ${containerReason}`,
+        `5 BlockStatement ${testReason}`,
+        `6 CallExpression ${testReason}`,
+        `6 ArithmeticOperator ${testReason}`,
+      ],
     );
   });
 

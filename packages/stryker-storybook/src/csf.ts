@@ -247,20 +247,21 @@ export function csfFile(
 
   return {
     metaObjects,
-    stories: isMetaObjectExportedBySpecifier(body, bindings)
-      ? []
-      : storyExports(
-          body,
-          bindings,
-          isFactoryFile,
-          index === undefined
-            ? storyFilter(metaObjects, isFactoryFile)
-            : ({ name }) => index.has(name),
-          (name) => list(index?.get(name)?.tests),
-          (local) =>
-            metaBindings.some(([name]) => written.has(name)) ||
-            elsewhere.has(local),
-        ),
+    stories:
+      index !== undefined && isMetaObjectExportedBySpecifier(body, bindings)
+        ? []
+        : storyExports(
+            body,
+            bindings,
+            isFactoryFile,
+            index === undefined
+              ? storyFilter(metaObjects, isFactoryFile)
+              : ({ name }) => index.has(name),
+            (name) => list(index?.get(name)?.tests),
+            (local) =>
+              metaBindings.some(([name]) => written.has(name)) ||
+              elsewhere.has(local),
+          ),
     written,
   };
 }
