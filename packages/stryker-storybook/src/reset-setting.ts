@@ -331,16 +331,17 @@ function siteVerdict(
   stories: readonly StoryReset[],
   users: readonly number[],
 ): StubVerdict {
-  const erasesBy = (index: number): boolean =>
-    stories.slice(0, index + 1).some(({ branch }) => erases(branch));
+  const firstEraser = stories.findIndex(({ branch }) => erases(branch));
 
-  if (!stories.some(({ branch }) => erases(branch))) {
+  if (firstEraser === -1) {
     return stories.some(({ branch }) => branch === 'unknown')
       ? 'unknown'
       : 'kept';
   }
 
-  return users.every(erasesBy) ? 'erased' : 'order-dependent';
+  return users.every((user) => user >= firstEraser)
+    ? 'erased'
+    : 'order-dependent';
 }
 
 function erases(branch: ResetBranch): boolean {
