@@ -775,20 +775,20 @@ function identifiersReachedFrom(node: unknown): readonly unknown[] {
 }
 
 function identifiersIn(node: unknown): readonly unknown[] {
-  if (field(node, 'type') === 'Identifier') {
+  if (!isRecord(node) || node['type'] === 'TSTypeQuery') {
+    // Stryker disable next-line ArrayDeclaration: namesReadElsewhere asks this list only about identifier nodes, which no string equals
+    return [];
+  }
+
+  if (node['type'] === 'Identifier') {
     return [node];
   }
 
-  if (
-    field(node, 'type') === 'MemberExpression' &&
-    field(node, 'computed') === false
-  ) {
-    return identifiersIn(field(node, 'object'));
+  if (node['type'] === 'MemberExpression' && node['computed'] === false) {
+    return identifiersIn(node['object']);
   }
 
-  return Object.values(
-    isRecord(node) && node['type'] !== 'TSTypeQuery' ? node : {},
-  ).flatMap(identifiersIn);
+  return Object.values(node).flatMap(identifiersIn);
 }
 
 /** The file holds a string literal that names this file, or loads a module whose specifier is not a string literal. Storybook 10.6.5's Vitest transform composes each story from the file's own bindings, so a write through an import of the file itself changes what runs without naming the story. */
