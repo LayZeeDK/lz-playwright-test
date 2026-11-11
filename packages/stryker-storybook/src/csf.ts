@@ -216,7 +216,7 @@ export interface CsfFile {
   readonly written: ReadonlySet<unknown>;
 }
 
-/** `index` gives the stories and their `.test()` children, as Storybook's story index lists them, in place of the package's own reading of the exports. */
+/** `index` gives the stories and their `.test()` children, as Storybook's story index lists them, in place of the package's own reading of the exports, and drops every story of a file whose meta object is exported by specifier: only Storybook's Vitest transform rejects that shape, and its indexer, which the ignorer follows, still lists the stories. */
 export function csfFile(
   body: readonly unknown[],
   bindings: Bindings,
@@ -778,7 +778,7 @@ function identifiersReachedFrom(node: unknown): readonly unknown[] {
 
 function identifiersIn(node: unknown): readonly unknown[] {
   if (!isRecord(node) || node['type'] === 'TSTypeQuery') {
-    // Stryker disable next-line ArrayDeclaration: a string in this list gives namesReadElsewhere an undefined name, which marks only a story whose local is undefined (a namespace re-export); Storybook 10.6.5's index never lists such a story, so classifyStubs drops it, and csfShapes never reads the flag
+    // Stryker disable next-line ArrayDeclaration: a string in this list gives namesReadElsewhere an undefined name, which marks only a story whose local is undefined: a namespace re-export, which Storybook 10.6.5's index never lists, or a re-export by string name, which its Vitest transform does not test; classifyStubs drops both, and csfShapes never reads the flag
     return [];
   }
 
