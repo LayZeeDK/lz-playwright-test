@@ -905,6 +905,34 @@ self.C.parameters.test.mockReset = true;`,
     assert.deepEqual(verdicts, ['unknown']);
   });
 
+  it('reads every story as unknown when the file writes a story through an import = require() of itself', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const C = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+import self = require('./X.stories');
+self.C.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
+  it('reads every story as unknown when the file writes a story through a new require() of itself', () => {
+    const verdicts = verdictsOf(
+      `export default { parameters: { test: { restoreMocks: false } } };
+export const C = {
+  parameters: { test: { restoreMocks: false } },
+  args: { g: fn().mockReturnValue(1) },
+};
+const self = new require('./X.stories');
+self.C.parameters.test.mockReset = true;`,
+    );
+
+    assert.deepEqual(verdicts, ['unknown']);
+  });
+
   it('reads every story as unknown when the file re-exports from itself', () => {
     const verdicts = verdictsOf(
       `export default { parameters: { test: { restoreMocks: false } } };

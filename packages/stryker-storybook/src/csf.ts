@@ -762,26 +762,15 @@ function identifiersIn(node: unknown): readonly unknown[] {
   return Object.values(node).flatMap(identifiersIn);
 }
 
-/** The file imports, re-exports or requires itself, or loads a module whose specifier is not a string literal. Storybook 10.6.5's Vitest transform composes each story from the file's own bindings, so a write through such an import changes what runs without naming the story. */
+/** The file holds a string literal that names this file, or loads a module whose specifier is not a string literal. Storybook 10.6.5's Vitest transform composes each story from the file's own bindings, so a write through an import of the file itself changes what runs without naming the story. */
 export function mayImportItself(
   body: readonly unknown[],
   fileName: string,
 ): boolean {
   const file = resolve(fileName);
   const withoutExtension = file.slice(0, file.length - extname(file).length);
-
-  return [
-    ...body
-      .map((statement) => field(statement, 'source'))
-      .filter((source) => isRecord(source)),
-    ...importCallArgumentsIn(body),
-  ].some((source) => {
-    const specifier = field(source, 'value');
-
-    if (field(source, 'type') !== 'StringLiteral') {
-      return true;
-    }
-
+  const nodes = nodesIn(body);
+  const namesThisFile = (specifier: unknown): boolean => {
     if (typeof specifier !== 'string' || !specifier.startsWith('.')) {
       return false;
     }
@@ -793,21 +782,27 @@ export function mayImportItself(
       [file, withoutExtension].includes(target) ||
       target.replace(/\.[cm]?jsx?$/, '') === withoutExtension
     );
-  });
+  };
+
+  return (
+    nodes
+      .filter((node) => field(node, 'type') === 'StringLiteral')
+      .some((literal) => namesThisFile(field(literal, 'value'))) ||
+    nodes
+      .filter(
+        (node) =>
+          field(node, 'callee', 'type') === 'Import' ||
+          field(node, 'callee', 'name') === 'require',
+      )
+      .some(
+        (call) =>
+          field(list(field(call, 'arguments'))[0], 'type') !== 'StringLiteral',
+      )
+  );
 }
 
-function importCallArgumentsIn(node: unknown): readonly unknown[] {
-  if (!isRecord(node)) {
-    return [];
-  }
-
-  return [
-    ...(field(node, 'callee', 'type') === 'Import' ||
-    field(node, 'callee', 'name') === 'require'
-      ? [list(node['arguments'])[0]]
-      : []),
-    ...Object.values(node).flatMap(importCallArgumentsIn),
-  ];
+function nodesIn(node: unknown): readonly unknown[] {
+  return isRecord(node) ? [node, ...Object.values(node).flatMap(nodesIn)] : [];
 }
 
 function propertyValue(object: unknown, key: string): unknown {
