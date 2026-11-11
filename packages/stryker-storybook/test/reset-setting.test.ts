@@ -114,6 +114,20 @@ function fixtureFile(file: string): StoryFile {
   );
 }
 
+function verdictsOf(
+  source: string,
+  testTags = untaggedPreviewTestTags,
+): readonly StubVerdict[] {
+  return classifyStubs(
+    storyFile(
+      `import { fn } from 'storybook/test';\n${source}`,
+      'X.stories.ts',
+    ),
+    {},
+    testTags,
+  ).stubs.map(({ verdict }) => verdict);
+}
+
 function predictions(
   stories: readonly StoryReset[],
 ): readonly (readonly [string, string, Prediction])[] {
@@ -164,17 +178,6 @@ describe('classifyStubs stub verdicts', () => {
     });
   });
 
-  function verdictsOf(source: string): readonly StubVerdict[] {
-    return classifyStubs(
-      storyFile(
-        `import { fn } from 'storybook/test';\n${source}`,
-        'X.stories.ts',
-      ),
-      {},
-      untaggedPreviewTestTags,
-    ).stubs.map(({ verdict }) => verdict);
-  }
-
   it('gives a meta stub that a story after the first one erases the verdict order-dependent', () => {
     const verdicts = verdictsOf(
       `export default { parameters: { test: { restoreMocks: false } }, args: { g: fn().mockReturnValue(1) } };
@@ -209,17 +212,6 @@ export const C = fn().mockReturnValue(1);`,
 });
 
 describe('classifyStubs parameter reading', () => {
-  function verdictsOf(source: string): readonly StubVerdict[] {
-    return classifyStubs(
-      storyFile(
-        `import { fn } from 'storybook/test';\n${source}`,
-        'X.stories.ts',
-      ),
-      {},
-      untaggedPreviewTestTags,
-    ).stubs.map(({ verdict }) => verdict);
-  }
-
   it('reads a quoted key by its value', () => {
     const verdicts = verdictsOf(
       `export default { parameters: { 'test': { restoreMocks: false } } };
@@ -326,27 +318,17 @@ export const B = { args: { g: fn().mockReturnValue(1) } };`,
     assert.deepEqual(verdicts, ['unknown']);
   });
 
-  it('reads a preview whose parameters spread an import as unreadable', () => {
-    const settings = readPreviewTest(
-      parseProgram(
-        `import { shared } from './shared';\nexport default { parameters: { ...shared } };\n`,
-        'preview.ts',
-      ),
-    );
-
-    assert.deepEqual(settings, {
-      mockReset: 'unreadable',
-      clearMocks: 'unreadable',
-      restoreMocks: 'unreadable',
-    });
-  });
-
   const unreadablePreview: ResetSettings = {
     mockReset: 'unreadable',
     clearMocks: 'unreadable',
     restoreMocks: 'unreadable',
   };
   const previewRows: readonly (readonly [string, string, ResetSettings])[] = [
+    [
+      'reads a preview whose parameters spread an import as unreadable',
+      `import { shared } from './shared';\nexport default { parameters: { ...shared } };\n`,
+      unreadablePreview,
+    ],
     [
       'reads the parameters export of a preview that exports another value first',
       `export const decorators = [];\nexport const parameters = { test: { restoreMocks: false } };\n`,
@@ -1047,20 +1029,6 @@ other.C.parameters.test.mockReset = true;`,
 });
 
 describe('classifyStubs tag filter', () => {
-  function verdictsOf(
-    source: string,
-    testTags = untaggedPreviewTestTags,
-  ): readonly StubVerdict[] {
-    return classifyStubs(
-      storyFile(
-        `import { fn } from 'storybook/test';\n${source}`,
-        'X.stories.ts',
-      ),
-      {},
-      testTags,
-    ).stubs.map(({ verdict }) => verdict);
-  }
-
   function testTags(rule: Partial<TestTags>): TestTags {
     return { ...untaggedPreviewTestTags, ...rule };
   }
