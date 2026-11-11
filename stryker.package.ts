@@ -45,6 +45,7 @@ export function packageConfig(
     reporters: base.reporters,
     htmlReporter: { fileName: `${reportDir}/mutation.html` },
     jsonReporter: { fileName: `${reportDir}/mutation.json` },
+    incrementalFile: `reports/stryker-incremental/${name}.src.json`,
     tempDirName: '.stryker-tmp',
     ignorePatterns: [
       ...base.ignorePatterns,

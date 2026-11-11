@@ -101,6 +101,15 @@ runner reruns the whole suite for every mutant. The runner is not on npm, so the
 An empty `LZ_NODE_TEST_RUNNER` counts as unset. Use it for `stryker-storybook`: its suite takes about 80 seconds
 in one process, and the command runner would run all of it for every mutant.
 
+With that runner, add `--incremental` while you work on a change. Stryker then keeps each package's results in
+`reports/stryker-incremental/<package>.src.json` and reruns only the mutants whose code or covering tests changed,
+also when `--mutate` names a part of the package: the other files' results stay in the file. Stryker cannot see
+changes outside the mutated files and the tests themselves: modules under `test/support`, other source the code
+imports, fixtures, a tsconfig, Stryker or the runner. An incremental run, `--force` included, also copies the
+results outside its `--mutate` scope into the report and the score, so before you call a change done, run the
+same command without `--incremental`. Leave `--incremental` out with the default `command` runner: it reports no
+coverage per test, so Stryker reuses every result whose mutant did not change, even after a test changed.
+
 The TypeScript checker resolves the JSX mutators' `@babel/core` from `packages/stryker-jsx-mutators/node_modules`.
 Stryker links only real `node_modules` folders into its sandbox. A copy of this workspace whose package
 `node_modules` were junctions stopped the checker with TS7016 on `@babel/core`, most likely for that reason. Run
