@@ -416,10 +416,8 @@ export function namedExports(
   body: readonly unknown[],
   bindings: Bindings,
 ): readonly NamedExport[] {
+  // A default-exported function passes too, which only a file Storybook 10.6.5 rejects can hold: its default export must be an object.
   return body
-    .filter(
-      (statement) => field(statement, 'type') === 'ExportNamedDeclaration',
-    )
     .flatMap((statement) => [
       ...list(field(statement, 'declaration', 'declarations')).map(
         (declarator) => ({
