@@ -135,6 +135,22 @@ const helper = () => null;
 export { helper };
 `,
   },
+  {
+    name: 'a story exported by an export type statement',
+    code: `export default {};
+const A = {};
+export type { A };
+export const B = {};
+`,
+  },
+  {
+    name: 'a story exported by a type specifier',
+    code: `export default {};
+const A = {};
+export { type A };
+export const B = {};
+`,
+  },
 ];
 
 function packageStories(code: string, testTags: TestTags): readonly string[] {
